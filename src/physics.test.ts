@@ -1,0 +1,322 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  createInitialWorld,
+  getCueBall,
+  strikeCueBall,
+  stepWorld,
+  simulateUntilStop,
+  pocketedThisShot,
+  isCueBallPocketed,
+  respotCueBall,
+  TABLE,
+  PHYSICS_DT,
+  type BilliardsWorld,
+} from './physics';
+
+describe('出杆机制测试', () => {
+  let world: BilliardsWorld;
+
+  beforeEach(() => {
+    world = createInitialWorld();
+  });
+
+  it('初始状态白球存在且静止', () => {
+    const cue = getCueBall(world);
+    expect(cue).toBeDefined();
+    expect(cue?.active).toBe(true);
+    expect(cue?.x).toBe(0);
+    expect(cue?.z).toBe(TABLE.length * 0.25);
+    expect(world.moving).toBe(false);
+  });
+
+  it('可以正常击打白球', () => {
+    const result = strikeCueBall(world, 0.5, 50);
+    expect(result).toBe(true);
+    expect(world.moving).toBe(true);
+    expect(world.shot).toBe(1);
+
+    const cue = getCueBall(world);
+    expect(cue?.vx).not.toBe(0);
+    expect(cue?.vz).not.toBe(0);
+  });
+
+  it('静止状态下才能击球', () => {
+    strikeCueBall(world, 0, 50);
+    expect(world.moving).toBe(true);
+    const result2 = strikeCueBall(world, 0.1, 50);
+    expect(result2).toBe(false);
+  });
+
+  it('物理模拟后球会停止', () => {
+    strikeCueBall(world, 0, 50);
+    simulateUntilStop(world);
+    expect(world.moving).toBe(false);
+    const cue = getCueBall(world);
+    expect(cue?.vx).toBe(0);
+    expect(cue?.vz).toBe(0);
+  });
+
+  it('击球后白球速度正确', () => {
+    strikeCueBall(world, 0, 50);
+    const cue = getCueBall(world);
+    const speed = Math.hypot(cue!.vx, cue!.vz);
+    // 0.35 + 0.5 * 7.65 = 4.175
+    expect(speed).toBeGreaterThan(3.9);
+    expect(speed).toBeLessThan(4.4);
+  });
+
+  it('力度边界值测试', () => {
+    strikeCueBall(world, 0, 1);
+    let cue = getCueBall(world);
+    let speed = Math.hypot(cue!.vx, cue!.vz);
+    expect(speed).toBeGreaterThan(0.35);
+    expect(speed).toBeLessThan(0.6);
+
+    world = createInitialWorld();
+    strikeCueBall(world, 0, 100);
+    cue = getCueBall(world);
+    speed = Math.hypot(cue!.vx, cue!.vz);
+    expect(speed).toBeGreaterThan(7.6);
+    expect(speed).toBeLessThan(8.2);
+  });
+
+  it('角度影响速度方向', () => {
+    strikeCueBall(world, Math.PI / 2, 50);
+    let cue = getCueBall(world);
+    expect(cue!.vx).toBeGreaterThan(0);
+    expect(Math.abs(cue!.vz)).toBeLessThan(0.01);
+
+    world = createInitialWorld();
+    strikeCueBall(world, -Math.PI / 2, 50);
+    cue = getCueBall(world);
+    expect(cue!.vx).toBeLessThan(0);
+    expect(Math.abs(cue!.vz)).toBeLessThan(0.01);
+  });
+});
+
+describe('滚动摩擦手感测试', () => {
+  function rollDistance(power: number): number {
+    const world = createInitialWorld();
+    // 清台，只留白球直线滚
+    for (const b of world.balls) if (b.number !== 0) b.active = false;
+    const cue = getCueBall(world)!;
+    strikeCueBall(world, 0, power);
+    let dist = 0;
+    for (let i = 0; i < 240 * 90 && world.moving; i++) {
+      stepWorld(world, PHYSICS_DT);
+      dist += Math.hypot(cue.vx, cue.vz) * PHYSICS_DT;
+    }
+    return dist;
+  }
+
+  it('小力(20)滚动距离合理（约 1.5-4.5m）', () => {
+    const d = rollDistance(20);
+    expect(d).toBeGreaterThan(1.5);
+    expect(d).toBeLessThan(4.5);
+  });
+
+  it('中力(50)滚动距离合理（约 4-14m）', () => {
+    const d = rollDistance(50);
+    expect(d).toBeGreaterThan(4);
+    expect(d).toBeLessThan(14);
+  });
+
+  it('滚动后自旋归零', () => {
+    const world = createInitialWorld();
+    for (const b of world.balls) if (b.number !== 0) b.active = false;
+    strikeCueBall(world, 0, 40);
+    simulateUntilStop(world, 60);
+    const cue = getCueBall(world)!;
+    expect(cue.wx).toBe(0);
+    expect(cue.wy).toBe(0);
+    expect(cue.wz).toBe(0);
+  });
+});
+
+describe('自旋（杆法）测试', () => {
+  function setupSingle(): BilliardsWorld {
+    const world = createInitialWorld();
+    for (const b of world.balls) if (b.number !== 0) b.active = false;
+    return world;
+  }
+
+  it('低杆击球瞬间白球反向自旋', () => {
+    const world = setupSingle();
+    strikeCueBall(world, 0, 60, { x: -1, y: 0 });
+    const cue = getCueBall(world)!;
+    // 向 -z 运动，低杆 → wx 与纯滚动方向相反（应为正）
+    expect(cue.wx).toBeGreaterThan(0);
+  });
+
+  it('高杆跟进、低杆拉回（打静止球后）', () => {
+    const runHit = (sx: number) => {
+      const world = setupSingle();
+      const one = world.balls.find(b => b.number === 1)!;
+      one.active = true;
+      one.x = 0; one.z = -0.3;
+      const cue = getCueBall(world)!;
+      cue.x = 0; cue.z = 0.3;
+      strikeCueBall(world, 0, 40, { x: sx, y: 0 });
+      simulateUntilStop(world, 60);
+      return cue.z;
+    };
+    const followZ = runHit(1);
+    const stunZ = runHit(0);
+    const drawZ = runHit(-1);
+    // 击球点在 z≈-0.24：高杆应跟进（z 明显更小），低杆应拉回（z 明显更大）
+    expect(followZ).toBeLessThan(-0.6);
+    expect(stunZ).toBeGreaterThan(followZ + 0.5);
+    expect(drawZ).toBeGreaterThan(stunZ + 0.3);
+  });
+
+  it('侧旋影响碰库后的切向反弹', () => {
+    const runKick = (sy: number) => {
+      const world = setupSingle();
+      const cue = getCueBall(world)!;
+      cue.z = 0;
+      cue.x = 0;
+      strikeCueBall(world, 0, 55, { x: 0, y: sy });
+      simulateUntilStop(world, 60);
+      return cue.x;
+    };
+    const right = runKick(1);
+    const left = runKick(-1);
+    // 右塞和左塞碰底库后横向偏移方向应相反
+    expect(Math.sign(right)).not.toBe(Math.sign(left));
+  });
+});
+
+describe('碰撞物理测试', () => {
+  it('物理引擎可以模拟多个时间步', () => {
+    const world = createInitialWorld();
+    strikeCueBall(world, 0.5, 60);
+    for (let i = 0; i < 100; i++) stepWorld(world);
+    expect(world.time).toBeGreaterThan(0);
+  });
+
+  it('直线正碰传递动量', () => {
+    const world = createInitialWorld();
+    for (const b of world.balls) if (b.number !== 0 && b.number !== 1) b.active = false;
+    const cue = getCueBall(world)!;
+    const one = world.balls.find(b => b.number === 1)!;
+    cue.z = 0;
+    cue.x = one.x;
+    const z0 = one.z;
+    strikeCueBall(world, 0, 40);
+    let minZ = z0;
+    for (let i = 0; i < 240 * 60 && world.moving; i++) {
+      stepWorld(world, PHYSICS_DT);
+      minZ = Math.min(minZ, one.z);
+    }
+    // 1号球应被打向 -z 方向至少 0.6m（碰库前）
+    expect(z0 - minZ).toBeGreaterThan(0.6);
+  });
+
+  it('库边反弹后仍在界内', () => {
+    const world = createInitialWorld();
+    strikeCueBall(world, 0.3, 90);
+    simulateUntilStop(world, 60);
+    for (const b of world.balls) {
+      if (!b.active) continue;
+      expect(Math.abs(b.x)).toBeLessThanOrEqual(TABLE.width / 2 + 0.001);
+      expect(Math.abs(b.z)).toBeLessThanOrEqual(TABLE.length / 2 + 0.001);
+    }
+  });
+
+  it('开球后球堆被炸散', () => {
+    const world = createInitialWorld();
+    strikeCueBall(world, 0, 92);
+    simulateUntilStop(world, 60);
+    // 统计炸散程度：目标球相对原始球堆中心的平均距离
+    const objects = world.balls.filter(b => b.active && b.number !== 0);
+    const cx = objects.reduce((s, b) => s + b.x, 0) / objects.length;
+    const cz = objects.reduce((s, b) => s + b.z, 0) / objects.length;
+    const spread = objects.reduce((s, b) => s + Math.hypot(b.x - cx, b.z - cz), 0) / objects.length;
+    expect(spread).toBeGreaterThan(0.25);
+  });
+});
+
+describe('落袋检测测试', () => {
+  it('白球落袋检测', () => {
+    const world = createInitialWorld();
+    const cue = getCueBall(world)!;
+    cue.x = -TABLE.width / 2 + 0.01;
+    cue.z = -TABLE.length / 2 + 0.01;
+    strikeCueBall(world, -Math.PI / 4, 50);
+    simulateUntilStop(world);
+    expect(isCueBallPocketed(world)).toBe(true);
+  });
+
+  it('白球落袋后应标记为inactive', () => {
+    const world = createInitialWorld();
+    const cue = getCueBall(world)!;
+    cue.x = -TABLE.width / 2 + 0.01;
+    cue.z = -TABLE.length / 2 + 0.01;
+    strikeCueBall(world, -Math.PI / 4, 50);
+    simulateUntilStop(world);
+    expect(cue.active).toBe(false);
+  });
+
+  it('模拟开球并打印落袋', () => {
+    const world = createInitialWorld();
+    strikeCueBall(world, 0, 88);
+    simulateUntilStop(world);
+    console.log('落袋球:', pocketedThisShot(world));
+  });
+});
+
+describe('白球重置测试', () => {
+  it('白球落袋后可以重置', () => {
+    const world = createInitialWorld();
+    const cue = getCueBall(world)!;
+    cue.x = -TABLE.width / 2 + 0.01;
+    cue.z = -TABLE.length / 2 + 0.01;
+    strikeCueBall(world, -Math.PI / 4, 50);
+    simulateUntilStop(world);
+    expect(isCueBallPocketed(world)).toBe(true);
+
+    respotCueBall(world);
+    expect(cue.active).toBe(true);
+    expect(cue.x).toBe(0);
+    expect(cue.z).toBe(TABLE.length * 0.25);
+    expect(cue.wy).toBe(0);
+    expect(world.moving).toBe(false);
+  });
+
+  it('重置位置有边界限制', () => {
+    const world = createInitialWorld();
+    respotCueBall(world, 10, 10);
+    const cue = getCueBall(world)!;
+    expect(Math.abs(cue.x)).toBeLessThan(TABLE.width / 2);
+    expect(Math.abs(cue.z)).toBeLessThan(TABLE.length / 2);
+  });
+});
+
+describe('物理手感基准（打印指标）', () => {
+  it('输出关键手感数据', () => {
+    // 滚动距离 vs 力度
+    for (const p of [10, 30, 50, 70, 100]) {
+      const world = createInitialWorld();
+      for (const b of world.balls) if (b.number !== 0) b.active = false;
+      const cue = getCueBall(world)!;
+      const z0 = cue.z;
+      strikeCueBall(world, 0, p);
+      simulateUntilStop(world, 90);
+      console.log(`力度${p}: 滚动 ${(z0 - cue.z).toFixed(2)}m, 用时 ${world.time.toFixed(2)}s`);
+    }
+
+    // 低杆拉回距离
+    {
+      const world = createInitialWorld();
+      for (const b of world.balls) if (b.number !== 0 && b.number !== 1) b.active = false;
+      const cue = getCueBall(world)!;
+      const one = world.balls.find(b => b.number === 1)!;
+      cue.x = one.x;
+      cue.z = one.z + 0.8;
+      strikeCueBall(world, 0, 45, { x: -0.9, y: 0 });
+      simulateUntilStop(world, 60);
+      console.log(`低杆: 白球最终 z=${cue.z.toFixed(3)} (碰球点约 z=${(one.z).toFixed(2)})`);
+    }
+    expect(true).toBe(true);
+  });
+});
