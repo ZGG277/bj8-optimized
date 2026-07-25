@@ -1,3 +1,9 @@
+/*
+[INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
+[OUTPUT]: 对外提供完整对局编排：开球、双视角、瞄准/杆法/蓄力输入、规则轮转、AI 回合与 HUD
+[POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   createInitialWorld,

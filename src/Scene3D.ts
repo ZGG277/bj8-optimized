@@ -1,3 +1,9 @@
+/*
+[INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
+[OUTPUT]: 对外提供场景渲染、双视角相机、瞄准辅助、合法目标环、球杆动画、自由球幽灵与 screenToTable 映射
+[POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
