@@ -7,15 +7,29 @@
  */
 import puppeteer from 'puppeteer-core';
 
-const URL = 'http://localhost:5199/';
+const GAME_URL = process.env.GAME_URL || 'http://localhost:5199/';
+const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9333';
 const results = [];
 const ok = (name, pass, detail = '') => {
   results.push({ name, pass });
   console.log(`${pass ? '✓' : '✗'} ${name}${detail ? ' — ' + detail : ''}`);
 };
 
+// 真实鼠标点击按钮(P1-05 原则:禁止 evaluate .click() 绕过真实输入路径)
+async function realClickButton(page, text) {
+  const box = await page.evaluate((t) => {
+    const btn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes(t));
+    if (!btn) return null;
+    const r = btn.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  }, text);
+  if (!box) return false;
+  await page.mouse.click(box.x, box.y);
+  return true;
+}
+
 const browser = await puppeteer.connect({
-  browserURL: 'http://127.0.0.1:9333',
+  browserURL: BROWSER_URL,
   defaultViewport: { width: 1280, height: 800 },
 });
 
@@ -23,11 +37,8 @@ const page = await browser.newPage();
 await page.bringToFront();
 const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
-await page.goto(URL, { waitUntil: 'networkidle0', timeout: 20000 });
-await page.evaluate(() => {
-  const btn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('开始对局'));
-  btn?.click();
-});
+await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+ok('开始对局按钮真实点击', await realClickButton(page, '开始对局'));
 await new Promise(r => setTimeout(r, 800));
 
 // 右上袋口
