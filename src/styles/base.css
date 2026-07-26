@@ -1,0 +1,68 @@
+/*
+[INPUT]: 设计令牌与全局重置约定
+[OUTPUT]: 对外提供色彩/字体/尺寸令牌(--topbar-h/--scoreboard-h/--hud-safe-top/--control-deck-h)、重置、焦点态与动画
+[POS]: 样式体系的基础层,只定义令牌与跨组件规则,不承载布局或控件样式
+[PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
+*/
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --green: #70c7a5;
+  --warm: #d9b781;
+  --danger: #c64a3a;
+  --panel: #111514;
+  --line: rgba(255,255,255,0.08);
+  --dim: #67706c;
+  --muted: #9aa39e;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  /* 竖屏/桌面壳层尺寸;横屏在 media query 中重定义 */
+  --topbar-h: 52px;
+  --scoreboard-h: 68px;
+  --control-deck-h: 100px;
+  /* 横屏悬浮 HUD 的顶部安全区 = topbar + scoreboard,控件顶边不得低于此值 */
+  --hud-safe-top: 0px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #090b0b;
+  color: #e0e5e2;
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#root {
+  height: 100%;
+}
+
+/* 焦点态:所有可聚焦控件有肉眼可见焦点环,不依赖颜色差异表达状态 */
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.9); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 横屏手机:统一壳层尺寸变量,HUD 顶部安全区 = 38 + 34 = 72 */
+@media (orientation: landscape) and (max-height: 560px) {
+  :root {
+    --topbar-h: 38px;
+    --scoreboard-h: 34px;
+    --hud-safe-top: 72px;
+  }
+}

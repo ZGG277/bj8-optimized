@@ -27,7 +27,11 @@ import {
 import { factsFromWorld } from './match/shot-facts';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from './match/types';
 import { useShotInput } from './input/use-shot-input';
-import { clampSpin, type ShotIntent } from './input/shot-input';
+import { MIN_POWER, type ShotIntent } from './input/shot-input';
+import { ViewToolbar } from './components/ViewToolbar';
+import { AimControls } from './components/AimControls';
+import { SpinControl } from './components/SpinControl';
+import { ShootControl } from './components/ShootControl';
 import { Scene3D } from './Scene3D';
 import { BilliardsAudio } from './audio';
 
@@ -142,6 +146,7 @@ export default function Game() {
     updateCharge,
     cancelCharge,
     releaseCharge,
+    commitShot,
   } = useShotInput({ canShoot: canAim, onCommit: handleCommit });
 
   // 初始化/重置游戏
@@ -408,22 +413,6 @@ export default function Game() {
     }
   }, []);
 
-  // 触控调整瞄准按钮
-  const adjustAim = (delta: number) => {
-    if (!canAim) return;
-    setAim(a => a + delta);
-  };
-
-  // 击球点拖拽：像素偏移经纯函数映射到单位圆（x 高低杆，y 左右塞）
-  const updateSpinFromPointer = (e: React.PointerEvent) => {
-    const el = e.currentTarget as HTMLElement;
-    const rect = el.getBoundingClientRect();
-    setSpin(clampSpin(
-      { x: e.clientX - rect.left, y: e.clientY - rect.top },
-      { width: rect.width, height: rect.height },
-    ));
-  };
-
   const activeNumbers = new Set(worldView.balls.filter(b => b.active).map(b => b.number));
   const solidPotted = 7 - worldView.balls.filter(b => b.active && b.group === 'solid').length;
   const stripePotted = 7 - worldView.balls.filter(b => b.active && b.group === 'stripe').length;
@@ -501,16 +490,11 @@ export default function Game() {
           onClick={handleCanvasClick}
         >
 
-          <div className="view-switcher">
-            <button className={viewMode === 'first' ? 'active' : ''} onClick={() => setViewMode('first')}>第一人称</button>
-            <button className={viewMode === 'overhead' ? 'active' : ''} onClick={() => setViewMode('overhead')}>俯视</button>
-            {viewMode === 'first' && (
-              <>
-                <button onClick={() => setCameraAngle(a => a - Math.PI / 4)} title="左转">◀</button>
-                <button onClick={() => setCameraAngle(a => a + Math.PI / 4)} title="右转">▶</button>
-              </>
-            )}
-          </div>
+          <ViewToolbar
+            viewMode={viewMode}
+            onViewMode={setViewMode}
+            onRotate={(dir) => setCameraAngle(a => a + dir * Math.PI / 4)}
+          />
 
           <div className="room-label">
             <span>PHYSICS WORLD</span>
@@ -555,38 +539,9 @@ export default function Game() {
 
       {/* 控制区 */}
       <footer className="control-deck">
-        {/* 瞄准微调 */}
-        <div className="aim-controls">
-          <button onClick={() => adjustAim(-0.01)} disabled={!canAim}>◀</button>
-          <div>
-            <strong>方向</strong>
-            <small>微调</small>
-          </div>
-          <button onClick={() => adjustAim(0.01)} disabled={!canAim}>▶</button>
-        </div>
+        <AimControls disabled={!canAim} onAdjust={(d) => setAim(a => a + d)} />
 
-        {/* 击球点（杆法） */}
-        <div
-          className="spin-pad"
-          onPointerDown={(e) => {
-            if (!canAim) return;
-            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-            updateSpinFromPointer(e);
-          }}
-          onPointerMove={(e) => {
-            if (canAim && e.buttons) updateSpinFromPointer(e);
-          }}
-        >
-          <div className="spin-ball">
-            <span className="spin-cross-h" />
-            <span className="spin-cross-v" />
-            <span
-              className="spin-dot"
-              style={{ left: `${50 + spin.y * 38}%`, top: `${50 - spin.x * 38}%` }}
-            />
-          </div>
-          <small>{spin.x > 0.25 ? '高杆' : spin.x < -0.25 ? '低杆' : spin.y > 0.25 ? '右塞' : spin.y < -0.25 ? '左塞' : '中杆'}</small>
-        </div>
+        <SpinControl spin={spin} disabled={!canAim} onSpinChange={setSpin} />
 
         {/* 信息 */}
         <div className="match-message">
@@ -594,40 +549,17 @@ export default function Game() {
           {!worldView.moving && <small>瞄好停一拍再出杆</small>}
         </div>
 
-        {/* 力度和出杆（右下角拉杆区） */}
-        <div className="shoot-zone">
-          <div className="power-meter">
-            <div className="power-meter-track">
-              <div
-                className={`power-meter-fill ${previewPower > 85 ? 'hot' : ''}`}
-                style={{ height: `${previewPower}%` }}
-              />
-            </div>
-            <span className="power-num">{Math.round(previewPower)}</span>
-          </div>
-          <div
-            className={`shoot-pad ${charging ? 'charging' : ''} ${!canAim ? 'disabled' : ''}`}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              // 可用行程 = 按下点到安全底边距离,输入层会归一到 72-180px
-              beginCharge(e.clientY, window.innerHeight - e.clientY - 24);
-            }}
-            onPointerMove={(e) => {
-              e.preventDefault();
-              updateCharge(e.clientY);
-            }}
-            onPointerUp={(e) => {
-              e.preventDefault();
-              releaseCharge();
-            }}
-            onPointerCancel={cancelCharge}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <strong>{match.breaking ? '开球' : '出杆'}</strong>
-            <small>下拉蓄力 · 松开出杆</small>
-          </div>
-        </div>
+        <ShootControl
+          disabled={!canAim}
+          charging={charging}
+          power={previewPower}
+          breaking={match.breaking}
+          onBegin={beginCharge}
+          onUpdate={updateCharge}
+          onRelease={releaseCharge}
+          onCancel={cancelCharge}
+          onTap={() => commitShot({ power: MIN_POWER, spin })}
+        />
       </footer>
 
       {/* 开始界面 */}

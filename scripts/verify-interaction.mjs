@@ -150,11 +150,22 @@ async function dragStrike(page, box, useTouch) {
   await page.close();
 }
 
-// ========== 场景2: 触摸(竖屏平板尺寸) ==========
+// ========== 场景2: 触摸(竖屏手机 390×844) ==========
 {
-  const { page, errors } = await newGamePage({ width: 834, height: 1112, hasTouch: true });
+  const { page, errors } = await newGamePage({ width: 390, height: 844, hasTouch: true, isMobile: true });
   const box = await padBox(page);
-  ok('触摸: 出杆区存在且在视口内', !!box && box.x + box.w <= 834 && box.y + box.h <= 1112);
+  ok('触摸: 出杆区存在且在视口内', !!box && box.x + box.w <= 390 && box.y + box.h <= 844,
+    box ? `(${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.w)}x${Math.round(box.h)})` : 'missing');
+  // P1-03 验收:竖屏手机控制区无溢出
+  const overflow = await page.evaluate(() => {
+    const deck = document.querySelector('.control-deck').getBoundingClientRect();
+    return [...document.querySelector('.control-deck').children]
+      .filter(c => {
+        const r = c.getBoundingClientRect();
+        return r.bottom > deck.bottom + 2 || r.right > deck.right + 2 || r.left < deck.left - 2;
+      }).length;
+  });
+  ok('触摸: 控制区无溢出元素', overflow === 0, overflow ? `${overflow}个元素溢出` : '');
   const { after } = await dragStrike(page, box, true);
   ok('触摸: 下拉蓄力出杆', !!after && after.shot === 1, JSON.stringify(after));
   ok('触摸: 页面无JS错误', errors.length === 0, errors[0] || '');
@@ -171,10 +182,48 @@ async function dragStrike(page, box, useTouch) {
     box ? `(${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.w)}x${Math.round(box.h)})` : 'missing');
   // 出杆区应在右下四分之一区域
   ok('横屏: 出杆区位于右下角', box && box.cx > 812 * 0.6 && box.cy > 375 * 0.5, box ? `cx=${Math.round(box.cx)} cy=${Math.round(box.cy)}` : '');
-  if (box) {
-    const { after } = await dragStrike(page, box, true);
-    ok('横屏: 触摸下拉出杆', !!after && after.shot === 1, JSON.stringify(after));
+
+  // P1-03 验收:视角按钮不被顶栏遮挡,elementFromPoint 命中按钮自身(开球前必为玩家回合)
+  const viewBtn = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('.view-switcher button')].find(b => b.textContent === '俯视');
+    if (!btn) return null;
+    const r = btn.getBoundingClientRect();
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    const hit = document.elementFromPoint(cx, cy);
+    return { cx, cy, top: r.y, hitIsSelf: hit === btn, hitTag: hit ? `${hit.tagName}.${hit.className}` : 'null' };
+  });
+  ok('横屏: 视角按钮不被遮挡(elementFromPoint)', !!viewBtn && viewBtn.hitIsSelf,
+    viewBtn ? `top=${Math.round(viewBtn.top)} hit=${viewBtn.hitTag}` : '按钮不存在');
+
+  // P1-03 验收:点击视角按钮不会改变 aim
+  if (viewBtn) {
+    const aimBefore = await page.evaluate(() => window.__bj8.aim.current);
+    await page.mouse.click(viewBtn.cx, viewBtn.cy);
+    await new Promise(r => setTimeout(r, 300));
+    const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
+    ok('横屏: 点击视角按钮不改变瞄准角', aimBefore === aimAfter, `before=${aimBefore} after=${aimAfter}`);
+    // 切回第一人称,继续出杆测试
+    await page.evaluate(() => {
+      const btn = [...document.querySelectorAll('.view-switcher button')].find(b => b.textContent === '第一人称');
+      btn?.click();
+    });
+    await new Promise(r => setTimeout(r, 300));
   }
+
+  // P1-03 验收:横屏真实拖拽可产生至少 95 力(可用行程归一化后小行程也能满力)
+  // 这次拖拽同时就是开球,复用为出杆断言
+  if (box) {
+    const before = await gameState(page);
+    await page.touchscreen.touchStart(box.cx, box.cy);
+    for (let i = 1; i <= 10; i++) await page.touchscreen.touchMove(box.cx, box.cy + i * 10);
+    const peak = await page.evaluate(() => document.querySelector('.power-num')?.textContent);
+    await page.touchscreen.touchEnd();
+    ok('横屏: 真实拖拽力度≥95', !!peak && parseInt(peak, 10) >= 95, `peak=${peak}`);
+    await new Promise(r => setTimeout(r, 600));
+    const after = await gameState(page);
+    ok('横屏: 触摸下拉出杆', !!after && after.shot === 1, JSON.stringify({ before, after }));
+  }
+
   ok('横屏: 页面无JS错误', errors.length === 0, errors[0] || '');
   await page.screenshot({ path: 'shots/12-landscape-phone.png' });
   await page.close();

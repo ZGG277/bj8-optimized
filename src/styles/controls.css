@@ -1,0 +1,356 @@
+/*
+[INPUT]: base.css 的令牌与 layout.css 的壳层几何
+[OUTPUT]: 对外提供视角工具条、瞄准微调、击球点盘、局面信息与出杆交互区的控件样式及横屏悬浮定位
+[POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
+[PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
+*/
+/* 视角工具条:位于球桌视口内,自身拦截指针事件,不冒泡到瞄准 */
+.view-switcher {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  background: rgba(7,10,9,0.8);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  z-index: 3;
+}
+
+.view-switcher button {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: #828c87;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.view-switcher button.active {
+  background: var(--green);
+  color: #09120e;
+}
+
+/* 控制区 */
+.control-deck {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.aim-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aim-controls button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+  color: #b8bfbb;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* 禁用不只靠颜色:透明度 + 禁止光标 + 删除线 */
+.aim-controls button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.aim-controls div {
+  text-align: center;
+}
+
+.aim-controls strong {
+  display: block;
+  font-size: 9px;
+}
+
+.aim-controls small {
+  display: block;
+  color: var(--dim);
+  font-size: 6px;
+  margin-top: 2px;
+}
+
+.match-message {
+  text-align: center;
+}
+
+/* 击球点（杆法）控制 */
+.spin-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+}
+
+.spin-ball {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #cfc8b8 70%, #a89f8c);
+  box-shadow: inset -3px -4px 8px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.4);
+  pointer-events: none;
+}
+
+.spin-cross-h,
+.spin-cross-v {
+  position: absolute;
+  background: rgba(0,0,0,0.12);
+}
+
+.spin-cross-h {
+  left: 12%;
+  right: 12%;
+  top: 50%;
+  height: 1px;
+}
+
+.spin-cross-v {
+  top: 12%;
+  bottom: 12%;
+  left: 50%;
+  width: 1px;
+}
+
+.spin-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 1px solid rgba(255,255,255,0.7);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 4px rgba(198,74,58,0.8);
+  transition: left 40ms, top 40ms;
+}
+
+.spin-pad small {
+  color: var(--dim);
+  font-size: 7px;
+  letter-spacing: 0.15em;
+}
+
+.match-message span {
+  font-family: 'Songti SC', serif;
+  font-size: 12px;
+}
+
+.match-message small {
+  display: block;
+  color: var(--dim);
+  font-size: 7px;
+  margin-top: 4px;
+}
+
+/* 右下角出杆交互区 */
+.shoot-zone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  user-select: none;
+}
+
+.power-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.power-meter-track {
+  position: relative;
+  width: 8px;
+  height: 56px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.power-meter-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(0deg, #487a67, var(--green));
+  transition: height 40ms linear;
+}
+
+.power-meter-fill.hot {
+  background: linear-gradient(0deg, #c64a3a, #e47f32);
+}
+
+.power-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.shoot-pad {
+  width: 96px;
+  height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #3f8a6d, #2b6b52);
+  border: 1px solid rgba(112,199,165,0.45);
+  color: #eafff5;
+  text-align: center;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+
+.shoot-pad strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.shoot-pad small {
+  font-size: 8px;
+  opacity: 0.75;
+}
+
+.shoot-pad.charging {
+  background: linear-gradient(160deg, #d98a3a, #b3641f);
+  border-color: rgba(228,127,50,0.6);
+  transform: scale(0.97);
+}
+
+/* 禁用不只靠颜色:透明度 + 斜体提示文案反转 */
+.shoot-pad.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(0.7);
+}
+
+/* 竖屏手机控件尺寸 */
+@media (max-width: 640px) {
+  .control-deck {
+    grid-template-columns: 80px 1fr 120px;
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .aim-controls button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .shoot-pad {
+    width: 88px;
+    height: 64px;
+  }
+
+  .match-message {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .control-deck {
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .aim-controls div {
+    display: none;
+  }
+
+  .spin-ball {
+    width: 36px;
+    height: 36px;
+  }
+
+  .shoot-pad {
+    width: 78px;
+    height: 60px;
+  }
+
+  .shoot-pad small {
+    display: none;
+  }
+}
+
+/* 横屏手机:控件悬浮右下/左下,层级高于球桌;视角工具条避开 hud-safe-top */
+@media (orientation: landscape) and (max-height: 560px) {
+  .view-switcher {
+    top: calc(var(--hud-safe-top) + 8px);
+    z-index: 10;
+  }
+
+  .control-deck {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 9;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .match-message {
+    display: none;
+  }
+
+  .aim-controls {
+    position: fixed;
+    left: 10px;
+    bottom: 10px;
+    z-index: 9;
+    background: rgba(17,21,20,0.7);
+    border-radius: 8px;
+    padding: 4px;
+  }
+
+  .spin-pad {
+    background: rgba(17,21,20,0.7);
+    border-radius: 10px;
+    padding: 4px;
+  }
+
+  .spin-ball {
+    width: 40px;
+    height: 40px;
+  }
+
+  .shoot-zone {
+    background: rgba(17,21,20,0.7);
+    border-radius: 12px;
+    padding: 8px;
+  }
+
+  .power-meter-track {
+    height: 68px;
+  }
+
+  .shoot-pad {
+    width: 104px;
+    height: 84px;
+  }
+}
