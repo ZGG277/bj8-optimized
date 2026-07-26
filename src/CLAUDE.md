@@ -4,7 +4,9 @@
 
 ## 成员清单
 
-`Game.tsx`: 当前对局总编排器，同时承载规则轮转、AI 调度、输入采样、物理循环与 HUD；Phase 0/1 将按 match、input、simulation、components 边界拆分。
+`Game.tsx`: 对局编排器，规则判定已迁至 `match/` 纯状态机；剩余职责为 AI 调度、输入采样、物理循环、视角/HUD 渲染（790 行，Phase 1 将按 input、simulation、components 边界继续拆分）。
+
+`match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 18 用例规则矩阵测试。
 
 `Scene3D.ts`: Three.js 场景适配器，消费物理世界快照并提供双视角、合法目标环、球杆动画、自由球预览和屏幕到球桌坐标映射。
 
