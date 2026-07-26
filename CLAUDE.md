@@ -6,15 +6,15 @@
 
 ## 成员清单
 
-`src/`: 游戏业务源码，包含物理世界、match 纯规则状态机、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
+`src/`: 游戏业务源码，包含物理世界、match 纯规则状态机、input 出杆输入层、components HUD 控件、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
 
-`scripts/`: 浏览器交互、画面与场景对象验证脚本；verify-interaction 为真实指针回归门禁，verify-break-group 为开球→连续进球→分组端到端复测；Phase 1 将收敛为真实指针输入回归矩阵。
+`scripts/`: 浏览器交互、画面与场景对象验证脚本；verify-interaction 为真实指针回归门禁（桌面/竖屏/横屏/瞄准动画 39 断言），verify-break-group 为开球→连续进球→分组端到端复测，均经环境变量定位浏览器与页面。
 
 `shots/`: 人工与自动化试玩截图，仅作为视觉回归证据，不作为运行时依赖。
 
 `index.html`: Vite HTML 入口，挂载 React 根节点并声明页面元数据。
 
-`package.json`: 本实验场的依赖与命令入口；Phase 0 将补充统一 `check` 门禁。
+`package.json`: 本实验场的依赖与命令入口；`npm run check` 为 typecheck + 单测 + 构建的统一提交门禁。
 
 `package-lock.json`: npm 依赖锁文件，保证本地与验证环境依赖一致。
 
