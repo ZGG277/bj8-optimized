@@ -209,6 +209,11 @@
   cursor: default;
 }
 
+/* 自由球放置模式:十字光标明示"点哪放哪" */
+.viewport.placing {
+  cursor: crosshair;
+}
+
 .viewport canvas {
   width: 100%;
   height: 100%;

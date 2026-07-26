@@ -104,10 +104,21 @@ async function dragStrike(page, box, useTouch) {
       const turn = await page.evaluate(() => document.querySelector('.match-state p')?.textContent);
       if (turn === '你的回合') { backToPlayer = true; break; }
       if (turn === '放置白球') {
+        // 先切到俯视,放置更直观可靠
+        const overheadBtn = await page.evaluate(() => {
+          const btn = [...document.querySelectorAll('.view-switcher button')].find(b => b.textContent === '俯视');
+          if (!btn) return null;
+          const r = btn.getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        });
+        if (overheadBtn) {
+          await page.mouse.click(overheadBtn.x, overheadBtn.y);
+          await new Promise(r => setTimeout(r, 400));
+        }
         // 在视口中下部尝试几个候选点,放到合法空位为止
         const candidates = await page.evaluate(() => {
           const r = document.querySelector('.viewport').getBoundingClientRect();
-          return [0.78, 0.68, 0.58, 0.85].map(fy => ({ x: r.x + r.width / 2, y: r.y + r.height * fy }));
+          return [0.75, 0.65, 0.55, 0.45].map(fy => ({ x: r.x + r.width / 2, y: r.y + r.height * fy }));
         });
         for (const pt of candidates) {
           await page.mouse.click(pt.x, pt.y);

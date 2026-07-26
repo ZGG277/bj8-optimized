@@ -10,11 +10,9 @@ import {
   cloneWorld,
   getCueBall,
   strikeCueBall,
-  stepWorld,
   respotCueBall,
   isCueBallPocketed,
   planSimpleShot,
-  PHYSICS_DT,
   TABLE,
   type BilliardsWorld,
 } from './physics';
@@ -28,6 +26,7 @@ import { factsFromWorld } from './match/shot-facts';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from './match/types';
 import { useShotInput } from './input/use-shot-input';
 import { MIN_POWER, type ShotIntent } from './input/shot-input';
+import { usePhysicsLoop } from './simulation/use-physics-loop';
 import { ViewToolbar } from './components/ViewToolbar';
 import { AimControls } from './components/AimControls';
 import { SpinControl } from './components/SpinControl';
@@ -248,24 +247,12 @@ export default function Game() {
     setWorldView(cloneWorld(world));
   }, []);
 
-  // 物理模拟循环
-  useEffect(() => {
-    if (match.phase !== 'rolling') return;
-
-    let animationId: number;
-    let lastTime = performance.now();
-    let accumulator = 0;
-
-    const tick = (now: number) => {
-      accumulator += Math.min(0.05, (now - lastTime) / 1000);
-      lastTime = now;
-
-      while (accumulator >= PHYSICS_DT && worldRef.current.moving) {
-        stepWorld(worldRef.current, PHYSICS_DT);
-        accumulator -= PHYSICS_DT;
-      }
-
-      // 新物理事件 → 音效
+  // 物理模拟循环:固定步调度,帧率只影响每帧步数,不影响步长与时间守恒
+  usePhysicsLoop({
+    active: match.phase === 'rolling',
+    worldRef,
+    onFrame: () => {
+      // 新物理事件 → 音效(按事件顺序,不重复不漏)
       const events = worldRef.current.events;
       for (let i = playedEventsRef.current; i < events.length; i++) {
         const ev = events[i];
@@ -274,20 +261,10 @@ export default function Game() {
         else if (ev.type === 'pocket') audioRef.current?.pocket();
       }
       playedEventsRef.current = events.length;
-
       setWorldView(cloneWorld(worldRef.current));
-
-      if (!worldRef.current.moving) {
-        settleShot();
-        return;
-      }
-
-      animationId = requestAnimationFrame(tick);
-    };
-
-    animationId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationId);
-  }, [match.phase, settleShot]);
+    },
+    onSettled: settleShot,
+  });
 
 
   // 对手AI回合
@@ -482,7 +459,7 @@ export default function Game() {
       <section className="table-stage">
         <div
           ref={containerRef}
-          className={`viewport ${viewMode}`}
+          className={`viewport ${viewMode} ${match.phase === 'placing' ? 'placing' : ''}`}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
