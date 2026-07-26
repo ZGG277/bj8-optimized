@@ -772,7 +772,7 @@ export class Scene3D {
     for (const ball of world.balls) {
       const ring = this.targetRings[ball.number];
       if (!ring) continue;
-      ring.visible = ball.active && this.legalTargets.has(ball.number) && this.phase === 'playing' && !world.moving;
+      ring.visible = ball.active && this.legalTargets.has(ball.number) && this.phase === 'aiming' && !world.moving;
       if (ring.visible) ring.position.set(ball.x, 0.0025, ball.z);
     }
 
@@ -782,7 +782,7 @@ export class Scene3D {
   /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球 */
   private updateAimGuide() {
     const world = this.lastWorld;
-    const show = this.phase === 'playing' && world && !world.moving && world.balls[0].active;
+    const show = this.phase === 'aiming' && world && !world.moving && world.balls[0].active;
     this.aimLine.visible = this.objLine.visible = this.tanLine.visible = this.ghostRing.visible = !!show;
     if (!show || !world) return;
 
@@ -905,7 +905,7 @@ export class Scene3D {
       // 出杆动画期间由 render() 接管球杆
       this.cueGroup.visible = true;
     } else {
-      const showCue = cueActive && phase === 'playing' && !this.lastWorld?.moving;
+      const showCue = cueActive && phase === 'aiming' && !this.lastWorld?.moving;
       this.cueGroup.visible = showCue;
       if (showCue) {
         const targetPull = power * 0.0032;
