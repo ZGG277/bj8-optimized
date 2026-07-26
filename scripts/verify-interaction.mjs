@@ -419,6 +419,47 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   ok('瞄准: 拖拽末端位置决定瞄准角', aimDrag * aimRight < 0,
     `拖拽末=${aimDrag?.toFixed(3)} 应偏左(负号相对右=${aimRight?.toFixed(3)})`);
 
+  // 单点点击确定性:第一人称相机绕白球刚性随转,按下时刻的活相机单次映射
+  // 即为正解(探针实测屏幕点方位偏移 φ 与瞄准角无关,无不动点可求)。
+  // 等相机就位后用目标位姿(screenToTableAt)反算屏幕点真值,
+  // 纯 down/up 点击(零位移)的瞄准角应与之吻合(取未钳制区间)。
+  const expectedAt = (cx, cy) => page.evaluate((x, y) => {
+    const s = window.__bj8.scene.current;
+    const cue = window.__bj8.world.current.balls[0];
+    const hit = s.screenToTableAt(x, y, window.__bj8.aim.current, s.cameraAngle);
+    if (!hit) return null;
+    const worldAngle = Math.atan2(hit.x - cue.x, -(hit.z - cue.z));
+    return Math.min(0.72, Math.max(-0.72, worldAngle - s.cameraAngle));
+  }, cx, cy);
+  {
+    await new Promise(r => setTimeout(r, 900)); // 等相机平滑就位(期间瞄准不变)
+    const px = vp.x + vp.w * 0.58, py = vp.y + vp.h * 0.5;
+    const expected = await expectedAt(px, py);
+    await page.mouse.move(px, py);
+    await page.mouse.down();
+    await page.mouse.up();
+    const got = await page.evaluate(() => window.__bj8.aim.current);
+    ok('瞄准: 单点点击指向所点(未钳制区间)',
+      expected !== null && Math.abs(expected) < 0.7 && got !== null && Math.abs(got - expected) < 0.01,
+      `aim=${got?.toFixed(4)} 真值=${expected?.toFixed(4)}`);
+  }
+
+  // 轻点附带 3px 微抖:8px 死区内不得二次采样(相机过渡期内二次采样会
+  // 把瞄准带偏几度),结果应与零位移点击一致
+  {
+    await new Promise(r => setTimeout(r, 900));
+    const px = vp.x + vp.w * 0.45, py = vp.y + vp.h * 0.55;
+    const expected = await expectedAt(px, py);
+    await page.mouse.move(px, py);
+    await page.mouse.down();
+    await page.mouse.move(px + 3, py + 2);
+    await page.mouse.up();
+    const got = await page.evaluate(() => window.__bj8.aim.current);
+    ok('瞄准: 轻点微抖不带偏瞄准(拖拽死区)',
+      expected !== null && Math.abs(expected) < 0.7 && got !== null && Math.abs(got - expected) < 0.01,
+      `aim=${got?.toFixed(4)} 真值=${expected?.toFixed(4)}`);
+  }
+
   // 出杆动画:触球瞬间皮头应贴到白球面上(gap ≈ R+2mm ≈ 0.0306m)
   const contactGap = await page.evaluate(() => new Promise(res => {
     const s = window.__bj8.scene.current;

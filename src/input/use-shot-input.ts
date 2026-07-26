@@ -46,7 +46,7 @@ type Options = {
 export function useShotInput({ canShoot, onCommit }: Options): ShotInputApi {
   const [aim, setAimState] = useState(0);
   const [spin, setSpin] = useState<CueSpin>({ x: 0, y: 0 });
-  const [previewPower, setPreviewPower] = useState(58);
+  const [previewPower, setPreviewPower] = useState(0);
   const [charging, setCharging] = useState(false);
 
   const sessionRef = useRef<ChargeSession | null>(null);

@@ -104,7 +104,7 @@ export default function Game() {
   const playedEventsRef = useRef(0);
 
   // 触摸/鼠标拖拽相关
-  const dragRef = useRef<{ aiming: boolean } | null>(null);
+  const dragRef = useRef<{ aiming: boolean; downX: number; downY: number; dragging: boolean } | null>(null);
   const aimRef = useRef(0);
 
   const canAim = match.phase === 'aiming' && match.actor === 'player' && !worldView.moving;
@@ -346,7 +346,10 @@ export default function Game() {
     scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
   }, [worldView, viewMode, cameraAngle, aim, previewPower, match, spin]);
 
-  // 点哪打哪：把触点映射到台面坐标，瞄准线直接指向它
+  // 点哪打哪:把触点映射到台面坐标,瞄准线直接指向它。
+  // 第一人称相机绕白球刚性随转,屏幕点的方位偏移 φ 与当前瞄准角无关
+  // (探针实测映射 f(a)=a+φ),因此按下时刻的活相机单次映射即为正解——
+  // 它指向玩家此刻看到的那个台面点;不存在不动点,迭代只会把瞄准推走。
   const aimAtPointer = useCallback((clientX: number, clientY: number) => {
     const scene = scene3DRef.current;
     if (!scene) return;
@@ -356,17 +359,20 @@ export default function Game() {
     if (!cue || !cue.active) return;
     const dx = hit.x - cue.x;
     const dz = hit.z - cue.z;
-    if (Math.hypot(dx, dz) < 0.035) return; // 离白球太近不响应，防抖动
+    if (Math.hypot(dx, dz) < 0.035) return; // 离白球太近不响应,防抖动
     const worldAngle = Math.atan2(dx, -dz);
     const base = viewMode === 'first' ? cameraAngle : 0;
     setAim(clamp(worldAngle - base, -0.72, 0.72));
   }, [viewMode, cameraAngle]);
 
-  // 触摸/鼠标拖拽调整瞄准
+  // 触摸/鼠标拖拽调整瞄准。
+  // 拖拽死区:按下已采样一次;相机随新瞄准角转动的过渡期内,手指的
+  // 微小抖动(轻点附带几像素位移)若再次采样,会用"正在旋转的相机"
+  // 二次采样把瞄准带偏几度。8px 死区内的移动不重复采样,超出才进入拖拽。
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (match.phase === 'placing') return; // 放置模式交给 click 处理
     if (!canAim) return;
-    dragRef.current = { aiming: true };
+    dragRef.current = { aiming: true, downX: e.clientX, downY: e.clientY, dragging: false };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     aimAtPointer(e.clientX, e.clientY);
   }, [canAim, match.phase, aimAtPointer]);
@@ -379,7 +385,12 @@ export default function Game() {
       if (scene && hit) scene.setGhostCue(hit.x, hit.z, true);
       return;
     }
-    if (!dragRef.current?.aiming || !canAim) return;
+    const drag = dragRef.current;
+    if (!drag?.aiming || !canAim) return;
+    if (!drag.dragging) {
+      if (Math.hypot(e.clientX - drag.downX, e.clientY - drag.downY) < 8) return;
+      drag.dragging = true;
+    }
     aimAtPointer(e.clientX, e.clientY);
   }, [canAim, match.phase, aimAtPointer]);
 

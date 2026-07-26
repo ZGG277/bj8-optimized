@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
-[OUTPUT]: 对外提供场景渲染、双视角相机、瞄准辅助、合法目标环、球杆动画、自由球幽灵与 screenToTable 映射
+[OUTPUT]: 对外提供场景渲染、双视角相机、瞄准辅助、合法目标环、球杆动画、自由球幽灵与 screenToTable / screenToTableAt(虚拟相机位姿)映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -23,6 +23,12 @@ const RAIL_H = 0.05;
 const RAIL_W = 0.085;
 const CUSHION_H = 0.038;
 const CUSHION_W = 0.048;
+// 第一人称杆后视角位姿基准（update() 与 screenToTableAt() 共用，禁两处各写一份）：
+// 相机在瞄准轴正后方，杆、瞄准线、视线共线；侧偏只留一丝保立体感
+const FP_CAM_DIST = 0.66;
+const FP_CAM_SIDE = 0.015;
+const FP_CAM_HEIGHT = 0.3;
+const FP_LOOK_AHEAD = 0.42;
 const CORNER_R = TABLE.cornerPocketRadius;
 const SIDE_R = TABLE.sidePocketRadius;
 
@@ -52,6 +58,8 @@ export class Scene3D {
   private aimGroup = new THREE.Group();
   private raycaster = new THREE.Raycaster();
   private tablePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  /** 点哪打哪迭代求解用的虚拟相机(不渲染,只取投影几何) */
+  private virtualCam: THREE.PerspectiveCamera;
 
   private aimAngle = 0;
   private cameraAngle = 0;
@@ -99,6 +107,7 @@ export class Scene3D {
     this.scene.fog = new THREE.Fog(0x07090a, 4, 11);
 
     this.camera = new THREE.PerspectiveCamera(46, element.clientWidth / element.clientHeight, 0.01, 60);
+    this.virtualCam = new THREE.PerspectiveCamera(46, element.clientWidth / element.clientHeight, 0.01, 60);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(element.clientWidth, element.clientHeight);
@@ -295,14 +304,27 @@ export class Scene3D {
       addCushion(shortSegLen, 0, z, side === -1 ? Math.PI / 2 : -Math.PI / 2);
     }
 
-    // ---- 袋口 ----
+    // ---- 袋口（皮口唇边 + 喉管 + 金属压板） ----
+    // 真实中八袋口：角袋内沿约 105mm、中袋约 120mm；洞口呢料切边被皮口
+    // 唇边压住收小，袋内是深色皮革喉管而非裸露黑洞；角袋有金属护角。
+    const MOUTH_R_CORNER = 0.0525;   // 角袋视觉开口半径（105mm 内沿）
+    const MOUTH_R_SIDE = 0.06;       // 中袋视觉开口半径（120mm 内沿）
+    const LIP_OVERHANG = 0.024;      // 皮口唇边外扩，盖住洞口呢料切边
+    const THROAT_DEPTH = 0.14;       // 皮口喉管纵深
+
     const linerMat = new THREE.MeshStandardMaterial({ color: 0x030303, roughness: 1, side: THREE.BackSide });
-    const leatherMat = new THREE.MeshPhysicalMaterial({
+    const throatMat = new THREE.MeshStandardMaterial({
       map: leatherTex,
-      color: 0x8a6844,
-      roughness: 0.75,
-      clearcoat: 0.25,
-      clearcoatRoughness: 0.5,
+      color: 0x3d2c1c,
+      roughness: 0.9,
+      side: THREE.BackSide, // 从袋口俯视看到的是喉管内壁
+    });
+    const lipMat = new THREE.MeshPhysicalMaterial({
+      map: leatherTex,
+      color: 0x6b4a30,
+      roughness: 0.8,
+      clearcoat: 0.15,
+      clearcoatRoughness: 0.6,
     });
     const brassMat = new THREE.MeshPhysicalMaterial({
       color: 0xb08d3e,
@@ -314,35 +336,43 @@ export class Scene3D {
     for (const [px, pz] of POCKET_POS) {
       const isSide = pz === 0;
       const pr = isSide ? SIDE_R : CORNER_R;
+      const mouthR = isSide ? MOUTH_R_SIDE : MOUTH_R_CORNER;
       const group = new THREE.Group();
       group.position.set(px, 0, pz);
-      // 袋口朝外方向（朝向库边/台帮一侧）的角度
-      const outAngle = Math.atan2(pz, px);
 
-      // 袋内衬（内壁）：只到呢面以下，洞口上方由角衬和台帮遮蔽
+      // 皮口唇边：平环压住洞口呢料切边，把视觉开口收到真实尺寸；
+      // 中袋用弧形唇边（弧心朝向台面），两端藏进角衬与库边之下
+      const lipArc = isSide ? Math.PI * 1.1 : Math.PI * 2;
+      const lipStart = isSide && Math.sign(px) > 0 ? Math.PI - lipArc / 2
+        : isSide ? -lipArc / 2 : 0;
+      const lip = new THREE.Mesh(
+        new THREE.RingGeometry(mouthR, mouthR + LIP_OVERHANG, 28, 1, lipStart, lipArc),
+        lipMat
+      );
+      lip.rotation.x = -Math.PI / 2;
+      lip.position.y = 0.0025;
+      lip.receiveShadow = true;
+      group.add(lip);
+
+      // 皮口喉管：深色皮革漏斗，上沿接唇边、下接袋底
+      const throat = new THREE.Mesh(
+        new THREE.CylinderGeometry(mouthR, mouthR * 0.95, THROAT_DEPTH, 28, 1, true),
+        throatMat
+      );
+      throat.position.y = 0.001 - THROAT_DEPTH / 2;
+      group.add(throat);
+
+      // 喉管之下的黑色纵深（内衬 + 袋底）
       const liner = new THREE.Mesh(
         new THREE.CylinderGeometry(pr * 0.98, pr * 0.7, 0.16, 28, 1, true),
         linerMat
       );
       liner.position.y = -0.08;
       group.add(liner);
-      // 袋底
       const bottom = new THREE.Mesh(new THREE.CircleGeometry(pr * 0.72, 28), new THREE.MeshStandardMaterial({ color: 0x020202 }));
       bottom.rotation.x = -Math.PI / 2;
       bottom.position.y = -0.158;
       group.add(bottom);
-      // 皮口唇边：中袋不用圆环（会读成"马蹄铁"），靠角衬+黑洞收边；
-      // 角袋留一小段朝外的唇边，隐在铜饰板下
-      if (!isSide) {
-        const lipArc = Math.PI * 0.85;
-        const lipGeo = new THREE.TorusGeometry(pr * 0.9, 0.0075, 10, 36, lipArc);
-        lipGeo.rotateZ(outAngle - lipArc / 2); // 弧中心对准袋口外侧
-        const rim = new THREE.Mesh(lipGeo, leatherMat);
-        rim.rotation.x = Math.PI / 2;
-        rim.position.y = 0.0015;
-        rim.castShadow = true;
-        group.add(rim);
-      }
 
       if (!isSide) {
         // 角袋铜饰板：盖板贴住台帮顶 + 向下延伸的立边裙板，形成金属袋口压板
@@ -355,27 +385,27 @@ export class Scene3D {
           Math.atan2(-pz, -px) - capArc / 2, capArc), brassMat);
         skirt.position.y = RAIL_H - 0.007;
         group.add(skirt);
-      }
 
-      // 袋口上方内阴影环（增强洞口纵深感）；中袋洞口半藏在台帮下，
-      // 平面的阴影环会在呢面上读成深色"C 形"，只对角袋使用
-      if (!isSide) {
+        // 袋口上方内阴影环（增强洞口纵深感）；中袋洞口半藏在圆鼻与
+        // 台帮下，平面阴影环会在呢面上读成深色"C 形"，只对角袋使用
         const shade = new THREE.Mesh(
           new THREE.RingGeometry(pr * 0.55, pr * 0.97, 28),
-          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
         );
         shade.rotation.x = -Math.PI / 2;
-        shade.position.y = 0.0015;
+        shade.position.y = 0.0012;
         group.add(shade);
       }
 
       this.tableGroup.add(group);
     }
 
-    // ---- 袋口角衬（jaws）：楔形块，斜面朝向袋口，与库边同高同质 ----
-    // 真实球台的袋口两侧是库边尽头的斜切角衬，不是方形块。
-    // 这里用顶视三角形挤出成立柱：直角顶点在库边尽头内侧，
-    // 斜边（hypotenuse）形成袋口漏斗面。
+    // ---- 袋口角衬（jaws）+ 库边圆鼻 ----
+    // 真实球台袋口两侧是包呢的圆鼻库边尽头：中袋漏斗面近直角（约 103°），
+    // 角袋漏斗面约 45°。角衬本体用顶视多边形挤出与库边同高同质，
+    // 库边尽头内侧再各压一颗圆鼻短圆柱，消除尖锐绿楔的读感。
+    const NOSE_R = 0.012;        // 库边圆鼻半径
+    const SIDE_JAW_TILT = 0.011; // 中袋漏斗面内倾量 ≈ CUSHION_W·tan(103°−90°)
     const jawMat = cushionMat.clone();
     jawMat.side = THREE.DoubleSide; // 部分朝向的形状为顺时针，防止斜面被剔除
     const jawDepth = CUSHION_W;     // 与库边同宽
@@ -391,24 +421,36 @@ export class Scene3D {
       mesh.receiveShadow = true;
       this.tableGroup.add(mesh);
     };
+    // 圆鼻：包呢短圆柱，半埋在库边尽头，朝袋口一侧鼓起
+    const noseGeo = new THREE.CylinderGeometry(NOSE_R, NOSE_R, CUSHION_H, 16);
+    const addNose = (x: number, z: number) => {
+      const nose = new THREE.Mesh(noseGeo, cushionMat);
+      nose.position.set(x, CUSHION_H / 2, z);
+      nose.castShadow = true;
+      nose.receiveShadow = true;
+      this.tableGroup.add(nose);
+    };
 
     for (const [px, pz] of POCKET_POS) {
       const isSide = pz === 0;
       const sx = Math.sign(px);
       if (isSide) {
-        // 中袋：库边沿 z 走向，袋口两侧各一块楔形角衬
+        // 中袋：库边沿 z 走向，袋口两侧角衬漏斗面近直角，尽头压圆鼻
         for (const dz of [-1, 1]) {
           const A: [number, number] = [sx * W / 2, dz * sideGap]; // 库边尽头内角
-          addJaw([A, [A[0], A[1] - dz * SIDE_R * 0.95], [A[0] + sx * jawDepth, A[1]]]);
+          addJaw([A, [A[0] + sx * jawDepth, A[1]], [A[0] + sx * jawDepth, A[1] - dz * SIDE_JAW_TILT]]);
+          addNose(sx * (W / 2 + 0.002), dz * sideGap);
         }
       } else {
         const sz = Math.sign(pz);
-        // 角袋：沿 x 库边的角衬（斜面朝袋口）
+        // 角袋：沿 x 库边的角衬（斜面朝袋口）+ 圆鼻
         const AX: [number, number] = [sx * (W / 2 - cornerGap), sz * L / 2];
         addJaw([AX, [AX[0] + sx * CORNER_R * 0.95, AX[1]], [AX[0], AX[1] + sz * jawDepth]]);
-        // 角袋：沿 z 库边的角衬
+        addNose(sx * (W / 2 - cornerGap), sz * (L / 2 + 0.002));
+        // 角袋：沿 z 库边的角衬 + 圆鼻
         const AZ: [number, number] = [sx * W / 2, sz * (L / 2 - cornerGap)];
         addJaw([AZ, [AZ[0], AZ[1] + sz * CORNER_R * 0.95], [AZ[0] + sx * jawDepth, AZ[1]]]);
+        addNose(sx * (W / 2 + 0.002), sz * (L / 2 - cornerGap));
       }
     }
 
@@ -880,25 +922,23 @@ export class Scene3D {
       this.targetCameraPos.set(0, 3.7, 0.85);
       this.targetLookAt.set(0, 0, 0.05);
     } else {
-      // 过肩视角：相机抬高拉远并略偏右，让整条球杆入画指向白球——
-      // 玩家能看到杆头对白球哪个点，才有"对准球"的感觉
-      const dist = 0.66 + power * 0.0022;
-      const side = 0.085;
+      // 杆后视角：相机位于瞄准轴正后方，杆、瞄准线、视线三者共线——
+      // 杆头直指球路。侧向偏移会让杆身在屏幕上与瞄准线成夹角，
+      // 读成"斜着拨球"，故只留一丝侧偏保留立体感
+      const dist = FP_CAM_DIST + power * 0.0022;
       this.targetCameraPos.set(
-        cueX - Math.sin(angle) * dist + Math.cos(angle) * side,
-        0.37 + power * 0.0004,
-        cueZ + Math.cos(angle) * dist + Math.sin(angle) * side
+        cueX - Math.sin(angle) * dist + Math.cos(angle) * FP_CAM_SIDE,
+        FP_CAM_HEIGHT + power * 0.0004,
+        cueZ + Math.cos(angle) * dist + Math.sin(angle) * FP_CAM_SIDE
       );
       this.targetLookAt.set(
-        cueX + Math.sin(angle) * 0.42,
+        cueX + Math.sin(angle) * FP_LOOK_AHEAD,
         0.03,
-        cueZ - Math.cos(angle) * 0.42
+        cueZ - Math.cos(angle) * FP_LOOK_AHEAD
       );
     }
-    const lerpK = 1 - Math.pow(0.0001, this.syncDt);
-    this.camera.position.lerp(this.targetCameraPos, Math.min(0.25, lerpK * 3));
-    this.smoothLookAt.lerp(this.targetLookAt, Math.min(0.3, lerpK * 4));
-    this.camera.lookAt(this.smoothLookAt);
+    // 相机只设目标位姿;平滑收敛在 render() 每帧执行。
+    // 若在此处随 React 渲染推进,松手后 React 不再渲染,相机会冻结在半途。
 
     // ---- 球杆：蓄力拉杆 ----
     if (this.strikeAnim) {
@@ -930,6 +970,13 @@ export class Scene3D {
   /** 渲染循环：推进落袋动画并渲染 */
   render() {
     const dt = Math.min(0.05, this.clock.getDelta());
+
+    // 相机平滑收敛:随 rAF 每帧向目标位姿推进,脱离 React 渲染节奏——
+    // 拖拽/点击瞄准后即使 React 不再渲染,相机也能滑行就位
+    const lerpK = 1 - Math.pow(0.0001, dt);
+    this.camera.position.lerp(this.targetCameraPos, Math.min(0.25, lerpK * 3));
+    this.smoothLookAt.lerp(this.targetLookAt, Math.min(0.3, lerpK * 4));
+    this.camera.lookAt(this.smoothLookAt);
 
     // 出杆动画：加速冲向白球 → 触球瞬间回调 → 减速送杆 → 收起
     if (this.strikeAnim) {
@@ -1002,6 +1049,39 @@ export class Scene3D {
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    const target = new THREE.Vector3();
+    if (this.raycaster.ray.intersectPlane(this.tablePlane, target)) {
+      return { x: target.x, z: target.z };
+    }
+    return null;
+  }
+
+  /**
+   * 以指定瞄准角的第一人称目标相机位姿做射线(不经过平滑滞后的活相机)。
+   * 活相机 lerp 就位后与该位姿一致,用于确定性反算"屏幕点对应的台面点"
+   * (回归测试的基准真值)。位姿公式与 update() 第一人称分支一致
+   * (静止瞄准态,power=0)。
+   */
+  screenToTableAt(clientX: number, clientY: number, aimAngle: number, cameraAngle: number): { x: number; z: number } | null {
+    const cue = this.ballMeshes[0];
+    if (!cue) return this.screenToTable(clientX, clientY);
+    const angle = aimAngle + cameraAngle;
+    const cueX = cue.position.x;
+    const cueZ = cue.position.z;
+    this.virtualCam.aspect = this.camera.aspect;
+    this.virtualCam.updateProjectionMatrix();
+    this.virtualCam.position.set(
+      cueX - Math.sin(angle) * FP_CAM_DIST + Math.cos(angle) * FP_CAM_SIDE,
+      FP_CAM_HEIGHT,
+      cueZ + Math.cos(angle) * FP_CAM_DIST + Math.sin(angle) * FP_CAM_SIDE
+    );
+    this.virtualCam.lookAt(cueX + Math.sin(angle) * FP_LOOK_AHEAD, 0.03, cueZ - Math.cos(angle) * FP_LOOK_AHEAD);
+    this.virtualCam.updateMatrixWorld(true);
+
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.virtualCam);
     const target = new THREE.Vector3();
     if (this.raycaster.ray.intersectPlane(this.tablePlane, target)) {
       return { x: target.x, z: target.z };
