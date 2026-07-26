@@ -95,11 +95,31 @@ async function dragStrike(page, box, useTouch) {
   await new Promise(r => setTimeout(r, 300));
   const tapState = await gameState(page);
   ok('桌面: 轻点也能出杆(保底力度)', tapState && tapState.shot >= 1, JSON.stringify(tapState));
-  // 等回到玩家回合（可能经过对手回合，AI 连杆时较久）
-  await page.waitForFunction(() => {
-    const el = document.querySelector('.match-state p');
-    return el?.textContent === '你的回合';
-  }, { timeout: 150000 });
+  // 等回到玩家回合（可能经过对手回合，AI 连杆时较久；
+  // AI 犯规送出自由球时会进入"放置白球"，必须真实点击台面放置才能继续）
+  {
+    const deadline = Date.now() + 150000;
+    let backToPlayer = false;
+    while (Date.now() < deadline && !backToPlayer) {
+      const turn = await page.evaluate(() => document.querySelector('.match-state p')?.textContent);
+      if (turn === '你的回合') { backToPlayer = true; break; }
+      if (turn === '放置白球') {
+        // 在视口中下部尝试几个候选点,放到合法空位为止
+        const candidates = await page.evaluate(() => {
+          const r = document.querySelector('.viewport').getBoundingClientRect();
+          return [0.78, 0.68, 0.58, 0.85].map(fy => ({ x: r.x + r.width / 2, y: r.y + r.height * fy }));
+        });
+        for (const pt of candidates) {
+          await page.mouse.click(pt.x, pt.y);
+          await new Promise(r => setTimeout(r, 350));
+          const now = await page.evaluate(() => document.querySelector('.match-state p')?.textContent);
+          if (now !== '放置白球') break;
+        }
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    ok('桌面: 回到你的回合(自由球自动放置)', backToPlayer);
+  }
 
   // 塞球盘拖到顶部 → 高杆
   await page.evaluate(() => {});

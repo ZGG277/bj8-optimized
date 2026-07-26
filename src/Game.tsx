@@ -17,7 +17,6 @@ import {
   PHYSICS_DT,
   TABLE,
   type BilliardsWorld,
-  type CueSpin,
 } from './physics';
 import {
   beginMatch,
@@ -27,6 +26,8 @@ import {
 } from './match/match-machine';
 import { factsFromWorld } from './match/shot-facts';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from './match/types';
+import { useShotInput } from './input/use-shot-input';
+import { clampSpin, type ShotIntent } from './input/shot-input';
 import { Scene3D } from './Scene3D';
 import { BilliardsAudio } from './audio';
 
@@ -83,12 +84,9 @@ export default function Game() {
   const matchRef = useRef(match);
   useEffect(() => { matchRef.current = match; }, [match]);
   const [viewMode, setViewMode] = useState<ViewMode>('first');
-  const [aim, setAim] = useState(0);
-  const [power, setPower] = useState(58);
   const [rating] = useState(50);
   const [showCoach, setShowCoach] = useState(true);
   const [cameraAngle, setCameraAngle] = useState(0);
-  const [spin, setSpin] = useState<CueSpin>({ x: 0, y: 0 }); // 击球点：x 高低杆 y 左右塞
 
   const matchMessage = renderMatchMessage(match);
   const setMessage = useCallback((key: MatchMessageKey, params: MatchMessageParams = {}) => {
@@ -106,28 +104,45 @@ export default function Game() {
   const dragRef = useRef<{ aiming: boolean } | null>(null);
   const aimRef = useRef(0);
 
-  // 蓄力：右下角拉杆区下拉蓄力（拖拽距离=力度），空格为按住时间蓄力
-  const chargeRef = useRef<{ mode: 'drag' | 'time'; startY: number; startTime: number } | null>(null);
-  const powerRafRef = useRef<number | null>(null);
-  const powerRef = useRef(58);
-  const applyPower = useCallback((v: number) => {
-    const p = Math.min(100, Math.max(0, v));
-    powerRef.current = p;
-    setPower(p);
-  }, []);
-
-  // 瞄准：方向键按住持续加速
-  const aimKeysRef = useRef<{
-    left: boolean;
-    right: boolean;
-    leftStart: number;
-    rightStart: number;
-    raf: number | null;
-  }>({ left: false, right: false, leftStart: 0, rightStart: 0, raf: null });
-  const AIM_BASE_SPEED = 0.0008;
-  const AIM_ACCEL = 0.0012;
-
   const canAim = match.phase === 'aiming' && match.actor === 'player' && !worldView.moving;
+
+  // 出杆提交:输入层只给 ShotIntent,这里负责球杆动画与物理击球
+  const handleCommit = useCallback((intent: ShotIntent) => {
+    // 角度必须与 3D 中球杆朝向一致(第一人称含相机转角)
+    const angle = viewMode === 'overhead' ? aimRef.current : aimRef.current + cameraAngle;
+    const cueBall = getCueBall(worldRef.current);
+    if (!cueBall) return;
+
+    // 物理击球在球杆皮头接触球面的动画帧触发,保证"杆到球动"的同步感
+    const doShot = () => {
+      if (!strikeCueBall(worldRef.current, angle, intent.power, intent.spin)) return;
+      audioRef.current?.strike(intent.power);
+      playedEventsRef.current = 0;
+      setWorldView(cloneWorld(worldRef.current));
+      setMatch(m => ({ ...m, phase: 'rolling', messageKey: 'rolling', messageParams: {} }));
+    };
+
+    const scene = scene3DRef.current;
+    if (scene) {
+      scene.triggerStrike({ cueX: cueBall.x, cueZ: cueBall.z, angle, power: intent.power, spin: intent.spin, onContact: doShot });
+    } else {
+      doShot();
+    }
+  }, [viewMode, cameraAngle]);
+
+  // 出杆输入协调器:aim/spin/蓄力会话与键盘统一在此
+  const {
+    aim,
+    spin,
+    previewPower,
+    charging,
+    setAim,
+    setSpin,
+    beginCharge,
+    updateCharge,
+    cancelCharge,
+    releaseCharge,
+  } = useShotInput({ canShoot: canAim, onCommit: handleCommit });
 
   // 初始化/重置游戏
   const resetGame = useCallback(() => {
@@ -137,44 +152,7 @@ export default function Game() {
     setMatch(m => beginMatch(m));
     setViewMode('first');
     setAim(0);
-    setPower(58);
-  }, []);
-
-  // 拉杆区：按下开始蓄力
-  const startDragCharge = useCallback((clientY: number) => {
-    if (!canAim || chargeRef.current) return;
-    chargeRef.current = { mode: 'drag', startY: clientY, startTime: 0 };
-    applyPower(0);
-  }, [canAim, applyPower]);
-
-  // 拉杆区：下拉距离映射力度（每像素 0.6，约 167px 满力）
-  const updateDragCharge = useCallback((clientY: number) => {
-    const c = chargeRef.current;
-    if (!c || c.mode !== 'drag') return;
-    applyPower((clientY - c.startY) * 0.6);
-  }, [applyPower]);
-
-  // 空格：按住时间蓄力
-  const startTimeCharge = useCallback(() => {
-    if (!canAim || chargeRef.current) return;
-    chargeRef.current = { mode: 'time', startY: 0, startTime: performance.now() };
-    const loop = () => {
-      const c = chargeRef.current;
-      if (!c || c.mode !== 'time') return;
-      applyPower((performance.now() - c.startTime) * 0.06);
-      powerRafRef.current = requestAnimationFrame(loop);
-    };
-    powerRafRef.current = requestAnimationFrame(loop);
-  }, [canAim, applyPower]);
-
-  // 取消蓄力（不出杆）
-  const cancelCharge = useCallback(() => {
-    if (powerRafRef.current) {
-      cancelAnimationFrame(powerRafRef.current);
-      powerRafRef.current = null;
-    }
-    chargeRef.current = null;
-  }, []);
+  }, [setAim]);
 
   // 处理点击 3D 场景放置白球（自由球）
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -243,122 +221,6 @@ export default function Game() {
     setMatch(m => ({ ...m, phase: 'aiming', messageKey: 'placed', messageParams: {} }));
     setWorldView(cloneWorld(world));
   }, [setMessage]);
-
-  // 松开出杆
-  const releaseCharge = useCallback(() => {
-    const c = chargeRef.current;
-    if (!c) return;
-
-    if (powerRafRef.current) {
-      cancelAnimationFrame(powerRafRef.current);
-      powerRafRef.current = null;
-    }
-    chargeRef.current = null;
-
-    if (!canAim) return;
-
-    // 最低力度保证轻触也能出杆
-    const finalPower = Math.max(6, powerRef.current);
-
-    // 执行击球：角度必须与 3D 中球杆朝向一致（第一人称含相机转角）
-    const angle = viewMode === 'overhead' ? aim : aim + cameraAngle;
-    const cueBall = getCueBall(worldRef.current);
-    if (!cueBall) return;
-
-    // 物理击球在球杆皮头接触球面的动画帧触发，保证"杆到球动"的同步感
-    const doShot = () => {
-      if (!strikeCueBall(worldRef.current, angle, finalPower, spin)) return;
-      audioRef.current?.strike(finalPower);
-      playedEventsRef.current = 0;
-      setWorldView(cloneWorld(worldRef.current));
-      setMatch(m => ({ ...m, phase: 'rolling', messageKey: 'rolling', messageParams: {} }));
-    };
-
-    setPower(finalPower);
-    const scene = scene3DRef.current;
-    if (scene) {
-      scene.triggerStrike({ cueX: cueBall.x, cueZ: cueBall.z, angle, power: finalPower, spin, onContact: doShot });
-    } else {
-      doShot();
-    }
-  }, [canAim, aim, viewMode, cameraAngle, spin]);
-
-  // 键盘控制
-  useEffect(() => {
-    const aimLoop = () => {
-      const keys = aimKeysRef.current;
-      const now = performance.now();
-      let delta = 0;
-
-      if (keys.left) {
-        const elapsed = now - keys.leftStart;
-        delta -= AIM_BASE_SPEED + elapsed * AIM_ACCEL;
-      }
-      if (keys.right) {
-        const elapsed = now - keys.rightStart;
-        delta += AIM_BASE_SPEED + elapsed * AIM_ACCEL;
-      }
-
-      if (delta !== 0) {
-        setAim(a => clamp(a + delta, -0.72, 0.72));
-      }
-
-      if (keys.left || keys.right) {
-        keys.raf = requestAnimationFrame(aimLoop);
-      } else {
-        keys.raf = null;
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat) {
-        e.preventDefault();
-        startTimeCharge();
-        return;
-      }
-
-      if (!canAim) return;
-      if ((e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') && !aimKeysRef.current.left) {
-        e.preventDefault();
-        aimKeysRef.current.left = true;
-        aimKeysRef.current.leftStart = performance.now();
-        if (!aimKeysRef.current.raf) {
-          aimKeysRef.current.raf = requestAnimationFrame(aimLoop);
-        }
-      }
-      if ((e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') && !aimKeysRef.current.right) {
-        e.preventDefault();
-        aimKeysRef.current.right = true;
-        aimKeysRef.current.rightStart = performance.now();
-        if (!aimKeysRef.current.raf) {
-          aimKeysRef.current.raf = requestAnimationFrame(aimLoop);
-        }
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        releaseCharge();
-        return;
-      }
-      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
-        aimKeysRef.current.left = false;
-      }
-      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
-        aimKeysRef.current.right = false;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      if (powerRafRef.current) cancelAnimationFrame(powerRafRef.current);
-      if (aimKeysRef.current.raf) cancelAnimationFrame(aimKeysRef.current.raf);
-    };
-  }, [canAim, startTimeCharge, releaseCharge]);
 
   // 物理停止：事实推导 → 纯规则结算 → 原子提交 → 执行显式 effects
   // 相同一杆只结算一次（shotId 守卫，StrictMode 下不重复）
@@ -499,8 +361,8 @@ export default function Game() {
     scene.sync(worldView);
 
     const cue = getCueBall(worldView);
-    scene.update(cue?.x ?? 0, cue?.z ?? 0, power, match.phase);
-  }, [worldView, viewMode, cameraAngle, aim, power, match, spin]);
+    scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
+  }, [worldView, viewMode, cameraAngle, aim, previewPower, match, spin]);
 
   // 点哪打哪：把触点映射到台面坐标，瞄准线直接指向它
   const aimAtPointer = useCallback((clientX: number, clientY: number) => {
@@ -549,18 +411,17 @@ export default function Game() {
   // 触控调整瞄准按钮
   const adjustAim = (delta: number) => {
     if (!canAim) return;
-    setAim(a => clamp(a + delta, -0.72, 0.72));
+    setAim(a => a + delta);
   };
 
-  // 击球点拖拽：映射到 -1..1（x 高低杆，y 左右塞）
+  // 击球点拖拽：像素偏移经纯函数映射到单位圆（x 高低杆，y 左右塞）
   const updateSpinFromPointer = (e: React.PointerEvent) => {
     const el = e.currentTarget as HTMLElement;
     const rect = el.getBoundingClientRect();
-    const dx = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
-    const dy = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
-    const len = Math.hypot(dx, dy);
-    const scale = len > 1 ? 1 / len : 1;
-    setSpin({ x: -dy * scale, y: dx * scale });
+    setSpin(clampSpin(
+      { x: e.clientX - rect.left, y: e.clientY - rect.top },
+      { width: rect.width, height: rect.height },
+    ));
   };
 
   const activeNumbers = new Set(worldView.balls.filter(b => b.active).map(b => b.number));
@@ -738,22 +599,23 @@ export default function Game() {
           <div className="power-meter">
             <div className="power-meter-track">
               <div
-                className={`power-meter-fill ${power > 85 ? 'hot' : ''}`}
-                style={{ height: `${power}%` }}
+                className={`power-meter-fill ${previewPower > 85 ? 'hot' : ''}`}
+                style={{ height: `${previewPower}%` }}
               />
             </div>
-            <span className="power-num">{Math.round(power)}</span>
+            <span className="power-num">{Math.round(previewPower)}</span>
           </div>
           <div
-            className={`shoot-pad ${chargeRef.current ? 'charging' : ''} ${!canAim ? 'disabled' : ''}`}
+            className={`shoot-pad ${charging ? 'charging' : ''} ${!canAim ? 'disabled' : ''}`}
             onPointerDown={(e) => {
               e.preventDefault();
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              startDragCharge(e.clientY);
+              // 可用行程 = 按下点到安全底边距离,输入层会归一到 72-180px
+              beginCharge(e.clientY, window.innerHeight - e.clientY - 24);
             }}
             onPointerMove={(e) => {
               e.preventDefault();
-              updateDragCharge(e.clientY);
+              updateCharge(e.clientY);
             }}
             onPointerUp={(e) => {
               e.preventDefault();
