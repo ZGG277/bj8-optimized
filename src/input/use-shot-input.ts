@@ -14,12 +14,12 @@ import {
   type ShotIntent,
 } from './shot-input';
 
-const AIM_LIMIT = 0.72;
 const AIM_BASE_SPEED = 0.0008;
 const AIM_ACCEL = 0.0012;
 
-function clampAim(v: number) {
-  return Math.min(AIM_LIMIT, Math.max(-AIM_LIMIT, v));
+// 瞄准为全周角：幽灵球靶点范式允许 360° 旋转，取值归一到 (-π, π]
+function wrapAim(v: number) {
+  return Math.atan2(Math.sin(v), Math.cos(v));
 }
 
 export type ShotInputApi = {
@@ -63,7 +63,7 @@ export function useShotInput({ canShoot, onCommit }: Options): ShotInputApi {
   useEffect(() => { spinRef.current = spin; }, [spin]);
 
   const setAim: React.Dispatch<React.SetStateAction<number>> = useCallback((v) => {
-    setAimState(a => clampAim(typeof v === 'function' ? (v as (p: number) => number)(a) : v));
+    setAimState(a => wrapAim(typeof v === 'function' ? (v as (p: number) => number)(a) : v));
   }, []);
 
   const stopPreview = useCallback(() => {

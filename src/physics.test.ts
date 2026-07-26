@@ -1,3 +1,9 @@
+/*
+[INPUT]: 依赖 vitest 与 physics 物理内核的全部公开接口
+[OUTPUT]: 对外提供物理内核单元测试与手感指标（无导出），由 npm run check 执行
+[POS]: 物理层的可失败断言网：出杆、滑动/滚动、碰库、落袋、走位与边界；摆球走无参固定摆法保证可复现
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createInitialWorld,

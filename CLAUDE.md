@@ -8,7 +8,7 @@
 
 `src/`: 游戏业务源码，包含物理世界、match 纯规则状态机、input 出杆输入层、components HUD 控件、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
 
-`scripts/`: 浏览器交互、画面与场景对象验证脚本；verify-interaction 为真实指针回归门禁（桌面/竖屏/横屏/瞄准动画 39 断言），verify-break-group 为开球→连续进球→分组端到端复测，均经环境变量定位浏览器与页面。
+`scripts/`: 浏览器交互、画面与场景对象验证脚本；verify-interaction 为真实指针回归门禁（桌面/竖屏/横屏/瞄准/出杆 41 断言），verify-break-group 为开球→连续进球→分组端到端复测（16 断言），verify-screens 为视觉回归截图，均经环境变量定位浏览器与页面。
 
 `shots/`: 人工与自动化试玩截图，仅作为视觉回归证据，不作为运行时依赖。
 

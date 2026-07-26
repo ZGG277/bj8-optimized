@@ -105,12 +105,18 @@ function makeBall(number: number, x: number, z: number): BallState {
 }
 
 /**
- * 创建初始球局
+ * 创建初始球局。
+ * 不传 rng 时用固定摆法（测试与复现用确定性）；
+ * 传 rng（如 Math.random）时每局随机摆法：8 号居中、底角一全一花、
+ * 其余随机——固定摆法前三排几乎全是全色球，导致开球后首进花色
+ * 长期偏向全色，玩家/对手分组失去随机性。
  */
-export function createInitialWorld(): BilliardsWorld {
+export function createInitialWorld(rng?: () => number): BilliardsWorld {
   const balls: BallState[] = [makeBall(0, 0, TABLE.length * 0.25)];
 
-  const rackOrder = [1, 9, 2, 10, 8, 3, 4, 11, 5, 12, 13, 6, 14, 7, 15];
+  const rackOrder = rng
+    ? shuffledRackOrder(rng)
+    : [1, 9, 2, 10, 8, 3, 4, 11, 5, 12, 13, 6, 14, 7, 15];
   const diameter = TABLE.ballRadius * 2.015;
   const rowDepth = diameter * Math.sqrt(3) / 2;
   const apexZ = -TABLE.length * 0.25;
@@ -125,6 +131,24 @@ export function createInitialWorld(): BilliardsWorld {
   }
 
   return { balls, events: [], time: 0, moving: false, shot: 0, firstContact: null };
+}
+
+/** 随机摆球次序：8 号居中（索引 4），底角两位（索引 9/14）一全一花，其余乱序 */
+function shuffledRackOrder(rng: () => number): number[] {
+  const solids = [1, 2, 3, 4, 5, 6, 7];
+  const stripes = [9, 10, 11, 12, 13, 14, 15];
+  const pick = (arr: number[]) => arr.splice(Math.floor(rng() * arr.length), 1)[0];
+  const cornerA = rng() < 0.5 ? pick(solids) : pick(stripes);
+  const cornerB = cornerA < 8 ? pick(stripes) : pick(solids);
+  const rest = [...solids, ...stripes];
+  const order: number[] = [];
+  for (let i = 0; i < 15; i++) {
+    if (i === 4) order.push(8);
+    else if (i === 9) order.push(cornerA);
+    else if (i === 14) order.push(cornerB);
+    else order.push(rest.splice(Math.floor(rng() * rest.length), 1)[0]);
+  }
+  return order;
 }
 
 export function cloneWorld(world: BilliardsWorld): BilliardsWorld {

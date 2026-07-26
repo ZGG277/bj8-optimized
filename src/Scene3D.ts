@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
-[OUTPUT]: 对外提供场景渲染、双视角相机、瞄准辅助、合法目标环、球杆动画、自由球幽灵与 screenToTable / screenToTableAt(虚拟相机位姿)映射
+[OUTPUT]: 对外提供场景渲染、双视角相机、瞄准辅助（射线/分离线/幽灵球靶点及抓取命中查询）、合法目标环、球杆动画、自由球幽灵与 screenToTable / screenToTableAt(虚拟相机位姿)映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -25,9 +25,9 @@ const CUSHION_H = 0.038;
 const CUSHION_W = 0.048;
 // 第一人称杆后视角位姿基准（update() 与 screenToTableAt() 共用，禁两处各写一份）：
 // 相机在瞄准轴正后方，杆、瞄准线、视线共线；侧偏只留一丝保立体感
-const FP_CAM_DIST = 0.66;
+const FP_CAM_DIST = 0.72;
 const FP_CAM_SIDE = 0.015;
-const FP_CAM_HEIGHT = 0.3;
+const FP_CAM_HEIGHT = 0.16;
 const FP_LOOK_AHEAD = 0.42;
 const CORNER_R = TABLE.cornerPocketRadius;
 const SIDE_R = TABLE.sidePocketRadius;
@@ -63,6 +63,8 @@ export class Scene3D {
 
   private aimAngle = 0;
   private cameraAngle = 0;
+  /** 俯身角度微调：叠加在第一人称相机高度上（含虚拟相机） */
+  private camLift = 0;
   private viewMode: 'first' | 'overhead' = 'first';
   private phase = 'intro';
 
@@ -81,6 +83,10 @@ export class Scene3D {
   private ghostRing!: THREE.Mesh;
   private lampGroup?: THREE.Group;
   private ghostCue!: THREE.Mesh;
+  /** 瞄准幽灵球靶点：白球影子球 + 定位环，玩家点击台面定位 */
+  private aimGhost = new THREE.Group();
+  /** 玩家指定的靶点距离（白球心到影子球心）；null = 自动取首触点 */
+  private aimGhostDist: number | null = null;
   private targetRings: THREE.Mesh[] = [];
   private legalTargets = new Set<number>();
   private spin: { x: number; y: number } = { x: 0, y: 0 };
@@ -304,53 +310,61 @@ export class Scene3D {
       addCushion(shortSegLen, 0, z, side === -1 ? Math.PI / 2 : -Math.PI / 2);
     }
 
-    // ---- 袋口（皮口唇边 + 喉管 + 金属压板） ----
+    // ---- 袋口（皮口唇边 + 喉管 + 金属件） ----
     // 真实中八袋口：角袋内沿约 105mm、中袋约 120mm；洞口呢料切边被皮口
-    // 唇边压住收小，袋内是深色皮革喉管而非裸露黑洞；角袋有金属护角。
+    // 唇边滚边压住收小，袋内是深色皮革喉管而非裸露黑洞；
+    // 角袋外沿有金属唇环，台帮转角顶面贴金属护板。
     const MOUTH_R_CORNER = 0.0525;   // 角袋视觉开口半径（105mm 内沿）
     const MOUTH_R_SIDE = 0.06;       // 中袋视觉开口半径（120mm 内沿）
-    const LIP_OVERHANG = 0.024;      // 皮口唇边外扩，盖住洞口呢料切边
+    const LIP_OVERHANG = 0.009;      // 皮口唇边外扩，盖住洞口呢料切边
     const THROAT_DEPTH = 0.14;       // 皮口喉管纵深
 
     const linerMat = new THREE.MeshStandardMaterial({ color: 0x030303, roughness: 1, side: THREE.BackSide });
     const throatMat = new THREE.MeshStandardMaterial({
       map: leatherTex,
-      color: 0x3d2c1c,
+      color: 0x54402a, // 深棕皮革，远壁能接到灯光，不是纯黑死洞
       roughness: 0.9,
       side: THREE.BackSide, // 从袋口俯视看到的是喉管内壁
     });
     const lipMat = new THREE.MeshPhysicalMaterial({
       map: leatherTex,
-      color: 0x6b4a30,
-      roughness: 0.8,
-      clearcoat: 0.15,
-      clearcoatRoughness: 0.6,
+      color: 0x5d3f28,
+      roughness: 0.78,
+      clearcoat: 0.2,
+      clearcoatRoughness: 0.55,
+      side: THREE.DoubleSide, // 车削剖面外降段法线朝下，双面渲染避免唇边读成黑色
     });
     const brassMat = new THREE.MeshPhysicalMaterial({
-      color: 0xb08d3e,
-      metalness: 0.9,
-      roughness: 0.32,
-      envMapIntensity: 1.2,
+      color: 0x8a6f34, // 仿古铜，降低金属眩光
+      metalness: 0.85,
+      roughness: 0.45,
+      envMapIntensity: 0.9,
     });
+    // 皮口唇边剖面：从喉管内壁向上卷起、微凸后落回呢面，形成包边滚边
+    const lipProfile = (mouthR: number) => [
+      new THREE.Vector2(mouthR * 0.97, -0.004),
+      new THREE.Vector2(mouthR, 0.001),
+      new THREE.Vector2(mouthR + 0.005, 0.0045),
+      new THREE.Vector2(mouthR + LIP_OVERHANG, 0.0005),
+    ];
 
     for (const [px, pz] of POCKET_POS) {
       const isSide = pz === 0;
       const pr = isSide ? SIDE_R : CORNER_R;
+      const sx = Math.sign(px);
       const mouthR = isSide ? MOUTH_R_SIDE : MOUTH_R_CORNER;
       const group = new THREE.Group();
       group.position.set(px, 0, pz);
 
-      // 皮口唇边：平环压住洞口呢料切边，把视觉开口收到真实尺寸；
-      // 中袋用弧形唇边（弧心朝向台面），两端藏进角衬与库边之下
+      // 皮口唇边：车削滚边压住洞口呢料切边，把视觉开口收到真实尺寸；
+      // 中袋用弧形唇边（弧心朝向台面），两端藏进圆鼻与库边之下
       const lipArc = isSide ? Math.PI * 1.1 : Math.PI * 2;
-      const lipStart = isSide && Math.sign(px) > 0 ? Math.PI - lipArc / 2
-        : isSide ? -lipArc / 2 : 0;
+      const lipStart = isSide ? -sx * Math.PI / 2 - lipArc / 2 : 0;
       const lip = new THREE.Mesh(
-        new THREE.RingGeometry(mouthR, mouthR + LIP_OVERHANG, 28, 1, lipStart, lipArc),
+        new THREE.LatheGeometry(lipProfile(mouthR), 28, lipStart, lipArc),
         lipMat
       );
-      lip.rotation.x = -Math.PI / 2;
-      lip.position.y = 0.0025;
+      lip.castShadow = true;
       lip.receiveShadow = true;
       group.add(lip);
 
@@ -361,6 +375,17 @@ export class Scene3D {
       );
       throat.position.y = 0.001 - THROAT_DEPTH / 2;
       group.add(throat);
+
+      // 袋腔背壁：洞口外半沿的皮面立墙，从呢面升到台帮底，
+      // 把袋口后方的黑色空腔封闭成皮革衬里的袋腔
+      const wallArc = Math.PI * 0.9;
+      const wallThetaC = Math.atan2(isSide ? sx : px, isSide ? 0 : pz); // 朝库边/台帮方向
+      const wall = new THREE.Mesh(
+        new THREE.CylinderGeometry(pr, pr, RAIL_H + 0.006, 20, 1, true, wallThetaC - wallArc / 2, wallArc),
+        throatMat
+      );
+      wall.position.y = (RAIL_H + 0.006) / 2 - 0.001;
+      group.add(wall);
 
       // 喉管之下的黑色纵深（内衬 + 袋底）
       const liner = new THREE.Mesh(
@@ -375,16 +400,24 @@ export class Scene3D {
       group.add(bottom);
 
       if (!isSide) {
-        // 角袋铜饰板：盖板贴住台帮顶 + 向下延伸的立边裙板，形成金属袋口压板
-        const capArc = Math.PI * 0.7;
-        const cap = new THREE.Mesh(new THREE.CylinderGeometry(pr * 1.05, pr * 1.15, 0.012, 24, 1, false,
-          Math.atan2(-pz, -px) - capArc / 2, capArc), brassMat);
-        cap.position.y = RAIL_H + 0.001;
-        group.add(cap);
-        const skirt = new THREE.Mesh(new THREE.CylinderGeometry(pr * 1.06, pr * 1.1, 0.016, 24, 1, true,
-          Math.atan2(-pz, -px) - capArc / 2, capArc), brassMat);
-        skirt.position.y = RAIL_H - 0.007;
-        group.add(skirt);
+        // 角袋金属唇环：袋口朝外半沿的黄铜包边（弧心对准台帮转角）
+        const rimArc = Math.PI * 0.85;
+        const rimGeo = new THREE.TorusGeometry(mouthR + 0.007, 0.004, 8, 32, rimArc);
+        rimGeo.rotateZ(Math.atan2(pz, px) - rimArc / 2);
+        const rim = new THREE.Mesh(rimGeo, brassMat);
+        rim.rotation.x = Math.PI / 2;
+        rim.position.y = 0.0045;
+        group.add(rim);
+
+        // 台帮转角金属护板：盖住两条台帮在袋口上方留出的小缺口，
+        // 3/4 扇形、缺口朝台面——小尺寸 + 仿古铜，不抢戏
+        const plate = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.035, 0.035, 0.003, 24, 1, false,
+            Math.atan2(-sx, -Math.sign(pz)) + Math.PI / 4, Math.PI * 1.5),
+          brassMat
+        );
+        plate.position.set(sx * CUSHION_W, RAIL_H + 0.0015, Math.sign(pz) * CUSHION_W);
+        group.add(plate);
 
         // 袋口上方内阴影环（增强洞口纵深感）；中袋洞口半藏在圆鼻与
         // 台帮下，平面阴影环会在呢面上读成深色"C 形"，只对角袋使用
@@ -625,6 +658,35 @@ export class Scene3D {
     );
     this.ghostCue.visible = false;
     this.scene.add(this.ghostCue);
+
+    // 瞄准幽灵球靶点：影子球 + 定位环，玩家点击台面即把靶点放到所点处，
+    // 白球过靶点中心的延长线就是杆向（ghost-ball 瞄准法）
+    const ghostBall = new THREE.Mesh(
+      new THREE.SphereGeometry(R, 32, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, depthWrite: false })
+    );
+    ghostBall.position.y = R;
+    this.aimGhost.add(ghostBall);
+    const ghostHalo = new THREE.Mesh(
+      new THREE.RingGeometry(R * 1.12, R * 1.38, 28),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false })
+    );
+    ghostHalo.rotation.x = -Math.PI / 2;
+    ghostHalo.position.y = 0.003;
+    this.aimGhost.add(ghostHalo);
+    this.aimGhost.visible = false;
+    this.aimGroup.add(this.aimGhost);
+  }
+
+  /** 设置瞄准幽灵球靶点距离（白球心起算）；null = 自动取首触点距离 */
+  setAimGhostDist(d: number | null) {
+    this.aimGhostDist = d;
+  }
+
+  /** 瞄准幽灵球当前台面位置（不可见时 null），供输入层做抓取命中判定 */
+  aimGhostPos(): { x: number; z: number } | null {
+    if (!this.aimGhost.visible) return null;
+    return { x: this.aimGhost.position.x, z: this.aimGhost.position.z };
   }
 
   setGhostCue(x: number, z: number, show: boolean) {
@@ -705,7 +767,9 @@ export class Scene3D {
     const analyticFrom = new THREE.Vector3(contact.x - dx * pull, y, contact.z - dz * pull);
     const from = this.cueGroup.visible ? this.cueGroup.position.clone() : analyticFrom;
 
-    this.cueGroup.rotation.set(-0.1, angle, 0, 'YXZ');
+    // 杆身局部 +z 是杆尾方向，须指向瞄准反方向 (-sin, +cos)，
+    // 故 yaw 取 -angle——取 +angle 杆身会左右镜像，读成"斜着拨球"
+    this.cueGroup.rotation.set(-0.1, -angle, 0, 'YXZ');
     // 加速时长随拉杆距离变化：轻杆快、重杆行程长一点
     const dist = from.distanceTo(contact);
     const dur1 = Math.min(0.22, Math.max(0.08, dist * 0.55));
@@ -742,6 +806,11 @@ export class Scene3D {
 
   setCameraAngle(angle: number) {
     this.cameraAngle = angle;
+  }
+
+  /** 俯身角度微调（米，正=抬高、负=压低），由视角工具条驱动 */
+  setCamLift(v: number) {
+    this.camLift = v;
   }
 
   setAim(angle: number) {
@@ -821,11 +890,12 @@ export class Scene3D {
     this.updateAimGuide();
   }
 
-  /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球 */
+  /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球+靶点影子球 */
   private updateAimGuide() {
     const world = this.lastWorld;
     const show = this.phase === 'aiming' && world && !world.moving && world.balls[0].active;
     this.aimLine.visible = this.objLine.visible = this.tanLine.visible = this.ghostRing.visible = !!show;
+    this.aimGhost.visible = !!show;
     if (!show || !world) return;
 
     const cue = world.balls[0];
@@ -857,6 +927,14 @@ export class Scene3D {
     if (dx < -1e-9) { const t = (-xL - px) / dx; if (t < cushionT) { cushionT = t; cushionAxis = 'x'; } }
     if (dz > 1e-9) { const t = (zL - pz) / dz; if (t < cushionT) { cushionT = t; cushionAxis = 'z'; } }
     if (dz < -1e-9) { const t = (-zL - pz) / dz; if (t < cushionT) { cushionT = t; cushionAxis = 'z'; } }
+
+    // 瞄准幽灵球靶点：默认贴首触点（球或库）；玩家点击定位过则取点击距离，
+    // 钳到首触点——点在目标球后就自动贴成标准 ghost-ball 触点球位，
+    // 点在近处则白球过靶心的延长线仍是杆向
+    const contactDist = hitBall !== null && bestT < cushionT ? bestT
+      : cushionT < Infinity ? cushionT : 1.2;
+    const ghostDist = Math.min(this.aimGhostDist ?? contactDist, contactDist);
+    this.aimGhost.position.set(px + dx * ghostDist, 0, pz + dz * ghostDist);
 
     const y = 0.004;
     const setLine = (line: THREE.Line, x1: number, z1: number, x2: number, z2: number) => {
@@ -928,7 +1006,7 @@ export class Scene3D {
       const dist = FP_CAM_DIST + power * 0.0022;
       this.targetCameraPos.set(
         cueX - Math.sin(angle) * dist + Math.cos(angle) * FP_CAM_SIDE,
-        FP_CAM_HEIGHT + power * 0.0004,
+        FP_CAM_HEIGHT + this.camLift + power * 0.0004,
         cueZ + Math.cos(angle) * dist + Math.sin(angle) * FP_CAM_SIDE
       );
       this.targetLookAt.set(
@@ -960,11 +1038,15 @@ export class Scene3D {
           R + 0.012 + this.spin.x * R * 0.25,
           cueZ + Math.cos(angle) * gap + pz
         );
-        this.cueGroup.rotation.set(-0.1, angle, 0, 'YXZ');
+        this.cueGroup.rotation.set(-0.1, -angle, 0, 'YXZ'); // yaw 取负：杆尾指向瞄准反向，理由见 triggerStrike
       } else {
         this.cuePull = 0;
       }
     }
+
+    // sync() 先于本方法被调用，updateAimGuide 依赖的 phase 在此刻才更新——
+    // 用最新 phase 重算一次瞄准辅助，避免开局幽灵球要等下一次交互才显示
+    this.updateAimGuide();
   }
 
   /** 渲染循环：推进落袋动画并渲染 */
@@ -1072,7 +1154,7 @@ export class Scene3D {
     this.virtualCam.updateProjectionMatrix();
     this.virtualCam.position.set(
       cueX - Math.sin(angle) * FP_CAM_DIST + Math.cos(angle) * FP_CAM_SIDE,
-      FP_CAM_HEIGHT,
+      FP_CAM_HEIGHT + this.camLift,
       cueZ + Math.cos(angle) * FP_CAM_DIST + Math.sin(angle) * FP_CAM_SIDE
     );
     this.virtualCam.lookAt(cueX + Math.sin(angle) * FP_LOOK_AHEAD, 0.03, cueZ - Math.cos(angle) * FP_LOOK_AHEAD);

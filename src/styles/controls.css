@@ -33,10 +33,10 @@
   color: #09120e;
 }
 
-/* 控制区 */
+/* 控制区：信息居左，方向微调/击球点盘/出杆区依次靠右 */
 .control-deck {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: 14px;
   padding: 0 14px;
@@ -245,12 +245,16 @@
   filter: grayscale(0.7);
 }
 
-/* 竖屏手机控件尺寸 */
+/* 竖屏手机控件尺寸（信息隐藏后方向微调贴右收拢） */
 @media (max-width: 640px) {
   .control-deck {
-    grid-template-columns: 80px 1fr 120px;
+    grid-template-columns: 1fr auto auto;
     gap: 8px;
     padding: 0 10px;
+  }
+
+  .aim-controls {
+    justify-self: end;
   }
 
   .aim-controls button {
@@ -318,11 +322,8 @@
     display: none;
   }
 
+  /* 横屏：方向微调不再钉在左下，与击球点盘一起收入右下控件组 */
   .aim-controls {
-    position: fixed;
-    left: 10px;
-    bottom: 10px;
-    z-index: 9;
     background: rgba(17,21,20,0.7);
     border-radius: 8px;
     padding: 4px;

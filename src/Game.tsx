@@ -104,8 +104,12 @@ export default function Game() {
   const playedEventsRef = useRef(0);
 
   // 触摸/鼠标拖拽相关
-  const dragRef = useRef<{ aiming: boolean; downX: number; downY: number; dragging: boolean } | null>(null);
+  const dragRef = useRef<{ mode: 'aim' | 'ghost' | 'line'; downX: number; downY: number; dragging: boolean } | null>(null);
   const aimRef = useRef(0);
+  // 幽灵球靶点距离（白球心到影子球心）；null = 自动贴首触点
+  const aimGhostDistRef = useRef<number | null>(null);
+  // 俯身角度微调（米），视角工具条 ▲▼ 驱动
+  const [camLift, setCamLift] = useState(0);
 
   const canAim = match.phase === 'aiming' && match.actor === 'player' && !worldView.moving;
 
@@ -115,6 +119,8 @@ export default function Game() {
     const angle = viewMode === 'overhead' ? aimRef.current : aimRef.current + cameraAngle;
     const cueBall = getCueBall(worldRef.current);
     if (!cueBall) return;
+    // 出杆后靶点回自动：下一杆幽灵球重新贴首触点
+    aimGhostDistRef.current = null;
 
     // 物理击球在球杆皮头接触球面的动画帧触发,保证"杆到球动"的同步感
     const doShot = () => {
@@ -148,14 +154,15 @@ export default function Game() {
     commitShot,
   } = useShotInput({ canShoot: canAim, onCommit: handleCommit });
 
-  // 初始化/重置游戏
+  // 初始化/重置游戏（每局随机摆法，分组归属由首进花色自然决定）
   const resetGame = useCallback(() => {
-    const fresh = createInitialWorld();
+    const fresh = createInitialWorld(Math.random);
     worldRef.current = fresh;
     setWorldView(cloneWorld(fresh));
     setMatch(m => beginMatch(m));
     setViewMode('first');
     setAim(0);
+    aimGhostDistRef.current = null;
   }, [setAim]);
 
   // 处理点击 3D 场景放置白球（自由球）
@@ -332,8 +339,10 @@ export default function Game() {
     aimRef.current = aim;
     scene.setViewMode(viewMode);
     scene.setCameraAngle(cameraAngle);
+    scene.setCamLift(camLift);
     scene.setAim(aim);
     scene.setSpin(spin);
+    scene.setAimGhostDist(aimGhostDistRef.current);
     // 合法目标高亮：只在玩家回合显示
     if (match.phase === 'aiming' && match.actor === 'player' && !worldView.moving) {
       scene.setLegalTargets(legalNumbers(worldView, 'player', match.playerGroup));
@@ -344,13 +353,16 @@ export default function Game() {
 
     const cue = getCueBall(worldView);
     scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
-  }, [worldView, viewMode, cameraAngle, aim, previewPower, match, spin]);
+  }, [worldView, viewMode, cameraAngle, camLift, aim, previewPower, match, spin]);
 
   // 点哪打哪:把触点映射到台面坐标,瞄准线直接指向它。
   // 第一人称相机绕白球刚性随转,屏幕点的方位偏移 φ 与当前瞄准角无关
   // (探针实测映射 f(a)=a+φ),因此按下时刻的活相机单次映射即为正解——
   // 它指向玩家此刻看到的那个台面点;不存在不动点,迭代只会把瞄准推走。
-  const aimAtPointer = useCallback((clientX: number, clientY: number) => {
+  // 瞄准角全周无钳制(useShotInput 内部归一到 (-π,π]),相机随瞄准整周转。
+  // keepDist: 抓瞄准线拖拽时只转角度,幽灵球靶点距离保持不变;
+  // 否则触点距离记为靶点距离,影子球落在所点处(超出首触点由场景钳回)。
+  const aimAtPointer = useCallback((clientX: number, clientY: number, keepDist = false) => {
     const scene = scene3DRef.current;
     if (!scene) return;
     const hit = scene.screenToTable(clientX, clientY);
@@ -359,23 +371,70 @@ export default function Game() {
     if (!cue || !cue.active) return;
     const dx = hit.x - cue.x;
     const dz = hit.z - cue.z;
-    if (Math.hypot(dx, dz) < 0.035) return; // 离白球太近不响应,防抖动
+    const dist = Math.hypot(dx, dz);
+    if (dist < 0.035) return; // 离白球太近不响应,防抖动
+    if (!keepDist) aimGhostDistRef.current = dist;
     const worldAngle = Math.atan2(dx, -dz);
     const base = viewMode === 'first' ? cameraAngle : 0;
-    setAim(clamp(worldAngle - base, -0.72, 0.72));
-  }, [viewMode, cameraAngle]);
+    setAim(worldAngle - base);
+  }, [viewMode, cameraAngle, setAim]);
+
+  // 抓影子球挪位:影子球跟随指针落到台面任意位置(不限角度),
+  // 白球过影子球心的延长线即杆向
+  const moveGhostTo = useCallback((clientX: number, clientY: number) => {
+    const scene = scene3DRef.current;
+    if (!scene) return;
+    const hit = scene.screenToTable(clientX, clientY);
+    if (!hit) return;
+    const cue = getCueBall(worldRef.current);
+    if (!cue || !cue.active) return;
+    const m = TABLE.ballRadius;
+    const gx = clamp(hit.x, -TABLE.width / 2 + m, TABLE.width / 2 - m);
+    const gz = clamp(hit.z, -TABLE.length / 2 + m, TABLE.length / 2 - m);
+    const dx = gx - cue.x;
+    const dz = gz - cue.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 0.05) return; // 影子球不能贴到白球上
+    aimGhostDistRef.current = dist;
+    const worldAngle = Math.atan2(dx, -dz);
+    const base = viewMode === 'first' ? cameraAngle : 0;
+    setAim(worldAngle - base);
+  }, [viewMode, cameraAngle, setAim]);
+
+  // 指针落点判定:幽灵球上=抓球挪位;瞄准线段上=抓线转角;其余=点哪打哪
+  const pickDragMode = useCallback((clientX: number, clientY: number): 'aim' | 'ghost' | 'line' => {
+    const scene = scene3DRef.current;
+    const cue = getCueBall(worldRef.current);
+    if (!scene || !cue) return 'aim';
+    const ghost = scene.aimGhostPos();
+    if (!ghost) return 'aim';
+    const hit = scene.screenToTable(clientX, clientY);
+    if (!hit) return 'aim';
+    if (Math.hypot(hit.x - ghost.x, hit.z - ghost.z) < 0.08) return 'ghost';
+    const lx = ghost.x - cue.x;
+    const lz = ghost.z - cue.z;
+    const len = Math.hypot(lx, lz);
+    if (len > 0.06) {
+      const t = ((hit.x - cue.x) * lx + (hit.z - cue.z) * lz) / (len * len);
+      const perp = Math.abs((hit.x - cue.x) * lz - (hit.z - cue.z) * lx) / len;
+      if (t > 0.05 && t < 1.05 && perp < 0.022) return 'line';
+    }
+    return 'aim';
+  }, []);
 
   // 触摸/鼠标拖拽调整瞄准。
-  // 拖拽死区:按下已采样一次;相机随新瞄准角转动的过渡期内,手指的
-  // 微小抖动(轻点附带几像素位移)若再次采样,会用"正在旋转的相机"
-  // 二次采样把瞄准带偏几度。8px 死区内的移动不重复采样,超出才进入拖拽。
+  // 拖拽死区:按下已采样一次(抓影子球除外,它等拖动);相机随新瞄准角转动的
+  // 过渡期内,手指的微小抖动(轻点附带几像素位移)若再次采样,会用"正在旋转
+  // 的相机"二次采样把瞄准带偏几度。8px 死区内的移动不重复采样,超出才进入拖拽。
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (match.phase === 'placing') return; // 放置模式交给 click 处理
     if (!canAim) return;
-    dragRef.current = { aiming: true, downX: e.clientX, downY: e.clientY, dragging: false };
+    const mode = pickDragMode(e.clientX, e.clientY);
+    dragRef.current = { mode, downX: e.clientX, downY: e.clientY, dragging: false };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    aimAtPointer(e.clientX, e.clientY);
-  }, [canAim, match.phase, aimAtPointer]);
+    if (mode === 'ghost') return; // 抓影子球:按下不跳变,等拖动
+    aimAtPointer(e.clientX, e.clientY, mode === 'line');
+  }, [canAim, match.phase, pickDragMode, aimAtPointer]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     // 放置模式：幽灵球预览
@@ -386,13 +445,14 @@ export default function Game() {
       return;
     }
     const drag = dragRef.current;
-    if (!drag?.aiming || !canAim) return;
+    if (!drag || !canAim) return;
     if (!drag.dragging) {
       if (Math.hypot(e.clientX - drag.downX, e.clientY - drag.downY) < 8) return;
       drag.dragging = true;
     }
-    aimAtPointer(e.clientX, e.clientY);
-  }, [canAim, match.phase, aimAtPointer]);
+    if (drag.mode === 'ghost') moveGhostTo(e.clientX, e.clientY);
+    else aimAtPointer(e.clientX, e.clientY, drag.mode === 'line');
+  }, [canAim, match.phase, aimAtPointer, moveGhostTo]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     dragRef.current = null;
@@ -482,6 +542,7 @@ export default function Game() {
             viewMode={viewMode}
             onViewMode={setViewMode}
             onRotate={(dir) => setCameraAngle(a => a + dir * Math.PI / 4)}
+            onElevate={(dir) => setCamLift(v => clamp(v + dir * 0.03, -0.02, 0.22))}
           />
 
           <div className="room-label">
@@ -525,17 +586,17 @@ export default function Game() {
         )}
       </section>
 
-      {/* 控制区 */}
+      {/* 控制区：信息居左，方向微调/击球点盘/出杆区依次靠右 */}
       <footer className="control-deck">
-        <AimControls disabled={!canAim} onAdjust={(d) => setAim(a => a + d)} />
-
-        <SpinControl spin={spin} disabled={!canAim} onSpinChange={setSpin} />
-
         {/* 信息 */}
         <div className="match-message">
           <span>{matchMessage}</span>
           {!worldView.moving && <small>瞄好停一拍再出杆</small>}
         </div>
+
+        <AimControls disabled={!canAim} onAdjust={(d) => setAim(a => a + d)} />
+
+        <SpinControl spin={spin} disabled={!canAim} onSpinChange={setSpin} />
 
         <ShootControl
           disabled={!canAim}

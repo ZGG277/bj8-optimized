@@ -6,7 +6,7 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 ## 成员清单
 
-`ViewToolbar.tsx`: 视角工具条（第一人称/俯视/左右转）,aria-pressed 与唯一 aria-label,pointerdown 拦截冒泡，点击不改变瞄准角。
+`ViewToolbar.tsx`: 视角工具条（第一人称/俯视/左右转/俯身角度▲▼微调）,aria-pressed 与唯一 aria-label,pointerdown 拦截冒泡，点击不改变瞄准角。
 
 `AimControls.tsx`: 瞄准微调按钮组，禁用同时以透明度与删除线表达，不只依赖颜色。
 
