@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖 matchMessage、canAim、spin、charging、previewPower、走位规划状态与事件回调
-[OUTPUT]: 渲染控制区（消息提示、💡 走位按钮三态常驻、瞄准微调、击球点盘、出杆区）
+[INPUT]: 依赖 canAim、spin、charging、previewPower、走位规划/复盘可见状态与事件回调
+[OUTPUT]: 桌面渲染完整控制区；竖屏渲染右侧灯泡、可展开击球点与长行程合一出杆控件
 [POS]: HUD 组件层，组合 AimControls / SpinControl / ShootControl；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -11,16 +11,16 @@ import type { CueSpin } from '../physics';
 import type { PositionPlanStatus } from '../hooks/usePositionPlan';
 
 interface ControlDeckProps {
-  matchMessage: string;
-  worldMoving: boolean;
   canAim: boolean;
-  /** 玩家回合（aiming + actor=player + 球静止）：💡 按钮可见性唯一判据 */
+  /** 玩家回合（aiming + actor=player + 球静止）；有复盘时灯泡跨回合保留 */
   playerTurn: boolean;
   spin: CueSpin;
   charging: boolean;
   previewPower: number;
   breaking: boolean;
   planStatus: PositionPlanStatus;
+  guidanceVisible: boolean;
+  hasReview: boolean;
   onAimAdjust: (d: number) => void;
   onSpinChange: (spin: CueSpin) => void;
   /** 💡 点击：ready=打开引导 / showing=关闭引导（与提示条 ✕ 等价）；其余态 disabled 不会触发 */
@@ -33,8 +33,6 @@ interface ControlDeckProps {
 }
 
 export function ControlDeck({
-  matchMessage,
-  worldMoving,
   canAim,
   playerTurn,
   spin,
@@ -42,6 +40,8 @@ export function ControlDeck({
   previewPower,
   breaking,
   planStatus,
+  guidanceVisible,
+  hasReview,
   onAimAdjust,
   onSpinChange,
   onTogglePlan,
@@ -55,7 +55,7 @@ export function ControlDeck({
   //   is-lit  = ready（可点击打开）
   //   is-open = showing（引导展示中，点击=关闭，与 ✕ 等价）
   //   is-dim  = computing（呼吸）/ failed / idle（灰静态，disabled）
-  // 非玩家回合用 visibility 隐藏而非卸载——保持 control-deck 网格列稳定，避免布局跳动破版
+  // 非玩家回合通常隐藏；但上一杆复盘存在时必须保留灯泡，让用户仍能一键熄灭全部提示。
   const planStateClass =
     planStatus === 'ready'
       ? 'is-lit'
@@ -64,24 +64,20 @@ export function ControlDeck({
         : planStatus === 'computing'
           ? 'is-dim is-computing'
           : 'is-dim';
-  const planDisabled = planStatus !== 'ready' && planStatus !== 'showing';
+  const planDisabled = planStatus !== 'ready' && planStatus !== 'showing' && !hasReview;
 
   return (
     <footer className="control-deck">
-      <div className="match-message">
-        <span>{matchMessage}</span>
-        {!worldMoving && <small>瞄好停一拍再出杆</small>}
-      </div>
-
       <button
         type="button"
-        className={`plan-button ${planStateClass}`}
-        style={{ visibility: playerTurn ? 'visible' : 'hidden' }}
+        className={`plan-button ${planStateClass} ${guidanceVisible ? 'guidance-on' : 'guidance-off'}`}
+        style={{ visibility: playerTurn || hasReview ? 'visible' : 'hidden' }}
         aria-label="走位规划"
         disabled={planDisabled}
         onClick={onTogglePlan}
       >
-        <strong>{planStatus === 'computing' ? '计算中' : '💡 走位'}</strong>
+        <span aria-hidden="true">💡 </span>
+        <strong>{planStatus === 'computing' ? '计算中' : '走位'}</strong>
       </button>
 
       <AimControls disabled={!canAim} onAdjust={onAimAdjust} />

@@ -16,6 +16,8 @@
 
 `README.md`: 项目说明（玩法、快速开始、质量门禁、浏览器回归、妙搭部署）。
 
+`MOBILE_PORTRAIT_V12_ACCEPTANCE.md`: `codex/mobile-portrait-v1.2-20260728` 的竖屏信息架构、单手交互决策、30 项真实触控证据与人工验收重点。
+
 `package.json`: 本实验场的依赖与命令入口；`npm run check` 为 typecheck + 单测 + 构建的统一提交门禁。
 
 `package-lock.json`: npm 依赖锁文件，保证本地与验证环境依赖一致。

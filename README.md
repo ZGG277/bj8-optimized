@@ -2,6 +2,8 @@
 
 Vite + React + Three.js 的 3D 中式八球（黑八）单机游戏：240 Hz 确定性物理内核、纯规则状态机、第一人称/俯视共享世界杆向、360° 粗瞄 + 近袋局部精瞄、杆法（高低杆与加塞）、AI 陪练对手「顾燃」、💡 走位规划（蒙特卡洛 3 层前瞻搜索连续 1–3 杆方案，含清组转 8 号、轨迹播放与走位区域展示）。
 
+v1.2.0 采用手机竖屏优先 HUD：34px 单行球组状态、右侧单手控制轨、球桌内方向微调、力度/出杆合一长控件、可展开击球点与可拖动规划/复盘浮层。
+
 线上版（飞书妙搭托管）：https://lg22l37ytz.aiforce.cloud/app/app_17atze3ahyj
 
 ## 快速开始
@@ -15,6 +17,7 @@ npm run dev        # 默认 http://localhost:5173，--host 已开
 
 ```bash
 npm run check      # typecheck + vitest 单测 + vite build，提交前必过
+npm run test:mobile # 390×844 真实触控专项门禁（需先启动下方本地浏览器）
 ```
 
 - 物理内核单测：`src/physics.test.ts`（含手感指标）
@@ -47,7 +50,8 @@ npx vite --port 5199 --strictPort &
 | `scripts/verify-break-group.mjs` | 开球→连续进球→分组端到端（16 断言） |
 | `scripts/verify-win8.mjs` | 清台后打进 8 号获胜与庆祝动效（5 断言） |
 | `scripts/verify-scoreboard-group.mjs` | 比分板球型图标跟随分组 |
-| `scripts/verify-mobile-spinpad.mjs` | 移动端击球点盘布局与球杆造型截图（8 断言） |
+| `scripts/verify-mobile-spinpad.mjs` | 移动端击球点盘布局与球杆造型截图（9 断言） |
+| `scripts/verify-mobile-portrait-v12.mjs` | v1.2.0 竖屏单手布局与真实触控专项（30 断言） |
 | `scripts/verify-position-plan.mjs` | 💡 走位规划与击球复盘集成（32 断言） |
 | `scripts/verify-screens.mjs` | 视觉回归截图（shots/01–06） |
 

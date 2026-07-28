@@ -1,11 +1,11 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口与 puppeteer-core
-[OUTPUT]: 竖屏击球点盘布局、桌面球杆造型断言及截图
+[OUTPUT]: 竖屏击球点小预览/大弹层布局、桌面球杆造型断言及截图
 [POS]: 移动端控件与球杆表现的浏览器视觉门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
  * 移动端击球点盘布局与球杆造型截图验证
- * 场景 A: 竖屏手机 390×844 (touch)，断言击球点盘固定在左下且加大(≥80px宽)，截图
+ * 场景 A: 竖屏手机 390×844 (touch)，断言右侧小预览可展开为 ≥120px 大母球且不压出杆区
  * 场景 B: 桌面 1280×800 瞄准时截图，目检球杆锥形与皮头
  * 前置: npx vite --port 5199 & ego lite headless :9333
  */
@@ -31,28 +31,42 @@ const browser = await puppeteer.connect({ browserURL: BROWSER_URL });
   await new Promise(r => setTimeout(r, 2500));
   await page.tap('button.start-btn');
   await new Promise(r => setTimeout(r, 1800));
+  if (await page.evaluate(() => window.__bj8?.match?.current?.phase === 'placing')) {
+    const spots = await page.evaluate(() => {
+      const r = document.querySelector('.viewport').getBoundingClientRect();
+      return [0.74, 0.8, 0.86].map(f => ({ x: r.left + r.width / 2, y: r.top + r.height * f }));
+    });
+    for (const spot of spots) {
+      await page.touchscreen.tap(spot.x, spot.y);
+      await new Promise(r => setTimeout(r, 250));
+      if (await page.evaluate(() => window.__bj8?.match?.current?.phase !== 'placing')) break;
+    }
+  }
 
   const rect = await page.evaluate(() => {
-    const el = document.querySelector('.spin-pad');
+    const el = document.querySelector('.spin-preview');
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
-    return { left: r.left, bottom: innerHeight - r.bottom, width: r.width, height: r.height, position: cs.position };
+    return { left: r.left, right: r.right, bottom: innerHeight - r.bottom, width: r.width, height: r.height };
   });
-  ok('竖屏: 击球点盘存在', !!rect);
+  ok('竖屏: 击球点小预览存在', !!rect);
   if (rect) {
-    ok('竖屏: 击球点盘固定定位', rect.position === 'fixed', rect.position);
-    ok('竖屏: 击球点盘贴左下', rect.left <= 20 && rect.bottom <= 20, `left=${rect.left.toFixed(0)} bottom=${rect.bottom.toFixed(0)}`);
-    ok('竖屏: 击球点盘加大(≥80px)', rect.width >= 80, `w=${rect.width.toFixed(0)} h=${rect.height.toFixed(0)}`);
+    ok('竖屏: 小预览位于右侧控制轨', rect.left >= 320 && rect.right <= 390, `left=${rect.left.toFixed(0)} right=${rect.right.toFixed(0)}`);
+    ok('竖屏: 小预览紧凑且可命中', rect.width >= 44 && rect.width <= 58 && rect.height >= 44, `w=${rect.width.toFixed(0)} h=${rect.height.toFixed(0)}`);
   }
-  // 陪练卡不与击球点盘重叠(若存在)
-  const overlap = await page.evaluate(() => {
-    const a = document.querySelector('.spin-pad')?.getBoundingClientRect();
-    const b = document.querySelector('.coach-card')?.getBoundingClientRect();
-    if (!a || !b) return null;
-    return !(a.right < b.left || b.right < a.left || a.bottom < b.top || b.bottom < a.top);
+  await page.tap('.spin-preview');
+  await new Promise(r => setTimeout(r, 120));
+  const expanded = await page.evaluate(() => {
+    const ball = document.querySelector('.mobile-spin-pad .spin-ball')?.getBoundingClientRect();
+    const popover = document.querySelector('.spin-popover')?.getBoundingClientRect();
+    const shoot = document.querySelector('.shoot-pad')?.getBoundingClientRect();
+    return ball && popover && shoot
+      ? { size: ball.width, popoverRight: popover.right, shootLeft: shoot.left }
+      : null;
   });
-  if (overlap !== null) ok('竖屏: 陪练卡与击球点盘不重叠', !overlap);
+  ok('竖屏: 点击展开大母球(≥120px)', !!expanded && expanded.size >= 120, JSON.stringify(expanded));
+  ok('竖屏: 大母球不覆盖出杆区', !!expanded && expanded.popoverRight <= expanded.shootLeft, JSON.stringify(expanded));
+  ok('竖屏: 解说浮层已删除', !await page.$('.coach-card'));
   const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
   ok('竖屏: pointer:coarse 生效(微调步进 0.004)', coarse);
   await page.screenshot({ path: 'shots/36-mobile-spinpad.png' });

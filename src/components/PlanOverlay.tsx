@@ -5,6 +5,7 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useEffect, useState } from 'react';
+import { useDraggableOverlay } from '../hooks/useDraggableOverlay';
 import type { ShotCandidate } from '../planner/candidates';
 import type { PositionPlan } from '../planner/search';
 
@@ -30,6 +31,7 @@ function chipText(cand: ShotCandidate): string {
 
 export function PlanOverlay({ plans, onClose, onShowPlan, onPlayPlan }: PlanOverlayProps) {
   const [routeIdx, setRouteIdx] = useState(0);
+  const drag = useDraggableOverlay();
   const plan = plans[routeIdx] ?? plans[0];
 
   // 选中路线 → 场景整链渲染（路线切换、初次打开都经此同步）
@@ -47,7 +49,8 @@ export function PlanOverlay({ plans, onClose, onShowPlan, onPlayPlan }: PlanOver
       : `本杆 ${Math.round(plan.chainProb * 100)}%`;
 
   return (
-    <div className="plan-bar" role="dialog" aria-label="走位规划">
+    <div ref={drag.elementRef} className="plan-bar" style={drag.style} role="dialog" aria-label="走位规划">
+      <span className="overlay-drag-handle" aria-label="拖动走位提示" {...drag.dragHandleProps}>⠿</span>
       {plans.length >= 2 && (
         <div className="plan-bar-routes" role="tablist">
           {plans.map((p, i) => (

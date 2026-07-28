@@ -12,7 +12,7 @@
 
 `aim/`: 纯精瞄几何层——世界角首碰检测、统一物理袋口、2R 走廊遮挡、含 throw 的袋口左右角尖反解、2.6× 进入/4× 退出迟滞；快速拖拽保持 360°，慢速靠近可下袋窗口切局部滑窗。
 
-`components/`: HUD 控制组件（视角工具条、瞄准微调、击球点盘、出杆区、顶部状态栏、比分板、球桌视口、控制区、开始界面），只转发事件，不持有对局状态；带 aria 语义与焦点态。
+`components/`: HUD 控制组件（桌面/竖屏视角工具条、球桌内方向微调、可展开击球点、力度出杆合一控件、单行球组状态、可拖动规划/复盘浮层、球桌视口与开始界面），只转发事件，不持有对局状态；带 aria 语义与焦点态。
 
 `styles/`: 样式体系 base → layout → controls；横屏尺寸令牌统一重定义，控件层级高于球桌、低于遮罩。
 
@@ -42,6 +42,7 @@
   - `useOpponentAI`：AI 对手回合调度，依赖 physics 击球与 match 规则状态机
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
   - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），玩家回合世界指纹变化时经可抢占 planner/async 后台搜索
+  - `useDraggableOverlay`：规划/复盘共用的 Pointer 拖拽位移与视口边界约束
 
 `utils/`: 纯工具函数层，不依赖 React 或 DOM：
   - `renderMatchMessage`：将规则层消息键+参数映射为中文文案，纯函数可测试

@@ -226,35 +226,40 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     return [...document.querySelector('.control-deck').children]
       .filter(c => {
         const r = c.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0 || getComputedStyle(c).display === 'none') return false;
         return r.bottom > deck.bottom + 2 || r.right > deck.right + 2 || r.left < deck.left - 2;
       }).length;
   });
   ok('触摸: 控制区无溢出元素', overflow === 0, overflow ? `${overflow}个元素溢出` : '');
 
-  // 第一人称粗调杆向按钮：真实命中，并直接改变唯一世界瞄准角
+  // 竖屏方向调节只在球桌内：真实命中外向三角，并改变唯一世界瞄准角
   const rotateBtn = await page.evaluate(() => {
-    const btn = document.querySelector('.view-switcher button[aria-label="杆向向左转 45 度"]');
+    const btn = document.querySelector('.aim-nudge-left');
     if (!btn) return null;
     const r = btn.getBoundingClientRect();
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     return { cx, cy, hitIsSelf: document.elementFromPoint(cx, cy) === btn };
   });
-  ok('触摸: 旋转按钮真实命中', !!rotateBtn && rotateBtn.hitIsSelf, rotateBtn ? '' : '按钮不存在或被遮挡');
+  ok('触摸: 桌内方向三角真实命中', !!rotateBtn && rotateBtn.hitIsSelf, rotateBtn ? '' : '按钮不存在或被遮挡');
   if (rotateBtn) {
     const aimBefore = await page.evaluate(() => window.__bj8.aim.current);
     await page.touchscreen.tap(rotateBtn.cx, rotateBtn.cy);
     await new Promise(r => setTimeout(r, 300));
     const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
     ok(
-      '触摸: 粗调按钮改变世界杆向',
-      aimAfter < aimBefore - 0.6,
+      '触摸: 桌内方向三角微调世界杆向',
+      aimAfter < aimBefore,
       `before=${aimBefore} after=${aimAfter}`,
     );
   }
 
   // 触摸拖拽出杆(开球),同时验证满力可达
-  await page.touchscreen.touchStart(box.cx, box.cy);
-  for (let i = 1; i <= 6; i++) await page.touchscreen.touchMove(box.cx, box.cy + i * 20);
+  const portraitStartY = box.y + 30;
+  const portraitEndY = 842;
+  await page.touchscreen.touchStart(box.cx, portraitStartY);
+  for (let i = 1; i <= 8; i++) {
+    await page.touchscreen.touchMove(box.cx, portraitStartY + (portraitEndY - portraitStartY) * i / 8);
+  }
   const peak = await page.evaluate(() => document.querySelector('.power-num')?.textContent);
   await page.touchscreen.touchEnd();
   ok('触摸: 竖屏满力可达(≥95)', !!peak && parseInt(peak, 10) >= 95, `peak=${peak}`);
@@ -398,8 +403,12 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   // 这次拖拽同时就是开球,复用为出杆断言
   if (box) {
     const before = await gameState(page);
-    await page.touchscreen.touchStart(box.cx, box.cy);
-    for (let i = 1; i <= 10; i++) await page.touchscreen.touchMove(box.cx, box.cy + i * 10);
+    const landscapeStartY = box.y + 1;
+    const landscapeEndY = 373;
+    await page.touchscreen.touchStart(box.cx, landscapeStartY);
+    for (let i = 1; i <= 8; i++) {
+      await page.touchscreen.touchMove(box.cx, landscapeStartY + (landscapeEndY - landscapeStartY) * i / 8);
+    }
     const peak = await page.evaluate(() => document.querySelector('.power-num')?.textContent);
     await page.touchscreen.touchEnd();
     ok('横屏: 真实拖拽力度≥95', !!peak && parseInt(peak, 10) >= 95, `peak=${peak}`);

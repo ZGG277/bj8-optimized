@@ -63,6 +63,8 @@ async function stage(n, clearGroups) {
     Object.assign(world.balls.find(b => b.number === n), { active: true, x: B.x, z: B.z, vx: 0, vz: 0, wx: 0, wy: 0, wz: 0 });
     Object.assign(world.balls[0], { active: true, x: C.x, z: C.z, vx: 0, vz: 0, wx: 0, wy: 0, wz: 0 });
     world.moving = false; world.events = []; world.firstContact = null;
+    // 专项门禁直接固定为玩家瞄准态；摆球仍经调试句柄，瞄准与出杆继续走真实指针。
+    window.__bj8.setMatch({ phase: 'aiming', actor: 'player' });
     window.__bj8.sync();
   }, { n, B, C, clearGroups });
   await new Promise(r => setTimeout(r, 400));
@@ -124,10 +126,10 @@ const end = await page.evaluate(() => ({
   h1: document.querySelector('.finish-mask h1')?.textContent ?? null,
   won: !!document.querySelector('.finish-mask.won'),
   confetti: document.querySelectorAll('.finish-mask .confetti i').length,
-  coach: document.querySelector('.coach-card h2')?.textContent ?? '',
+  messageKey: window.__bj8.match.current.messageKey,
 }));
 ok('清台进 8 号：对局结束且玩家获胜', end.h1 === '你赢了！', JSON.stringify(end));
-ok('结算文案为 win-8（非犯规判负）', end.coach.includes('你赢了'), end.coach);
+ok('结算事实为 win-8（非犯规判负）', end.messageKey === 'win-8', end.messageKey);
 ok('庆祝彩带已渲染', end.won && end.confetti === 28, `confetti=${end.confetti}`);
 ok('页面无 JS 错误', errors.length === 0, errors[0] ?? '');
 

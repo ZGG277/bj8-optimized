@@ -40,7 +40,6 @@ export function useGameState() {
 
   // ── 辅助状态 ──
   const [rating] = useState(50);
-  const [showCoach, setShowCoach] = useState(true);
 
   // ── 派生 ──
   const canAim = match.phase === 'aiming' && match.actor === 'player' && !worldView.moving;
@@ -95,8 +94,6 @@ export function useGameState() {
     camLift,
     setCamLift,
     rating,
-    showCoach,
-    setShowCoach,
     canAim,
     setMessage,
     resetGame,

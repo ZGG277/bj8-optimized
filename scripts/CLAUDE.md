@@ -18,7 +18,9 @@
 
 `verify-win8.mjs`: 8 号球胜负回归门禁（5 断言）：开球进 1 号→进 2 号分全色→摆清台局面干净打进 8 号（无碰库），断言玩家获胜、win-8 文案与庆祝彩带渲染，截图 shots/35。
 
-`verify-mobile-spinpad.mjs`: 移动端击球点盘布局与球杆造型验证（8 断言）：竖屏触摸断言击球点盘固定左下、加大(≥80px)、与陪练卡不重叠、pointer:coarse 生效，截图 shots/36（竖屏）与 shots/37（桌面球杆）。
+`verify-mobile-spinpad.mjs`: 移动端击球点与球杆兼容回归：竖屏断言右侧小预览可展开 ≥120px 大母球且不压出杆区、解说卡不存在，截图 shots/36/37。
+
+`verify-mobile-portrait-v12.mjs`: v1.2.0 390×844 真实触控门禁（30 断言）：34px 球组灰态首行、右侧竖轨、桌内 52px 三角、124px 击球点弹层、长行程满力与击球后回中、规划/复盘拖拽、灯泡总开关、JS 错误；输出 shots/44–47。
 
 `verify-position-plan.mjs`: 💡 走位规划 + 击球复盘集成回归（32 断言）：开球放置白球（placing→aiming，网格扫描 screenToTable 找开球区屏幕点）后经 `__bj8` 摆三球固定局面，断言按钮三态流转（is-dim 呼吸→is-lit 微光→is-open 展开、再点 toggle 关/开与 ✕ 等价）、顶部提示条出现且无旧面板、压缩 chip 1–3 个且文案匹配「N·杆法塞力档」、连贯/本杆概率文案、场景整链规划对象上屏（planObjectCount）、打开期间瞄准禁用、整链播放起止、关闭后场景清除/视角恢复/瞄准恢复（截图 shots/38）；后半段摆 1 号短直球局面，等 💡 重新就绪后真实点击瞄准（aim 必须经 React 状态不能写 __bj8.aim——蓄力预览的同步会把 aimRef 覆盖回状态值）+ .shoot-pad 真实拖拽出杆，断言 .review-chip 出现且文案非空、▶ 对比展开 .review-bar 且 reviewObjectCount ≥2（截图 shots/43-shot-review.png）、✕ 收起后场景清除。
 

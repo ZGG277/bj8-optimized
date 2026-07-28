@@ -6,26 +6,28 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 ## 成员清单
 
-`ViewToolbar.tsx`: 视角/粗瞄工具条（第一人称/俯视、左右 45° 世界杆向、俯身角度▲▼微调），aria-pressed 与唯一 aria-label，pointerdown 拦截冒泡；切视角不改杆向。
+`ViewToolbar.tsx`: 视角/粗瞄工具条；桌面保留第一人称/俯视、45° 杆向与俯身微调，竖屏右上只显示双视角切换，pointerdown 拦截冒泡。
 
 `GameHeader.tsx`: 顶部状态栏，渲染品牌标识与回合状态/杆数，纯展示性组件。
 
-`Scoreboard.tsx`: 比分板，消费世界快照计算进球数，渲染玩家/对手卡片与比分；球型图标（mini-rack）跟随实际分组渲染，玩家分到花色时玩家侧为 9-15、对手侧为 1-7。
+`Scoreboard.tsx`: 桌面渲染完整比分板；竖屏压成 34px 首行，只显示开球/开放球局/玩家球组及本组 7 球+8号，已进球灰化。
 
-`TableStage.tsx`: 球桌区域，组合 ViewToolbar 与 3D 视口，包含目标球→袋口精瞄滑窗/操作提示、回合遮罩、结束覆层（按 winner 显示胜负文案，玩家获胜时播放彩带庆祝）、教练卡片。
+`TableStage.tsx`: 球桌区域，组合 ViewToolbar、TableAimNudges 与 3D 视口，包含精瞄滑窗、回合遮罩与结束覆层；不再渲染左下教练/解说卡。
 
-`ControlDeck.tsx`: 控制区，组合 💡 走位按钮（三态常驻：is-lit=ready 微光可点 / is-open=showing 描边表示展开中、点击=关引导 / is-dim=computing 呼吸、failed/idle 灰静态 disabled；非玩家回合 visibility 隐藏保网格稳定）、AimControls/SpinControl/ShootControl 与消息提示。
+`ControlDeck.tsx`: 桌面右侧控制组与竖屏右侧单手轨，组合灯泡总开关、AimControls、SpinControl、ShootControl；灯泡统一收起规划/复盘，有复盘时跨回合保持可用；消息/解说区已删除。
 
-`PlanOverlay.tsx`: 走位规划顶部紧凑提示条（路线分段「①75%」、每杆压缩 chip「1·低杆中力」=杆法+塞+力档、连贯/本杆概率、▶ 播放、✕ 关闭），不遮台面主体；场景渲染经 onShowPlan/onPlayPlan 回调委托 Scene3D 整链直绘。
+`PlanOverlay.tsx`: 半透明紧凑走位浮层（路线、打法 chip、概率、播放、关闭），带独立拖拽手柄；场景渲染委托 Scene3D。
 
-`ReviewOverlay.tsx`: 击球复盘条（讲上一杆，与规划的下一杆引导共存；planOpen 时让位不渲染）——折叠态 .review-chip「复盘：{诊断} · ▶ 对比」，展开态 .review-bar（verdict 色签 + 诊断 + 虚线=计划/实线=实际图例 + ✕ 收起）；场景对比渲染经父组件回调委托 Scene3D.showReviewOverlay。
+`ReviewOverlay.tsx`: 半透明可拖动击球复盘浮层；折叠态一句话诊断，展开态展示 verdict、诊断与计划/实际图例，场景对比委托 Scene3D。
 
 `IntroScreen.tsx`: 开始界面，品牌标识与开始按钮。
 
 `AimControls.tsx`: 瞄准微调按钮组，禁用同时以透明度与删除线表达，不只依赖颜色；基础步进触屏 0.004rad、桌面 0.01rad，Game 靠近袋口窗口时自适应缩到窗口宽度 1/6。
 
-`SpinControl.tsx`: 击球点盘，拖拽经 clampSpin 映射到单位圆；可 Tab 聚焦，方向键微调、0/Backspace 复位中杆。
+`TableAimNudges.tsx`: 竖屏球桌内部的两个 52px 外向三角，转发左右方向微调，确保方向触控不离开 viewport。
 
-`ShootControl.tsx`: 出杆交互区（力度表 role=meter + 出杆钮 role=button)；下拉蓄力、松开提交、Enter 轻杆；可用行程由按下点到安全底边计算。
+`SpinControl.tsx`: 桌面直接显示击球点盘；竖屏显示小母球预览，点击展开 124px 大盘；拖拽经 clampSpin 映射单位圆。
+
+`ShootControl.tsx`: 力度表与出杆按钮合一；竖屏为 196–240px 长行程下拉面，松开提交、Enter 轻杆。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

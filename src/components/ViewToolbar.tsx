@@ -24,26 +24,28 @@ export function ViewToolbar({ viewMode, onViewMode, onRotate, onElevate }: Props
     >
       <button
         type="button"
-        className={viewMode === 'first' ? 'active' : ''}
+        className={`view-mode-button ${viewMode === 'first' ? 'active' : ''}`}
         aria-pressed={viewMode === 'first'}
+        aria-label="切换第一人称视角"
         onClick={() => onViewMode('first')}
       >
         第一人称
       </button>
       <button
         type="button"
-        className={viewMode === 'overhead' ? 'active' : ''}
+        className={`view-mode-button ${viewMode === 'overhead' ? 'active' : ''}`}
         aria-pressed={viewMode === 'overhead'}
+        aria-label="切换俯视视角"
         onClick={() => onViewMode('overhead')}
       >
         俯视
       </button>
       {viewMode === 'first' && (
         <>
-          <button type="button" aria-label="杆向向左转 45 度" onClick={() => onRotate(-1)}>◀</button>
-          <button type="button" aria-label="杆向向右转 45 度" onClick={() => onRotate(1)}>▶</button>
-          <button type="button" aria-label="俯身角度抬高" onClick={() => onElevate(1)}>▲</button>
-          <button type="button" aria-label="俯身角度压低" onClick={() => onElevate(-1)}>▼</button>
+          <button className="view-extra-button" type="button" aria-label="杆向向左转 45 度" onClick={() => onRotate(-1)}>◀</button>
+          <button className="view-extra-button" type="button" aria-label="杆向向右转 45 度" onClick={() => onRotate(1)}>▶</button>
+          <button className="view-extra-button" type="button" aria-label="俯身角度抬高" onClick={() => onElevate(1)}>▲</button>
+          <button className="view-extra-button" type="button" aria-label="俯身角度压低" onClick={() => onElevate(-1)}>▼</button>
         </>
       )}
     </div>

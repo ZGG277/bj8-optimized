@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的令牌与 layout.css 的壳层几何
-[OUTPUT]: 对外提供视角工具条、💡 走位按钮、瞄准微调、击球点盘、走位规划覆盖层（面板/步进器/力度条/击球点指示）、局面信息与出杆交互区的控件样式及横屏悬浮定位
+[OUTPUT]: 对外提供视角工具条、桌内方向微调、右侧竖屏控制轨、可展开击球点、力度出杆合一控件及可拖动规划/复盘浮层样式
 [POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -33,6 +33,10 @@
   color: #09120e;
 }
 
+.table-aim-nudges {
+  display: none;
+}
+
 /* 控制区：信息居左，💡 走位/方向微调/击球点盘/出杆区依次靠右 */
 .control-deck {
   display: grid;
@@ -42,6 +46,10 @@
   padding: 0 14px;
   border-top: 1px solid var(--line);
   background: var(--panel);
+}
+
+.control-deck > .plan-button {
+  grid-column: 2;
 }
 
 /* 💡 走位按钮三态：is-lit(ready) 微光高亮 / is-open(showing) 描边表示展开中 /
@@ -128,10 +136,6 @@
   margin-top: 2px;
 }
 
-.match-message {
-  text-align: center;
-}
-
 /* 击球点（杆法）控制 */
 .spin-pad {
   display: flex;
@@ -141,6 +145,15 @@
   cursor: crosshair;
   user-select: none;
   touch-action: none;
+}
+
+.spin-control {
+  position: relative;
+}
+
+.spin-preview,
+.spin-popover {
+  display: none;
 }
 
 .spin-ball {
@@ -191,19 +204,7 @@
   letter-spacing: 0.15em;
 }
 
-.match-message span {
-  font-family: 'Songti SC', serif;
-  font-size: var(--fs-xl);
-}
-
-.match-message small {
-  display: block;
-  color: var(--dim);
-  font-size: var(--fs-xs);
-  margin-top: 4px;
-}
-
-/* 右下角出杆交互区 */
+/* 力度与出杆合一：力度填充直接位于操作面内，不再并列第二根表。 */
 .shoot-zone {
   display: flex;
   align-items: center;
@@ -211,44 +212,18 @@
   user-select: none;
 }
 
-.power-meter {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.power-meter-track {
-  position: relative;
-  width: 8px;
-  height: 56px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.08);
-  overflow: hidden;
-}
-
-.power-meter-fill {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(0deg, #487a67, var(--green));
-  transition: height 40ms linear;
-}
-
-.power-meter-fill.hot {
-  background: linear-gradient(0deg, #c64a3a, #e47f32);
-}
-
 .power-num {
+  position: relative;
+  z-index: 1;
   font-family: var(--font-mono);
   font-size: var(--fs-xl);
-  color: var(--muted);
+  color: #f1fff8;
 }
 
 .shoot-pad {
-  width: 96px;
-  height: 72px;
+  position: relative;
+  width: 106px;
+  height: 76px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -262,17 +237,42 @@
   cursor: pointer;
   touch-action: none;
   box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .shoot-pad strong {
+  position: relative;
+  z-index: 1;
   font-size: var(--fs-3xl);
   font-weight: 700;
   letter-spacing: 0.2em;
 }
 
 .shoot-pad small {
+  position: relative;
+  z-index: 1;
   font-size: var(--fs-sm);
   opacity: 0.75;
+}
+
+.shoot-power-fill {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(112, 199, 165, 0.8), rgba(72, 122, 103, 0.6));
+  transition: height 40ms linear;
+  pointer-events: none;
+}
+
+.shoot-power-fill.hot {
+  background: linear-gradient(0deg, rgba(228, 127, 50, 0.92), rgba(198, 74, 58, 0.75));
+}
+
+.shoot-pull-mark {
+  display: none;
 }
 
 .shoot-pad.charging {
@@ -307,6 +307,24 @@
   border-radius: 10px;
   background: rgba(17, 21, 20, 0.88);
   backdrop-filter: blur(10px);
+}
+
+.overlay-drag-handle {
+  width: 24px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  border-radius: 6px;
+  color: var(--dim);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.overlay-drag-handle:active {
+  cursor: grabbing;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .plan-bar-routes {
@@ -383,7 +401,7 @@
 
 /* 击球复盘：折叠 chip 与展开条都放在提示条同一区域（顶部居中）；
    与 plan-bar 互斥（Game 层保证 planOpen 时不渲染复盘 chip） */
-.review-chip {
+.review-float {
   position: fixed;
   top: calc(var(--topbar-h) + var(--scoreboard-h) + 4px);
   left: 50%;
@@ -391,13 +409,22 @@
   z-index: 12;
   display: flex;
   align-items: center;
-  gap: 6px;
   max-width: min(94vw, 760px);
-  padding: 6px 12px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 10px;
   background: rgba(17, 21, 20, 0.88);
   backdrop-filter: blur(10px);
+}
+
+.review-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  min-width: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
   color: var(--warm);
   font-size: var(--fs-sm);
   white-space: nowrap;
@@ -407,22 +434,14 @@
 }
 
 .review-bar {
-  position: fixed;
-  top: calc(var(--topbar-h) + var(--scoreboard-h) + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 12;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  max-width: min(94vw, 760px);
   padding: 6px 8px;
-  border: 1px solid rgba(217, 183, 129, 0.4);
-  border-radius: 10px;
-  background: rgba(17, 21, 20, 0.88);
-  backdrop-filter: blur(10px);
+  border: none;
+  background: transparent;
 }
 
 .review-verdict {
@@ -470,84 +489,323 @@
     max-width: 96vw;
   }
 
-  .review-bar,
-  .review-chip {
+  .review-float {
     top: calc(var(--hud-safe-top) + 4px);
-    padding: 4px 8px;
     max-width: 96vw;
   }
 }
 
-/* 竖屏手机控件尺寸（信息隐藏后方向微调贴右收拢） */
-@media (max-width: 640px) {
+/* 竖屏手机：所有主控沿右侧竖排；方向微调只在 viewport 内显示。 */
+@media (max-width: 640px) and (orientation: portrait) {
+  .view-switcher {
+    top: 8px;
+    left: auto;
+    right: 6px;
+    transform: none;
+    width: 62px;
+    flex-direction: column;
+    border-radius: 12px;
+    z-index: 10;
+  }
+
+  .view-switcher button {
+    min-height: 42px;
+    padding: 5px 3px;
+    font-size: 11px;
+  }
+
+  .view-switcher .view-extra-button {
+    display: none;
+  }
+
   .control-deck {
-    grid-template-columns: 1fr auto auto;
+    position: fixed;
+    top: 146px;
+    right: 6px;
+    bottom: 8px;
+    z-index: 9;
+    width: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
-    padding: 0 10px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    pointer-events: none;
   }
 
   .aim-controls {
-    justify-self: end;
-  }
-
-  .aim-controls button {
-    width: 30px;
-    height: 30px;
-  }
-
-  .shoot-pad {
-    width: 88px;
-    height: 64px;
-  }
-
-  .match-message {
     display: none;
   }
 
-  /* 击球点盘挪到左下并加大,方便拇指点选、避免误触 */
-  .spin-pad {
+  .control-deck > * {
+    pointer-events: auto;
+  }
+
+  .plan-button {
+    grid-column: auto;
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    align-self: flex-end;
+    padding: 0;
+    border-radius: 14px;
+    background: rgba(12, 16, 14, 0.74);
+    backdrop-filter: blur(8px);
+  }
+
+  .plan-button span {
+    font-size: 22px;
+  }
+
+  .plan-button strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .plan-button.guidance-off {
+    filter: grayscale(1);
+    opacity: 0.48;
+    box-shadow: none;
+  }
+
+  .spin-control {
+    margin-top: auto;
+    align-self: flex-end;
+  }
+
+  .desktop-spin-pad {
+    display: none;
+  }
+
+  .spin-preview {
+    width: 54px;
+    height: 58px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(12, 16, 14, 0.78);
+    color: var(--muted);
+    backdrop-filter: blur(8px);
+  }
+
+  .spin-preview-ball {
+    position: relative;
+    width: 31px;
+    height: 31px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #cfc8b8 70%, #a89f8c);
+    box-shadow: inset -2px -3px 5px rgba(0,0,0,0.24);
+  }
+
+  .spin-preview-ball i {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+    transform: translate(-50%, -50%);
+  }
+
+  .spin-preview small {
+    font-size: 9px;
+  }
+
+  .spin-popover {
     position: fixed;
-    left: 10px;
-    bottom: 10px;
-    z-index: 9;
-    background: rgba(17,21,20,0.7);
-    border-radius: 12px;
+    right: 76px;
+    bottom: 170px;
+    z-index: 13;
+    width: 152px;
+    display: block;
     padding: 8px;
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 16px;
+    background: rgba(12, 16, 14, 0.88);
+    box-shadow: 0 18px 48px rgba(0,0,0,0.46);
+    backdrop-filter: blur(12px);
   }
 
-  .spin-ball {
-    width: 76px;
-    height: 76px;
+  .spin-popover-head {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 11px;
   }
 
-  .spin-dot {
-    width: 10px;
-    height: 10px;
-  }
-}
-
-@media (max-width: 400px) {
-  .control-deck {
-    gap: 8px;
-    padding: 0 8px;
+  .spin-popover-head button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
   }
 
-  .aim-controls div {
+  .mobile-spin-pad {
+    display: flex;
+    padding: 4px;
+  }
+
+  .mobile-spin-pad .spin-ball {
+    width: 124px;
+    height: 124px;
+  }
+
+  .mobile-spin-pad .spin-dot {
+    width: 12px;
+    height: 12px;
+  }
+
+  .mobile-spin-pad small {
     display: none;
   }
 
-  .spin-ball {
-    width: 68px;
-    height: 68px;
+  .shoot-zone {
+    width: 64px;
+    align-self: flex-end;
+    border-radius: 16px;
+    background: rgba(12, 16, 14, 0.58);
+    backdrop-filter: blur(8px);
   }
 
   .shoot-pad {
-    width: 78px;
-    height: 60px;
+    width: 64px;
+    height: min(240px, 34vh);
+    min-height: 196px;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 20px 3px 8px;
+    border-radius: 16px;
+  }
+
+  .shoot-pad strong {
+    font-size: 17px;
+    letter-spacing: 0.08em;
   }
 
   .shoot-pad small {
-    display: none;
+    margin-top: auto;
+    font-size: 9px;
+  }
+
+  .shoot-pad .power-num {
+    font-size: 18px;
+  }
+
+  .shoot-pull-mark {
+    position: relative;
+    z-index: 1;
+    display: block;
+    margin-top: 14px;
+    font-size: 28px;
+    opacity: 0.62;
+  }
+
+  .table-aim-nudges {
+    position: absolute;
+    left: 50%;
+    bottom: 18%;
+    z-index: 8;
+    width: min(250px, calc(100% - 112px));
+    display: flex;
+    justify-content: space-between;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .table-aim-nudges button {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid rgba(112, 199, 165, 0.42);
+    border-radius: 14px;
+    background: rgba(8, 13, 11, 0.52);
+    color: rgba(220, 255, 239, 0.9);
+    font-size: 27px;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.7);
+    backdrop-filter: blur(5px);
+    pointer-events: auto;
+  }
+
+  .table-aim-nudges button:disabled {
+    opacity: 0.22;
+  }
+
+  .plan-bar,
+  .review-float {
+    top: 42px;
+    left: 8px;
+    transform: none;
+    max-width: calc(100vw - 92px);
+    padding: 5px;
+    justify-content: flex-start;
+    border-radius: 12px;
+    background: rgba(12, 16, 14, 0.76);
+    backdrop-filter: blur(8px);
+  }
+
+  .review-float {
+    padding: 0;
+  }
+
+  .plan-bar-routes,
+  .plan-bar-chips {
+    gap: 3px;
+  }
+
+  .plan-chip,
+  .plan-bar-routes button,
+  .plan-bar-prob,
+  .plan-bar-play,
+  .review-chip,
+  .review-bar,
+  .review-verdict,
+  .review-bar-message,
+  .review-bar-legend {
+    font-size: 10px;
+  }
+
+  .plan-chip {
+    padding: 2px 4px;
+  }
+
+  .plan-bar-play {
+    padding: 4px 7px;
+  }
+
+  .review-chip {
+    max-width: calc(100vw - 124px);
+    padding: 6px 7px;
+  }
+
+  .review-bar {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .overlay-drag-handle {
+    width: 28px;
+    height: 32px;
+    flex-basis: 28px;
+  }
+}
+
+@media (max-width: 400px) and (orientation: portrait) {
+  .shoot-pad {
+    height: min(228px, 32vh);
   }
 }
 
@@ -570,10 +828,6 @@
     padding: 0;
     border: none;
     background: transparent;
-  }
-
-  .match-message {
-    display: none;
   }
 
   /* 横屏：方向微调不再钉在左下，与击球点盘一起收入右下控件组 */
@@ -613,10 +867,6 @@
     background: rgba(17,21,20,0.7);
     border-radius: 12px;
     padding: 8px;
-  }
-
-  .power-meter-track {
-    height: 68px;
   }
 
   .shoot-pad {

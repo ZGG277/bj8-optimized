@@ -22,4 +22,6 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `usePositionPlan.test.ts`: 世界指纹必须包含玩家分组的竞态回归。
 
+`useDraggableOverlay.ts`: 规划/复盘浮层共用 Pointer 拖拽 Hook；用独立手柄捕获指针，位移钳制在当前视口 8px 安全边界内。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

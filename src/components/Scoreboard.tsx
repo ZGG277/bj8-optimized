@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 世界快照与 match 对局状态
-[OUTPUT]: 渲染比分板（玩家卡片 + 比分 + 对手卡片）
+[OUTPUT]: 桌面渲染完整比分板；竖屏首行只渲染玩家球组与进球状态
 [POS]: HUD 组件层，只消费世界快照计算进球数；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -29,9 +29,28 @@ export function Scoreboard({ match, worldView }: ScoreboardProps) {
   const playerBalls = match.playerGroup === 'stripe' ? [9,10,11,12,13,14,15,8] : [1,2,3,4,5,6,7,8];
   const opponentBalls = match.playerGroup === 'stripe' ? [1,2,3,4,5,6,7,8] : [9,10,11,12,13,14,15,8];
   const groupClass = (n: number) => (n === 8 ? 'eight' : n < 8 ? 'solid' : 'stripe');
+  const mobileLabel = match.breaking ? '开球' : playerGroupLabel;
+  const mobileBalls = match.playerGroup ? playerBalls : [];
 
   return (
     <section className="scoreboard">
+      <div className="mobile-ball-status" aria-label={`我的球组：${mobileLabel}`}>
+        <strong>{mobileLabel}</strong>
+        {mobileBalls.length > 0 && (
+          <div className="mobile-ball-rack" aria-label="我的进球状态，灰色为已进">
+            {mobileBalls.map(n => (
+              <span
+                key={n}
+                className={`mini-ball ${groupClass(n)} ${!activeNumbers.has(n) ? 'down' : ''}`}
+                style={{ '--c': COLORS[n] } as React.CSSProperties}
+              >
+                {n}
+              </span>
+            ))}
+          </div>
+        )}
+        <small>{mobileBalls.length ? '灰色已进' : '进球后确定花色'}</small>
+      </div>
       <div className="player-card">
         <div className="avatar me">我</div>
         <div className="identity">

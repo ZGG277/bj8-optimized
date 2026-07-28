@@ -1,6 +1,6 @@
 /*
 [INPUT]: 禁用/蓄力态、预览力度、开球标记与 begin/update/release/cancel/tap 回调
-[OUTPUT]: 对外提供 ShootControl 出杆区:力度表(role=meter)+ 出杆钮(role=button,可 Tab 聚焦,Enter 轻杆)
+[OUTPUT]: 对外提供力度与出杆合一的长行程控件(role=button 内含 role=meter,可 Tab 聚焦,Enter 轻杆)
 [POS]: 控制组件层,只负责手势出口与语义;力度事实由 input 层计算,物理击球由 Game 提交
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -22,22 +22,6 @@ export function ShootControl({ disabled, charging, power, breaking, onBegin, onU
   const rounded = Math.round(power);
   return (
     <div className="shoot-zone" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="power-meter">
-        <div
-          className="power-meter-track"
-          role="meter"
-          aria-label="出杆力度"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={rounded}
-        >
-          <div
-            className={`power-meter-fill ${power > 85 ? 'hot' : ''}`}
-            style={{ height: `${power}%` }}
-          />
-        </div>
-        <span className="power-num">{rounded}</span>
-      </div>
       <div
         className={`shoot-pad ${charging ? 'charging' : ''} ${disabled ? 'disabled' : ''}`}
         role="button"
@@ -49,8 +33,9 @@ export function ShootControl({ disabled, charging, power, breaking, onBegin, onU
           e.stopPropagation();
           if (disabled) return;
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-          // 可用行程 = 按下点到安全底边距离,输入层会归一到 72-180px
-          onBegin(e.clientY, window.innerHeight - e.clientY - 24);
+          const rect = e.currentTarget.getBoundingClientRect();
+          // 合一控件本身就是下拉轨道：从按下点到控件底边均为有效行程。
+          onBegin(e.clientY, Math.min(220, Math.max(72, rect.bottom - e.clientY)));
         }}
         onPointerMove={(e) => {
           e.preventDefault();
@@ -70,8 +55,19 @@ export function ShootControl({ disabled, charging, power, breaking, onBegin, onU
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
+        <span
+          className={`shoot-power-fill ${power > 85 ? 'hot' : ''}`}
+          style={{ height: `${power}%` }}
+          role="meter"
+          aria-label="出杆力度"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={rounded}
+        />
+        <span className="shoot-pull-mark" aria-hidden="true">↓</span>
         <strong>{breaking ? '开球' : '出杆'}</strong>
-        <small>下拉蓄力 · 松开出杆</small>
+        <span className="power-num">{rounded}</span>
+        <small>下拉 · 松开</small>
       </div>
     </div>
   );

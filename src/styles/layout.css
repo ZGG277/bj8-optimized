@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的尺寸与色彩令牌
-[OUTPUT]: 对外提供壳层网格、顶栏、计分板、球桌舞台、遮罩、陪练卡与开始界面样式及响应式布局规则
+[OUTPUT]: 对外提供壳层网格、顶栏、桌面比分/竖屏单行球组状态、球桌舞台、遮罩与开始界面响应式布局
 [POS]: 样式体系的布局层,只管几何与层级结构;控件内部样式归 controls.css
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -87,6 +87,10 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
+}
+
+.mobile-ball-status {
+  display: none;
 }
 
 .player-card {
@@ -449,51 +453,6 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* 陪练卡片 */
-.coach-card {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  width: 240px;
-  padding: 16px;
-  background: rgba(14,18,16,0.9);
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-  backdrop-filter: blur(12px);
-}
-
-.coach-toggle {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  padding: 4px 8px;
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--dim);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-
-.coach-index {
-  color: var(--green);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.1em;
-}
-
-.coach-card h2 {
-  margin-top: 8px;
-  font-family: 'Songti SC', serif;
-  font-size: var(--fs-4xl);
-  font-weight: 500;
-}
-
-.coach-card p {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: var(--fs-md);
-  line-height: 1.6;
-}
-
 /* 开始界面 */
 .intro-backdrop {
   position: fixed;
@@ -630,64 +589,118 @@
 }
 
 /* 竖屏手机布局 */
-@media (max-width: 640px) {
+@media (max-width: 640px) and (orientation: portrait) {
   .game-shell {
-    grid-template-rows: 48px 60px 1fr 90px;
+    grid-template-rows: 34px minmax(0, 1fr);
   }
 
-  .mini-rack {
+  .topbar {
     display: none;
   }
 
   .scoreboard {
-    grid-template-columns: 1fr 60px 1fr;
-    padding: 0 8px;
+    display: block;
+    min-width: 0;
+    height: 34px;
+    padding: 0;
+    background: rgba(15, 19, 17, 0.96);
   }
 
-  .score-center span {
-    font-size: var(--fs-3xl);
-  }
-
-  .identity span {
+  .scoreboard > .player-card,
+  .scoreboard > .score-center {
     display: none;
   }
 
-  .identity strong {
-    font-size: var(--fs-lg);
+  .mobile-ball-status {
+    height: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 7px;
+    white-space: nowrap;
+    overflow: hidden;
   }
 
-  .coach-card {
-    width: min(220px, calc(100% - 24px));
-    left: 12px;
-    right: 12px;
-    bottom: 140px;
+  .mobile-ball-status strong {
+    flex: 0 0 auto;
+    color: var(--green);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+
+  .mobile-ball-rack {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .mobile-ball-status .mini-ball {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+    font-size: 8px;
+  }
+
+  .mobile-ball-status .mini-ball.down {
+    opacity: 0.28;
+    filter: grayscale(1);
+    transform: scale(0.82);
+  }
+
+  .mobile-ball-status small {
+    min-width: 0;
+    margin-left: auto;
+    color: var(--dim);
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .room-label,
+  .shot-target,
+  .view-hint {
+    display: none;
   }
 
   .precision-aim {
-    bottom: 42px;
+    left: 8px;
+    right: 82px;
+    bottom: 10px;
+    width: auto;
+    padding: 6px 8px;
   }
 
   .precision-aim > div:first-child {
     display: block;
   }
 
+  .precision-aim strong,
   .precision-aim span {
     display: block;
+    font-size: 10px;
+  }
+
+  .precision-aim span {
     margin-top: 2px;
-  }
-
-  .brand small {
-    display: none;
-  }
-
-  .brand strong {
-    font-size: var(--fs-2xl);
   }
 }
 
-@media (max-width: 400px) {
-  .game-shell {
-    grid-template-rows: 44px 54px 1fr 84px;
+@media (max-width: 400px) and (orientation: portrait) {
+  .mobile-ball-status {
+    gap: 4px;
+    padding-inline: 5px;
+  }
+
+  .mobile-ball-status .mini-ball {
+    width: 18px;
+    height: 18px;
+    flex-basis: 18px;
+  }
+
+  .mobile-ball-status small {
+    font-size: 8px;
   }
 }
 
@@ -729,7 +742,4 @@
     top: calc(var(--hud-safe-top) + 8px);
   }
 
-  .coach-card {
-    display: none;
-  }
 }

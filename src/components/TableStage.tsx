@@ -1,11 +1,12 @@
 /*
 [INPUT]: 依赖 viewMode / match / worldView / precisionAim 状态与 pointer 事件处理器
-[OUTPUT]: 渲染球桌区域（3D 视口、视角工具条、精瞄袋口窗口、回合遮罩、结束/教练覆层）
+[OUTPUT]: 渲染球桌区域（3D 视口、视角工具条、桌内方向微调、精瞄袋口窗口与回合/结束遮罩）
 [POS]: HUD 组件层，组合 ViewToolbar 与 3D 视口；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import React from 'react';
 import { ViewToolbar } from './ViewToolbar';
+import { TableAimNudges } from './TableAimNudges';
 import type { BilliardsWorld } from '../physics';
 import type { MatchState } from '../match/types';
 import type { PrecisionAimSolution } from '../aim/aim-solution';
@@ -16,8 +17,7 @@ interface TableStageProps {
   viewMode: ViewMode;
   match: MatchState;
   worldView: BilliardsWorld;
-  showCoach: boolean;
-  matchMessage: string;
+  canAim: boolean;
   precisionAim: (PrecisionAimSolution & { offset: number }) | null;
   containerRef: React.Ref<HTMLDivElement>;
   onPointerDown: (e: React.PointerEvent) => void;
@@ -28,16 +28,15 @@ interface TableStageProps {
   onViewMode: (mode: ViewMode) => void;
   onRotate: (dir: number) => void;
   onElevate: (dir: number) => void;
+  onAimAdjust: (delta: number) => void;
   onResetGame: () => void;
-  onToggleCoach: () => void;
 }
 
 export function TableStage({
   viewMode,
   match,
   worldView,
-  showCoach,
-  matchMessage,
+  canAim,
   precisionAim,
   containerRef,
   onPointerDown,
@@ -48,8 +47,8 @@ export function TableStage({
   onViewMode,
   onRotate,
   onElevate,
+  onAimAdjust,
   onResetGame,
-  onToggleCoach,
 }: TableStageProps) {
   return (
     <section className="table-stage">
@@ -68,6 +67,7 @@ export function TableStage({
           onRotate={onRotate}
           onElevate={onElevate}
         />
+        <TableAimNudges disabled={!canAim} onAdjust={onAimAdjust} />
 
         <div className="room-label">
           <span>PHYSICS WORLD</span>
@@ -124,14 +124,6 @@ export function TableStage({
         )}
       </div>
 
-      {showCoach && (
-        <aside className="coach-card">
-          <button className="coach-toggle" onClick={onToggleCoach}>收起</button>
-          <span className="coach-index">物理复盘 · {String(Math.max(1, worldView.shot)).padStart(2, '0')}</span>
-          <h2>{matchMessage.split('：')[1] || matchMessage}</h2>
-          <p>{match.breaking ? '开球从白球冲量开始，经过球球碰撞、库边和摩擦停止。' : '瞄好方向，按住蓄力，松开出杆。'}</p>
-        </aside>
-      )}
     </section>
   );
 }
