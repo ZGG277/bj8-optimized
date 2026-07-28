@@ -1,13 +1,19 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
-[OUTPUT]: 对外提供场景渲染、双视角相机、瞄准辅助（射线/分离线/幽灵球靶点及抓取命中查询）、合法目标环、球杆动画、自由球幽灵与 screenToTable / screenToTableAt(虚拟相机位姿)映射
+[OUTPUT]: 对外提供场景渲染、双视角相机、世界角瞄准辅助（射线/分离线/幽灵球靶点及抓取命中查询）、合法目标环、球杆动画、自由球幽灵、走位规划整链渲染与连续播放（showPlanChain/playPlanChain）、击球复盘对比渲染（showReviewOverlay）与屏幕↔台面坐标映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-import { TABLE, type BilliardsWorld } from './physics';
+import {
+  TABLE,
+  predictBallCollisionDirections,
+  type BilliardsWorld,
+} from './physics';
+import type { PositionPlan } from './planner/search';
+import type { ShotReview } from './planner/review';
 import {
   makeClothMaps,
   makeWoodTexture,
@@ -38,6 +44,32 @@ const POCKET_POS: [number, number][] = [
   [-W / 2, L / 2], [W / 2, L / 2],
 ];
 
+/** 整链规划的分杆配色（台呢绿底可读：暖橙/青/紫），轨迹/高亮环/序号标记同色 */
+const PLAN_STEP_COLORS = [0xffa03c, 0x35d6d6, 0xb478ff];
+
+/** 袋口旁序号标记：杆色圆底 + 白色数字的 CanvasTexture sprite（始终面向相机） */
+function mkStepBadge(n: number, color: number, x: number, z: number): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+  ctx.beginPath();
+  ctx.arc(64, 64, 56, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 72px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(n), 64, 68);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }),
+  );
+  sprite.scale.setScalar(0.055);
+  sprite.position.set(x, 0.055, z);
+  return sprite;
+}
+
 type DropAnim = {
   t: number;
   from: THREE.Vector3;
@@ -62,7 +94,6 @@ export class Scene3D {
   private virtualCam: THREE.PerspectiveCamera;
 
   private aimAngle = 0;
-  private cameraAngle = 0;
   /** 俯身角度微调：叠加在第一人称相机高度上（含虚拟相机） */
   private camLift = 0;
   private viewMode: 'first' | 'overhead' = 'first';
@@ -105,6 +136,23 @@ export class Scene3D {
   private animationId = 0;
   private running = false;
 
+  // ---- 走位规划渲染 ----
+  /** 规划图层：瞄准线/轨迹/走位区域/序号标记，showPlanChain(null) 整体清空 */
+  private planGroup = new THREE.Group();
+  /** 复盘图层：计划（虚线）vs 实际（实线）轨迹对比，showReviewOverlay(null) 整体清空 */
+  private reviewGroup = new THREE.Group();
+  /** 规划展示期间隐藏常规瞄准辅助与球杆，避免与规划图层互相干扰 */
+  private planActive = false;
+  /** 整链播放：逐杆沿 display 路径插值移动真实球网格，杆间按 endWorld 衔接球位 */
+  private planPlayAnim: {
+    plan: PositionPlan;
+    stepIdx: number;
+    t: number;                       // 当前杆进度 0..1
+    phase: 'anim' | 'pause' | 'hold';
+    phaseT: number;                  // pause/hold 累计秒
+    snapped: boolean;                // 当前杆起点球位是否已摆放
+  } | null = null;
+
   constructor(element: HTMLElement) {
     this.element = element;
 
@@ -139,6 +187,8 @@ export class Scene3D {
 
     this.scene.add(this.tableGroup);
     this.scene.add(this.aimGroup);
+    this.scene.add(this.planGroup);
+    this.scene.add(this.reviewGroup);
 
     const cueZ = TABLE.length * 0.25;
     this.targetCameraPos.set(0, 0.26, cueZ + 0.5);
@@ -561,17 +611,28 @@ export class Scene3D {
   private buildCue() {
     const group = this.cueGroup;
 
-    // 前节（枫木，锥形）
-    const shaft = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.0055, 0.0105, 0.75, 20),
-      new THREE.MeshPhysicalMaterial({ color: 0xd8b184, roughness: 0.32, clearcoat: 0.7, clearcoatRoughness: 0.2 })
-    );
-    shaft.rotation.x = Math.PI / 2;
-    shaft.position.z = 0.395;
-    shaft.castShadow = true;
-    group.add(shaft);
+    const woodMat = new THREE.MeshPhysicalMaterial({ color: 0xd8b184, roughness: 0.32, clearcoat: 0.7, clearcoatRoughness: 0.2 });
 
-    // 皮头 + 先角
+    // 前节分两截锥形拼接:向皮头方向逐渐收细(radiusTop 朝向杆尾)
+    const shaftFront = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.0055, 0.42, 20),
+      woodMat
+    );
+    shaftFront.rotation.x = Math.PI / 2;
+    shaftFront.position.z = 0.25;
+    shaftFront.castShadow = true;
+    group.add(shaftFront);
+
+    const shaftRear = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0105, 0.008, 0.31, 20),
+      woodMat
+    );
+    shaftRear.rotation.x = Math.PI / 2;
+    shaftRear.position.z = 0.615;
+    shaftRear.castShadow = true;
+    group.add(shaftRear);
+
+    // 皮头 + 先角(皮头前端保持在 z=0.006,出杆贴球判定依赖该值)
     const ferrule = new THREE.Mesh(
       new THREE.CylinderGeometry(0.0055, 0.0055, 0.02, 16),
       new THREE.MeshPhysicalMaterial({ color: 0xe8e2d0, roughness: 0.4 })
@@ -579,13 +640,22 @@ export class Scene3D {
     ferrule.rotation.x = Math.PI / 2;
     ferrule.position.z = 0.03;
     group.add(ferrule);
+    const tipMat = new THREE.MeshStandardMaterial({ color: 0x375a7a, roughness: 0.95 });
     const tip = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.0055, 0.0058, 0.012, 16),
-      new THREE.MeshStandardMaterial({ color: 0x3a6d94, roughness: 0.85 })
+      new THREE.CylinderGeometry(0.0055, 0.0059, 0.012, 16),
+      tipMat
     );
     tip.rotation.x = Math.PI / 2;
     tip.position.z = 0.012;
     group.add(tip);
+    // 皮头端面微凸的弧面,最前端仍在 z=0.006
+    const tipCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.0059, 16, 12),
+      tipMat
+    );
+    tipCap.scale.z = 0.45;
+    tipCap.position.z = 0.006 + 0.0059 * 0.45;
+    group.add(tipCap);
 
     // 后把（深色缠线握把）
     const butt = new THREE.Mesh(
@@ -725,6 +795,317 @@ export class Scene3D {
     return Math.hypot(p.x - c.x, p.z - c.z);
   }
 
+  // ---- 走位规划渲染 ----
+
+  /** 调试用：规划图层当前对象数（验证轨迹/区域已上屏） */
+  planObjectCount(): number {
+    return this.planGroup.children.length;
+  }
+
+  /** 调试用：规划轨迹是否正在播放 */
+  planPlaying(): boolean {
+    return this.planPlayAnim !== null;
+  }
+
+  /** 清空规划图层并复位球网格到真实球局（播放动画会移动网格，必须恢复） */
+  private clearPlan() {
+    this.planPlayAnim = null;
+    for (const child of [...this.planGroup.children]) {
+      this.planGroup.remove(child);
+      const mesh = child as THREE.Mesh;
+      mesh.geometry?.dispose?.();
+      const material = (child as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      const disposeOne = (m: THREE.Material) => {
+        (m as THREE.SpriteMaterial).map?.dispose?.(); // 序号 sprite 的 CanvasTexture
+        m.dispose();
+      };
+      if (Array.isArray(material)) material.forEach(disposeOne);
+      else if (material) disposeOne(material);
+    }
+    if (this.lastWorld) this.sync(this.lastWorld); // 恢复被播放动画挪动/隐藏的球
+  }
+
+  /**
+   * 渲染整链走位规划：三杆同屏，每杆一个区分色（PLAN_STEP_COLORS）——
+   * 母球/目标球预测轨迹、目标球与目标袋口高亮环、袋口旁序号 sprite；
+   * 第 1 杆额外画瞄准虚线/ghost 定位环与走位区域。
+   * zone 只画第 1 杆：三杆同屏已含 3 组轨迹+标记，多层 zone 叠加在台呢上
+   * 互相染色不可读，且玩家当下要决策的只有第 1 杆的走位。
+   * 传 null 清除全部规划渲染并恢复常规瞄准辅助。
+   */
+  showPlanChain(plan: PositionPlan | null) {
+    this.clearPlan();
+    this.planActive = plan !== null;
+    if (!plan || plan.steps.length === 0) {
+      this.updateAimGuide();
+      return;
+    }
+
+    const y = 0.005;
+    const mkPolyline = (points: { x: number; z: number }[], color: number, opacity: number) => {
+      const geo = new THREE.BufferGeometry().setFromPoints(
+        points.map((p) => new THREE.Vector3(p.x, y, p.z)),
+      );
+      const line = new THREE.Line(
+        geo,
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
+      );
+      line.frustumCulled = false;
+      this.planGroup.add(line);
+      return line;
+    };
+    const mkRing = (inner: number, outer: number, color: number, opacity: number, x: number, z: number) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(inner, outer, 32),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x, 0.004, z);
+      this.planGroup.add(ring);
+    };
+
+    plan.steps.forEach((step, i) => {
+      const cand = step.candidate;
+      const cueStart = step.display.cuePath[0];
+      if (!cueStart) return;
+      const color = PLAN_STEP_COLORS[i] ?? PLAN_STEP_COLORS[PLAN_STEP_COLORS.length - 1];
+
+      // 第 1 杆：瞄准线（母球→ghost）与 ghost 定位环（沿用瞄准辅助的白色虚线语言）
+      if (i === 0) {
+        const dirX = Math.sin(cand.angle);
+        const dirZ = -Math.cos(cand.angle);
+        const ghostX = cueStart.x + dirX * cand.cueDistance;
+        const ghostZ = cueStart.z + dirZ * cand.cueDistance;
+        const aimGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(cueStart.x, y, cueStart.z),
+          new THREE.Vector3(ghostX, y, ghostZ),
+        ]);
+        const aimLine = new THREE.Line(
+          aimGeo,
+          new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.03, gapSize: 0.02, transparent: true, opacity: 0.75 }),
+        );
+        aimLine.computeLineDistances();
+        aimLine.frustumCulled = false;
+        this.planGroup.add(aimLine);
+        mkRing(R * 0.72, R * 0.98, 0xffffff, 0.55, ghostX, ghostZ);
+
+        // 走位区域：仅首杆，凸包多边形半透明填充，贴在台面上方 1mm 防 z-fighting
+        if (step.zone.length >= 3) {
+          const shape = new THREE.Shape();
+          step.zone.forEach((p, j) => {
+            if (j === 0) shape.moveTo(p.x, -p.z); // shape 的 y 轴对应世界 -z（与台面挖洞同约定）
+            else shape.lineTo(p.x, -p.z);
+          });
+          shape.closePath();
+          const zoneMesh = new THREE.Mesh(
+            new THREE.ShapeGeometry(shape),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }),
+          );
+          zoneMesh.rotation.x = -Math.PI / 2;
+          zoneMesh.position.y = 0.001;
+          this.planGroup.add(zoneMesh);
+        }
+      }
+
+      // 母球/目标球预测轨迹（同杆同色）
+      if (step.display.cuePath.length >= 2) mkPolyline(step.display.cuePath, color, 0.85);
+      if (step.display.objectPath.length >= 2) mkPolyline(step.display.objectPath, color, 0.95);
+
+      // 母球停位终点标记
+      mkRing(R * 0.35, R * 0.62, color, 0.8, step.cueEnd.x, step.cueEnd.z);
+
+      // 目标球高亮环
+      const objStart = step.display.objectPath[0];
+      if (objStart) mkRing(R * 1.12, R * 1.45, color, 0.85, objStart.x, objStart.z);
+
+      // 目标袋口高亮环 + 序号标记（CanvasTexture sprite，颜色与该杆一致）
+      const [pocketX, pocketZ] = POCKET_POS[cand.pocket];
+      mkRing(CORNER_R * 1.05, CORNER_R * 1.35, color, 0.7, pocketX, pocketZ);
+      this.planGroup.add(mkStepBadge(i + 1, color, pocketX, pocketZ));
+    });
+
+    this.updateAimGuide(); // planActive 置位后隐藏常规瞄准辅助
+  }
+
+  // ---- 击球复盘渲染（计划 vs 实际） ----
+
+  /** 调试用：复盘图层当前对象数（验证对比轨迹已上屏） */
+  reviewObjectCount(): number {
+    return this.reviewGroup.children.length;
+  }
+
+  /** 清空复盘图层（dispose 含 ✕ sprite 的 CanvasTexture，同 clearPlan 写法） */
+  private clearReview() {
+    for (const child of [...this.reviewGroup.children]) {
+      this.reviewGroup.remove(child);
+      const mesh = child as THREE.Mesh;
+      mesh.geometry?.dispose?.();
+      const material = (child as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      const disposeOne = (m: THREE.Material) => {
+        (m as THREE.SpriteMaterial).map?.dispose?.();
+        m.dispose();
+      };
+      if (Array.isArray(material)) material.forEach(disposeOne);
+      else if (material) disposeOne(material);
+    }
+  }
+
+  /**
+   * 复盘对比渲染：计划 = 虚线（沿用第 1 杆暖橙）+ 计划停位圆环；
+   * 实际 = 实线（母球白 / 目标球红）+ 实际停位 ✕ sprite。
+   * zone 不画——两组轨迹+两组停位标记信息密度已够。传 null 清除。
+   */
+  showReviewOverlay(review: ShotReview | null) {
+    this.clearReview();
+    if (!review) return;
+
+    const y = 0.006; // 比规划图层(0.005)略高，防同屏 z-fighting
+    const PLAN_COLOR = PLAN_STEP_COLORS[0];
+    const mkLine = (points: { x: number; z: number }[], color: number, opacity: number, dashed: boolean) => {
+      if (points.length < 2) return;
+      const geo = new THREE.BufferGeometry().setFromPoints(
+        points.map((p) => new THREE.Vector3(p.x, y, p.z)),
+      );
+      const mat = dashed
+        ? new THREE.LineDashedMaterial({ color, dashSize: 0.03, gapSize: 0.02, transparent: true, opacity })
+        : new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+      const line = new THREE.Line(geo, mat);
+      line.computeLineDistances();
+      line.frustumCulled = false;
+      this.reviewGroup.add(line);
+    };
+    const mkRing = (inner: number, outer: number, color: number, opacity: number, x: number, z: number) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(inner, outer, 32),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x, 0.004, z);
+      this.reviewGroup.add(ring);
+    };
+
+    // 计划：虚线 + 停位圆环
+    mkLine(review.planned.display.cuePath, PLAN_COLOR, 0.7, true);
+    mkLine(review.planned.display.objectPath, PLAN_COLOR, 0.8, true);
+    mkRing(R * 0.35, R * 0.62, PLAN_COLOR, 0.8, review.planned.cueEnd.x, review.planned.cueEnd.z);
+
+    // 实际：实线（母球白 / 目标球红）
+    mkLine(review.actual.cuePath, 0xffffff, 0.9, false);
+    mkLine(review.actual.objectPath, 0xff4444, 0.95, false);
+
+    // 实际停位 ✕（洗袋则无停位，不画）
+    if (review.actual.cueEnd) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d')!;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 18;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(34, 34);
+      ctx.lineTo(94, 94);
+      ctx.moveTo(94, 34);
+      ctx.lineTo(34, 94);
+      ctx.stroke();
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }),
+      );
+      sprite.scale.setScalar(0.05);
+      sprite.position.set(review.actual.cueEnd.x, 0.055, review.actual.cueEnd.z);
+      this.reviewGroup.add(sprite);
+    }
+  }
+
+  /** 把球网格直接贴合到指定世界的球位（整链播放的杆间衔接；不走落袋动画、不改 lastWorld） */
+  private snapBallsTo(world: BilliardsWorld | null | undefined) {
+    if (!world) return;
+    for (const ball of world.balls) {
+      const mesh = this.ballMeshes[ball.number];
+      if (!mesh) continue;
+      this.dropAnims.delete(ball.number);
+      mesh.position.set(ball.x, R, ball.z);
+      mesh.visible = ball.active;
+      mesh.scale.setScalar(1);
+    }
+  }
+
+  /**
+   * 整链连续播放：按链条顺序逐杆动画（每杆 1.3s，杆间停顿 0.3s，总时长 ≈4.7s），
+   * 每杆起点把全部球网格贴合到上一杆 endWorld（被带动的他球也正确衔接），
+   * 播完停留 0.8s 最终局面后复位当前真实球局（复位而非停留——规划只是演示，
+   * 停留虚拟终态会让玩家误以为球局已变）。
+   */
+  playPlanChain(plan: PositionPlan) {
+    if (!this.planActive || plan.steps.length === 0) return;
+    this.planPlayAnim = { plan, stepIdx: 0, t: 0, phase: 'anim', phaseT: 0, snapped: false };
+  }
+
+  /** 整链播放推进（render 每帧调用） */
+  private updatePlanPlay(dt: number) {
+    const anim = this.planPlayAnim;
+    if (!anim) return;
+    const steps = anim.plan.steps;
+    const step = steps[anim.stepIdx];
+
+    if (anim.phase === 'pause') {
+      anim.phaseT += dt;
+      if (anim.phaseT >= 0.3) {
+        anim.stepIdx += 1;
+        if (anim.stepIdx >= steps.length) {
+          anim.phase = 'hold';
+          anim.phaseT = 0;
+        } else {
+          anim.phase = 'anim';
+          anim.t = 0;
+          anim.snapped = false;
+        }
+      }
+      return;
+    }
+    if (anim.phase === 'hold') {
+      anim.phaseT += dt;
+      if (anim.phaseT >= 0.8) {
+        if (this.lastWorld) this.sync(this.lastWorld); // 复位真实球局
+        this.planPlayAnim = null;
+      }
+      return;
+    }
+
+    // phase === 'anim'：本杆动画
+    if (!anim.snapped) {
+      this.snapBallsTo(anim.stepIdx === 0 ? this.lastWorld : steps[anim.stepIdx - 1].endWorld);
+      anim.snapped = true;
+    }
+    anim.t = Math.min(1, anim.t + dt / 1.3);
+    const { cuePath, objectPath } = step.display;
+
+    const sample = (points: { x: number; z: number }[], progress: number) => {
+      const idx = progress * (points.length - 1);
+      const i = Math.min(points.length - 2, Math.floor(idx));
+      const frac = idx - i;
+      const a = points[i];
+      const b = points[i + 1];
+      return { x: a.x + (b.x - a.x) * frac, z: a.z + (b.z - a.z) * frac };
+    };
+
+    const cueMesh = this.ballMeshes[0];
+    if (cueMesh && cuePath.length >= 2) {
+      const p = sample(cuePath, anim.t);
+      cueMesh.position.set(p.x, R, p.z);
+    }
+    const targetMesh = this.ballMeshes[step.candidate.target];
+    if (targetMesh && objectPath.length >= 2) {
+      const p = sample(objectPath, anim.t);
+      targetMesh.position.set(p.x, R, p.z);
+    }
+    if (anim.t >= 1) {
+      this.snapBallsTo(step.endWorld); // 落袋隐藏/被带动他球一次贴合终态
+      anim.phase = 'pause';
+      anim.phaseT = 0;
+    }
+  }
+
   /**
    * 出杆动画：球杆从拉杆位置加速冲向白球，皮头接触球面瞬间触发 onContact，
    * 随后短暂送杆再收起。保证视觉上"杆头真的打到球"，且球在接触瞬间才开始动。
@@ -804,10 +1185,6 @@ export class Scene3D {
     if (this.lampGroup) this.lampGroup.visible = mode !== 'overhead';
   }
 
-  setCameraAngle(angle: number) {
-    this.cameraAngle = angle;
-  }
-
   /** 俯身角度微调（米，正=抬高、负=压低），由视角工具条驱动 */
   setCamLift(v: number) {
     this.camLift = v;
@@ -817,9 +1194,9 @@ export class Scene3D {
     this.aimAngle = angle;
   }
 
-  /** 瞄准总角度（含第一人称相机旋转） */
+  /** 全局唯一瞄准事实：两种视角均消费同一个世界角。 */
   private totalAim(): number {
-    return this.viewMode === 'first' ? this.aimAngle + this.cameraAngle : this.aimAngle;
+    return this.aimAngle;
   }
 
   sync(world: BilliardsWorld) {
@@ -883,7 +1260,7 @@ export class Scene3D {
     for (const ball of world.balls) {
       const ring = this.targetRings[ball.number];
       if (!ring) continue;
-      ring.visible = ball.active && this.legalTargets.has(ball.number) && this.phase === 'aiming' && !world.moving;
+      ring.visible = ball.active && this.legalTargets.has(ball.number) && this.phase === 'aiming' && !world.moving && !this.planActive;
       if (ring.visible) ring.position.set(ball.x, 0.0025, ball.z);
     }
 
@@ -893,7 +1270,7 @@ export class Scene3D {
   /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球+靶点影子球 */
   private updateAimGuide() {
     const world = this.lastWorld;
-    const show = this.phase === 'aiming' && world && !world.moving && world.balls[0].active;
+    const show = this.phase === 'aiming' && world && !world.moving && world.balls[0].active && !this.planActive;
     this.aimLine.visible = this.objLine.visible = this.tanLine.visible = this.ghostRing.visible = !!show;
     this.aimGhost.visible = !!show;
     if (!show || !world) return;
@@ -928,6 +1305,28 @@ export class Scene3D {
     if (dz > 1e-9) { const t = (zL - pz) / dz; if (t < cushionT) { cushionT = t; cushionAxis = 'z'; } }
     if (dz < -1e-9) { const t = (-zL - pz) / dz; if (t < cushionT) { cushionT = t; cushionAxis = 'z'; } }
 
+    // 辅助线障碍裁剪：沿 (rdx,rdz) 找最近的球（半径 2R 的圆）或库边，
+    // 线长到首个障碍为止——与 8 Ball Pool 等成熟游戏一致，不画穿球/穿库的线
+    const clipRay = (ox: number, oz: number, rdx: number, rdz: number, maxLen: number, exclude: number) => {
+      let t = maxLen;
+      for (const b of world.balls) {
+        if (!b.active || b.number === exclude) continue;
+        const bx = b.x - ox, bz = b.z - oz;
+        const proj = bx * rdx + bz * rdz;
+        if (proj <= 0) continue;
+        const perp2 = bx * bx + bz * bz - proj * proj;
+        const rr = (R * 2) ** 2;
+        if (perp2 >= rr) continue;
+        const hit = proj - Math.sqrt(rr - perp2);
+        if (hit < t) t = hit;
+      }
+      if (rdx > 1e-9) t = Math.min(t, (xL - ox) / rdx);
+      if (rdx < -1e-9) t = Math.min(t, (-xL - ox) / rdx);
+      if (rdz > 1e-9) t = Math.min(t, (zL - oz) / rdz);
+      if (rdz < -1e-9) t = Math.min(t, (-zL - oz) / rdz);
+      return Math.max(0, t);
+    };
+
     // 瞄准幽灵球靶点：默认贴首触点（球或库）；玩家点击定位过则取点击距离，
     // 钳到首触点——点在目标球后就自动贴成标准 ghost-ball 触点球位，
     // 点在近处则白球过靶心的延长线仍是杆向
@@ -951,21 +1350,39 @@ export class Scene3D {
       const cz = pz + dz * bestT;
       setLine(this.aimLine, px, pz, cx, cz);
 
-      const target = world.balls[hitBall];
+      const target = world.balls.find(b => b.number === hitBall)!;
       let nx = target.x - cx, nz = target.z - cz;
       const nLen = Math.hypot(nx, nz) || 1;
       nx /= nLen; nz /= nLen;
-      // 目标球走向线
-      setLine(this.objLine, target.x, target.z, target.x + nx * 0.5, target.z + nz * 0.5);
-      this.objLine.visible = true;
-      // 白球分离线（切向）
-      const dot = dx * nx + dz * nz;
-      let tx = dx - dot * nx, tz = dz - dot * nz;
-      const tLen = Math.hypot(tx, tz);
-      if (tLen > 0.05) {
-        tx /= tLen; tz /= tLen;
-        setLine(this.tanLine, cx, cz, cx + tx * 0.32, cz + tz * 0.32);
-        this.tanLine.visible = true;
+      // 与物理内核共享恢复/throw 预测，避免大切角时理想法线与真实出射方向错位。
+      const predicted = predictBallCollisionDirections(dx, dz, nx, nz);
+      const objLen = clipRay(
+        target.x,
+        target.z,
+        predicted.object.x,
+        predicted.object.z,
+        0.8,
+        hitBall,
+      );
+      setLine(
+        this.objLine,
+        target.x,
+        target.z,
+        target.x + predicted.object.x * objLen,
+        target.z + predicted.object.z * objLen,
+      );
+      this.objLine.visible = objLen > 0.01;
+      // 白球分离线同样取冲量后的真实预测方向；正碰残速过小时隐藏。
+      if (predicted.cueSpeedRatio > 0.05) {
+        const tanLen = clipRay(cx, cz, predicted.cue.x, predicted.cue.z, 0.32, hitBall);
+        setLine(
+          this.tanLine,
+          cx,
+          cz,
+          cx + predicted.cue.x * tanLen,
+          cz + predicted.cue.z * tanLen,
+        );
+        this.tanLine.visible = tanLen > 0.01;
       } else {
         this.tanLine.visible = false;
       }
@@ -1023,7 +1440,7 @@ export class Scene3D {
       // 出杆动画期间由 render() 接管球杆
       this.cueGroup.visible = true;
     } else {
-      const showCue = cueActive && phase === 'aiming' && !this.lastWorld?.moving;
+      const showCue = cueActive && phase === 'aiming' && !this.lastWorld?.moving && !this.planActive;
       this.cueGroup.visible = showCue;
       if (showCue) {
         const targetPull = power * 0.0032;
@@ -1107,6 +1524,8 @@ export class Scene3D {
       mesh.rotation.x += dt * 6;
     }
 
+    this.updatePlanPlay(dt);
+
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -1138,27 +1557,56 @@ export class Scene3D {
     return null;
   }
 
+  /** 台面坐标投影到当前活相机的屏幕坐标，供真实交互回归定位，不参与执行。 */
+  tableToScreen(x: number, z: number): { x: number; y: number } {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const projected = new THREE.Vector3(x, 0, z).project(this.camera);
+    return {
+      x: rect.left + ((projected.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - projected.y) / 2) * rect.height,
+    };
+  }
+
+  private positionVirtualCamera(aimAngle: number): boolean {
+    const cue = this.ballMeshes[0];
+    if (!cue) return false;
+    const cueX = cue.position.x;
+    const cueZ = cue.position.z;
+    this.virtualCam.aspect = this.camera.aspect;
+    this.virtualCam.updateProjectionMatrix();
+    this.virtualCam.position.set(
+      cueX - Math.sin(aimAngle) * FP_CAM_DIST + Math.cos(aimAngle) * FP_CAM_SIDE,
+      FP_CAM_HEIGHT + this.camLift,
+      cueZ + Math.cos(aimAngle) * FP_CAM_DIST + Math.sin(aimAngle) * FP_CAM_SIDE,
+    );
+    this.virtualCam.lookAt(
+      cueX + Math.sin(aimAngle) * FP_LOOK_AHEAD,
+      0.03,
+      cueZ - Math.cos(aimAngle) * FP_LOOK_AHEAD,
+    );
+    this.virtualCam.updateMatrixWorld(true);
+    return true;
+  }
+
+  /** 以指定世界瞄准角的目标相机位姿，把台面坐标投影到屏幕。 */
+  tableToScreenAt(x: number, z: number, aimAngle: number): { x: number; y: number } | null {
+    if (!this.positionVirtualCamera(aimAngle)) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const projected = new THREE.Vector3(x, 0, z).project(this.virtualCam);
+    return {
+      x: rect.left + ((projected.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - projected.y) / 2) * rect.height,
+    };
+  }
+
   /**
    * 以指定瞄准角的第一人称目标相机位姿做射线(不经过平滑滞后的活相机)。
    * 活相机 lerp 就位后与该位姿一致,用于确定性反算"屏幕点对应的台面点"
    * (回归测试的基准真值)。位姿公式与 update() 第一人称分支一致
    * (静止瞄准态,power=0)。
    */
-  screenToTableAt(clientX: number, clientY: number, aimAngle: number, cameraAngle: number): { x: number; z: number } | null {
-    const cue = this.ballMeshes[0];
-    if (!cue) return this.screenToTable(clientX, clientY);
-    const angle = aimAngle + cameraAngle;
-    const cueX = cue.position.x;
-    const cueZ = cue.position.z;
-    this.virtualCam.aspect = this.camera.aspect;
-    this.virtualCam.updateProjectionMatrix();
-    this.virtualCam.position.set(
-      cueX - Math.sin(angle) * FP_CAM_DIST + Math.cos(angle) * FP_CAM_SIDE,
-      FP_CAM_HEIGHT + this.camLift,
-      cueZ + Math.cos(angle) * FP_CAM_DIST + Math.sin(angle) * FP_CAM_SIDE
-    );
-    this.virtualCam.lookAt(cueX + Math.sin(angle) * FP_LOOK_AHEAD, 0.03, cueZ - Math.cos(angle) * FP_LOOK_AHEAD);
-    this.virtualCam.updateMatrixWorld(true);
+  screenToTableAt(clientX: number, clientY: number, aimAngle: number): { x: number; z: number } | null {
+    if (!this.positionVirtualCamera(aimAngle)) return this.screenToTable(clientX, clientY);
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;

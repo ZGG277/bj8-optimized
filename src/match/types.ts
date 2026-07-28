@@ -32,9 +32,11 @@ export type MatchMessageKey =
   | 'ai-choice'
   | 'ai-safe'
   | 'placing-freeball'
+  | 'placing-break'
   | 'placed'
   | 'place-occupied'
-  | 'place-near-pocket';
+  | 'place-near-pocket'
+  | 'place-outside-kitchen';
 
 export type MatchMessageParams = {
   actor?: Actor;

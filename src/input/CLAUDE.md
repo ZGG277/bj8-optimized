@@ -10,6 +10,8 @@
 
 `shot-input.test.ts`: 输入换算单元测试，覆盖行程窗口、保底力度、1350ms≈81、单位圆收回与单会话单意图。
 
-`use-shot-input.ts`: React 协调器，维护 aim/spin/charge 会话，统一 pointer 与键盘出口；rAF 只做力度预览，canShoot 拒绝时绝不提交 ShotIntent；卸载时清理全部 rAF 与键盘监听。
+`use-shot-input.ts`: React 协调器，维护世界角 aim/spin/charge 会话，统一 pointer 与键盘出口；持续按键按真实帧间隔积分并封顶加速度；rAF 只做力度预览，canShoot 拒绝时绝不提交 ShotIntent；卸载时清理全部 rAF 与键盘监听。
+
+`use-shot-input.test.ts`: 键盘持续瞄准的帧率无关积分与速度封顶回归。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

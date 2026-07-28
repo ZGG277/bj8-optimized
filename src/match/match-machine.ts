@@ -72,9 +72,9 @@ export function createInitialMatchState(): MatchState {
   };
 }
 
-/** 从介绍页进入开球 */
+/** 从介绍页进入开球：先让玩家在开球区放置白球 */
 export function beginMatch(state: MatchState): MatchState {
-  return { ...createInitialMatchState(), phase: 'aiming', messageParams: state.messageParams };
+  return { ...createInitialMatchState(), phase: 'placing', messageKey: 'placing-break', messageParams: state.messageParams };
 }
 
 /**
@@ -103,7 +103,9 @@ export function resolveStoppedShot(state: MatchState, facts: ShotFacts): RoundRe
     const legal = fcGroup === actorGroup || (facts.firstContact === 8 && actorRemaining === 0);
     if (!legal) foul = 'wrong-first';
   }
-  if (!foul && facts.firstContact !== null && objectPotted.length === 0 && !facts.cushionAfterFirstContact) {
+  // "碰球后须碰库或进球"中的进球含 8 号：干净打进 8 号（无碰库）不算 no-cushion
+  const anyObjectPotted = objectPotted.length > 0 || eightPotted;
+  if (!foul && facts.firstContact !== null && !anyObjectPotted && !facts.cushionAfterFirstContact) {
     foul = 'no-cushion';
   }
 

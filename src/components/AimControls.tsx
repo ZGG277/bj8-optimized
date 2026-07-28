@@ -10,13 +10,19 @@ type Props = {
   onAdjust: (delta: number) => void;
 };
 
+/** 触屏设备用更小步进,避免一按就越过瞄准点 */
+function adjustStep(): number {
+  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 0.004 : 0.01;
+}
+
 export function AimControls({ disabled, onAdjust }: Props) {
+  const step = adjustStep();
   return (
     <div className="aim-controls" onPointerDown={(e) => e.stopPropagation()}>
       <button
         type="button"
         aria-label="瞄准向左微调"
-        onClick={() => onAdjust(-0.01)}
+        onClick={() => onAdjust(-step)}
         disabled={disabled}
       >
         ◀
@@ -28,7 +34,7 @@ export function AimControls({ disabled, onAdjust }: Props) {
       <button
         type="button"
         aria-label="瞄准向右微调"
-        onClick={() => onAdjust(0.01)}
+        onClick={() => onAdjust(step)}
         disabled={disabled}
       >
         ▶

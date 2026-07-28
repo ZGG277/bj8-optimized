@@ -35,19 +35,19 @@
   border: 1px solid rgba(112,199,165,0.5);
   color: var(--green);
   font-family: 'Songti SC', serif;
-  font-size: 15px;
+  font-size: var(--fs-3xl);
 }
 
 .brand strong {
   font-family: 'Songti SC', serif;
-  font-size: 16px;
+  font-size: var(--fs-3xl);
   letter-spacing: 0.1em;
 }
 
 .brand small {
   display: block;
   color: var(--dim);
-  font-size: 7px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.1em;
   margin-top: 1px;
 }
@@ -56,7 +56,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 9px;
+  font-size: var(--fs-base);
 }
 
 .match-state p {
@@ -105,8 +105,15 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: var(--fs-2xl);
   flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s;
+}
+
+.avatar:active {
+  transform: scale(0.92);
 }
 
 .avatar.me {
@@ -123,20 +130,28 @@
 .identity span {
   display: block;
   color: var(--dim);
-  font-size: 6px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.1em;
 }
 
 .identity strong {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-xl);
   margin: 2px 0;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.15s;
+}
+
+.identity strong:active {
+  color: var(--green);
 }
 
 .identity small {
   display: block;
   color: var(--dim);
-  font-size: 6px;
+  font-size: var(--fs-2xs);
 }
 
 .identity.right {
@@ -156,7 +171,7 @@
   border-radius: 50%;
   background: var(--c);
   box-shadow: inset -3px -4px 6px rgba(0,0,0,0.4);
-  font-size: 5px;
+  font-size: var(--fs-3xs);
   display: grid;
   place-items: center;
   color: #111;
@@ -183,7 +198,7 @@
   align-items: center;
   gap: 10px;
   font-family: var(--font-mono);
-  font-size: 20px;
+  font-size: var(--fs-5xl);
 }
 
 .score-center i {
@@ -225,7 +240,7 @@
   top: 14px;
   left: 14px;
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: var(--fs-xs);
   color: rgba(255,255,255,0.4);
   letter-spacing: 0.1em;
 }
@@ -233,7 +248,7 @@
 .room-label small {
   display: block;
   color: rgba(255,255,255,0.2);
-  font-size: 6px;
+  font-size: var(--fs-2xs);
   margin-top: 2px;
 }
 
@@ -249,14 +264,14 @@
 .shot-target small {
   display: block;
   color: rgba(255,255,255,0.4);
-  font-size: 6px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.1em;
 }
 
 .shot-target strong {
   display: block;
   font-family: 'Songti SC', serif;
-  font-size: 14px;
+  font-size: var(--fs-2xl);
   margin-top: 3px;
   font-weight: 400;
 }
@@ -270,10 +285,73 @@
   background: rgba(6,9,8,0.7);
   border: 1px solid rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.5);
-  font-size: 8px;
+  font-size: var(--fs-sm);
   letter-spacing: 0.05em;
   white-space: nowrap;
   backdrop-filter: blur(6px);
+}
+
+.precision-aim {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  bottom: 48px;
+  width: min(360px, calc(100% - 32px));
+  transform: translateX(-50%);
+  padding: 10px 12px;
+  pointer-events: none;
+  color: #fff;
+  background: rgba(7, 13, 11, 0.9);
+  border: 1px solid color-mix(in srgb, var(--green) 55%, transparent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.precision-aim > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.precision-aim strong {
+  color: var(--green);
+  font-size: var(--fs-sm);
+}
+
+.precision-aim span {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: var(--fs-2xs);
+}
+
+.precision-aim-track {
+  position: relative;
+  height: 4px;
+  margin-top: 9px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #d9b36c, #fff 50%, #d9b36c);
+}
+
+.precision-aim-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 1px;
+  height: 10px;
+  background: rgba(6, 9, 8, 0.8);
+}
+
+.precision-aim-track i {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(81, 220, 153, 0.16);
+  transform: translate(-50%, -50%);
 }
 
 .turn-mask {
@@ -298,7 +376,7 @@
 .turn-mask strong {
   margin-top: 10px;
   font-family: 'Songti SC', serif;
-  font-size: 18px;
+  font-size: var(--fs-4xl);
   font-weight: 400;
 }
 
@@ -318,14 +396,14 @@
 .finish-mask span {
   color: var(--green);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: var(--fs-sm);
   letter-spacing: 0.2em;
 }
 
 .finish-mask h1 {
   margin-top: 12px;
   font-family: 'Songti SC', serif;
-  font-size: 32px;
+  font-size: var(--fs-6xl);
   font-weight: 400;
 }
 
@@ -336,8 +414,39 @@
   color: #08120e;
   border: none;
   font-weight: 700;
-  font-size: 10px;
+  font-size: var(--fs-md);
   cursor: pointer;
+}
+
+/* 胜利庆祝：彩带飘落（仅玩家获胜时渲染） */
+.finish-mask .confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.finish-mask .confetti i {
+  position: absolute;
+  top: -16px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti-fall 2.8s cubic-bezier(0.25, 0.6, 0.45, 1) forwards;
+}
+
+.finish-mask.won h1 {
+  animation: win-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) 0.1s both;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, -2vh, 0) rotate(0deg); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate3d(3vw, 108vh, 0) rotate(680deg); opacity: 0; }
+}
+
+@keyframes win-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 /* 陪练卡片 */
@@ -361,27 +470,27 @@
   background: transparent;
   border: 1px solid var(--line);
   color: var(--dim);
-  font-size: 7px;
+  font-size: var(--fs-xs);
   cursor: pointer;
 }
 
 .coach-index {
   color: var(--green);
-  font-size: 7px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.1em;
 }
 
 .coach-card h2 {
   margin-top: 8px;
   font-family: 'Songti SC', serif;
-  font-size: 18px;
+  font-size: var(--fs-4xl);
   font-weight: 500;
 }
 
 .coach-card p {
   margin-top: 6px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fs-md);
   line-height: 1.6;
 }
 
@@ -408,14 +517,14 @@
 .intro-kicker {
   color: var(--green);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: var(--fs-sm);
   letter-spacing: 0.15em;
 }
 
 .intro-card h1 {
   margin-top: 12px;
   font-family: 'Songti SC', serif;
-  font-size: 48px;
+  font-size: var(--fs-7xl);
   font-weight: 400;
   letter-spacing: 0.1em;
 }
@@ -423,7 +532,7 @@
 .intro-card p {
   margin-top: 16px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-lg);
   line-height: 1.7;
 }
 
@@ -433,7 +542,7 @@
   background: var(--green);
   color: #08120e;
   border: none;
-  font-size: 12px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   cursor: pointer;
 }
@@ -449,7 +558,75 @@
   padding: 4px 8px;
   border: 1px solid var(--line);
   color: var(--dim);
-  font-size: 7px;
+  font-size: var(--fs-xs);
+}
+
+/* 名称编辑输入框 */
+.name-input {
+  display: block;
+  width: 100%;
+  max-width: 80px;
+  padding: 2px 6px;
+  margin: 2px 0;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--green);
+  border-radius: 2px;
+  color: #fff;
+  font-size: var(--fs-xl);
+  font-family: inherit;
+  outline: none;
+}
+
+.name-input::selection {
+  background: var(--green);
+  color: #0d1713;
+}
+
+/* 头像容器（用于 emoji 选择器定位） */
+.avatar-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Emoji 选择器 */
+.emoji-picker {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  padding: 6px;
+  background: #1a201d;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  width: 200px;
+}
+
+.emoji-picker.picker-left {
+  left: auto;
+  right: 0;
+}
+
+.emoji-option {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--fs-2xl);
+  padding: 0;
+  transition: background 0.1s;
+}
+
+.emoji-option:hover {
+  background: rgba(255,255,255,0.12);
 }
 
 /* 竖屏手机布局 */
@@ -468,7 +645,7 @@
   }
 
   .score-center span {
-    font-size: 16px;
+    font-size: var(--fs-3xl);
   }
 
   .identity span {
@@ -476,14 +653,27 @@
   }
 
   .identity strong {
-    font-size: 11px;
+    font-size: var(--fs-lg);
   }
 
   .coach-card {
     width: min(220px, calc(100% - 24px));
     left: 12px;
     right: 12px;
-    bottom: 10px;
+    bottom: 140px;
+  }
+
+  .precision-aim {
+    bottom: 42px;
+  }
+
+  .precision-aim > div:first-child {
+    display: block;
+  }
+
+  .precision-aim span {
+    display: block;
+    margin-top: 2px;
   }
 
   .brand small {
@@ -491,7 +681,7 @@
   }
 
   .brand strong {
-    font-size: 14px;
+    font-size: var(--fs-2xl);
   }
 }
 

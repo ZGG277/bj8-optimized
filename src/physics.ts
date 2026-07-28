@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖常量表与纯数学；禁止依赖 React、DOM、规则状态或渲染层
-[OUTPUT]: 对外输出 240 Hz 确定性世界：步进、首碰/碰库/落袋事件、合法目标推导与击球接口
+[OUTPUT]: 对外输出 240 Hz 确定性世界：步进、统一袋口几何、首碰/碰库/落袋事件、合法目标推导与击球接口
 [POS]: 物理内核层，规则与 UI 的事实来源；所有时间积分必须以 PHYSICS_DT 固定步长进行
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -10,10 +10,24 @@
  * 模型参考：
  * - 滑动/滚动两阶段摩擦（Dr. Dave Billiards / pooltool）
  *   滑动期: 线加速度 -μs·g·û，角加速度由接触点摩擦扭矩驱动，直到 |u|→0 进入纯滚动
- *   滚动期: 恒定滚动阻力减速度（非指数衰减），垂直轴旋转缓慢衰减
+ *   滚动期: 恒定滚动阻力减速度（非指数衰减），垂直轴旋转缓慢衰减；
+ *   静止残旋为线性+正比混合衰减（~2s 收敛，避免满塞 stun 后 world.moving 仅靠 wy 空转 18s）
  * - 库边: 速度相关恢复系数 + 切向摩擦 + 侧旋反踢（Mathaven & Stronge 的简化版）
- * - 球球: 恢复系数 + 切向摩擦（throw）
+ * - 球球: 恢复系数 + 切向摩擦（throw）+ TOI 回滚（步内精确触点，对齐瞄准辅助线）
+ * - 球堆力量传导: 一球同时冲向两球的"叉路"接触走三联立求解（detectFork/resolveForkTriple），
+ *   冲量按接触几何分配；若逐对顺序结算，索引在前的接触会吃掉全部法向冲量形成单链动量漏斗，
+ *   开球 77% 动能灌进一颗球、球堆炸不散。低速堆叠（<REST_SPEED）仍按完全非弹性逐对处理防抖动
  */
+import {
+  BALL_RESTITUTION,
+  BALL_THROW_FRICTION,
+} from './physics/collision-model';
+export {
+  BALL_RESTITUTION,
+  BALL_THROW_FRICTION,
+  predictBallCollisionDirections,
+  type PredictedCollisionDirections,
+} from './physics/collision-model';
 
 export const TABLE = {
   width: 1.27,            // 台面宽 1.27m
@@ -29,8 +43,6 @@ const G = 9.81;
 const R = TABLE.ballRadius;
 
 // ---- 物理参数（经手感仿真调校） ----
-const BALL_RESTITUTION = 0.94;       // 球球碰撞恢复系数
-const BALL_THROW_FRICTION = 0.055;   // 球球切向摩擦（throw）
 const SLIDE_FRICTION = 0.21;         // 滑动摩擦系数 μs（减速 ≈ 2.06 m/s²）
 const ROLL_DECEL = 0.6;              // 滚动阻力减速度 m/s²（手感调校：中力停球约 4 秒）
 const SPIN_DECEL = 2.2;              // 垂直轴侧旋衰减 rad/s²
@@ -38,6 +50,7 @@ const SLIP_EPS = 0.004;              // 滑动→滚动切换阈值 (m/s)
 const STOP_SPEED = 0.008;            // 停止判定阈值（m/s）
 const STOP_SPIN = 0.4;               // 自旋停止阈值（rad/s）
 const REST_SPEED = 0.08;             // 低于此法向速度的球碰按完全非弹性处理（防抖动供能）
+const FORK_MIN_SPEED = 0.5;          // 叉路联立求解的冲球者最低速度（远高于 REST_SPEED，低速堆叠仍走逐对防抖路径）
 
 // 库边：恢复系数随撞击速度降低（高速弹得更"死"）
 const CUSHION_E_BASE = 0.82;
@@ -80,10 +93,10 @@ export type BilliardsWorld = {
   firstContact: number | null;
 };
 
-type Pocket = { x: number; z: number; radius: number };
+export type Pocket = { x: number; z: number; radius: number };
 
 // 6个袋口：左上、左中、左下、右上、右中、右下
-const POCKETS: Pocket[] = [
+export const POCKETS: readonly Pocket[] = [
   { x: -TABLE.width / 2, z: -TABLE.length / 2, radius: TABLE.cornerPocketRadius },
   { x: TABLE.width / 2, z: -TABLE.length / 2, radius: TABLE.cornerPocketRadius },
   { x: -TABLE.width / 2, z: 0, radius: TABLE.sidePocketRadius },
@@ -92,7 +105,7 @@ const POCKETS: Pocket[] = [
   { x: TABLE.width / 2, z: TABLE.length / 2, radius: TABLE.cornerPocketRadius },
 ];
 
-export type PlannedShot = { angle: number; power: number; target: number; pocket: number };
+export type PlannedShot = { angle: number; power: number; target: number; pocket: number; spin?: CueSpin };
 
 function groupFor(number: number): BallGroup {
   if (number === 0) return "cue";
@@ -104,15 +117,57 @@ function makeBall(number: number, x: number, z: number): BallState {
   return { id: number, number, group: groupFor(number), x, z, vx: 0, vz: 0, wx: 0, wy: 0, wz: 0, active: true };
 }
 
+// 摆球位置扰动：模拟真实球框无法 100% 贴紧以及台面微小不平。
+// 数值控制在球径的 ~1.5% 以内，既不影响人眼识别，也足以打破对称开球。
+const RACK_POSITION_JITTER = 0.00045;
+const CUE_KITCHEN_JITTER_X = 0.18;
+const CUE_KITCHEN_JITTER_Z = 0.12;
+
+/**
+ * 对球堆做轻量重叠消除。小球随机偏移后偶发重叠，沿球心连线推开。
+ */
+function settleRack(balls: BallState[], iterations = 8) {
+  const objectBalls = balls.filter((b) => b.number !== 0);
+  const minDistance = R * 2;
+  for (let i = 0; i < iterations; i++) {
+    let moved = false;
+    for (let a = 0; a < objectBalls.length; a++) {
+      for (let b = a + 1; b < objectBalls.length; b++) {
+        const first = objectBalls[a];
+        const second = objectBalls[b];
+        const dx = second.x - first.x;
+        const dz = second.z - first.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0 && dist < minDistance) {
+          const overlap = (minDistance - dist) * 0.51;
+          const nx = dx / dist;
+          const nz = dz / dist;
+          first.x -= nx * overlap;
+          first.z -= nz * overlap;
+          second.x += nx * overlap;
+          second.z += nz * overlap;
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+}
+
 /**
  * 创建初始球局。
  * 不传 rng 时用固定摆法（测试与复现用确定性）；
  * 传 rng（如 Math.random）时每局随机摆法：8 号居中、底角一全一花、
- * 其余随机——固定摆法前三排几乎全是全色球，导致开球后首进花色
- * 长期偏向全色，玩家/对手分组失去随机性。
+ * 其余随机，并叠加微小位置抖动——固定摆法下即使球序不同，
+ * 几何完全对称仍会导致同力度开球结果过于相似。
  */
 export function createInitialWorld(rng?: () => number): BilliardsWorld {
-  const balls: BallState[] = [makeBall(0, 0, TABLE.length * 0.25)];
+  // 白球初始在开球区内随机位置；玩家进入对局后仍可在开球区重新放置
+  const cueX = rng ? (rng() - 0.5) * 2 * CUE_KITCHEN_JITTER_X : 0;
+  const cueZ = rng
+    ? TABLE.length * 0.25 + rng() * Math.min(CUE_KITCHEN_JITTER_Z, TABLE.length * 0.25 - R)
+    : TABLE.length * 0.25;
+  const balls: BallState[] = [makeBall(0, cueX, cueZ)];
 
   const rackOrder = rng
     ? shuffledRackOrder(rng)
@@ -125,10 +180,18 @@ export function createInitialWorld(rng?: () => number): BilliardsWorld {
   for (let row = 0; row < 5; row += 1) {
     for (let column = 0; column <= row; column += 1) {
       const number = rackOrder[index];
-      balls.push(makeBall(number, (column - row / 2) * diameter, apexZ - row * rowDepth));
+      let x = (column - row / 2) * diameter;
+      let z = apexZ - row * rowDepth;
+      if (rng) {
+        x += (rng() - 0.5) * 2 * RACK_POSITION_JITTER;
+        z += (rng() - 0.5) * 2 * RACK_POSITION_JITTER;
+      }
+      balls.push(makeBall(number, x, z));
       index += 1;
     }
   }
+
+  if (rng) settleRack(balls);
 
   return { balls, events: [], time: 0, moving: false, shot: 0, firstContact: null };
 }
@@ -163,6 +226,25 @@ export function getCueBall(world: BilliardsWorld): BallState | undefined {
   return world.balls.find((ball) => ball.number === 0);
 }
 
+/**
+ * 将瞄准角限制在母球朝向对面半台的方向内。
+ * 开球时母球在开球区（正 z），球堆在负 z，因此有效方向约为 [-π/2, π/2]；
+ * 母球跑到对面半台时则自动翻转前方，避免玩家把杆转到身后导致视角天旋地转。
+ */
+export function clampAimToForwardHalf(cue: { x: number; z: number } | undefined, angle: number): number {
+  if (!cue) return angle;
+  const a = Math.atan2(Math.sin(angle), Math.cos(angle));
+  if (cue.z > 0) {
+    // 母球在头台（含开球区），只能朝球堆/负 z 半台
+    return Math.max(-Math.PI / 2, Math.min(Math.PI / 2, a));
+  }
+  // 母球在球堆半台，只能朝头台/正 z 半台
+  if (a > -Math.PI / 2 && a < Math.PI / 2) {
+    return a <= 0 ? -Math.PI / 2 : Math.PI / 2;
+  }
+  return a;
+}
+
 /** 纯滚动角速度：ω = (ŷ × v) / R */
 function rollingSpin(vx: number, vz: number): { wx: number; wz: number } {
   return { wx: vz / R, wz: -vx / R };
@@ -178,9 +260,9 @@ export function strikeCueBall(world: BilliardsWorld, angle: number, power: numbe
     return false;
   }
 
-  // 力度映射：1-100 -> 速度 0.35-8.0 m/s（满分可开出有力的球堆）
+  // 力度映射：1-100 -> 速度 0.35-10.0 m/s（满分可开出有力的球堆）
   const normalizedPower = Math.min(100, Math.max(1, power)) / 100;
-  const speed = 0.35 + normalizedPower * 7.65;
+  const speed = 0.35 + normalizedPower * 9.65;
 
   cue.vx = Math.sin(angle) * speed;
   cue.vz = -Math.cos(angle) * speed;
@@ -372,34 +454,231 @@ function resolveCushions(world: BilliardsWorld, ball: BallState) {
 }
 
 /**
- * 球球碰撞：法向冲量 + 切向摩擦（throw）
+ * 叉路接触：冲球者同时冲向两颗低速球（球堆内的一球对两球接触）。
+ * 逐对顺序结算会把全部法向冲量给索引在前的接触，形成索引序单链动量漏斗
+ * （实测开球 77% 动能灌进一颗角球）；联立求解让冲量按接触几何分配，
+ * 对称叉路两目标各得约一半（等质量假设下切向分量各自保持，法向满足 e 恢复）。
  */
-function resolveBallPair(world: BilliardsWorld, first: BallState, second: BallState) {
-  if (!first.active || !second.active) return;
+type ForkContact = { striker: BallState; targets: [BallState, BallState] };
+
+function detectFork(world: BilliardsWorld, first: BallState, second: BallState): ForkContact | null {
+  for (const [candidate, other] of [[first, second], [second, first]] as const) {
+    const strikerSpeed = Math.hypot(candidate.vx, candidate.vz);
+    if (strikerSpeed < FORK_MIN_SPEED) continue;
+    if (Math.hypot(other.vx, other.vz) > strikerSpeed * 0.5) continue;
+    let extra: BallState | null = null;
+    for (const ball of world.balls) {
+      if (ball === candidate || ball === other || !ball.active) continue;
+      const dx = ball.x - candidate.x;
+      const dz = ball.z - candidate.z;
+      const minimum = R * 2;
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared > minimum * minimum) continue;
+      const distance = Math.sqrt(distanceSquared) || minimum;
+      const approaching =
+        ((ball.vx - candidate.vx) * dx + (ball.vz - candidate.vz) * dz) / distance;
+      if (approaching >= -REST_SPEED) continue;
+      if (Math.hypot(ball.vx, ball.vz) > strikerSpeed * 0.5) continue;
+      if (extra) { extra = null; break; } // 三接触及以上：退回逐对顺序结算
+      extra = ball;
+    }
+    if (extra) return { striker: candidate, targets: [other, extra] };
+  }
+  return null;
+}
+
+/** 叉路三联立：等质量、冲量只沿接触法线，2×2 线性方程求解两目标法向速度 */
+function resolveForkTriple(world: BilliardsWorld, fork: ForkContact, dt: number) {
+  const { striker, targets } = fork;
+  const minimum = R * 2;
+
+  // 两接触各自求本步内 TOI，取最早触点统一回滚三球
+  let t0 = 0;
+  for (const target of targets) {
+    const dx = target.x - striker.x;
+    const dz = target.z - striker.z;
+    const rvx = target.vx - striker.vx;
+    const rvz = target.vz - striker.vz;
+    const a = rvx * rvx + rvz * rvz;
+    const b = rvx * dx + rvz * dz;
+    const c = dx * dx + dz * dz - minimum * minimum;
+    const disc = b * b - a * c;
+    if (a > 1e-12 && disc > 0) {
+      let t = (-b - Math.sqrt(disc)) / a;
+      if (t < -dt) t = -dt;
+      if (t > 0) t = 0;
+      if (t < t0) t0 = t;
+    }
+  }
+  for (const ball of [striker, targets[0], targets[1]]) {
+    ball.x += ball.vx * t0;
+    ball.z += ball.vz * t0;
+  }
+
+  // 触点法线与各接触法向接近速度（冲量前的相对速度）
+  const normals: Array<{ nx: number; nz: number; rvn: number; rvx: number; rvz: number }> = [];
+  for (const target of targets) {
+    const cdx = target.x - striker.x;
+    const cdz = target.z - striker.z;
+    const cDist = Math.hypot(cdx, cdz) || minimum;
+    const rvx = target.vx - striker.vx;
+    const rvz = target.vz - striker.vz;
+    const nx = cdx / cDist;
+    const nz = cdz / cDist;
+    normals.push({ nx, nz, rvn: rvx * nx + rvz * nz, rvx, rvz });
+  }
+
+  // 2β1 + c·β2 = -(1+e)·rvn1；c·β1 + 2β2 = -(1+e)·rvn2（等质量动量守恒 + 各接触 e 恢复）
+  const e = BALL_RESTITUTION;
+  const cDot = normals[0].nx * normals[1].nx + normals[0].nz * normals[1].nz;
+  const rhs0 = -(1 + e) * normals[0].rvn;
+  const rhs1 = -(1 + e) * normals[1].rvn;
+  const det = 4 - cDot * cDot;
+  let beta0 = (2 * rhs0 - cDot * rhs1) / det;
+  let beta1 = (2 * rhs1 - cDot * rhs0) / det;
+  // 解出负冲量（接触实际在分离）时退化该接触为普通两球碰撞
+  if (beta0 < 0) { beta0 = 0; beta1 = rhs1 / 2; }
+  if (beta1 < 0) { beta1 = 0; beta0 = rhs0 / 2; }
+  if (beta0 < 0) beta0 = 0;
+  if (beta1 < 0) beta1 = 0;
+  const betas = [beta0, beta1];
+
+  for (let i = 0; i < 2; i += 1) {
+    const { nx, nz } = normals[i];
+    const beta = betas[i];
+    targets[i].vx += beta * nx;
+    targets[i].vz += beta * nz;
+    striker.vx -= beta * nx;
+    striker.vz -= beta * nz;
+  }
+
+  // 切向摩擦（throw）：逐接触按 beta 当法向冲量，与逐对路径同式
+  for (let i = 0; i < 2; i += 1) {
+    const { nx, nz, rvx, rvz } = normals[i];
+    const tx = -nz;
+    const tz = nx;
+    const relativeTangent = rvx * tx + rvz * tz;
+    const jt =
+      Math.min(BALL_THROW_FRICTION * betas[i], Math.abs(relativeTangent) * 0.5) *
+      Math.sign(relativeTangent);
+    striker.vx += jt * tx * 0.5;
+    striker.vz += jt * tz * 0.5;
+    targets[i].vx -= jt * tx * 0.5;
+    targets[i].vz -= jt * tz * 0.5;
+  }
+
+  // 用碰撞后的新速度走完本步剩余时间（与逐对路径一致，保持链条逐步多跳传播）
+  const advance = -t0;
+  if (advance > 0) {
+    for (const ball of [striker, targets[0], targets[1]]) {
+      ball.x += ball.vx * advance;
+      ball.z += ball.vz * advance;
+    }
+  }
+
+  if (world.firstContact === null) {
+    const cueInvolved = striker.number === 0 || targets.some((t) => t.number === 0);
+    if (cueInvolved) {
+      const object =
+        striker.number === 0
+          ? Math.abs(normals[0].rvn) >= Math.abs(normals[1].rvn)
+            ? targets[0]
+            : targets[1]
+          : striker;
+      world.firstContact = object.number;
+      world.events.push({
+        type: "first-contact",
+        ball: object.number,
+        time: world.time,
+        speed: Math.max(Math.abs(normals[0].rvn), Math.abs(normals[1].rvn)),
+      });
+    }
+  }
+}
+
+/**
+ * 球球碰撞：法向冲量 + 切向摩擦（throw）
+ * 高速碰撞先做 TOI（time-of-impact）回滚：固定步进下球在步内过冲，
+ * 若按过冲位置算法线，出射角最多可偏十几度（240Hz、4m/s 时步长占 2R 的 30%）。
+ * 回滚到本步内精确触点再结算，使实际球路与瞄准辅助线（理想 ghost-ball 几何）对齐。
+ */
+function resolveBallPair(world: BilliardsWorld, first: BallState, second: BallState, dt: number): boolean {
+  if (!first.active || !second.active) return false;
 
   const dx = second.x - first.x;
   const dz = second.z - first.z;
   const minimum = R * 2;
   const distanceSquared = dx * dx + dz * dz;
 
-  if (distanceSquared >= minimum * minimum) return;
-
-  const distance = Math.sqrt(distanceSquared) || minimum;
-  const nx = dx / distance;
-  const nz = dz / distance;
-
-  const overlap = minimum - distance;
-  first.x -= nx * overlap * 0.5;
-  first.z -= nz * overlap * 0.5;
-  second.x += nx * overlap * 0.5;
-  second.z += nz * overlap * 0.5;
+  if (distanceSquared > minimum * minimum) return false;
 
   const rvx = second.vx - first.vx;
   const rvz = second.vz - first.vz;
-  const relativeNormal = rvx * nx + rvz * nz;
-  if (relativeNormal >= 0) return;
 
-  // 低速接触按完全非弹性处理，避免静态接触抖动互相供能
+  // 当前法向（仅用于判断是否接近与低速路径）
+  const distanceNow = Math.sqrt(distanceSquared) || minimum;
+  const approachingNow = (rvx * dx + rvz * dz) / distanceNow;
+  if (approachingNow >= 0) return false;
+
+  // 高速叉路：冲球者同时冲向两颗低速球时走三联立求解，避免索引序动量漏斗
+  if (-approachingNow >= REST_SPEED) {
+    const fork = detectFork(world, first, second);
+    if (fork) {
+      resolveForkTriple(world, fork, dt);
+      return true;
+    }
+  }
+
+  let nx: number, nz: number;
+  let advanceFirst = 0;
+  let advanceSecond = 0;
+
+  if (-approachingNow < REST_SPEED) {
+    // 低速接触：过冲可忽略，按完全非弹性处理，避免静态接触抖动互相供能
+    nx = dx / distanceNow;
+    nz = dz / distanceNow;
+    const overlap = minimum - distanceNow;
+    first.x -= nx * overlap * 0.5;
+    first.z -= nz * overlap * 0.5;
+    second.x += nx * overlap * 0.5;
+    second.z += nz * overlap * 0.5;
+  } else {
+    // 高速碰撞：解 |r + rv·t|² = (2R)² 求本步内精确碰撞时刻 t0 ≤ 0
+    const a = rvx * rvx + rvz * rvz;
+    const b = rvx * dx + rvz * dz;
+    const c = distanceSquared - minimum * minimum; // < 0（重叠中）
+    const disc = b * b - a * c;
+    let t0 = 0;
+    if (a > 1e-12 && disc > 0) {
+      t0 = (-b - Math.sqrt(disc)) / a; // 最近的过去时刻
+      if (t0 < -dt) t0 = -dt; // 上一步遗留重叠时只回滚本步
+      if (t0 > 0) t0 = 0;
+    }
+    // 回滚两球到触点
+    first.x += first.vx * t0;
+    first.z += first.vz * t0;
+    second.x += second.vx * t0;
+    second.z += second.vz * t0;
+    // 触点法线（理想 ghost-ball 几何）
+    const cdx = second.x - first.x;
+    const cdz = second.z - first.z;
+    const cDist = Math.hypot(cdx, cdz) || minimum;
+    nx = cdx / cDist;
+    nz = cdz / cDist;
+    advanceFirst = -t0;
+    advanceSecond = -t0;
+  }
+
+  const relativeNormal = rvx * nx + rvz * nz;
+  if (relativeNormal >= 0) {
+    // 回滚后已分离（数值边界情形），直接前进剩余时间
+    first.x += first.vx * advanceFirst;
+    first.z += first.vz * advanceFirst;
+    second.x += second.vx * advanceSecond;
+    second.z += second.vz * advanceSecond;
+    return false;
+  }
+
   const e = -relativeNormal < REST_SPEED ? 0 : BALL_RESTITUTION;
   const jn = -(1 + e) * relativeNormal * 0.5;
   first.vx -= jn * nx;
@@ -417,6 +696,16 @@ function resolveBallPair(world: BilliardsWorld, first: BallState, second: BallSt
   second.vx -= jt * tx * 0.5;
   second.vz -= jt * tz * 0.5;
 
+  // 用碰撞后的新速度走完本步剩余时间
+  if (advanceFirst > 0) {
+    first.x += first.vx * advanceFirst;
+    first.z += first.vz * advanceFirst;
+  }
+  if (advanceSecond > 0) {
+    second.x += second.vx * advanceSecond;
+    second.z += second.vz * advanceSecond;
+  }
+
   if (world.firstContact === null) {
     const object = first.number === 0 ? second : second.number === 0 ? first : null;
     if (object) {
@@ -429,6 +718,7 @@ function resolveBallPair(world: BilliardsWorld, first: BallState, second: BallSt
       });
     }
   }
+  return true;
 }
 
 /**
@@ -497,8 +787,12 @@ function applyClothFriction(ball: BallState, dt: number) {
   }
 
   // 垂直轴侧旋衰减（静止时衰减更快——原地打转的摩擦更大）
+  // 静止残旋叠加正比项：满塞 stun 后球停在原地时，wy≈238 rad/s 全靠线性衰减需 18s，
+  // 期间 world.moving 仅靠 wy 维系，系统长时间误报"球在运动中"；
+  // 正比衰减使任何量级残旋都在 ~2s 内收敛，视觉上是球原地打转自然停下
   if (ball.wy !== 0) {
-    const rate = Math.hypot(ball.vx, ball.vz) > STOP_SPEED ? SPIN_DECEL : SPIN_DECEL * 6;
+    const moving = Math.hypot(ball.vx, ball.vz) > STOP_SPEED;
+    const rate = moving ? SPIN_DECEL : SPIN_DECEL * 6 + Math.abs(ball.wy) * 2;
     const dw = rate * dt;
     if (Math.abs(ball.wy) <= dw) ball.wy = 0;
     else ball.wy -= Math.sign(ball.wy) * dw;
@@ -535,12 +829,9 @@ export function stepWorld(world: BilliardsWorld, dt = PHYSICS_DT) {
     collisionOccurred = false;
     for (let first = 0; first < world.balls.length; first += 1) {
       for (let second = first + 1; second < world.balls.length; second += 1) {
-        const beforeFirstX = world.balls[first].x;
-        const beforeSecondX = world.balls[second].x;
-        resolveBallPair(world, world.balls[first], world.balls[second]);
-        if (world.balls[first].x !== beforeFirstX || world.balls[second].x !== beforeSecondX) {
-          collisionOccurred = true;
-        }
+        collisionOccurred =
+          resolveBallPair(world, world.balls[first], world.balls[second], dt) ||
+          collisionOccurred;
       }
     }
     iterations++;

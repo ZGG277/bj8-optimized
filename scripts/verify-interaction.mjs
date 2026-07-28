@@ -1,4 +1,10 @@
-/* 真实交互回归矩阵:桌面鼠标+键盘 / 竖屏触摸 / 横屏触摸
+/*
+[INPUT]: 依赖已启动游戏页、ego lite 调试端口与 puppeteer-core
+[OUTPUT]: 桌面/竖屏/横屏的真实指针、键盘、瞄准、视角、蓄力与放置断言
+[POS]: 核心输入交互的浏览器出口门禁，DOM 只读不代替执行
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+ * 真实交互回归矩阵:桌面鼠标+键盘 / 竖屏触摸 / 横屏触摸
  * 原则:启动、视角、蓄力、放置全部走真实 mouse/touch/keyboard 事件;
  * DOM 读取只用于验证结果,不用 element.click() 执行被测动作。
  * 前置启动(ego lite 用无头模式,不弹窗不打断前台):
@@ -35,6 +41,22 @@ async function realClickButton(page, text) {
   return true;
 }
 
+async function placeCueBallInKitchen(page) {
+  const candidates = await page.evaluate(() => {
+    const r = document.querySelector('.viewport').getBoundingClientRect();
+    // 俯视下开球区在屏幕下方（head string 之后，z >= L/4），取几个候选点
+    return [0.72, 0.78, 0.84, 0.90].map(fy => ({ x: r.x + r.width / 2, y: r.y + r.height * fy }));
+  });
+  for (const pt of candidates) {
+    await page.mouse.click(pt.x, pt.y);
+    await new Promise(r => setTimeout(r, 350));
+    const phase = await page.evaluate(() => window.__bj8?.match?.current?.phase);
+    if (phase && phase !== 'placing') break;
+    const label = await page.evaluate(() => document.querySelector('.match-state p')?.textContent);
+    if (label !== '放置白球') break;
+  }
+}
+
 async function newGamePage(viewport) {
   const page = await browser.newPage();
   await page.setViewport(viewport);
@@ -44,6 +66,10 @@ async function newGamePage(viewport) {
   await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
   await realClickButton(page, '开始对局');
   await new Promise(r => setTimeout(r, 800));
+  // 处理开球放置：点击开球区后进入瞄准阶段
+  const phase = await page.evaluate(() => window.__bj8?.match?.current?.phase);
+  const label = await page.evaluate(() => document.querySelector('.match-state p')?.textContent);
+  if (phase === 'placing' || label === '放置白球') await placeCueBallInKitchen(page);
   return { page, errors };
 }
 
@@ -205,9 +231,9 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   });
   ok('触摸: 控制区无溢出元素', overflow === 0, overflow ? `${overflow}个元素溢出` : '');
 
-  // 第一人称旋转按钮:真实命中,不改变瞄准角
+  // 第一人称粗调杆向按钮：真实命中，并直接改变唯一世界瞄准角
   const rotateBtn = await page.evaluate(() => {
-    const btn = document.querySelector('.view-switcher button[aria-label="视角向左转"]');
+    const btn = document.querySelector('.view-switcher button[aria-label="杆向向左转 45 度"]');
     if (!btn) return null;
     const r = btn.getBoundingClientRect();
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
@@ -219,7 +245,11 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     await page.touchscreen.tap(rotateBtn.cx, rotateBtn.cy);
     await new Promise(r => setTimeout(r, 300));
     const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
-    ok('触摸: 旋转不改变瞄准角', aimBefore === aimAfter, `before=${aimBefore} after=${aimAfter}`);
+    ok(
+      '触摸: 粗调按钮改变世界杆向',
+      aimAfter < aimBefore - 0.6,
+      `before=${aimBefore} after=${aimAfter}`,
+    );
   }
 
   // 触摸拖拽出杆(开球),同时验证满力可达
@@ -426,10 +456,10 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   const expectedAt = (cx, cy) => page.evaluate((x, y) => {
     const s = window.__bj8.scene.current;
     const cue = window.__bj8.world.current.balls[0];
-    const hit = s.screenToTableAt(x, y, window.__bj8.aim.current, s.cameraAngle);
+    const hit = s.screenToTableAt(x, y, window.__bj8.aim.current);
     if (!hit) return null;
     const worldAngle = Math.atan2(hit.x - cue.x, -(hit.z - cue.z));
-    return Math.min(0.72, Math.max(-0.72, worldAngle - s.cameraAngle));
+    return Math.min(0.72, Math.max(-0.72, worldAngle));
   }, cx, cy);
   {
     await new Promise(r => setTimeout(r, 900)); // 等相机平滑就位(期间瞄准不变)

@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的令牌与 layout.css 的壳层几何
-[OUTPUT]: 对外提供视角工具条、瞄准微调、击球点盘、局面信息与出杆交互区的控件样式及横屏悬浮定位
+[OUTPUT]: 对外提供视角工具条、💡 走位按钮、瞄准微调、击球点盘、走位规划覆盖层（面板/步进器/力度条/击球点指示）、局面信息与出杆交互区的控件样式及横屏悬浮定位
 [POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -24,7 +24,7 @@
   border: none;
   background: transparent;
   color: #828c87;
-  font-size: 8px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
@@ -33,15 +33,58 @@
   color: #09120e;
 }
 
-/* 控制区：信息居左，方向微调/击球点盘/出杆区依次靠右 */
+/* 控制区：信息居左，💡 走位/方向微调/击球点盘/出杆区依次靠右 */
 .control-deck {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto;
   align-items: center;
   gap: 14px;
   padding: 0 14px;
   border-top: 1px solid var(--line);
   background: var(--panel);
+}
+
+/* 💡 走位按钮三态：is-lit(ready) 微光高亮 / is-open(showing) 描边表示展开中 /
+   is-dim(computing 呼吸；failed/idle 灰静态 disabled)；非玩家回合走 visibility（组件内注释） */
+.plan-button {
+  display: grid;
+  place-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  color: #b8bfbb;
+  font-size: var(--fs-base);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.plan-button.is-lit {
+  border-color: rgba(217,183,129,0.75);
+  color: var(--warm);
+  box-shadow: 0 0 14px rgba(217,183,129,0.4);
+}
+
+.plan-button.is-open {
+  border-color: rgba(217,183,129,0.9);
+  color: var(--warm);
+  box-shadow: inset 0 0 0 1px rgba(217,183,129,0.5), 0 0 10px rgba(217,183,129,0.25);
+}
+
+.plan-button.is-dim {
+  color: #6b7270;
+  border-color: rgba(255,255,255,0.08);
+  cursor: default;
+}
+
+.plan-button.is-dim:disabled {
+  opacity: 0.85;
+}
+
+/* computing 在 is-dim 灰底上保留呼吸提示 */
+.plan-button.is-dim.is-computing {
+  animation: pulse 1.2s ease-in-out infinite;
+  cursor: wait;
 }
 
 .aim-controls {
@@ -58,7 +101,7 @@
   border: 1px solid var(--line);
   background: rgba(255,255,255,0.03);
   color: #b8bfbb;
-  font-size: 14px;
+  font-size: var(--fs-2xl);
   cursor: pointer;
 }
 
@@ -75,13 +118,13 @@
 
 .aim-controls strong {
   display: block;
-  font-size: 9px;
+  font-size: var(--fs-base);
 }
 
 .aim-controls small {
   display: block;
   color: var(--dim);
-  font-size: 6px;
+  font-size: var(--fs-2xs);
   margin-top: 2px;
 }
 
@@ -144,19 +187,19 @@
 
 .spin-pad small {
   color: var(--dim);
-  font-size: 7px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.15em;
 }
 
 .match-message span {
   font-family: 'Songti SC', serif;
-  font-size: 12px;
+  font-size: var(--fs-xl);
 }
 
 .match-message small {
   display: block;
   color: var(--dim);
-  font-size: 7px;
+  font-size: var(--fs-xs);
   margin-top: 4px;
 }
 
@@ -199,7 +242,7 @@
 
 .power-num {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-xl);
   color: var(--muted);
 }
 
@@ -222,13 +265,13 @@
 }
 
 .shoot-pad strong {
-  font-size: 15px;
+  font-size: var(--fs-3xl);
   font-weight: 700;
   letter-spacing: 0.2em;
 }
 
 .shoot-pad small {
-  font-size: 8px;
+  font-size: var(--fs-sm);
   opacity: 0.75;
 }
 
@@ -243,6 +286,196 @@
   opacity: 0.35;
   pointer-events: none;
   filter: grayscale(0.7);
+}
+
+/* 走位规划提示条：顶部居中一条（高一行到两行），替代旧右侧面板/底部抽屉；
+   避开 GameHeader（左上）与记分板（右上），层级低于结束/介绍遮罩 */
+.plan-bar {
+  position: fixed;
+  top: calc(var(--topbar-h) + var(--scoreboard-h) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: min(94vw, 760px);
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(17, 21, 20, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.plan-bar-routes {
+  display: flex;
+  gap: 4px;
+}
+
+.plan-bar-routes button {
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.plan-bar-routes button.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #09120e;
+}
+
+.plan-bar-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 压缩打法 chip：与桌上轨迹分色一致（暖橙/青/紫） */
+.plan-chip {
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.plan-chip-1 { color: #ffa03c; border: 1px solid rgba(255, 160, 60, 0.45); }
+.plan-chip-2 { color: #35d6d6; border: 1px solid rgba(53, 214, 214, 0.45); }
+.plan-chip-3 { color: #b478ff; border: 1px solid rgba(180, 120, 255, 0.45); }
+
+.plan-bar-prob {
+  color: var(--warm);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.plan-bar-play {
+  padding: 4px 10px;
+  border: 1px solid rgba(112, 199, 165, 0.45);
+  border-radius: 8px;
+  background: linear-gradient(160deg, #3f8a6d, #2b6b52);
+  color: #eafff5;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.plan-bar-close {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 击球复盘：折叠 chip 与展开条都放在提示条同一区域（顶部居中）；
+   与 plan-bar 互斥（Game 层保证 planOpen 时不渲染复盘 chip） */
+.review-chip {
+  position: fixed;
+  top: calc(var(--topbar-h) + var(--scoreboard-h) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(94vw, 760px);
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(17, 21, 20, 0.88);
+  backdrop-filter: blur(10px);
+  color: var(--warm);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.review-bar {
+  position: fixed;
+  top: calc(var(--topbar-h) + var(--scoreboard-h) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: min(94vw, 760px);
+  padding: 6px 8px;
+  border: 1px solid rgba(217, 183, 129, 0.4);
+  border-radius: 10px;
+  background: rgba(17, 21, 20, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.review-verdict {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.review-verdict.perfect { color: #35d6a0; border: 1px solid rgba(53, 214, 160, 0.45); }
+.review-verdict.position-miss { color: #ffa03c; border: 1px solid rgba(255, 160, 60, 0.45); }
+.review-verdict.pot-miss { color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.45); }
+
+.review-verdict-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.review-verdict-dot.perfect { background: #35d6a0; }
+.review-verdict-dot.position-miss { background: #ffa03c; }
+.review-verdict-dot.pot-miss { background: #ff6b6b; }
+
+.review-bar-message {
+  color: var(--warm);
+  font-size: var(--fs-sm);
+}
+
+.review-bar-legend {
+  display: flex;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.review-bar-legend .legend-plan { color: #ffa03c; }
+.review-bar-legend .legend-actual { color: #e8ecea; }
+
+/* 横屏手机：提示条贴顶部安全区并压缩内边距 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .plan-bar {
+    top: calc(var(--hud-safe-top) + 4px);
+    padding: 4px 6px;
+    max-width: 96vw;
+  }
+
+  .review-bar,
+  .review-chip {
+    top: calc(var(--hud-safe-top) + 4px);
+    padding: 4px 8px;
+    max-width: 96vw;
+  }
 }
 
 /* 竖屏手机控件尺寸（信息隐藏后方向微调贴右收拢） */
@@ -270,6 +503,27 @@
   .match-message {
     display: none;
   }
+
+  /* 击球点盘挪到左下并加大,方便拇指点选、避免误触 */
+  .spin-pad {
+    position: fixed;
+    left: 10px;
+    bottom: 10px;
+    z-index: 9;
+    background: rgba(17,21,20,0.7);
+    border-radius: 12px;
+    padding: 8px;
+  }
+
+  .spin-ball {
+    width: 76px;
+    height: 76px;
+  }
+
+  .spin-dot {
+    width: 10px;
+    height: 10px;
+  }
 }
 
 @media (max-width: 400px) {
@@ -283,8 +537,8 @@
   }
 
   .spin-ball {
-    width: 36px;
-    height: 36px;
+    width: 68px;
+    height: 68px;
   }
 
   .shoot-pad {
@@ -329,15 +583,30 @@
     padding: 4px;
   }
 
+  /* 横屏：💡 走位按钮与右下控件组同风格悬浮 */
+  .plan-button {
+    background: rgba(17,21,20,0.7);
+  }
+
+  /* 横屏：击球点盘钉在左下并加大，与右下控件组分离 */
   .spin-pad {
+    position: fixed;
+    left: 10px;
+    bottom: 10px;
+    z-index: 9;
     background: rgba(17,21,20,0.7);
     border-radius: 10px;
-    padding: 4px;
+    padding: 6px;
   }
 
   .spin-ball {
-    width: 40px;
-    height: 40px;
+    width: 72px;
+    height: 72px;
+  }
+
+  .spin-dot {
+    width: 10px;
+    height: 10px;
   }
 
   .shoot-zone {

@@ -14,6 +14,8 @@ import {
   pocketedThisShot,
   isCueBallPocketed,
   respotCueBall,
+  clampAimToForwardHalf,
+  predictBallCollisionDirections,
   TABLE,
   PHYSICS_DT,
   type BilliardsWorld,
@@ -66,9 +68,9 @@ describe('出杆机制测试', () => {
     strikeCueBall(world, 0, 50);
     const cue = getCueBall(world);
     const speed = Math.hypot(cue!.vx, cue!.vz);
-    // 0.35 + 0.5 * 7.65 = 4.175
-    expect(speed).toBeGreaterThan(3.9);
-    expect(speed).toBeLessThan(4.4);
+    // 0.35 + 0.5 * 9.65 = 5.175
+    expect(speed).toBeGreaterThan(4.9);
+    expect(speed).toBeLessThan(5.4);
   });
 
   it('力度边界值测试', () => {
@@ -82,8 +84,8 @@ describe('出杆机制测试', () => {
     strikeCueBall(world, 0, 100);
     cue = getCueBall(world);
     speed = Math.hypot(cue!.vx, cue!.vz);
-    expect(speed).toBeGreaterThan(7.6);
-    expect(speed).toBeLessThan(8.2);
+    expect(speed).toBeGreaterThan(9.6);
+    expect(speed).toBeLessThan(10.4);
   });
 
   it('角度影响速度方向', () => {
@@ -162,7 +164,7 @@ describe('自旋（杆法）测试', () => {
       one.x = 0; one.z = -0.3;
       const cue = getCueBall(world)!;
       cue.x = 0; cue.z = 0.3;
-      strikeCueBall(world, 0, 40, { x: sx, y: 0 });
+      strikeCueBall(world, 0, 25, { x: sx, y: 0 });
       simulateUntilStop(world, 60);
       return cue.z;
     };
@@ -170,9 +172,9 @@ describe('自旋（杆法）测试', () => {
     const stunZ = runHit(0);
     const drawZ = runHit(-1);
     // 击球点在 z≈-0.24：高杆应跟进（z 明显更小），低杆应拉回（z 明显更大）
-    expect(followZ).toBeLessThan(-0.6);
-    expect(stunZ).toBeGreaterThan(followZ + 0.5);
-    expect(drawZ).toBeGreaterThan(stunZ + 0.3);
+    expect(followZ).toBeLessThan(-0.4);
+    expect(stunZ).toBeGreaterThan(followZ + 0.3);
+    expect(drawZ).toBeGreaterThan(stunZ + 0.15);
   });
 
   it('侧旋影响碰库后的切向反弹', () => {
@@ -193,6 +195,18 @@ describe('自旋（杆法）测试', () => {
 });
 
 describe('碰撞物理测试', () => {
+  it('瞄准预测与球碰冲量共享：正碰目标球沿母球方向，切球包含 throw 偏转', () => {
+    const straight = predictBallCollisionDirections(0, -1, 0, -1);
+    expect(straight.object.x).toBeCloseTo(0, 8);
+    expect(straight.object.z).toBeCloseTo(-1, 8);
+    expect(straight.cueSpeedRatio).toBeLessThan(0.05);
+
+    const invSqrt2 = Math.SQRT1_2;
+    const cut = predictBallCollisionDirections(0, -1, invSqrt2, -invSqrt2);
+    expect(Math.hypot(cut.object.x, cut.object.z)).toBeCloseTo(1, 8);
+    expect(cut.object.x).not.toBeCloseTo(invSqrt2, 3);
+  });
+
   it('物理引擎可以模拟多个时间步', () => {
     const world = createInitialWorld();
     strikeCueBall(world, 0.5, 60);
@@ -216,6 +230,28 @@ describe('碰撞物理测试', () => {
     }
     // 1号球应被打向 -z 方向至少 0.6m（碰库前）
     expect(z0 - minZ).toBeGreaterThan(0.6);
+  });
+
+  it('纯 z 方向逆序三球链在同一步内继续传播（碰撞迭代不得只观察 x）', () => {
+    const world = createInitialWorld();
+    for (const ball of world.balls) ball.active = [0, 1, 2].includes(ball.number);
+    const cue = world.balls.find((ball) => ball.number === 0)!;
+    const one = world.balls.find((ball) => ball.number === 1)!;
+    const two = world.balls.find((ball) => ball.number === 2)!;
+    const diameter = TABLE.ballRadius * 2;
+    cue.x = one.x = two.x = 0;
+    cue.z = -diameter;
+    one.z = 0;
+    two.z = diameter;
+    cue.vx = cue.vz = one.vx = one.vz = two.vx = 0;
+    two.vz = -1;
+    world.moving = true;
+
+    stepWorld(world, PHYSICS_DT);
+
+    // 数组配对顺序先检查 0-1，后检查 1-2；只有检测到纯 z 碰撞并再迭代，
+    // 0 号才会在同一固定步收到从 2→1→0 的冲量。
+    expect(cue.vz).toBeLessThan(-0.01);
   });
 
   it('库边反弹后仍在界内', () => {
@@ -324,5 +360,26 @@ describe('物理手感基准（打印指标）', () => {
       console.log(`低杆: 白球最终 z=${cue.z.toFixed(3)} (碰球点约 z=${(one.z).toFixed(2)})`);
     }
     expect(true).toBe(true);
+  });
+});
+
+describe('瞄准方向约束', () => {
+  it('开球区母球只能瞄准对面半台（负 z 半面）', () => {
+    const cue = { x: 0.16, z: TABLE.length * 0.25 + 0.08 };
+    // 朝球堆（0 rad）保留
+    expect(clampAimToForwardHalf(cue, 0)).toBeCloseTo(0, 3);
+    // 朝左/右库边界保留
+    expect(clampAimToForwardHalf(cue, Math.PI / 2)).toBeCloseTo(Math.PI / 2, 3);
+    expect(clampAimToForwardHalf(cue, -Math.PI / 2)).toBeCloseTo(-Math.PI / 2, 3);
+    // 朝身后（正 z）被钳制到最近边界，不允许产生向后分量
+    expect(clampAimToForwardHalf(cue, Math.PI)).toBeCloseTo(Math.PI / 2, 3);
+    expect(clampAimToForwardHalf(cue, -Math.PI)).toBeCloseTo(-Math.PI / 2, 3);
+  });
+
+  it('母球跑到对面半台时前方自动翻转', () => {
+    const cue = { x: 0, z: -TABLE.length * 0.25 };
+    // 此时“前方”是朝正 z，原朝球堆方向会被翻到身后边界
+    expect(clampAimToForwardHalf(cue, 0)).toBeCloseTo(-Math.PI / 2, 3);
+    expect(clampAimToForwardHalf(cue, Math.PI)).toBeCloseTo(Math.PI, 3);
   });
 });

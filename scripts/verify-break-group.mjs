@@ -1,4 +1,10 @@
-/* P0-06 出口门禁:开球进球 → 连续进球 → 分组 的端到端复测
+/*
+[INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core 与 __bj8 调试句柄
+[OUTPUT]: 开球进球→连续进球→分组的真实输入端到端断言
+[POS]: 规则/输入/物理贯通的浏览器出口门禁
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+ * P0-06 出口门禁:开球进球 → 连续进球 → 分组 的端到端复测
  * 通过 __bj8 调试句柄摆球,但瞄准/出杆全部走真实鼠标输入。
  * 前置:
  *   npx vite --port 5199 --strictPort &
@@ -41,6 +47,33 @@ await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
 ok('开始对局按钮真实点击', await realClickButton(page, '开始对局'));
 await new Promise(r => setTimeout(r, 800));
 
+// 开球流程适配：开局进入 placing 阶段（点击开球区放置白球）→ 放球后才到 aiming。
+// 网格扫描 screenToTable 找一个 z ≥ headString 的屏幕点，真实移鼠标+点击放置
+const wasPlacing = await page.evaluate(() => !!document.querySelector('.viewport.placing'));
+if (wasPlacing) {
+  const spot = await page.evaluate(() => {
+    const scene = window.__bj8.scene.current;
+    const headString = 2.54 * 0.25; // TABLE.length * 0.25
+    for (let py = 100; py < 780; py += 20) {
+      for (let px = 200; px < 1100; px += 20) {
+        const hit = scene.screenToTable(px, py);
+        if (hit && Math.abs(hit.x) < 0.3 && hit.z > headString + 0.15 && hit.z < headString + 0.6) {
+          return { px, py };
+        }
+      }
+    }
+    return null;
+  });
+  if (spot) {
+    await page.mouse.move(spot.px, spot.py);
+    await new Promise(r => setTimeout(r, 200));
+    await page.mouse.click(spot.px, spot.py);
+    await new Promise(r => setTimeout(r, 500));
+  }
+  const stillPlacing = await page.evaluate(() => !!document.querySelector('.viewport.placing'));
+  ok('开球放置白球（placing→aiming）', !stillPlacing, `spot=${JSON.stringify(spot)}`);
+}
+
 // 右上袋口
 const POCKET = { x: 0.635, z: -1.27 };
 // 摆球:小角度切球几何。目标球离袋口 0.35m;白球行进方向比"目标球→袋口"方向小 15°,
@@ -50,7 +83,7 @@ function staging(R) {
   const B = { x: POCKET.x - 0.35 * v.x, z: POCKET.z - 0.35 * v.z }; // 目标球
   const G = { x: B.x - v.x * 2 * R, z: B.z - v.z * 2 * R }; // 幽灵球位(触球瞬间白球球心)
   const u = { x: 0.373, z: -0.928 }; // 白球行进方向(v 顺时针减 15°,21.9°,在瞄准限制内)
-  const C = { x: G.x - u.x * 0.31, z: G.z - u.z * 0.31 }; // 白球起点
+  const C = { x: G.x - u.x * 1.25, z: G.z - u.z * 1.25 }; // 白球起点（z>0 半台：clampAimToForwardHalf 才允许朝 -z 瞄准）
   const aimPoint = { x: G.x + u.x * 0.2, z: G.z + u.z * 0.2 }; // 瞄准点(过幽灵球位延长线上)
   return { B, C, aimPoint };
 }
@@ -64,7 +97,7 @@ async function stagePot(ballNumber) {
     const B = { x: pocket.x - 0.35 * v.x, z: pocket.z - 0.35 * v.z };
     const G = { x: B.x - v.x * 2 * R, z: B.z - v.z * 2 * R };
     const u = { x: 0.373, z: -0.928 };
-    const C = { x: G.x - u.x * 0.31, z: G.z - u.z * 0.31 };
+    const C = { x: G.x - u.x * 1.25, z: G.z - u.z * 1.25 }; // 与 staging() 一致：白球放 z>0 半台
     // 清场:除白球外全部移出
     for (const b of world.balls) {
       if (b.number === 0) continue;

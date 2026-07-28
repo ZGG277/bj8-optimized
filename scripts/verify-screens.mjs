@@ -1,4 +1,9 @@
-/* 无头浏览器截图验证脚本 */
+/*
+[INPUT]: 依赖已启动游戏页、固定 ego lite 调试端口与 puppeteer-core
+[OUTPUT]: 介绍页、第一人称与俯视等基准视觉截图
+[POS]: 基础视觉回归取证脚本，不参与运行时
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
 import puppeteer from 'puppeteer-core';
 
 const shots = [

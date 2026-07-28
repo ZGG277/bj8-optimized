@@ -2,17 +2,19 @@
 
 > L2 | 父级: `../CLAUDE.md`
 
-独立 Vite + React + Three.js 中式八球实验场，验证 240 Hz 物理、双视角、杆法、规则轮转与真实交互。
+独立 Vite + React + Three.js 中式八球实验场（产品名「净息」），验证 240 Hz 物理、双视角、杆法、规则轮转与真实交互；发布于飞书妙搭（app_17atze3ahyj），玩法与部署说明见 README.md。
 
 ## 成员清单
 
-`src/`: 游戏业务源码，包含物理世界、match 纯规则状态机、input 出杆输入层、components HUD 控件、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
+`src/`: 游戏业务源码，包含 physics 物理世界、aim 360°/近袋精瞄几何、match 纯规则状态机、planner 走位规划引擎（含可抢占 Web Worker 异步封装）、input 出杆输入层、components HUD 控件、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
 
-`scripts/`: 浏览器交互、画面与场景对象验证脚本；verify-interaction 为真实指针回归门禁（桌面/竖屏/横屏/瞄准/出杆 41 断言），verify-break-group 为开球→连续进球→分组端到端复测（16 断言），verify-screens 为视觉回归截图，均经环境变量定位浏览器与页面。
+`scripts/`: 浏览器交互、画面与场景对象验证脚本；含真实指针回归（verify-interaction 41 断言）、粗瞄/精瞄双档交互（verify-precision-aim 5 断言）、预测球路一致性（verify-aim-accuracy 19 断言）、规则/布局专项门禁、走位规划与视觉截图，成员清单见 `scripts/CLAUDE.md`。
 
 `shots/`: 人工与自动化试玩截图，仅作为视觉回归证据，不作为运行时依赖。
 
 `index.html`: Vite HTML 入口，挂载 React 根节点并声明页面元数据。
+
+`README.md`: 项目说明（玩法、快速开始、质量门禁、浏览器回归、妙搭部署）。
 
 `package.json`: 本实验场的依赖与命令入口；`npm run check` 为 typecheck + 单测 + 构建的统一提交门禁。
 
@@ -20,9 +22,13 @@
 
 `tsconfig.json`: TypeScript 严格模式与未使用符号检查配置。
 
-`vite.config.ts`: Vite React 构建配置，使用相对资源基址支持静态托管。
+`vite.config.ts`: Vite React 构建配置，使用相对资源基址支持静态托管；业务、React、Three core、Three addons 分块以稳定缓存并消除单主包告警。
 
 `PHASE_0_1_EXECUTION_PLAN.md`: 规则正确性、GEB 同构、输入确定性与固定步时钟的可执行优化方案。
+
+`POSITION_PLAY_DESIGN.md`: 走位规划（已交付，`src/planner/`）与拍照还原球局（方案阶段）的完整调研、方案决策、实测数据与交互设计文档。
+
+`PRECISION_AIM_V2_ACCEPTANCE.md`: `codex/precision-aim-v2-20260728` 的功能边界、双档精瞄操作规格、自动化证据与人工验收清单。
 
 `dist/`: Vite 生成产物，不作为源代码维护。
 

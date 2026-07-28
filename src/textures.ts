@@ -1,4 +1,9 @@
 /*
+[INPUT]: 依赖浏览器 Canvas API 与 Three.js CanvasTexture
+[OUTPUT]: 对外提供台呢、木纹、皮革、球体与母球的程序化贴图工厂
+[POS]: 渲染资源层；只生成纹理，不持有场景或对局状态
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
  * 程序化贴图：绒布（带倒顺毛）、木纹、法线噪声
  * 全部在 Canvas 上生成，无外部资源依赖
  */

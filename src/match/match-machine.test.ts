@@ -180,6 +180,27 @@ describe('8 号球胜负', () => {
     expect(r.next.messageKey).toBe('win-8');
   });
 
+  it('清台干净进 8 号（无碰库）：进球满足"碰库或进球"规则 → 获胜', () => {
+    // 回归：曾把 8 号排除在 objectPotted 外，干净打进 8 号被误判 no-cushion 犯规
+    const r = resolveStoppedShot(
+      S({ playerGroup: 'solid' }),
+      F({ firstContact: 8, pocketed: [8], remainingSolids: 0, cushionAfterFirstContact: false }),
+    );
+    expect(r.next.phase).toBe('finished');
+    expect(r.next.winner).toBe('player');
+    expect(r.next.messageKey).toBe('win-8');
+  });
+
+  it('未清台时合法首碰后 8 号入袋（无碰库）：提前入袋判负，不算 no-cushion 犯规', () => {
+    const r = resolveStoppedShot(
+      S({ playerGroup: 'solid' }),
+      F({ firstContact: 3, pocketed: [8], remainingSolids: 2, cushionAfterFirstContact: false }),
+    );
+    expect(r.next.phase).toBe('finished');
+    expect(r.next.winner).toBe('opponent');
+    expect(r.next.messageKey).toBe('lose-8-early');
+  });
+
   it('进 8 号同时白球落袋：伴随犯规 → 当前击球者失败', () => {
     const r = resolveStoppedShot(
       S({ playerGroup: 'solid' }),
@@ -192,9 +213,10 @@ describe('8 号球胜负', () => {
 });
 
 describe('状态机属性', () => {
-  it('重开：回到初始开放开球局', () => {
+  it('重开：回到初始开放开球局（先放置白球）', () => {
     const m = beginMatch(createInitialMatchState());
-    expect(m.phase).toBe('aiming');
+    expect(m.phase).toBe('placing');
+    expect(m.messageKey).toBe('placing-break');
     expect(m.actor).toBe('player');
     expect(m.breaking).toBe(true);
     expect(m.playerGroup).toBeNull();
