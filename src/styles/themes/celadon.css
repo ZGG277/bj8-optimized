@@ -1,0 +1,222 @@
+/*
+[INPUT]: controls.css 全部控件选择器
+[OUTPUT]: 主题「青瓷 celadon」——宋代青瓷美学：墨绿底、天青主色、玉石温润内光、米金辅色
+[POS]: 三主题层默认方案，:root[data-theme='celadon'] 作用域，仅覆盖视觉表达，不改交互几何
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+:root[data-theme='celadon'] {
+  --green: #8fd3c2;            /* 天青 */
+  --warm: #d6c49a;             /* 米金 */
+  --danger: #c65b48;
+  --panel: #0e1714;
+  --line: rgba(183, 224, 211, 0.09);
+  --dim: #5f7169;
+  --muted: #93a89e;
+  --line-strong: rgba(143, 211, 194, 0.42);
+  --radius-sm: 9px;
+  --radius-control: 13px;
+  --radius-panel: 16px;
+  --surface-1: rgba(18, 30, 26, 0.8);
+  --surface-2: rgba(14, 23, 20, 0.9);
+  --surface-control: rgba(20, 33, 29, 0.74);
+  --shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.5);
+  --blur-overlay: blur(12px) saturate(1.15);
+  /* 玉质高光：控件顶部一道釉光 */
+  --glaze: inset 0 1px 0 rgba(220, 245, 236, 0.14);
+}
+
+:root[data-theme='celadon'] body {
+  background: #080f0d;
+  color: #dcebe4;
+}
+
+:root[data-theme='celadon'] :focus-visible {
+  outline-color: var(--green);
+}
+
+/* ── 计分板 ── */
+:root[data-theme='celadon'] .scoreboard {
+  background: linear-gradient(180deg, #101a17, #0c1311);
+  border-bottom: 1px solid var(--line);
+}
+
+:root[data-theme='celadon'] .avatar.me {
+  background: radial-gradient(circle at 32% 28%, #b9e8da, #6db3a0 68%);
+  color: #0a1a14;
+  box-shadow: inset 0 -2px 4px rgba(10, 40, 30, 0.3), 0 0 0 1px rgba(143, 211, 194, 0.35);
+}
+
+:root[data-theme='celadon'] .avatar.rival {
+  color: var(--warm);
+  border: 1px solid rgba(214, 196, 154, 0.4);
+  background: radial-gradient(circle at 35% 30%, #453d2c, #101713 72%);
+}
+
+:root[data-theme='celadon'] .score-center {
+  color: #e6f2ec;
+}
+
+/* ── 桌面角标 ── */
+:root[data-theme='celadon'] .shot-target {
+  border-right: 2px solid rgba(143, 211, 194, 0.65);
+}
+
+/* ── 控制轨：玉质面板——深釉绿渐变 + 顶部釉光 ── */
+:root[data-theme='celadon'] .control-rail {
+  background: linear-gradient(175deg, rgba(21, 35, 30, 0.85), rgba(9, 15, 13, 0.88));
+  border: 0;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--glaze), inset 0 0 0 1px rgba(143, 211, 194, 0.14), inset 0 0 22px rgba(6, 12, 10, 0.5), 0 10px 28px rgba(0, 0, 0, 0.38);
+}
+
+:root[data-theme='celadon'] .control-rail.is-editing {
+  outline: 1px solid rgba(143, 211, 194, 0.6);
+  box-shadow: var(--glaze), 0 0 0 3px rgba(143, 211, 194, 0.12), 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+/* 视角推杆 */
+:root[data-theme='celadon'] .view-switcher {
+  background: linear-gradient(170deg, rgba(24, 39, 34, 0.85), rgba(12, 20, 17, 0.85));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--glaze);
+}
+
+:root[data-theme='celadon'] .view-switcher button {
+  color: #6e857b;
+}
+
+:root[data-theme='celadon'] .view-switcher button.active {
+  background: rgba(143, 211, 194, 0.15);
+  color: #d7f3e9;
+}
+
+:root[data-theme='celadon'] .view-slider-fill {
+  background: linear-gradient(0deg, rgba(143, 211, 194, 0.35), var(--green));
+}
+
+:root[data-theme='celadon'] .view-slider-thumb {
+  border: 1px solid rgba(143, 211, 194, 0.55);
+  border-radius: 10px;
+  background: linear-gradient(160deg, #57a08b, #38685a);
+  box-shadow: inset 0 1px 0 rgba(220, 245, 236, 0.3), 0 5px 14px rgba(0, 0, 0, 0.42);
+}
+
+:root[data-theme='celadon'] .view-slider-thumb i {
+  background: rgba(228, 250, 242, 0.85);
+  box-shadow: 0 -5px rgba(228, 250, 242, 0.3), 0 5px rgba(228, 250, 242, 0.3);
+}
+
+/* 走位按钮 */
+:root[data-theme='celadon'] .plan-button {
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  box-shadow: var(--glaze);
+  color: #a9c0b6;
+}
+
+:root[data-theme='celadon'] .plan-button.is-open {
+  border-color: rgba(214, 196, 154, 0.85);
+  color: #e9dcb8;
+  box-shadow: var(--glaze), 0 0 12px rgba(214, 196, 154, 0.2);
+}
+
+/* 击球点 */
+:root[data-theme='celadon'] .spin-preview {
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  box-shadow: var(--glaze);
+}
+
+:root[data-theme='celadon'] .spin-popover {
+  border-radius: var(--radius-panel);
+  background: var(--surface-2);
+  border: 1px solid rgba(143, 211, 194, 0.16);
+  box-shadow: var(--glaze), var(--shadow-overlay);
+}
+
+/* 出杆：青玉渐变 */
+:root[data-theme='celadon'] .shoot-zone {
+  background: rgba(14, 23, 20, 0.6);
+  border-radius: var(--radius-control);
+}
+
+:root[data-theme='celadon'] .shoot-pad {
+  border-radius: var(--radius-control);
+  background: linear-gradient(168deg, #57a08b, #356355);
+  border: 1px solid rgba(143, 211, 194, 0.5);
+  color: #e9faf3;
+  box-shadow: inset 0 1px 0 rgba(220, 245, 236, 0.28), inset 0 -8px 18px rgba(10, 30, 24, 0.35), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme='celadon'] .shoot-power-fill {
+  background: linear-gradient(0deg, rgba(143, 211, 194, 0.8), rgba(87, 160, 139, 0.55));
+}
+
+:root[data-theme='celadon'] .shoot-power-fill.hot {
+  background: linear-gradient(0deg, rgba(222, 132, 70, 0.92), rgba(198, 91, 72, 0.75));
+}
+
+:root[data-theme='celadon'] .shoot-pad.charging {
+  background: linear-gradient(168deg, #cfa050, #9c6f2a);
+  border-color: rgba(233, 220, 184, 0.65);
+}
+
+:root[data-theme='celadon'] .power-num {
+  color: #eefaf4;
+}
+
+/* 瞄准刻度盘 */
+:root[data-theme='celadon'] .aim-dial {
+  border-radius: var(--radius-panel);
+  background: rgba(11, 18, 16, 0.76);
+  border: 1px solid rgba(143, 211, 194, 0.16);
+  box-shadow: var(--glaze), 0 8px 26px rgba(0, 0, 0, 0.32);
+}
+
+/* 精准瞄准条 */
+:root[data-theme='celadon'] .precision-aim {
+  background: rgba(10, 17, 15, 0.9);
+  border: 1px solid rgba(143, 211, 194, 0.45);
+  border-radius: var(--radius-control);
+}
+
+/* 顶部提示条 */
+:root[data-theme='celadon'] .plan-bar,
+:root[data-theme='celadon'] .review-float {
+  background: rgba(13, 22, 19, 0.9);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--glaze);
+}
+
+:root[data-theme='celadon'] .plan-step-tabs button.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #0a1a14;
+}
+
+:root[data-theme='celadon'] .plan-bar-play {
+  background: linear-gradient(160deg, #57a08b, #356355);
+  border-color: rgba(143, 211, 194, 0.5);
+}
+
+/* 遮罩与开始界面 */
+:root[data-theme='celadon'] .intro-card {
+  background: linear-gradient(150deg, #15241f, #0b120f);
+  border: 1px solid rgba(143, 211, 194, 0.2);
+  border-radius: 18px;
+  box-shadow: var(--glaze), 0 40px 80px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='celadon'] .finish-mask button,
+:root[data-theme='celadon'] .start-btn {
+  background: linear-gradient(150deg, #a9e0cf, #6db3a0);
+  color: #0a1a14;
+  border-radius: 10px;
+}
+
+:root[data-theme='celadon'] .intro-tags span {
+  border-color: rgba(143, 211, 194, 0.2);
+  color: #6e857b;
+}

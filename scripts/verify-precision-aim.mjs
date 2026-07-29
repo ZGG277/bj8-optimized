@@ -134,23 +134,31 @@ ok(
   JSON.stringify(fine),
 );
 
-const expandedPoint = await page.evaluate(() => {
+const expandedAngle = await page.evaluate(() => {
   const debug = window.__bj8;
   const centered = debug.precisionAt(debug.aim.current, 8);
   if (!centered) return null;
-  const angle = centered.centerAngle + centered.halfWidth * 3.2;
-  const cue = debug.world.current.balls.find((ball) => ball.number === 0);
-  const distance = 0.32;
-  const point = debug.scene.current.tableToScreen(
-    cue.x + Math.sin(angle) * distance,
-    cue.z - Math.cos(angle) * distance,
-  );
-  return { ...point, expectedAngle: angle };
+  return centered.centerAngle + centered.halfWidth * 3.2;
 });
-if (!expandedPoint) throw new Error('expanded dial point unavailable');
+if (expandedAngle === null) throw new Error('expanded dial angle unavailable');
 // 先移开当前瞄准线，避免目标点因离中心线太近被命中判定为“抓线”而不是新幽灵球落点。
 await page.mouse.click(offTarget.x, offTarget.y);
 await wait(100);
+// 连续镜头在俯视端仍随世界杆向环绕；移动瞄准线后必须按“当前目标相机位姿”
+// 重新投影扩大接近区的台面点，不能复用旧固定俯视相机下的屏幕坐标。
+const expandedPoint = await page.evaluate((angle) => {
+  const debug = window.__bj8;
+  const cue = debug.world.current.balls.find((ball) => ball.number === 0);
+  const distance = 0.32;
+  const point = debug.scene.current.tableToScreenAt(
+    cue.x + Math.sin(angle) * distance,
+    cue.z - Math.cos(angle) * distance,
+    debug.aim.current,
+    1,
+  );
+  return point ? { ...point, expectedAngle: angle } : null;
+}, expandedAngle);
+if (!expandedPoint) throw new Error('expanded dial point unavailable');
 const expandedHit = await page.evaluate(({ x, y }) => {
   const element = document.elementFromPoint(x, y);
   const dial = document.querySelector('.aim-dial')?.getBoundingClientRect();

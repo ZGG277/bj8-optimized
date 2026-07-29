@@ -6,7 +6,7 @@ v1.2.0 采用零浪费 HUD：桌面删除产品/回合/杆数顶栏，手机端�
 
 当前对局提供两种关系：**陪练**按玩家长期能力匹配略弱对手，保留走位/复盘；**挑战**匹配高一档对手并关闭赛中规划提示。玩家能力只从目标明确的非开球样本更新，AI 档案在每局开始生成后锁定，局内不会追着比分升降。
 
-视觉语言 v1.3 在不改变上述信息架构、54px 控制轨与手势几何的前提下，统一为“静谧球房”深绿黑烟熏表面，并借用“竞技仪表”的状态层级、等宽数字和刻度秩序；三案比较与验收边界见 `VISUAL_LANGUAGE_V13.md`。
+视觉语言 v1.3 以“静谧球房”的信息架构、54px 控制轨和手势几何为共同底座，提供三套可即时切换的表达：默认「青瓷」、正式竞技「决赛之夜」、年轻夜场「霓虹球房」。左下角按钮、URL `?theme=celadon|noir|neon` 与 `[` / `]` 键均可切换，选择会保存在本机；主题只改视觉，不改游戏逻辑与触控几何。
 
 线上版（飞书妙搭托管）：https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj
 
@@ -60,6 +60,7 @@ npx vite --port 5199 --strictPort &
 | `scripts/verify-mobile-spinpad.mjs` | 移动端击球点盘布局与球杆造型截图（9 断言） |
 | `scripts/verify-mobile-portrait-v12.mjs` | 竖屏虚母球拖动、落位拨轮、连续视角停留/环绕、整轨编辑、击球点与灯泡总开关（48 断言） |
 | `scripts/verify-position-plan.mjs` | 最高概率分杆规划与手动复盘集成（34 断言） |
+| `scripts/verify-themes.mjs` | 三主题按钮、URL/本地持久化、桌面/竖屏边界与开局后主题保持 |
 | `scripts/verify-screens.mjs` | 视觉回归截图（shots/01–06） |
 
 截图证据存于 `shots/`。
@@ -89,7 +90,7 @@ src/
   Scene3D.ts        Three.js 场景适配器（连续环绕相机、瞄准辅助、球杆动画、规划轨迹/走位区域渲染）
   components/       HUD 控件（只转发事件，不持有对局状态）
   hooks/            对局编排拆出的 React Hooks（含 usePositionPlan 走位规划预算）
-  styles/           base → layout → controls 样式体系
+  styles/           base → layout → controls → themes 样式体系
 scripts/            浏览器回归脚本
 shots/              视觉回归截图证据
 ```

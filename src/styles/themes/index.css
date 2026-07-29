@@ -1,0 +1,69 @@
+/*
+[INPUT]: base/layout/controls 三层样式之后加载；ThemeSwitcher 组件
+[OUTPUT]: 汇总青瓷、决赛之夜、霓虹球房三套主题，并提供常驻按钮组样式
+[POS]: 视觉主题层入口；主题规则以 :root[data-theme] 隔离，不改变游戏交互几何
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+@import './celadon.css';
+@import './noir.css';
+@import './neon.css';
+
+.theme-switcher {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  max-width: calc(100vw - 78px);
+  overflow-x: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  box-shadow: var(--shadow-raised);
+  backdrop-filter: var(--blur-surface);
+  scrollbar-width: none;
+}
+
+.theme-switcher::-webkit-scrollbar {
+  display: none;
+}
+
+.theme-switcher button {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 11px/1 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.theme-switcher button:hover {
+  color: var(--text-primary);
+}
+
+.theme-switcher button.active {
+  border-color: var(--line-strong);
+  background: color-mix(in srgb, var(--green) 18%, var(--surface-control));
+  color: var(--text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .theme-switcher {
+    left: max(6px, env(safe-area-inset-left));
+    bottom: max(6px, env(safe-area-inset-bottom));
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .theme-switcher button {
+    min-height: 26px;
+    padding: 4px 7px;
+    font-size: 10px;
+  }
+}
