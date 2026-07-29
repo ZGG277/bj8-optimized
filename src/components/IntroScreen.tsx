@@ -14,7 +14,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
     <div className="intro-backdrop">
       <div className="intro-card">
         <span className="intro-kicker">中式八球 · 物理模拟</span>
-        <h1>净息</h1>
+        <h1>瓜瓜台球</h1>
         <p>真实物理引擎驱动，每一杆都经过碰撞计算。</p>
         <button className="start-btn" onClick={onStart}>
           开始对局

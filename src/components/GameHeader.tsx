@@ -24,7 +24,7 @@ export function GameHeader({ match, shot }: GameHeaderProps) {
       <div className="brand">
         <span className="brand-glyph">净</span>
         <div>
-          <strong>净息</strong>
+          <strong>瓜瓜台球</strong>
           <small>中式八球</small>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 > L2 | 父级: `../CLAUDE.md`
 
-独立 Vite + React + Three.js 中式八球实验场（产品名「净息」），验证 240 Hz 物理、双视角、杆法、规则轮转与真实交互；发布于飞书妙搭（app_17atze3ahyj），玩法与部署说明见 README.md。
+独立 Vite + React + Three.js 中式八球实验场（产品名「瓜瓜台球」），验证 240 Hz 物理、双视角、杆法、规则轮转与真实交互；新移动版发布于独立飞书妙搭应用 `app_17b15z6mnst`，旧应用 `app_17atze3ahyj` 保留，玩法与部署说明见 README.md。
 
 ## 成员清单
 
