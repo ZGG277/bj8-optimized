@@ -162,7 +162,9 @@ const viewTrackPoint = {
 await page.touchscreen.touchStart(viewTrackPoint.x, viewTrackPoint.bottom);
 await page.touchscreen.touchMove(viewTrackPoint.x, (viewTrackPoint.top + viewTrackPoint.bottom) / 2);
 await page.touchscreen.touchEnd();
-await wait(220);
+// 连续镜头采用逐帧平滑收敛；无头浏览器在低帧率时 220ms 仍可能停在半途。
+// 等镜头到达中间高度后再采样，避免把收敛过程误判为转向造成的高度漂移。
+await wait(700);
 const heldMidView = await page.evaluate(() => ({
   value: Number(document.querySelector('.view-slider-track')?.getAttribute('aria-valuenow')),
   level: Number(document.querySelector('.viewport')?.getAttribute('data-view-level')),
