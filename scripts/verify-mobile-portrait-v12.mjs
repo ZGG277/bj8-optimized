@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 竖屏单手布局、开球落位拨轮、长行程视角推杆、击球点弹层、出杆、灯泡与浮层拖拽断言及截图
+[OUTPUT]: 390×844 竖屏单手布局、开球落位拨轮、可停任意高度的长行程视角推杆、击球点弹层、出杆、灯泡与浮层拖拽断言及截图
 [POS]: v1.2.0 手机竖屏核心交互的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -153,12 +153,54 @@ const dialEndAim = await page.evaluate(() => window.__bj8.aim.current);
 ok('手机触摸横拨真实改变击球方向', Math.abs(dialEndAim - dialStartAim) > 0.001,
   `${dialStartAim} → ${dialEndAim}`);
 
-// 真实推拉视角杆：推到顶切俯视，拉到底回第一人称。
+// 真实推拉视角杆：中途松手原位停留，推到顶切俯视，拉到底回第一人称。
 const viewTrackPoint = {
   x: layout.viewTrack.x + layout.viewTrack.width / 2,
   top: layout.viewTrack.y + 8,
   bottom: layout.viewTrack.bottom - 8,
 };
+await page.touchscreen.touchStart(viewTrackPoint.x, viewTrackPoint.bottom);
+await page.touchscreen.touchMove(viewTrackPoint.x, (viewTrackPoint.top + viewTrackPoint.bottom) / 2);
+await page.touchscreen.touchEnd();
+await wait(220);
+const heldMidView = await page.evaluate(() => ({
+  value: Number(document.querySelector('.view-slider-track')?.getAttribute('aria-valuenow')),
+  level: Number(document.querySelector('.viewport')?.getAttribute('data-view-level')),
+  overhead: document.querySelector('.viewport')?.classList.contains('overhead'),
+}));
+ok('视角推杆可在中间高度松手停留',
+  heldMidView.value >= 45 && heldMidView.value <= 55 &&
+    heldMidView.level >= 0.45 && heldMidView.level <= 0.55 && !heldMidView.overhead,
+  JSON.stringify(heldMidView));
+
+const midOrbitBefore = await page.evaluate(() => {
+  const scene = window.__bj8.scene.current;
+  return {
+    aim: window.__bj8.aim.current,
+    x: scene.camera.position.x,
+    y: scene.camera.position.y,
+    z: scene.camera.position.z,
+  };
+});
+await page.touchscreen.touchStart(layout.dial.x + layout.dial.width * 0.55, layout.dial.y + layout.dial.height / 2);
+await page.touchscreen.touchMove(layout.dial.x + layout.dial.width * 0.8, layout.dial.y + layout.dial.height / 2);
+await page.touchscreen.touchEnd();
+await wait(700);
+const midOrbitAfter = await page.evaluate(() => {
+  const scene = window.__bj8.scene.current;
+  return {
+    aim: window.__bj8.aim.current,
+    x: scene.camera.position.x,
+    y: scene.camera.position.y,
+    z: scene.camera.position.z,
+  };
+});
+ok('中间高度下全局转向会环绕球台且保持当前高度',
+  Math.abs(midOrbitAfter.aim - midOrbitBefore.aim) > 0.01 &&
+    Math.hypot(midOrbitAfter.x - midOrbitBefore.x, midOrbitAfter.z - midOrbitBefore.z) > 0.03 &&
+    Math.abs(midOrbitAfter.y - midOrbitBefore.y) < 0.02,
+  JSON.stringify({ before: midOrbitBefore, after: midOrbitAfter }));
+
 await page.touchscreen.touchStart(viewTrackPoint.x, viewTrackPoint.bottom);
 await page.touchscreen.touchMove(viewTrackPoint.x, viewTrackPoint.top);
 await page.touchscreen.touchEnd();

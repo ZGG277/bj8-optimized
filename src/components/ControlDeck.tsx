@@ -1,5 +1,5 @@
 /*
-[INPUT]: 依赖视角、canAim、spin、charging、previewPower、走位总开关状态与事件回调
+[INPUT]: 依赖连续视角高度、canAim、spin、charging、previewPower、走位总开关状态与事件回调
 [OUTPUT]: 渲染右侧黑色四控件轨；长按整轨进入抖动编辑态，槽位仅在轨内纵向调整，点击轨外锁定
 [POS]: HUD 组件层，组合 ViewToolbar / SpinControl / ShootControl；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -13,7 +13,6 @@ import { useControlSlotDrag } from '../hooks/useControlSlotDrag';
 import type { CueSpin } from '../physics';
 import type { PositionPlanStatus } from '../hooks/usePositionPlan';
 
-type ViewMode = 'first' | 'overhead';
 type ControlSlotId = 'view' | 'guidance' | 'spin' | 'shoot';
 const LAYOUT_LONG_PRESS_MS = 420;
 
@@ -47,7 +46,7 @@ function DraggableControlSlot({
 }
 
 interface ControlDeckProps {
-  viewMode: ViewMode;
+  viewLevel: number;
   canAim: boolean;
   spin: CueSpin;
   charging: boolean;
@@ -56,7 +55,7 @@ interface ControlDeckProps {
   planStatus: PositionPlanStatus;
   guidanceEnabled: boolean;
   hasReview: boolean;
-  onViewMode: (mode: ViewMode) => void;
+  onViewLevel: (level: number) => void;
   onSpinChange: (spin: CueSpin) => void;
   /** 💡 点击：作为规划与复盘的总开关；熄灭时不允许任何提示主动出现 */
   onTogglePlan: () => void;
@@ -68,7 +67,7 @@ interface ControlDeckProps {
 }
 
 export function ControlDeck({
-  viewMode,
+  viewLevel,
   canAim,
   spin,
   charging,
@@ -77,7 +76,7 @@ export function ControlDeck({
   planStatus,
   guidanceEnabled,
   hasReview,
-  onViewMode,
+  onViewLevel,
   onSpinChange,
   onTogglePlan,
   onBeginCharge,
@@ -194,8 +193,8 @@ export function ControlDeck({
       >
         <DraggableControlSlot id="view" editing={editing} railRef={railRef}>
           <ViewToolbar
-            viewMode={viewMode}
-            onViewMode={onViewMode}
+            viewLevel={viewLevel}
+            onViewLevel={onViewLevel}
           />
         </DraggableControlSlot>
         <DraggableControlSlot id="guidance" editing={editing} railRef={railRef}>

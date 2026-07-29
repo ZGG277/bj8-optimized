@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：虚母球开球落位、双视角、桌内360°瞄准/无限拨轮/杆法/蓄力、规则轮转、AI 回合、走位复盘与竖屏 HUD
+[OUTPUT]: 对外提供完整对局编排：虚母球开球落位、连续环绕视角、桌内360°瞄准/无限拨轮/杆法/蓄力、规则轮转、AI 回合、走位复盘与竖屏 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -29,14 +29,14 @@ import { Scene3D } from './Scene3D';
 import type { PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
+import { OVERHEAD_VIEW } from './camera-view';
 
 export default function Game() {
   // ── 对局编排状态 ──
   const {
     worldRef, worldView, setWorldView,
     match, matchRef, setMatch,
-    viewMode, setViewMode,
-    camLift,
+    viewLevel, setViewLevel,
     rating,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
@@ -78,33 +78,33 @@ export default function Game() {
   const [guidanceEnabled, setGuidanceEnabled] = useState(false);
 
   // 打开前的视角，关闭时恢复
-  const prevViewModeRef = useRef(viewMode);
+  const prevViewLevelRef = useRef(viewLevel);
   const handleOpenPlan = useCallback(() => {
-    prevViewModeRef.current = viewMode;
+    prevViewLevelRef.current = viewLevel;
     positionPlan.open();
-  }, [viewMode, positionPlan]);
+  }, [viewLevel, positionPlan]);
   const handleClosePlan = useCallback(() => {
     positionPlan.close();
-    setViewMode(prevViewModeRef.current);
+    setViewLevel(prevViewLevelRef.current);
     setGuidanceEnabled(false);
-  }, [positionPlan, setViewMode]);
+  }, [positionPlan, setViewLevel]);
 
   // ── 复盘开合：▶ 对比切俯视 + 场景叠加；✕/💡 收起回 chip ──
-  const prevReviewViewModeRef = useRef(viewMode);
+  const prevReviewViewLevelRef = useRef(viewLevel);
   const handleOpenReview = useCallback(() => {
     if (!shotReview) return;
     setGuidanceEnabled(true);
-    prevReviewViewModeRef.current = viewMode;
+    prevReviewViewLevelRef.current = viewLevel;
     setReviewOpen(true);
-    setViewMode('overhead');
+    setViewLevel(OVERHEAD_VIEW);
     scene3DRef.current?.showReviewOverlay(shotReview);
-  }, [shotReview, viewMode, setViewMode]);
+  }, [shotReview, viewLevel, setViewLevel]);
   const handleCloseReview = useCallback(() => {
     setReviewOpen(false);
     scene3DRef.current?.showReviewOverlay(null);
-    setViewMode(prevReviewViewModeRef.current);
+    setViewLevel(prevReviewViewLevelRef.current);
     setGuidanceEnabled(false);
-  }, [setViewMode]);
+  }, [setViewLevel]);
 
   // 💡 是规划与复盘的总开关：默认熄灭；复盘优先，规划仅在用户主动点亮时打开。
   const handleTogglePlan = useCallback(() => {
@@ -137,8 +137,8 @@ export default function Game() {
 
   // 打开规划视图自动切俯视（轨迹/走位区域在俯视下可读性最好）
   useEffect(() => {
-    if (planOpen && viewMode !== 'overhead') setViewMode('overhead');
-  }, [planOpen, viewMode, setViewMode]);
+    if (planOpen && viewLevel !== OVERHEAD_VIEW) setViewLevel(OVERHEAD_VIEW);
+  }, [planOpen, viewLevel, setViewLevel]);
 
   const handleShowPlanStep = useCallback((plan: PositionPlan | null, stepIndex: number) => {
     scene3DRef.current?.showPlanStep(plan, stepIndex);
@@ -223,7 +223,7 @@ export default function Game() {
   } = useAimInteraction({
     scene3DRef,
     worldRef,
-    viewMode,
+    viewLevel,
     setAim,
     aimRef,
     aimGhostDistRef,
@@ -234,7 +234,7 @@ export default function Game() {
     setMatch,
     setMessage,
     setWorldView,
-    setViewMode,
+    setViewLevel,
   });
 
   // ── 重置游戏 ──
@@ -247,7 +247,7 @@ export default function Game() {
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
-    settleShotRaw(setViewMode);
+    settleShotRaw(setViewLevel);
     // 复盘生成：有捕获（玩家杆）→ 判定；无捕获（对手杆）→ 清掉旧复盘
     const capture = shotCaptureRef.current;
     shotCaptureRef.current = null;
@@ -255,7 +255,7 @@ export default function Game() {
     setShotReview(review);
     // 只记录复盘，不主动打开；用户需要再次点亮 💡。
     setGuidanceEnabled(false);
-  }, [settleShotRaw, setViewMode]);
+  }, [settleShotRaw, setViewLevel]);
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
@@ -326,8 +326,7 @@ export default function Game() {
     if (!scene) return;
 
     aimRef.current = aim;
-    scene.setViewMode(viewMode);
-    scene.setCamLift(camLift);
+    scene.setViewLevel(viewLevel);
     scene.setAim(aim);
     scene.setSpin(spin);
     scene.setAimGhostDist(aimGhostDistRef.current);
@@ -337,14 +336,14 @@ export default function Game() {
 
     const cue = getCueBall(worldView);
     scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
-  }, [worldView, viewMode, camLift, aim, previewPower, match, spin, aimGhostDistRef, legalTargets]);
+  }, [worldView, viewLevel, aim, previewPower, match, spin, aimGhostDistRef, legalTargets]);
 
   // ── 渲染 ──
   return (
     <div className="game-shell">
       <Scoreboard match={match} worldView={worldView} />
       <TableStage
-        viewMode={viewMode}
+        viewLevel={viewLevel}
         match={match}
         aimDialVisible={aimDialVisible}
         aimDialSolution={aimDialSolution}
@@ -357,7 +356,7 @@ export default function Game() {
         onResetGame={handleResetGame}
       />
       <ControlDeck
-        viewMode={viewMode}
+        viewLevel={viewLevel}
         canAim={canAim}
         spin={spin}
         charging={charging}
@@ -366,7 +365,7 @@ export default function Game() {
         planStatus={positionPlan.status}
         guidanceEnabled={guidanceEnabled}
         hasReview={Boolean(shotReview)}
-        onViewMode={setViewMode}
+        onViewLevel={setViewLevel}
         onSpinChange={setSpin}
         onTogglePlan={handleTogglePlan}
         onBeginCharge={beginCharge}

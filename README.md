@@ -1,8 +1,8 @@
 # 瓜瓜台球
 
-Vite + React + Three.js 的 3D 中式八球（黑八）单机游戏：240 Hz 确定性物理内核、纯规则状态机、第一人称/俯视共享世界杆向、360° 球桌粗瞄 + 幽灵球落位即出现的无限变速拨轮、杆法（高低杆与加塞）、AI 陪练对手「顾燃」、默认熄灭的 💡 走位/复盘总开关，以及最高概率方案的逐杆路线展示。
+Vite + React + Three.js 的 3D 中式八球（黑八）单机游戏：240 Hz 确定性物理内核、纯规则状态机、可停留任意高度的第一人称→俯视连续环绕视角、360° 球桌粗瞄 + 幽灵球落位即出现的无限变速拨轮、杆法（高低杆与加塞）、AI 陪练对手「顾燃」、默认熄灭的 💡 走位/复盘总开关，以及最高概率方案的逐杆路线展示。
 
-v1.2.0 采用零浪费 HUD：桌面删除产品/回合/杆数顶栏，手机端只保留 34px 单行球组状态；右侧四个单手控件等宽，视角采用长行程推杆；开球先隐藏实体母球，手指在合法区域拖动半透明预览，落实后立即出现球桌内横向拨轮；拨轮可反复抬手续拨，接近袋口时连续降低传动比。
+v1.2.0 采用零浪费 HUD：桌面删除产品/回合/杆数顶栏，手机端只保留 34px 单行球组状态；右侧四个单手控件等宽，视角采用可停任意位置的长行程推杆；开球先隐藏实体母球，手指在合法区域拖动半透明预览，落实后立即出现球桌内横向拨轮；拨轮可反复抬手续拨，接近袋口时连续降低传动比。
 
 线上版（飞书妙搭托管）：https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj
 
@@ -53,7 +53,7 @@ npx vite --port 5199 --strictPort &
 | `scripts/verify-win8.mjs` | 清台后打进 8 号获胜与庆祝动效（5 断言） |
 | `scripts/verify-scoreboard-group.mjs` | 比分板球型图标跟随分组 |
 | `scripts/verify-mobile-spinpad.mjs` | 移动端击球点盘布局与球杆造型截图（9 断言） |
-| `scripts/verify-mobile-portrait-v12.mjs` | 竖屏虚母球拖动、落位拨轮、视角推杆、整轨编辑、击球点与灯泡总开关（46 断言） |
+| `scripts/verify-mobile-portrait-v12.mjs` | 竖屏虚母球拖动、落位拨轮、连续视角停留/环绕、整轨编辑、击球点与灯泡总开关（48 断言） |
 | `scripts/verify-position-plan.mjs` | 最高概率分杆规划与手动复盘集成（34 断言） |
 | `scripts/verify-screens.mjs` | 视觉回归截图（shots/01–06） |
 
@@ -79,7 +79,8 @@ src/
   planner/          走位规划引擎（几何候选→erf→MC→3 层前瞻，含可取消 Web Worker）
   input/            出杆输入层（世界角、帧率无关键盘微调、蓄力与击球点）
   simulation/       固定步调度器与 React 物理循环桥
-  Scene3D.ts        Three.js 场景适配器（双视角、瞄准辅助、球杆动画、规划轨迹/走位区域渲染）
+  camera-view.ts    连续视角纯几何（高度、环绕方位、观察轴心与端点语义）
+  Scene3D.ts        Three.js 场景适配器（连续环绕相机、瞄准辅助、球杆动画、规划轨迹/走位区域渲染）
   components/       HUD 控件（只转发事件，不持有对局状态）
   hooks/            对局编排拆出的 React Hooks（含 usePositionPlan 走位规划预算）
   styles/           base → layout → controls 样式体系

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
-[OUTPUT]: 对外提供对局状态（worldView / match / viewMode / camLift）与
+[OUTPUT]: 对外提供对局状态（worldView / match / viewLevel）与
           resetGame / settleShot / setMessage 等编排动作
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -20,8 +20,7 @@ import {
 import { factsFromWorld } from '../match/shot-facts';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from '../match/types';
 import { createShotSettlementGuard } from './shot-settlement-guard';
-
-type ViewMode = 'first' | 'overhead';
+import { FIRST_PERSON_VIEW, OVERHEAD_VIEW } from '../camera-view';
 
 export function useGameState() {
   // ── 物理世界 ──
@@ -35,8 +34,7 @@ export function useGameState() {
   useEffect(() => { matchRef.current = match; }, [match]);
 
   // ── 视图状态 ──
-  const [viewMode, setViewMode] = useState<ViewMode>('first');
-  const [camLift, setCamLift] = useState(0);
+  const [viewLevel, setViewLevel] = useState(FIRST_PERSON_VIEW);
 
   // ── 辅助状态 ──
   const [rating] = useState(50);
@@ -59,13 +57,13 @@ export function useGameState() {
     settlementGuardRef.current.reset();
     setWorldView(cloneWorld(fresh));
     setMatch(m => beginMatch(m));
-    setViewMode('overhead');
+    setViewLevel(OVERHEAD_VIEW);
     setAim(0);
   }, []);
 
   /** 物理停止：事实推导 → 纯规则结算 → 原子提交 → 执行显式 effects
    *  相同一杆只结算一次（shotId 守卫，StrictMode 下不重复） */
-  const settleShotRaw = useCallback((setViewModeFn: (m: ViewMode) => void) => {
+  const settleShotRaw = useCallback((setViewLevelFn: (level: number) => void) => {
     const world = worldRef.current;
     const facts = factsFromWorld(world);
     if (!settlementGuardRef.current.accept(facts.shotId)) return;
@@ -75,7 +73,7 @@ export function useGameState() {
       if (effect.type === 'auto-respot-cue') {
         respotCueBall(world);
       } else if (effect.type === 'request-player-placement') {
-        setViewModeFn('overhead');
+        setViewLevelFn(OVERHEAD_VIEW);
       }
     }
     setMatch(resolution.next);
@@ -89,10 +87,8 @@ export function useGameState() {
     match,
     matchRef,
     setMatch,
-    viewMode,
-    setViewMode,
-    camLift,
-    setCamLift,
+    viewLevel,
+    setViewLevel,
     rating,
     canAim,
     setMessage,

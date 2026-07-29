@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
-[OUTPUT]: 对外提供场景渲染、双视角相机、世界角瞄准辅助（射线/分离线/幽灵球靶点）、摆球阶段虚母球与实体显隐、合法目标环、球杆动画、走位/复盘渲染及屏幕↔台面坐标映射
+[OUTPUT]: 对外提供场景渲染、连续环绕相机、世界角瞄准辅助（射线/分离线/幽灵球靶点）、摆球阶段虚母球与实体显隐、合法目标环、球杆动画、走位/复盘渲染及屏幕↔台面坐标映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -15,6 +15,7 @@ import {
 } from './physics';
 import type { PositionPlan } from './planner/search';
 import type { ShotReview } from './planner/review';
+import { cameraPoseAt, clampViewLevel } from './camera-view';
 import {
   makeClothMaps,
   makeWoodTexture,
@@ -30,12 +31,6 @@ const RAIL_H = 0.045;
 const RAIL_W = 0.07;
 const CUSHION_H = 0.038;
 const CUSHION_W = 0.048;
-// 第一人称杆后视角位姿基准（update() 与 screenToTableAt() 共用，禁两处各写一份）：
-// 相机在瞄准轴正后方，杆、瞄准线、视线共线；侧偏只留一丝保立体感
-const FP_CAM_DIST = 0.72;
-const FP_CAM_SIDE = 0.015;
-const FP_CAM_HEIGHT = 0.16;
-const FP_LOOK_AHEAD = 0.42;
 // 视觉开孔与二维捕获半径分开调校：角袋保持既有 105mm 视觉口径，
 // 中袋由约 120mm 收到 104mm，直接回应“中袋过大、过易进球”的验收反馈。
 const CORNER_HOLE_R = 0.0525;
@@ -98,9 +93,8 @@ export class Scene3D {
   private virtualCam: THREE.PerspectiveCamera;
 
   private aimAngle = 0;
-  /** 俯身角度微调：叠加在第一人称相机高度上（含虚拟相机） */
-  private camLift = 0;
-  private viewMode: 'first' | 'overhead' = 'first';
+  /** 0=第一人称，1=俯视；中间值可停留，并在所有高度共享世界杆向。 */
+  private viewLevel = 0;
   private phase = 'intro';
 
   private targetCameraPos = new THREE.Vector3();
@@ -1299,22 +1293,17 @@ export class Scene3D {
     }, dur1 * 1000 + 100);
   }
 
-  setViewMode(mode: 'first' | 'overhead') {
-    this.viewMode = mode;
-    // 俯视时吊灯会挡住台面，隐藏
-    if (this.lampGroup) this.lampGroup.visible = mode !== 'overhead';
-  }
-
-  /** 俯身角度微调（米，正=抬高、负=压低），由视角工具条驱动 */
-  setCamLift(v: number) {
-    this.camLift = v;
+  setViewLevel(level: number) {
+    this.viewLevel = clampViewLevel(level);
+    // 高位时吊灯会挡住台面；在进入灯体高度前隐藏，避免穿模。
+    if (this.lampGroup) this.lampGroup.visible = this.viewLevel < 0.78;
   }
 
   setAim(angle: number) {
     this.aimAngle = angle;
   }
 
-  /** 全局唯一瞄准事实：两种视角均消费同一个世界角。 */
+  /** 全局唯一瞄准事实：所有视角高度均消费同一个世界角。 */
   private totalAim(): number {
     return this.aimAngle;
   }
@@ -1539,26 +1528,14 @@ export class Scene3D {
     if (cue && phase === 'placing') cue.visible = false;
     const angle = this.totalAim();
 
-    // ---- 相机 ----
-    if (this.viewMode === 'overhead') {
-      this.targetCameraPos.set(0, 3.7, 0.85);
-      this.targetLookAt.set(0, 0, 0.05);
-    } else {
-      // 杆后视角：相机位于瞄准轴正后方，杆、瞄准线、视线三者共线——
-      // 杆头直指球路。侧向偏移会让杆身在屏幕上与瞄准线成夹角，
-      // 读成"斜着拨球"，故只留一丝侧偏保留立体感
-      const dist = FP_CAM_DIST + power * 0.0022;
-      this.targetCameraPos.set(
-        cueX - Math.sin(angle) * dist + Math.cos(angle) * FP_CAM_SIDE,
-        FP_CAM_HEIGHT + this.camLift + power * 0.0004,
-        cueZ + Math.cos(angle) * dist + Math.sin(angle) * FP_CAM_SIDE
-      );
-      this.targetLookAt.set(
-        cueX + Math.sin(angle) * FP_LOOK_AHEAD,
-        0.03,
-        cueZ - Math.cos(angle) * FP_LOOK_AHEAD
-      );
-    }
+    // ---- 相机：高度、轴心与方位角共用纯几何，滑杆和全局转向都不会触发模式跳变。 ----
+    const cameraPose = cameraPoseAt(cueX, cueZ, angle, power, this.viewLevel);
+    this.targetCameraPos.set(
+      cameraPose.position.x,
+      cameraPose.position.y,
+      cameraPose.position.z,
+    );
+    this.targetLookAt.set(cameraPose.lookAt.x, cameraPose.lookAt.y, cameraPose.lookAt.z);
     // 相机只设目标位姿;平滑收敛在 render() 每帧执行。
     // 若在此处随 React 渲染推进,松手后 React 不再渲染,相机会冻结在半途。
 
@@ -1694,30 +1671,23 @@ export class Scene3D {
     };
   }
 
-  private positionVirtualCamera(aimAngle: number): boolean {
+  private positionVirtualCamera(aimAngle: number, viewLevel = this.viewLevel): boolean {
     const cue = this.ballMeshes[0];
     if (!cue) return false;
     const cueX = cue.position.x;
     const cueZ = cue.position.z;
     this.virtualCam.aspect = this.camera.aspect;
     this.virtualCam.updateProjectionMatrix();
-    this.virtualCam.position.set(
-      cueX - Math.sin(aimAngle) * FP_CAM_DIST + Math.cos(aimAngle) * FP_CAM_SIDE,
-      FP_CAM_HEIGHT + this.camLift,
-      cueZ + Math.cos(aimAngle) * FP_CAM_DIST + Math.sin(aimAngle) * FP_CAM_SIDE,
-    );
-    this.virtualCam.lookAt(
-      cueX + Math.sin(aimAngle) * FP_LOOK_AHEAD,
-      0.03,
-      cueZ - Math.cos(aimAngle) * FP_LOOK_AHEAD,
-    );
+    const pose = cameraPoseAt(cueX, cueZ, aimAngle, 0, viewLevel);
+    this.virtualCam.position.set(pose.position.x, pose.position.y, pose.position.z);
+    this.virtualCam.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
     this.virtualCam.updateMatrixWorld(true);
     return true;
   }
 
   /** 以指定世界瞄准角的目标相机位姿，把台面坐标投影到屏幕。 */
-  tableToScreenAt(x: number, z: number, aimAngle: number): { x: number; y: number } | null {
-    if (!this.positionVirtualCamera(aimAngle)) return null;
+  tableToScreenAt(x: number, z: number, aimAngle: number, viewLevel = this.viewLevel): { x: number; y: number } | null {
+    if (!this.positionVirtualCamera(aimAngle, viewLevel)) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     const projected = new THREE.Vector3(x, 0, z).project(this.virtualCam);
     return {
@@ -1727,13 +1697,17 @@ export class Scene3D {
   }
 
   /**
-   * 以指定瞄准角的第一人称目标相机位姿做射线(不经过平滑滞后的活相机)。
+   * 以指定瞄准角和视角高度的目标相机位姿做射线(不经过平滑滞后的活相机)。
    * 活相机 lerp 就位后与该位姿一致,用于确定性反算"屏幕点对应的台面点"
-   * (回归测试的基准真值)。位姿公式与 update() 第一人称分支一致
-   * (静止瞄准态,power=0)。
+   * (回归测试的基准真值)。位姿公式与 update() 一致(静止瞄准态,power=0)。
    */
-  screenToTableAt(clientX: number, clientY: number, aimAngle: number): { x: number; z: number } | null {
-    if (!this.positionVirtualCamera(aimAngle)) return this.screenToTable(clientX, clientY);
+  screenToTableAt(
+    clientX: number,
+    clientY: number,
+    aimAngle: number,
+    viewLevel = this.viewLevel,
+  ): { x: number; z: number } | null {
+    if (!this.positionVirtualCamera(aimAngle, viewLevel)) return this.screenToTable(clientX, clientY);
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
