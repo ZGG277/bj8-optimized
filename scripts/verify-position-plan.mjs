@@ -1,11 +1,11 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core 与 __bj8 调试句柄
-[OUTPUT]: 走位规划状态机/桌面整链/播放/复盘对比的真实输入集成断言与截图
+[OUTPUT]: 灯泡总开关、最高概率单方案分杆展示与手动复盘的真实输入集成断言及截图
 [POS]: planner→React→Scene3D→真实输入的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
- * P1 走位规划集成回归:固定球局 → 💡 按钮三态流转(is-dim→is-lit→is-open toggle) → 覆盖层 → 场景渲染 → 播放 → 关闭恢复
- *   → 击球复盘:真实出杆 → .review-chip 出现 → ▶ 对比(场景叠加 reviewObjectCount) → 收起
+ * P1 走位规划集成回归:固定球局 → 默认熄灭 → 💡 点亮 → 最高概率方案分杆展示 → 关闭恢复
+ *   → 击球复盘:真实出杆后保持静默 → 再点 💡 → .review-chip → ▶ 对比 → 收起
  * 摆球经 __bj8 调试句柄(同 verify-break-group 模式),按钮点击全部走真实鼠标事件。
  * 前置:
  *   npx vite --port 5199 --strictPort &
@@ -17,6 +17,7 @@ import puppeteer from 'puppeteer-core';
 
 const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9333';
 const GAME_URL = process.env.GAME_URL || 'http://localhost:5199/';
+const SHOT_DIR = process.env.SHOT_DIR || 'shots';
 const results = [];
 const ok = (name, pass, detail = '') => {
   results.push({ name, pass });
@@ -100,7 +101,7 @@ const staged = await page.evaluate(() => {
 });
 ok('摆球同步(4 颗 active)', staged === 4, `active=${staged}`);
 
-// 等 💡 按钮从隐藏 → is-dim(computing 呼吸) → is-lit(ready 微光)(worker 搜索约 0.2–1.5s)
+// 等后台规划完成；按钮始终保持“熄灭”视觉，只以 enabled 表示可主动点亮。
 const buttonFlow = await page.evaluate(() => new Promise((resolve) => {
   const seen = new Set();
   const deadline = Date.now() + 20000;
@@ -108,8 +109,8 @@ const buttonFlow = await page.evaluate(() => new Promise((resolve) => {
     const btn = document.querySelector('.plan-button');
     if (!btn) return;
     const visible = getComputedStyle(btn).visibility === 'visible';
-    if (visible && btn.classList.contains('is-computing')) seen.add('computing');
-    if (visible && btn.classList.contains('is-lit')) {
+    if (visible && btn.disabled) seen.add('computing');
+    if (visible && !btn.disabled) {
       seen.add('ready');
       clearInterval(timer);
       resolve([...seen]);
@@ -120,10 +121,12 @@ const buttonFlow = await page.evaluate(() => new Promise((resolve) => {
     }
   }, 120);
 }));
-ok('💡 按钮就绪(is-dim→is-lit)', buttonFlow.includes('ready'), `flow=${buttonFlow.join('→')}`);
+ok('💡 默认熄灭且就绪后可主动点亮', buttonFlow.includes('ready') && await page.evaluate(
+  () => document.querySelector('.plan-button')?.getAttribute('aria-pressed') === 'false'
+), `flow=${buttonFlow.join('→')}`);
 
 // 真实点击打开规划提示条
-ok('点击 💡 走位按钮', await realClickButton(page, '💡 走位'));
+ok('点击 💡 提示按钮', await realClickButton(page, '提示'));
 await new Promise(r => setTimeout(r, 600));
 const overlay = await page.evaluate(() => {
   const bar = document.querySelector('.plan-bar');
@@ -133,27 +136,38 @@ const overlay = await page.evaluate(() => {
   return { bar: !!bar, panel: !!panel, chips, prob };
 });
 ok('提示条出现且无旧面板', overlay.bar && !overlay.panel, `bar=${overlay.bar} panel=${overlay.panel}`);
-ok('压缩打法 chip 渲染 1–3 个', overlay.chips.length >= 1 && overlay.chips.length <= 3, `chips=${overlay.chips.length}`);
-ok('chip 含杆法与力档', overlay.chips.every(t => /^\d·(高杆|低杆|中杆)(右塞|左塞)?(小力|中力|发力)$/.test(t)), overlay.chips.join(' | '));
-ok('整链概率文案存在', /连贯 \d+%|本杆 \d+%/.test(overlay.prob), overlay.prob);
+ok('最高概率方案只显示当前一杆 chip', overlay.chips.length === 1, `chips=${overlay.chips.length}`);
+ok('chip 含杆法与力档', overlay.chips.every(t => /^(高杆|低杆|中杆)(右塞|左塞)?(小力|中力|发力)$/.test(t)), overlay.chips.join(' | '));
+ok('当前杆概率文案存在', /本杆 \d+%/.test(overlay.prob), overlay.prob);
 
 // 💡 三态 toggle：展开中按钮为 is-open，再点 = 关闭（与 ✕ 等价），再点重开
 ok('引导展开中按钮为 is-open', await page.evaluate(
   () => document.querySelector('.plan-button')?.classList.contains('is-open') ?? false));
-ok('再点 💡 关闭引导', await realClickButton(page, '💡 走位'));
+ok('再点 💡 关闭引导', await realClickButton(page, '提示'));
 await new Promise(r => setTimeout(r, 500));
 const afterToggleClose = await page.evaluate(() => ({
   bar: !!document.querySelector('.plan-bar'),
-  lit: document.querySelector('.plan-button')?.classList.contains('is-lit') ?? false,
+  off: document.querySelector('.plan-button')?.classList.contains('is-off') ?? false,
 }));
-ok('toggle 关闭后提示条消失且按钮回 is-lit', !afterToggleClose.bar && afterToggleClose.lit, JSON.stringify(afterToggleClose));
-ok('再点 💡 重开引导', await realClickButton(page, '💡 走位'));
+ok('toggle 关闭后提示条消失且按钮熄灭', !afterToggleClose.bar && afterToggleClose.off, JSON.stringify(afterToggleClose));
+ok('再点 💡 重开引导', await realClickButton(page, '提示'));
 await new Promise(r => setTimeout(r, 600));
 ok('重开后提示条恢复', await page.evaluate(() => !!document.querySelector('.plan-bar')));
 
-// 场景规划渲染上屏(整链三杆分色轨迹/序号标记/首杆 zone)
+// 场景默认只渲染第 1 杆；点击第 2/3 杆标签才切换对应预览。
 const planObjects = await page.evaluate(() => window.__bj8.scene.current.planObjectCount());
-ok('场景规划对象上屏(整链轨迹/标记)', planObjects > 0, `planObjectCount=${planObjects}`);
+ok('场景规划对象上屏(单杆轨迹/标记)', planObjects > 0, `planObjectCount=${planObjects}`);
+const stepSwitch = await page.evaluate(() => {
+  const tabs = [...document.querySelectorAll('.plan-step-tabs button')];
+  if (tabs.length < 2) return { available: false, selected: null };
+  tabs[1].click();
+  return { available: true, selected: tabs[1].getAttribute('aria-selected') };
+});
+await new Promise(r => setTimeout(r, 250));
+ok('点击第 2 杆后才切换后续路线', !stepSwitch.available || await page.evaluate(
+  () => document.querySelectorAll('.plan-bar-chips .plan-chip').length === 1 &&
+    document.querySelectorAll('.plan-step-tabs button[aria-selected="true"]').length === 1
+), JSON.stringify(stepSwitch));
 
 // 提示条出现期间瞄准被禁用(canAim 压低:拖拽不改瞄准角)
 const aimBefore = await page.evaluate(() => window.__bj8.aim.current);
@@ -169,26 +183,10 @@ await new Promise(r => setTimeout(r, 200));
 const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
 ok('提示条出现期间瞄准输入禁用', aimBefore === aimAfter, `aim=${aimBefore}→${aimAfter}`);
 
-// 整链连续播放(三杆 ≈4.7s + 0.8s 停留，轮询等自然结束)
-ok('点击 ▶ 播放', await realClickButton(page, '▶ 播放'));
-await new Promise(r => setTimeout(r, 300));
-const playing = await page.evaluate(() => window.__bj8.scene.current.planPlaying());
-await page.screenshot({ path: 'shots/38-position-plan.png' });
-const playingAfter = await page.evaluate(() => new Promise((resolve) => {
-  const deadline = Date.now() + 10000;
-  const timer = setInterval(() => {
-    if (!window.__bj8.scene.current.planPlaying()) {
-      clearInterval(timer);
-      resolve(false);
-    }
-    if (Date.now() > deadline) {
-      clearInterval(timer);
-      resolve(true); // 超时仍在播视为异常
-    }
-  }, 200);
-}));
-ok('整链播放启动并自然结束', playing === true && playingAfter === false, `playing=${playing}→${playingAfter}`);
-await page.screenshot({ path: 'shots/40-plan-on-table.png' });
+ok('规划层不再自动播放整链', !await page.evaluate(
+  () => document.querySelector('.plan-bar-play') || window.__bj8.scene.current.planPlaying()
+));
+await page.screenshot({ path: `${SHOT_DIR}/38-position-plan.png` });
 
 // 关闭:提示条消失、场景规划渲染清除、视角恢复第一人称、瞄准恢复
 ok('点击 ✕ 关闭', await realClickButton(page, '✕'));
@@ -196,7 +194,7 @@ await new Promise(r => setTimeout(r, 600));
 const restored = await page.evaluate(() => ({
   bar: !!document.querySelector('.plan-bar'),
   planObjects: window.__bj8.scene.current.planObjectCount(),
-  firstPressed: document.querySelector('.view-switcher button:nth-child(1)')?.getAttribute('aria-pressed'),
+  firstPressed: document.querySelector('[aria-label="切换第一人称视角"]')?.getAttribute('aria-pressed'),
 }));
 ok('关闭后提示条消失且场景清除', !restored.bar && restored.planObjects === 0, JSON.stringify(restored));
 ok('关闭后视角恢复第一人称', restored.firstPressed === 'true', `aria-pressed=${restored.firstPressed}`);
@@ -247,7 +245,7 @@ const relit = await page.evaluate(() => new Promise((resolve) => {
   const deadline = Date.now() + 20000;
   const timer = setInterval(() => {
     const btn = document.querySelector('.plan-button');
-    if (btn && getComputedStyle(btn).visibility === 'visible' && btn.classList.contains('is-lit')) {
+    if (btn && getComputedStyle(btn).visibility === 'visible' && !btn.disabled) {
       clearInterval(timer);
       resolve(true);
     }
@@ -297,9 +295,17 @@ if (shootBox) {
   await new Promise(r => setTimeout(r, 150));
   await page.mouse.up();
 }
-ok('真实拖拽出杆', !!shootBox);
+await page.waitForFunction(() => window.__bj8.world.current.shot >= 1, { timeout: 8000 }).catch(() => {});
+const shotCommitted = await page.evaluate(() => window.__bj8.world.current.shot >= 1);
+ok('真实拖拽出杆', !!shootBox && shotCommitted);
 
-// 等结算生成复盘 chip（物理停稳 + buildShotReview）
+// 等物理停稳；复盘只缓存，不允许主动出现。
+await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 15000 }).catch(() => {});
+await new Promise(r => setTimeout(r, 300));
+ok('击球结算后复盘保持隐藏', !await page.$('.review-float'));
+ok('再次点亮 💡 请求复盘', await realClickButton(page, '提示'));
+
+// 点亮后生成复盘 chip（buildShotReview 已在结算时缓存）
 const chipText = await page.evaluate(() => new Promise((resolve) => {
   const deadline = Date.now() + 15000;
   const timer = setInterval(() => {
@@ -324,7 +330,7 @@ const reviewShown = await page.evaluate(() => ({
   objects: window.__bj8.scene.current.reviewObjectCount(),
 }));
 ok('对比条展开且场景叠加上屏', reviewShown.bar && reviewShown.objects >= 2, JSON.stringify(reviewShown));
-await page.screenshot({ path: 'shots/43-shot-review.png' });
+await page.screenshot({ path: `${SHOT_DIR}/43-shot-review.png` });
 
 // ✕ 收起：对比条消失、场景叠加清除
 ok('点击 ✕ 收起复盘', await realClickButton(page, '✕'));

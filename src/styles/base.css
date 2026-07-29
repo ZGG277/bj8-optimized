@@ -1,6 +1,6 @@
 /*
 [INPUT]: 设计令牌与全局重置约定
-[OUTPUT]: 对外提供色彩/字体/尺寸令牌(--topbar-h/--scoreboard-h/--hud-safe-top/--control-deck-h)、重置、焦点态与动画
+[OUTPUT]: 对外提供色彩/字体/尺寸令牌(--scoreboard-h/--hud-safe-top/--control-deck-h)、重置、焦点态与动画
 [POS]: 样式体系的基础层,只定义令牌与跨组件规则,不承载布局或控件样式
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -37,10 +37,9 @@
   --fs-7xl: clamp(48px, 4.0vw + 33.0px, 72px);
 
   /* 竖屏/桌面壳层尺寸;横屏在 media query 中重定义 */
-  --topbar-h: 52px;
-  --scoreboard-h: 68px;
+  --scoreboard-h: 48px;
   --control-deck-h: 100px;
-  /* 横屏悬浮 HUD 的顶部安全区 = topbar + scoreboard,控件顶边不得低于此值 */
+  /* 横屏悬浮 HUD 的顶部安全区只需避让比分/球组状态行。 */
   --hud-safe-top: 0px;
 }
 
@@ -84,11 +83,10 @@ button, [role="button"], .control, .hud, .icon-btn {
   to { opacity: 1; }
 }
 
-/* 横屏手机:统一壳层尺寸变量,HUD 顶部安全区 = 38 + 34 = 72 */
+/* 横屏手机：仅保留 34px 比分/球组状态行。 */
 @media (orientation: landscape) and (max-height: 560px) {
   :root {
-    --topbar-h: 38px;
     --scoreboard-h: 34px;
-    --hud-safe-top: 72px;
+    --hud-safe-top: 34px;
   }
 }

@@ -1,12 +1,13 @@
 /*
-[INPUT]: 主线程的 BilliardsWorld 快照与合法目标球；plan-worker.ts（Vite module worker）
+[INPUT]: 主线程的 BilliardsWorld 快照与合法目标球；plan-worker.ts（Vite 内联 module worker）
 [OUTPUT]: planPositionAsync 可取消异步走位搜索（Promise<PositionPlan[]>），新请求抢占旧 worker，失败降级主线程
-[POS]: 规划层的异步门面——UI 只依赖本文件，不关心计算跑在 worker 还是主线程；不允许悬挂 Promise
+[POS]: 规划层的异步门面——Worker 以 Blob 随主包发布，UI 不关心计算跑在 worker 还是主线程；不允许悬挂 Promise
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import type { BilliardsWorld } from '../physics';
 import { planPosition, type PlannerOptions, type PositionPlan } from './search';
 import type { PlanWorkerRequest, PlanWorkerResponse } from './plan-worker';
+import InlinePlanWorker from './plan-worker?worker&inline';
 
 let worker: Worker | null | undefined; // undefined=未尝试，null=创建失败（降级主线程）
 let generation = 0;
@@ -35,7 +36,7 @@ function cancelWorkerRequest() {
 function ensureWorker(): Worker | null {
   if (worker !== undefined) return worker;
   try {
-    worker = new Worker(new URL('./plan-worker.ts', import.meta.url), { type: 'module' });
+    worker = new InlinePlanWorker();
     worker.onmessage = (event: MessageEvent<PlanWorkerResponse>) => {
       const data = event.data;
       // generation 令牌：新请求已发出时旧结果直接丢弃

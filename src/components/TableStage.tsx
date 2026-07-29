@@ -1,13 +1,11 @@
 /*
-[INPUT]: 依赖 viewMode / match / worldView / precisionAim 状态与 pointer 事件处理器
-[OUTPUT]: 渲染球桌区域（3D 视口、视角工具条、桌内方向微调、精瞄袋口窗口与回合/结束遮罩）
-[POS]: HUD 组件层，组合 ViewToolbar 与 3D 视口；不持有对局状态
+[INPUT]: 依赖 viewMode / match / 幽灵球落位后的拨轮状态与 pointer 事件处理器
+[OUTPUT]: 渲染精简球桌区域（3D 视口、无限瞄准拨轮与回合/结束遮罩）
+[POS]: HUD 组件层，组合瞄准拨轮与 3D 视口；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import React from 'react';
-import { ViewToolbar } from './ViewToolbar';
-import { TableAimNudges } from './TableAimNudges';
-import type { BilliardsWorld } from '../physics';
+import { AimDial } from './AimDial';
 import type { MatchState } from '../match/types';
 import type { PrecisionAimSolution } from '../aim/aim-solution';
 
@@ -16,38 +14,28 @@ type ViewMode = 'first' | 'overhead';
 interface TableStageProps {
   viewMode: ViewMode;
   match: MatchState;
-  worldView: BilliardsWorld;
-  canAim: boolean;
-  precisionAim: (PrecisionAimSolution & { offset: number }) | null;
+  aimDialVisible: boolean;
+  aimDialSolution: PrecisionAimSolution | null;
   containerRef: React.Ref<HTMLDivElement>;
   onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
   onPointerCancel: (e: React.PointerEvent) => void;
-  onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-  onViewMode: (mode: ViewMode) => void;
-  onRotate: (dir: number) => void;
-  onElevate: (dir: number) => void;
-  onAimAdjust: (delta: number) => void;
+  onAimDialAdjust: (pixelDelta: number) => void;
   onResetGame: () => void;
 }
 
 export function TableStage({
   viewMode,
   match,
-  worldView,
-  canAim,
-  precisionAim,
+  aimDialVisible,
+  aimDialSolution,
   containerRef,
   onPointerDown,
   onPointerMove,
   onPointerUp,
   onPointerCancel,
-  onClick,
-  onViewMode,
-  onRotate,
-  onElevate,
-  onAimAdjust,
+  onAimDialAdjust,
   onResetGame,
 }: TableStageProps) {
   return (
@@ -59,41 +47,12 @@ export function TableStage({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        onClick={onClick}
       >
-        <ViewToolbar
-          viewMode={viewMode}
-          onViewMode={onViewMode}
-          onRotate={onRotate}
-          onElevate={onElevate}
+        <AimDial
+          visible={aimDialVisible}
+          solution={aimDialSolution}
+          onAdjust={onAimDialAdjust}
         />
-        <TableAimNudges disabled={!canAim} onAdjust={onAimAdjust} />
-
-        <div className="room-label">
-          <span>PHYSICS WORLD</span>
-          <small>{worldView.balls.filter(b => b.active).length} BALLS</small>
-        </div>
-
-        <div className="shot-target">
-          <small>{match.breaking ? '第一杆' : '合法目标'}</small>
-          <strong>{match.playerGroup === 'solid' ? '全色球' : match.playerGroup === 'stripe' ? '花色球' : '开放球局'}</strong>
-        </div>
-
-        <div className="view-hint">
-          {worldView.moving ? '球在运动中...' : viewMode === 'overhead' ? '观察球形' : '拖拽调整方向'}
-        </div>
-
-        {precisionAim && (
-          <div className="precision-aim" role="status" aria-live="polite">
-            <div>
-              <strong>精瞄 · {precisionAim.target} 号 → {precisionAim.pocketName}</strong>
-              <span>横拖选择袋口落点，竖向移出可回到 360° 粗瞄</span>
-            </div>
-            <div className="precision-aim-track" aria-hidden="true">
-              <i style={{ left: `${(precisionAim.offset + 1) * 50}%` }} />
-            </div>
-          </div>
-        )}
 
         {match.phase === 'opponent' && (
           <div className="turn-mask">

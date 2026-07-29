@@ -2,13 +2,13 @@
 
 > L2 | 父级: `../CLAUDE.md`
 
-独立 Vite + React + Three.js 中式八球实验场（产品名「瓜瓜台球」），验证 240 Hz 物理、双视角、杆法、规则轮转与真实交互；新移动版发布于独立飞书妙搭应用 `app_17b15z6mnst`，旧应用 `app_17atze3ahyj` 保留，玩法与部署说明见 README.md。
+独立 Vite + React + Three.js 中式八球实验场（产品名「瓜瓜台球」），验证 240 Hz 物理、双视角、杆法、规则轮转与真实交互；当前公开移动版使用独立妙搭应用 `app_17b18dh5axj`，旧应用保留，玩法与部署说明见 README.md。
 
 ## 成员清单
 
 `src/`: 游戏业务源码，包含 physics 物理世界、aim 360°/近袋精瞄几何、match 纯规则状态机、planner 走位规划引擎（含可抢占 Web Worker 异步封装）、input 出杆输入层、components HUD 控件、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
 
-`scripts/`: 浏览器交互、画面与场景对象验证脚本；含真实指针回归（verify-interaction 41 断言）、粗瞄/精瞄双档交互（verify-precision-aim 5 断言）、预测球路一致性（verify-aim-accuracy 19 断言）、规则/布局专项门禁、走位规划与视觉截图，成员清单见 `scripts/CLAUDE.md`。
+`scripts/`: 构建发布适配、浏览器交互、画面与场景对象验证脚本；含妙搭单 HTML 门禁、真实指针回归（41 断言）、手机竖屏（46 断言）、虚母球/无限拨轮（8 断言）、预测球路一致性（19 断言）及规划/规则/视觉专项，成员清单见 `scripts/CLAUDE.md`。
 
 `shots/`: 人工与自动化试玩截图，仅作为视觉回归证据，不作为运行时依赖。
 
@@ -24,13 +24,15 @@
 
 `tsconfig.json`: TypeScript 严格模式与未使用符号检查配置。
 
-`vite.config.ts`: Vite React 构建配置，使用相对资源基址支持静态托管；业务、React、Three core、Three addons 分块以稳定缓存并消除单主包告警。
+`vite.config.ts`: Vite React 构建配置；正式构建合并业务、React 与 Three.js 主 chunk，CSS 不分包，规划 Worker 以内联 Blob 生成；`scripts/inline-build.mjs` 再产出妙搭兼容的单 HTML，本地开发仍保持 Vite 模块热更新。
 
 `PHASE_0_1_EXECUTION_PLAN.md`: 规则正确性、GEB 同构、输入确定性与固定步时钟的可执行优化方案。
 
 `POSITION_PLAY_DESIGN.md`: 走位规划（已交付，`src/planner/`）与拍照还原球局（方案阶段）的完整调研、方案决策、实测数据与交互设计文档。
 
 `PRECISION_AIM_V2_ACCEPTANCE.md`: `codex/precision-aim-v2-20260728` 的功能边界、双档精瞄操作规格、自动化证据与人工验收清单。
+
+`MULTIPLAYER_DESIGN.md`: 实时联网对战评估稿（两方案：Kimi 建站数据库轮询 vs 静态托管+实时层），含共用同步协议（快照权威+本地重放）、数据表/消息设计、利弊对比与开放问题；待 codex 审核后决策。
 
 `dist/`: Vite 生成产物，不作为源代码维护。
 

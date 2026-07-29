@@ -66,7 +66,7 @@ export function ShootControl({ disabled, charging, power, breaking, onBegin, onU
         />
         <span className="shoot-pull-mark" aria-hidden="true">↓</span>
         <strong>{breaking ? '开球' : '出杆'}</strong>
-        <span className="power-num">{rounded}</span>
+        {!breaking && <span className="power-num">{rounded}</span>}
         <small>下拉 · 松开</small>
       </div>
     </div>

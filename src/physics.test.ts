@@ -16,6 +16,7 @@ import {
   respotCueBall,
   clampAimToForwardHalf,
   predictBallCollisionDirections,
+  POCKETS,
   TABLE,
   PHYSICS_DT,
   type BilliardsWorld,
@@ -279,6 +280,60 @@ describe('碰撞物理测试', () => {
 });
 
 describe('落袋检测测试', () => {
+  it('中袋捕获半径比旧版 62mm 收窄，且明显小于角袋', () => {
+    expect(TABLE.ballRadius * 2).toBeCloseTo(0.05715, 6);
+    expect(TABLE.cornerPocketRadius).toBeCloseTo(0.068, 6);
+    expect(TABLE.sidePocketRadius).toBeCloseTo(0.052, 6);
+    expect(TABLE.sidePocketRadius).toBeLessThan(0.062);
+    expect(POCKETS[2].captureRadius).toBeLessThan(POCKETS[0].captureRadius);
+  });
+
+  it('正对中袋的球可落袋，高速跨过窄捕获圈也不会穿透', () => {
+    const world = createInitialWorld();
+    for (const ball of world.balls) if (ball.number !== 0) ball.active = false;
+    const cue = getCueBall(world)!;
+    cue.x = TABLE.width / 2 - TABLE.ballRadius - 0.08;
+    cue.z = 0;
+    cue.vx = 8.5;
+    cue.vz = 0;
+    world.moving = true;
+
+    simulateUntilStop(world, 1);
+    expect(cue.active).toBe(false);
+    expect(world.events.some((event) => event.type === 'pocket' && event.pocket === 3)).toBe(true);
+  });
+
+  it('偏出中袋净球心窗口的球应碰库，不应被袋口吸走', () => {
+    const world = createInitialWorld();
+    for (const ball of world.balls) if (ball.number !== 0) ball.active = false;
+    const cue = getCueBall(world)!;
+    cue.x = TABLE.width / 2 - TABLE.ballRadius - 0.08;
+    cue.z = TABLE.sidePocketRadius + 0.006;
+    cue.vx = 1.2;
+    cue.vz = 0;
+    world.moving = true;
+
+    simulateUntilStop(world, 3);
+    expect(cue.active).toBe(true);
+    expect(world.events.some((event) => event.type === 'cushion')).toBe(true);
+    expect(world.events.some((event) => event.type === 'pocket')).toBe(false);
+  });
+
+  it('沿 45° 中心线进入角袋仍可正常落袋', () => {
+    const world = createInitialWorld();
+    for (const ball of world.balls) if (ball.number !== 0) ball.active = false;
+    const cue = getCueBall(world)!;
+    cue.x = TABLE.width / 2 - TABLE.ballRadius - 0.08;
+    cue.z = TABLE.length / 2 - TABLE.ballRadius - 0.08;
+    cue.vx = 1.2;
+    cue.vz = 1.2;
+    world.moving = true;
+
+    simulateUntilStop(world, 2);
+    expect(cue.active).toBe(false);
+    expect(world.events.some((event) => event.type === 'pocket' && event.pocket === 5)).toBe(true);
+  });
+
   it('白球落袋检测', () => {
     const world = createInitialWorld();
     const cue = getCueBall(world)!;

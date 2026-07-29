@@ -1,82 +1,14 @@
 /*
 [INPUT]: base.css 的尺寸与色彩令牌
-[OUTPUT]: 对外提供壳层网格、顶栏、桌面比分/竖屏单行球组状态、球桌舞台、遮罩与开始界面响应式布局
+[OUTPUT]: 对外提供无产品顶栏的壳层网格、桌面比分/竖屏单行球组状态、球桌舞台、遮罩与开始界面响应式布局
 [POS]: 样式体系的布局层,只管几何与层级结构;控件内部样式归 controls.css
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
 .game-shell {
   height: 100%;
   display: grid;
-  grid-template-rows: var(--topbar-h) var(--scoreboard-h) 1fr var(--control-deck-h);
+  grid-template-rows: var(--scoreboard-h) minmax(0, 1fr);
   overflow: hidden;
-}
-
-/* 顶部栏 */
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-glyph {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(112,199,165,0.5);
-  color: var(--green);
-  font-family: 'Songti SC', serif;
-  font-size: var(--fs-3xl);
-}
-
-.brand strong {
-  font-family: 'Songti SC', serif;
-  font-size: var(--fs-3xl);
-  letter-spacing: 0.1em;
-}
-
-.brand small {
-  display: block;
-  color: var(--dim);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.1em;
-  margin-top: 1px;
-}
-
-.match-state {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-base);
-}
-
-.match-state p {
-  color: #cbd0cd;
-}
-
-.match-state strong {
-  color: var(--dim);
-}
-
-.turn-light {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #555d59;
-}
-
-.turn-light.live {
-  background: var(--green);
-  box-shadow: 0 0 10px rgba(112,199,165,0.7);
 }
 
 /* 计分板 */
@@ -84,7 +16,7 @@
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
@@ -96,7 +28,7 @@
 .player-card {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .player-card.opponent {
@@ -104,12 +36,12 @@
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-lg);
   flex-shrink: 0;
   cursor: pointer;
   user-select: none;
@@ -131,17 +63,10 @@
   background: radial-gradient(circle at 35% 30%, #594a35, #171a18 70%);
 }
 
-.identity span {
-  display: block;
-  color: var(--dim);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.1em;
-}
-
 .identity strong {
   display: block;
-  font-size: var(--fs-xl);
-  margin: 2px 0;
+  font-size: var(--fs-base);
+  margin: 0;
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
@@ -155,7 +80,7 @@
 .identity small {
   display: block;
   color: var(--dim);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-xs);
 }
 
 .identity.right {
@@ -170,8 +95,8 @@
 
 .mini-ball {
   --c: #ddd;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--c);
   box-shadow: inset -3px -4px 6px rgba(0,0,0,0.4);
@@ -200,9 +125,9 @@
 .score-center {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   font-family: var(--font-mono);
-  font-size: var(--fs-5xl);
+  font-size: var(--fs-3xl);
 }
 
 .score-center i {
@@ -219,7 +144,7 @@
 
 .viewport {
   position: absolute;
-  inset: 0;
+  inset: 0 72px 0 0;
   cursor: ew-resize;
   touch-action: none;
 }
@@ -594,10 +519,6 @@
     grid-template-rows: 34px minmax(0, 1fr);
   }
 
-  .topbar {
-    display: none;
-  }
-
   .scoreboard {
     display: block;
     min-width: 0;
@@ -664,26 +585,8 @@
     display: none;
   }
 
-  .precision-aim {
-    left: 8px;
-    right: 82px;
-    bottom: 10px;
-    width: auto;
-    padding: 6px 8px;
-  }
-
-  .precision-aim > div:first-child {
-    display: block;
-  }
-
-  .precision-aim strong,
-  .precision-aim span {
-    display: block;
-    font-size: 10px;
-  }
-
-  .precision-aim span {
-    margin-top: 2px;
+  .viewport {
+    right: 66px;
   }
 }
 
@@ -704,26 +607,16 @@
   }
 }
 
-/* 横屏手机:壳层控件全部悬浮,球台占满;顶栏与计分板占住 hud-safe-top */
+/* 横屏手机：壳层控件全部悬浮，比分/球组状态行占住 hud-safe-top。 */
 @media (orientation: landscape) and (max-height: 560px) {
   .game-shell {
     display: block;
     height: 100%;
   }
 
-  .topbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: var(--topbar-h);
-    z-index: 8;
-    background: rgba(17,21,20,0.92);
-  }
-
   .scoreboard {
     position: fixed;
-    top: var(--topbar-h);
+    top: 0;
     left: 0;
     right: 0;
     height: var(--scoreboard-h);
@@ -735,6 +628,10 @@
   .table-stage {
     position: fixed;
     inset: 0;
+  }
+
+  .viewport {
+    right: 66px;
   }
 
   .room-label,

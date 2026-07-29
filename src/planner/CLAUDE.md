@@ -18,7 +18,7 @@
 
 `plan-worker.ts`: Web Worker 入口——接收 { world, legal, opts }（纯 JSON 结构化克隆），跑 planPosition 回传 plans；Vite module worker，把 0.2–1s 搜索移出主线程。
 
-`async.ts`: 异步门面 planPositionAsync——新请求 reject 旧 Promise 并 terminate 旧 worker，随后按需重建；worker 创建失败降级主线程。
+`async.ts`: 异步门面 planPositionAsync——内联 Blob Worker 随单 HTML 产物发布；新请求 reject 旧 Promise 并 terminate 旧 worker，随后按需重建，worker 创建失败降级主线程。
 
 `async.test.ts`: FakeWorker 回归：第二请求抢占第一请求、旧 worker 终止、旧 Promise 以 PlanCancelledError 结算、新请求正常返回。
 

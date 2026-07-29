@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 世界快照与 match 对局状态
-[OUTPUT]: 桌面渲染完整比分板；竖屏首行只渲染玩家球组与进球状态
+[OUTPUT]: 桌面渲染精简双方球组/比分；竖屏首行只渲染玩家球组与进球状态
 [POS]: HUD 组件层，只消费世界快照计算进球数；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -54,7 +54,6 @@ export function Scoreboard({ match, worldView }: ScoreboardProps) {
       <div className="player-card">
         <div className="avatar me">我</div>
         <div className="identity">
-          <span>PLAYER</span>
           <strong>你</strong>
           <small>{playerGroupLabel}</small>
         </div>
@@ -78,7 +77,6 @@ export function Scoreboard({ match, worldView }: ScoreboardProps) {
           ))}
         </div>
         <div className="identity right">
-          <span>SPARRING</span>
           <strong>顾燃</strong>
           <small>{opponentGroupLabel}</small>
         </div>

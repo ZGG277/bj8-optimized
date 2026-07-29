@@ -6,28 +6,26 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 ## 成员清单
 
-`ViewToolbar.tsx`: 视角/粗瞄工具条；桌面保留第一人称/俯视、45° 杆向与俯身微调，竖屏右上只显示双视角切换，pointerdown 拦截冒泡。
+`ViewToolbar.tsx`: 桌面/手机共用长行程竖向视角推杆；顶端俯视、底端第一人称，拖动越过中点切换并在松手后吸附端点，同时保留端点点击与键盘上下键。
 
-`GameHeader.tsx`: 顶部状态栏，渲染品牌标识与回合状态/杆数，纯展示性组件。
+`Scoreboard.tsx`: 桌面渲染压缩后的玩家/对手球组与比分，不再显示 PLAYER/SPARRING 等装饰字；竖屏压成 34px 首行，只显示开球/开放球局/玩家球组及本组 7 球+8号，已进球灰化。
 
-`Scoreboard.tsx`: 桌面渲染完整比分板；竖屏压成 34px 首行，只显示开球/开放球局/玩家球组及本组 7 球+8号，已进球灰化。
+`TableStage.tsx`: 球桌区域，组合 AimDial 与 3D 视口，包含回合遮罩与结束覆层；移除 PHYSICS WORLD、合法目标、拖拽提示等桌面装饰文案，视角工具条并入右侧控制轨。
 
-`TableStage.tsx`: 球桌区域，组合 ViewToolbar、TableAimNudges 与 3D 视口，包含精瞄滑窗、回合遮罩与结束覆层；不再渲染左下教练/解说卡。
+`ControlDeck.tsx`: 桌面/手机共用 54px 右侧黑色单手轨，组合与出杆区等长的 ViewToolbar、始终保留位置且默认熄灭的灯泡总开关、SpinControl 与 ShootControl；长按整轨后四块一起轻微抖动，编辑态可在轨内分别上下移动，点击轨外锁定且不透传游戏操作。
 
-`ControlDeck.tsx`: 桌面右侧控制组与竖屏右侧单手轨，组合灯泡总开关、AimControls、SpinControl、ShootControl；灯泡统一收起规划/复盘，有复盘时跨回合保持可用；消息/解说区已删除。
-
-`PlanOverlay.tsx`: 半透明紧凑走位浮层（路线、打法 chip、概率、播放、关闭），带独立拖拽手柄；场景渲染委托 Scene3D。
+`PlanOverlay.tsx`: 半透明紧凑走位浮层；只取最高概率方案，默认第 1 杆，用户点击第 2/3 杆标签后才切换对应单杆路线；带独立拖拽手柄，场景渲染委托 Scene3D。
 
 `ReviewOverlay.tsx`: 半透明可拖动击球复盘浮层；折叠态一句话诊断，展开态展示 verdict、诊断与计划/实际图例，场景对比委托 Scene3D。
 
 `IntroScreen.tsx`: 开始界面，品牌标识与开始按钮。
 
-`AimControls.tsx`: 瞄准微调按钮组，禁用同时以透明度与删除线表达，不只依赖颜色；基础步进触屏 0.004rad、桌面 0.01rad，Game 靠近袋口窗口时自适应缩到窗口宽度 1/6。
+`AimControls.tsx`: 兼容保留的键盘/按钮式瞄准微调组件；当前主球桌交互使用 AimDial。
 
-`TableAimNudges.tsx`: 竖屏球桌内部的两个 52px 外向三角，转发左右方向微调，确保方向触控不离开 viewport。
+`AimDial.tsx`: 母球或幽灵球落位后显示的横向密码轮；固定中央指针、刻度相对移动，Pointer 可反复抬手续拨而无行程边界；只转发像素增量并展示粗档/接近/精瞄状态。
 
 `SpinControl.tsx`: 桌面直接显示击球点盘；竖屏显示小母球预览，点击展开 124px 大盘；拖拽经 clampSpin 映射单位圆。
 
-`ShootControl.tsx`: 力度表与出杆按钮合一；竖屏为 196–240px 长行程下拉面，松开提交、Enter 轻杆。
+`ShootControl.tsx`: 力度表与出杆按钮合一；竖屏为 196–240px 长行程下拉面，开球阶段只显示颜色力度条、不显示数字，松开提交、Enter 轻杆。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

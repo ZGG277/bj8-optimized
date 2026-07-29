@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 竖屏单手布局、桌内瞄准、击球点弹层、长行程出杆、灯泡总开关与浮层拖拽断言及截图
+[OUTPUT]: 390×844 竖屏单手布局、开球落位拨轮、长行程视角推杆、击球点弹层、出杆、灯泡与浮层拖拽断言及截图
 [POS]: v1.2.0 手机竖屏核心交互的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -8,6 +8,7 @@ import puppeteer from 'puppeteer-core';
 
 const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9334';
 const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:5200/';
+const SHOT_DIR = process.env.SHOT_DIR || 'shots';
 const results = [];
 const ok = (name, pass, detail = '') => {
   results.push({ name, pass });
@@ -21,6 +22,12 @@ await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true
 const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
 await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+await page.evaluate(() => {
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('bj8-control-y:')) localStorage.removeItem(key);
+  }
+});
+await page.reload({ waitUntil: 'networkidle0' });
 
 async function tap(selector) {
   const point = await page.$eval(selector, element => {
@@ -33,17 +40,32 @@ async function tap(selector) {
 await tap('.start-btn');
 await wait(800);
 
+let placementBefore = null;
+let placementDuring = null;
 if (await page.evaluate(() => window.__bj8?.match?.current?.phase === 'placing')) {
+  placementBefore = await page.evaluate(() => window.__bj8.scene.current.cuePlacementVisualState());
   const candidates = await page.$eval('.viewport', element => {
     const rect = element.getBoundingClientRect();
     return [0.74, 0.8, 0.86].map(y => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height * y }));
   });
-  for (const point of candidates) {
-    await page.touchscreen.tap(point.x, point.y);
+  await page.touchscreen.touchStart(candidates[0].x - 18, candidates[0].y);
+  await page.touchscreen.touchMove(candidates[0].x + 18, candidates[0].y);
+  await wait(120);
+  placementDuring = await page.evaluate(() => window.__bj8.scene.current.cuePlacementVisualState());
+  await page.touchscreen.touchEnd();
+  await wait(300);
+  for (const point of candidates.slice(1)) {
     await wait(300);
     if (await page.evaluate(() => window.__bj8?.match?.current?.phase !== 'placing')) break;
+    await page.touchscreen.tap(point.x, point.y);
   }
 }
+
+ok('手机开球初始不显示实体母球', placementBefore && !placementBefore.realVisible && !placementBefore.ghostVisible,
+  JSON.stringify(placementBefore));
+ok('手机拖动摆球时虚母球跟手且实体母球保持隐藏',
+  placementDuring && placementDuring.ghostVisible && !placementDuring.realVisible,
+  JSON.stringify(placementDuring));
 
 const layout = await page.evaluate(() => {
   const box = selector => {
@@ -66,41 +88,165 @@ const layout = await page.evaluate(() => {
     table: box('.table-stage'),
     viewport: box('.viewport'),
     view: box('.view-switcher'),
+    viewTrack: box('.view-slider-track'),
+    viewValue: document.querySelector('.view-slider-track')?.getAttribute('aria-valuetext'),
     deck: box('.control-deck'),
+    rail: box('.control-rail'),
+    slots: [...document.querySelectorAll('.control-slot')].map(element => {
+      const rect = element.getBoundingClientRect();
+      return {
+        id: element.getAttribute('data-control-slot'),
+        x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+        right: rect.right, bottom: rect.bottom,
+      };
+    }),
     bulb: box('.plan-button'),
     spin: box('.spin-preview'),
     shoot: box('.shoot-pad'),
-    nudges: [...document.querySelectorAll('.table-aim-nudges button')].map(element => {
-      const rect = element.getBoundingClientRect();
-      return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
-    }),
+    dial: box('.aim-dial'),
+    dialText: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
     coachCount: document.querySelectorAll('.coach-card,.match-message').length,
     separateMeterCount: document.querySelectorAll('.power-meter,.power-meter-track').length,
+    gripCount: document.querySelectorAll('.control-slot-grip').length,
+    powerNumberCount: document.querySelectorAll('.power-num').length,
+    meterCount: document.querySelectorAll('[role="meter"][aria-label="出杆力度"]').length,
   };
 });
 
-ok('顶部产品栏完全移除', layout.header?.display === 'none', JSON.stringify(layout.header));
+ok('顶部产品栏从 DOM 完全移除', layout.header === null, JSON.stringify(layout.header));
 ok('顶部状态压到 34px 单行', layout.scoreboard?.height <= 35 && layout.status?.height <= 35,
   `score=${layout.scoreboard?.height} status=${layout.status?.height}`);
 ok('球组/进球状态首行完整无横向溢出', layout.statusScrollWidth <= layout.statusClientWidth + 1,
   `${layout.statusScrollWidth}/${layout.statusClientWidth}`);
 ok('球桌吃满顶部状态以下空间', layout.table?.y <= 35 && layout.table?.bottom >= 843,
   JSON.stringify(layout.table));
-ok('视角位于球桌右上且可单手命中', layout.view?.right <= 390 && layout.view?.x >= 318 && layout.view?.height >= 80,
+ok('视角位于右上且为长行程竖向推杆', layout.view?.right <= 390 && layout.view?.x >= 320
+  && layout.view?.height >= 196 && layout.viewTrack?.height >= 120,
   JSON.stringify(layout.view));
-ok('右侧控制轨不占布局行', layout.deck?.x >= 320 && layout.deck?.bottom <= 844,
-  JSON.stringify(layout.deck));
-ok('灯泡为紧凑 48px 触控目标', layout.bulb?.width >= 44 && layout.bulb?.width <= 52 && layout.bulb?.height >= 44,
+ok('右侧控制轨固定为 54px 窄列', layout.rail?.width === 54 && layout.rail?.x >= 320 && layout.rail?.bottom <= 844,
+  JSON.stringify(layout.rail));
+ok('四个主控宽度一致', [layout.view, layout.bulb, layout.spin, layout.shoot].every(item => item?.width === 54),
+  JSON.stringify({ view: layout.view?.width, bulb: layout.bulb?.width, spin: layout.spin?.width, shoot: layout.shoot?.width }));
+ok('球桌为右侧控制轨预留空间', layout.viewport?.right <= layout.rail?.x - 4,
+  `${layout.viewport?.right}/${layout.rail?.x}`);
+ok('灯泡为紧凑 48px 高触控目标', layout.bulb?.width === 54 && layout.bulb?.height >= 44,
   JSON.stringify(layout.bulb));
+ok('开球控件只显示颜色力度条而不显示数字', layout.powerNumberCount === 0 && layout.meterCount === 1,
+  `number=${layout.powerNumberCount} meter=${layout.meterCount}`);
 ok('力度与出杆已合并为单控件', layout.separateMeterCount === 0, `separate=${layout.separateMeterCount}`);
 ok('出杆有效控件高度不少于 196px', layout.shoot?.height >= 196, JSON.stringify(layout.shoot));
+ok('视角推杆与出杆区行程等长', Math.abs(layout.view?.height - layout.shoot?.height) <= 1,
+  `${layout.view?.height}/${layout.shoot?.height}`);
 ok('解说区与解说浮层已删除', layout.coachCount === 0, `count=${layout.coachCount}`);
-ok('桌内微调三角均为 ≥52px 命中区', layout.nudges.length === 2 && layout.nudges.every(item => item.width >= 52 && item.height >= 52),
-  JSON.stringify(layout.nudges));
-ok('方向触控全部位于球桌范围内', layout.nudges.every(item =>
-  item.x >= layout.viewport.x && item.right <= layout.viewport.right &&
-  item.y >= layout.viewport.y && item.bottom <= layout.viewport.bottom),
-JSON.stringify(layout.nudges));
+ok('开球母球落位后立即显示横向拨轮', layout.dial?.width >= 200 && layout.dial?.height >= 50,
+  JSON.stringify({ dial: layout.dial, text: layout.dialText }));
+ok('拨轮完全位于球桌触控区域内', layout.dial?.x >= layout.viewport?.x && layout.dial?.right <= layout.viewport?.right,
+  JSON.stringify({ dial: layout.dial, viewport: layout.viewport }));
+ok('四个控件不再各自显示拖动点', layout.gripCount === 0, `grips=${layout.gripCount}`);
+
+const dialStartAim = await page.evaluate(() => window.__bj8.aim.current);
+await page.touchscreen.touchStart(layout.dial.x + layout.dial.width * 0.6, layout.dial.y + layout.dial.height / 2);
+await page.touchscreen.touchMove(layout.dial.x + layout.dial.width * 0.78, layout.dial.y + layout.dial.height / 2);
+await page.touchscreen.touchEnd();
+await wait(160);
+const dialEndAim = await page.evaluate(() => window.__bj8.aim.current);
+ok('手机触摸横拨真实改变击球方向', Math.abs(dialEndAim - dialStartAim) > 0.001,
+  `${dialStartAim} → ${dialEndAim}`);
+
+// 真实推拉视角杆：推到顶切俯视，拉到底回第一人称。
+const viewTrackPoint = {
+  x: layout.viewTrack.x + layout.viewTrack.width / 2,
+  top: layout.viewTrack.y + 8,
+  bottom: layout.viewTrack.bottom - 8,
+};
+await page.touchscreen.touchStart(viewTrackPoint.x, viewTrackPoint.bottom);
+await page.touchscreen.touchMove(viewTrackPoint.x, viewTrackPoint.top);
+await page.touchscreen.touchEnd();
+await wait(220);
+const pushedUp = await page.evaluate(() => ({
+  value: document.querySelector('.view-slider-track')?.getAttribute('aria-valuetext'),
+  overhead: document.querySelector('.viewport')?.classList.contains('overhead'),
+}));
+ok('视角推杆推到顶端切换俯视', pushedUp.value === '俯视' && pushedUp.overhead, JSON.stringify(pushedUp));
+
+await page.touchscreen.touchStart(viewTrackPoint.x, viewTrackPoint.top);
+await page.touchscreen.touchMove(viewTrackPoint.x, viewTrackPoint.bottom);
+await page.touchscreen.touchEnd();
+await wait(220);
+const pulledDown = await page.evaluate(() => ({
+  value: document.querySelector('.view-slider-track')?.getAttribute('aria-valuetext'),
+  first: !document.querySelector('.viewport')?.classList.contains('overhead'),
+}));
+ok('视角推杆拉到底端切换第一人称', pulledDown.value === '第一人称' && pulledDown.first,
+  JSON.stringify(pulledDown));
+
+// 长按整条黑色控制轨进入统一编辑态，四块一起抖动。
+const railHold = {
+  x: layout.rail.x + layout.rail.width / 2,
+  y: layout.rail.bottom - 24,
+};
+await page.touchscreen.touchStart(railHold.x, railHold.y);
+await wait(480);
+await page.touchscreen.touchEnd();
+await wait(80);
+const editState = await page.evaluate(() => ({
+  editing: document.querySelector('.control-rail')?.getAttribute('data-layout-editing'),
+  animated: [...document.querySelectorAll('.control-slot-body')]
+    .every(element => getComputedStyle(element).animationName.includes('control-slot-wiggle')),
+}));
+ok('长按右侧黑条后四个控件一起进入抖动编辑态',
+  editState.editing === 'true' && editState.animated, JSON.stringify(editState));
+
+// 编辑态下四块分别移动，同时保留互不遮挡的可用间距。
+const slotDeltas = { view: 4, guidance: 10, spin: 20, shoot: 30 };
+const slotsBefore = Object.fromEntries(layout.slots.map(slot => [slot.id, slot]));
+for (const [id, delta] of Object.entries(slotDeltas)) {
+  const slotPoint = await page.$eval(`[data-control-slot="${id}"]`, element => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  });
+  await page.touchscreen.touchStart(slotPoint.x, slotPoint.y);
+  await page.touchscreen.touchMove(slotPoint.x, slotPoint.y + delta);
+  await page.touchscreen.touchEnd();
+  await wait(80);
+}
+const slotsAfter = await page.evaluate(() => Object.fromEntries(
+  [...document.querySelectorAll('.control-slot')].map(element => {
+    const rect = element.getBoundingClientRect();
+    return [element.getAttribute('data-control-slot'), {
+      x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom,
+    }];
+  }),
+));
+ok('编辑态下四个操控区都可直接上下拖动',
+  Object.entries(slotDeltas).every(([id, delta]) =>
+    Math.abs(slotsAfter[id].y - slotsBefore[id].y - delta) < 2),
+  JSON.stringify(slotsAfter));
+ok('四个控件始终限制在黑色控制轨内且不发生横向漂移',
+  Object.values(slotsAfter).every(slot =>
+    slot.x >= layout.rail.x && slot.y >= layout.rail.y
+      && slot.right <= layout.rail.right && slot.bottom <= layout.rail.bottom),
+  JSON.stringify(slotsAfter));
+
+// 点击非右侧区域只锁定布局，不把这次点击透传成瞄准操作。
+const aimBeforeLock = await page.evaluate(() => window.__bj8.aim.current);
+await page.touchscreen.tap(Math.max(24, layout.viewport.x + 40), layout.viewport.y + layout.viewport.height / 2);
+await wait(100);
+const lockedState = await page.evaluate(() => ({
+  editing: document.querySelector('.control-rail')?.getAttribute('data-layout-editing'),
+  aim: window.__bj8.aim.current,
+  storedPositions: Object.keys(localStorage).filter(key => key.startsWith('bj8-control-y:v2:')).length,
+  slots: Object.fromEntries([...document.querySelectorAll('.control-slot')].map(element => {
+    const rect = element.getBoundingClientRect();
+    return [element.getAttribute('data-control-slot'), rect.y];
+  })),
+}));
+ok('点击非右侧区域后锁定四个控件的相对位置',
+  lockedState.editing === 'false' && lockedState.storedPositions === 4
+    && Object.entries(slotsAfter).every(([id, slot]) => Math.abs(lockedState.slots[id] - slot.y) < 1),
+  JSON.stringify(lockedState));
+ok('退出布局的点击不会误触球桌瞄准', Math.abs(lockedState.aim - aimBeforeLock) < 1e-9,
+  `${aimBeforeLock} → ${lockedState.aim}`);
 
 await page.evaluate(() => {
   const world = window.__bj8.world.current;
@@ -122,12 +268,6 @@ ok('分组后首行完整展示本组 7 球与 8 号', groupedStatus.label === '
 ok('已进球变灰且分组状态仍不溢出', groupedStatus.down >= 1 && groupedStatus.scroll <= groupedStatus.client + 1,
   JSON.stringify(groupedStatus));
 
-const aimBefore = await page.evaluate(() => window.__bj8.aim.current);
-await tap('.aim-nudge-right');
-await wait(120);
-const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
-ok('桌内三角真实微调世界杆向', aimAfter > aimBefore, `${aimBefore} → ${aimAfter}`);
-
 await tap('.spin-preview');
 await wait(120);
 const spinOpen = await page.evaluate(() => {
@@ -142,7 +282,7 @@ ok('小母球可展开为大击球点盘', spinOpen.ball?.width >= 120 && spinOp
   JSON.stringify(spinOpen));
 ok('大击球点盘不覆盖右侧出杆区', spinOpen.popover?.right <= layout.shoot.x,
   JSON.stringify(spinOpen.popover));
-await page.screenshot({ path: 'shots/45-mobile-spin-expanded.png' });
+await page.screenshot({ path: `${SHOT_DIR}/45-mobile-spin-expanded.png` });
 
 const spinBall = await page.$eval('.mobile-spin-pad .spin-ball', element => {
   const rect = element.getBoundingClientRect();
@@ -193,6 +333,16 @@ while (!planBefore && Date.now() < planDeadline) {
 ok('灯泡在提示可用时可点击', Boolean(planBefore));
 if (planBefore) {
   ok('灯泡点亮显示紧凑走位浮层', !!planBefore && planBefore.right <= 306, JSON.stringify(planBefore));
+  const planPresentation = await page.evaluate(() => ({
+    plans: document.querySelectorAll('.plan-bar').length,
+    steps: document.querySelectorAll('.plan-step-tabs button').length,
+    chips: document.querySelectorAll('.plan-bar-chips .plan-chip').length,
+    play: document.querySelectorAll('.plan-bar-play').length,
+  }));
+  ok('只展示最高概率方案且默认仅一杆路线',
+    planPresentation.plans === 1 && planPresentation.steps >= 1 &&
+    planPresentation.steps <= 3 && planPresentation.chips === 1 && planPresentation.play === 0,
+    JSON.stringify(planPresentation));
   const handle = await page.$eval('.plan-bar .overlay-drag-handle', element => {
     const rect = element.getBoundingClientRect();
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -207,7 +357,7 @@ if (planBefore) {
   });
   ok('走位浮层可拖动且仍留在视口', planAfter.x > planBefore.x + 20 && planAfter.y > planBefore.y + 40,
     `${JSON.stringify(planBefore)} → ${JSON.stringify(planAfter)}`);
-  await page.screenshot({ path: 'shots/46-mobile-plan-float.png' });
+  await page.screenshot({ path: `${SHOT_DIR}/46-mobile-plan-float.png` });
   await tap('.plan-button');
   await wait(100);
   ok('灯泡熄灭同时收起提示区域', await page.$eval('.plan-button', () =>
@@ -216,7 +366,7 @@ if (planBefore) {
 
 // 规划关闭会从俯视平滑恢复杆后视角；等相机稳定后再取视觉基线，避免把过渡帧误判为空间浪费。
 await wait(1500);
-await page.screenshot({ path: 'shots/44-mobile-portrait.png' });
+await page.screenshot({ path: `${SHOT_DIR}/44-mobile-portrait.png` });
 
 // 出杆前重新设为高杆，确认物理确认击球后自动复位并自动收起大母球。
 await tap('.spin-preview');
@@ -236,7 +386,8 @@ await page.touchscreen.touchStart(shoot.x, shoot.startY);
 for (let index = 1; index <= 8; index += 1) {
   await page.touchscreen.touchMove(shoot.x, shoot.startY + (shoot.endY - shoot.startY) * index / 8);
 }
-const peak = await page.$eval('.power-num', element => Number(element.textContent));
+const peak = await page.$eval('[role="meter"][aria-label="出杆力度"]',
+  element => Number(element.getAttribute('aria-valuenow')));
 await page.touchscreen.touchEnd();
 ok('长行程下拉可连续控制并达到满力', peak >= 95, `peak=${peak}`);
 await page.waitForFunction(() => window.__bj8.world.current.shot >= 1, { timeout: 8000 }).catch(() => {});
@@ -249,8 +400,18 @@ ok('出杆成功', postShot.shot >= 1, JSON.stringify(postShot));
 ok('击球后杆法自动回中并收起大母球', postShot.spinLabel.includes('中杆') && !postShot.popover,
   JSON.stringify(postShot));
 
-const reviewAppeared = await page.waitForSelector('.review-float', { timeout: 30000 }).then(() => true).catch(() => false);
-ok('玩家杆结束后出现紧凑复盘浮层', reviewAppeared);
+await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 30000 }).catch(() => {});
+await wait(300);
+const reviewStayedHidden = !await page.$('.review-float');
+ok('击球结束后复盘不会主动弹出', reviewStayedHidden);
+const reviewBulbReady = await page.$eval('.plan-button', button => {
+  const style = getComputedStyle(button);
+  return style.visibility === 'visible' && !button.disabled && button.getAttribute('aria-pressed') === 'false';
+}).catch(() => false);
+if (reviewBulbReady) await tap('.plan-button');
+await wait(120);
+const reviewAppeared = Boolean(await page.$('.review-float'));
+ok('再次点亮灯泡后才显示复盘信息', reviewBulbReady && reviewAppeared);
 if (reviewAppeared) {
   // 停住对手调度，隔离验证复盘自身的拖拽与灯泡总开关。
   await page.evaluate(() => window.__bj8.setMatch({ actor: 'player', phase: 'aiming' }));
@@ -273,7 +434,7 @@ if (reviewAppeared) {
   });
   ok('复盘浮层可拖动且避开右侧控制轨', after.x > before.x + 18 && after.y > before.y + 50 && after.right <= 382,
     `${JSON.stringify(before)} → ${JSON.stringify(after)}`);
-  await page.screenshot({ path: 'shots/47-mobile-review-float.png' });
+  await page.screenshot({ path: `${SHOT_DIR}/47-mobile-review-float.png` });
   const bulbVisible = await page.$eval('.plan-button', button => {
     const style = getComputedStyle(button);
     return style.visibility === 'visible' && !button.disabled;

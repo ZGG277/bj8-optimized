@@ -1,7 +1,7 @@
 /*
-[INPUT]: PositionPlan 列表与关闭/展示/播放回调；依赖 planner 的 PlannedStep/PositionPlan 类型
-[OUTPUT]: 渲染走位规划紧凑提示条（路线切换、三杆压缩打法 chip、连贯概率、整链播放、关闭）
-[POS]: HUD 组件层，只做展示与选择转发；场景渲染经 onShowPlan/onPlayPlan 委托 Scene3D
+[INPUT]: 按概率排序的 PositionPlan 列表与关闭/分杆展示回调
+[OUTPUT]: 只展示最高概率方案；默认第1杆，用户点击第2/3杆后才切换对应路线
+[POS]: HUD 组件层，只做展示与分杆选择；场景渲染经 onShowStep 委托 Scene3D
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useEffect, useState } from 'react';
@@ -12,10 +12,8 @@ import type { PositionPlan } from '../planner/search';
 interface PlanOverlayProps {
   plans: PositionPlan[];
   onClose: () => void;
-  /** 选中路线变化时通知（打开即展示首条路线整链；卸载时传 null 清除） */
-  onShowPlan: (plan: PositionPlan | null) => void;
-  /** 点击播放：驱动 Scene3D 整链连续播放当前路线 */
-  onPlayPlan: (plan: PositionPlan) => void;
+  /** 打开默认第1杆；用户点第2/3杆后只渲染对应一步；卸载时传 null 清除 */
+  onShowStep: (plan: PositionPlan | null, stepIndex: number) => void;
 }
 
 /**
@@ -29,55 +27,46 @@ function chipText(cand: ShotCandidate): string {
   return `${vertical}${side}${power}`;
 }
 
-export function PlanOverlay({ plans, onClose, onShowPlan, onPlayPlan }: PlanOverlayProps) {
-  const [routeIdx, setRouteIdx] = useState(0);
+export function PlanOverlay({ plans, onClose, onShowStep }: PlanOverlayProps) {
+  const [stepIdx, setStepIdx] = useState(0);
   const drag = useDraggableOverlay();
-  const plan = plans[routeIdx] ?? plans[0];
+  // planner 已按 score/成功率排序；只给用户最高置信度方案，避免路线选择焦虑。
+  const plan = plans[0];
+  const safeStepIdx = plan ? Math.min(stepIdx, Math.max(0, plan.steps.length - 1)) : 0;
+  const step = plan?.steps[safeStepIdx];
 
-  // 选中路线 → 场景整链渲染（路线切换、初次打开都经此同步）
+  // 默认只上屏第1杆；切换按钮才显示后续杆。
   useEffect(() => {
-    onShowPlan(plan ?? null);
-  }, [plan, onShowPlan]);
+    onShowStep(plan ?? null, safeStepIdx);
+  }, [plan, safeStepIdx, onShowStep]);
   // 卸载（关闭提示条）时清除规划渲染
-  useEffect(() => () => onShowPlan(null), [onShowPlan]);
+  useEffect(() => () => onShowStep(null, 0), [onShowStep]);
 
-  if (!plan) return null;
-
-  const probText =
-    plan.steps.length >= 2
-      ? `连贯 ${Math.round(plan.chainProb * 100)}%`
-      : `本杆 ${Math.round(plan.chainProb * 100)}%`;
+  if (!plan || !step) return null;
 
   return (
     <div ref={drag.elementRef} className="plan-bar" style={drag.style} role="dialog" aria-label="走位规划">
       <span className="overlay-drag-handle" aria-label="拖动走位提示" {...drag.dragHandleProps}>⠿</span>
-      {plans.length >= 2 && (
-        <div className="plan-bar-routes" role="tablist">
-          {plans.map((p, i) => (
+      <div className="plan-step-tabs" role="tablist" aria-label="分杆路线">
+        {plan.steps.map((candidateStep, i) => (
             <button
               key={i}
               type="button"
               role="tab"
-              aria-selected={i === routeIdx}
-              className={i === routeIdx ? 'active' : ''}
-              onClick={() => setRouteIdx(i)}
+              aria-selected={i === safeStepIdx}
+              className={i === safeStepIdx ? 'active' : ''}
+              onClick={() => setStepIdx(i)}
             >
-              {`${['①', '②', '③'][i] ?? `${i + 1}`}${Math.round(p.chainProb * 100)}%`}
+              {`第${i + 1}球 · ${candidateStep.candidate.target}号`}
             </button>
-          ))}
-        </div>
-      )}
-      <div className="plan-bar-chips">
-        {plan.steps.map((s, i) => (
-          <span key={i} className={`plan-chip plan-chip-${i + 1}`}>
-            {`${i + 1}·${chipText(s.candidate)}`}
-          </span>
         ))}
       </div>
-      <span className="plan-bar-prob">{probText}</span>
-      <button type="button" className="plan-bar-play" aria-label="播放整杆路线" onClick={() => onPlayPlan(plan)}>
-        ▶ 播放
-      </button>
+      <div className="plan-bar-chips">
+        <span className={`plan-chip plan-chip-${safeStepIdx + 1}`}>
+          {chipText(step.candidate)}
+        </span>
+      </div>
+      <span className="plan-bar-prob">{`本杆 ${Math.round(step.prob * 100)}%`}</span>
       <button type="button" className="plan-bar-close" aria-label="关闭走位规划" onClick={onClose}>
         ✕
       </button>

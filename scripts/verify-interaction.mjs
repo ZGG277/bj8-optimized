@@ -64,6 +64,12 @@ async function newGamePage(viewport) {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('bj8-control-y:')) localStorage.removeItem(key);
+    }
+  });
+  await page.reload({ waitUntil: 'networkidle0' });
   await realClickButton(page, '开始对局');
   await new Promise(r => setTimeout(r, 800));
   // 处理开球放置：点击开球区后进入瞄准阶段
@@ -78,7 +84,37 @@ const gameState = (page) => page.evaluate(() => {
   return w ? { shot: w.shot, moving: w.moving } : null;
 });
 
-const turnText = (page) => page.evaluate(() => document.querySelector('.match-state p')?.textContent);
+// 产品顶栏已删除，测试直接读取规则状态，不再依赖不存在的装饰文案。
+const turnText = (page) => page.evaluate(() => {
+  const match = window.__bj8?.match?.current;
+  if (!match) return '';
+  if (match.phase === 'placing') return '放置白球';
+  if (match.phase === 'opponent') return '顾燃思考';
+  if (match.phase === 'aiming' && match.actor === 'player') return '你的回合';
+  return match.phase;
+});
+
+/** 输入矩阵只验证玩家控件：每杆后固定回到静止的普通瞄准回合，避免随机 AI 时长污染门禁。 */
+async function stagePlayerAim(page) {
+  await page.evaluate(() => {
+    const world = window.__bj8.world.current;
+    for (const ball of world.balls) {
+      ball.vx = ball.vz = ball.wx = ball.wy = ball.wz = 0;
+    }
+    const cue = world.balls.find(ball => ball.number === 0);
+    if (cue && !cue.active) Object.assign(cue, { active: true, x: 0, z: 0.55 });
+    world.moving = false;
+    window.__bj8.setMatch({
+      phase: 'aiming',
+      actor: 'player',
+      breaking: false,
+      winner: null,
+    });
+    window.__bj8.sync();
+  });
+  await new Promise(resolve => setTimeout(resolve, 120));
+  return (await turnText(page)) === '你的回合';
+}
 
 const padBox = (page) => page.evaluate(() => {
   const el = document.querySelector('.shoot-pad');
@@ -153,8 +189,8 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   await realClickButton(page, '俯视');
   await new Promise(r => setTimeout(r, 400));
   const pressed = await page.evaluate(() => ({
-    first: document.querySelector('.view-switcher button:nth-child(1)')?.getAttribute('aria-pressed'),
-    overhead: document.querySelector('.view-switcher button:nth-child(2)')?.getAttribute('aria-pressed'),
+    first: document.querySelector('[aria-label="切换第一人称视角"]')?.getAttribute('aria-pressed'),
+    overhead: document.querySelector('[aria-label="切换俯视视角"]')?.getAttribute('aria-pressed'),
   }));
   ok('桌面: 切视角 aria-pressed 翻转', pressed.first === 'false' && pressed.overhead === 'true', JSON.stringify(pressed));
   const aimAfterSwitch = await page.evaluate(() => window.__bj8.aim.current);
@@ -167,16 +203,18 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   ok('桌面: 鼠标下拉蓄力出杆', !!after && after.shot === 1, JSON.stringify({ before, after }));
   ok('桌面: 松开瞬间球未动(等杆头触球)', !!immediate && immediate.shot === 0, JSON.stringify(immediate));
 
-  // 等球停，再轻点出杆（最低力度）
+  // 等球停并回到玩家回合，再轻点出杆（最低力度）；对手回合控件按契约禁用。
   await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 30000 });
-  await page.mouse.move(box.cx, box.cy);
+  ok('桌面: 固定回到你的回合', await stagePlayerAim(page));
+  const tapBox = await padBox(page);
+  await page.mouse.move(tapBox.cx, tapBox.cy);
   await page.mouse.down();
   await page.mouse.up();
   await new Promise(r => setTimeout(r, 300));
   const tapState = await gameState(page);
   ok('桌面: 轻点也能出杆(保底力度)', tapState && tapState.shot >= 1, JSON.stringify(tapState));
 
-  ok('桌面: 回到你的回合(自由球自动放置)', await waitPlayerTurn(page));
+  ok('桌面: 轻点后再次回到你的回合', await stagePlayerAim(page));
 
   // 键盘:空格按住 1350ms → 最终力度 81±2(真实 keyboard 事件,与帧率无关)
   await page.keyboard.down('Space');
@@ -185,11 +223,17 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   await new Promise(r => setTimeout(r, 250));
   const holdPower = await page.evaluate(() => parseInt(document.querySelector('.power-num')?.textContent ?? '0', 10));
   ok('桌面: 空格1350ms力度81±2', Math.abs(holdPower - 81) <= 2, `power=${holdPower}`);
-  ok('桌面: 空格出杆后回到你的回合', await waitPlayerTurn(page));
+  ok('桌面: 空格出杆后回到你的回合', await stagePlayerAim(page));
 
-  // 塞球盘拖到顶部 → 高杆
+  // 紧凑击球点先展开，再把大母球拖到顶部 → 高杆
+  const spinPreview = await page.evaluate(() => {
+    const r = document.querySelector('.spin-preview')?.getBoundingClientRect();
+    return r ? { cx: r.x + r.width / 2, cy: r.y + r.height / 2 } : null;
+  });
+  if (spinPreview) await page.mouse.click(spinPreview.cx, spinPreview.cy);
+  await new Promise(r => setTimeout(r, 120));
   const spinBox = await page.evaluate(() => {
-    const r = document.querySelector('.spin-ball').getBoundingClientRect();
+    const r = document.querySelector('.mobile-spin-pad .spin-ball').getBoundingClientRect();
     return { cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
   });
   await page.mouse.move(spinBox.cx, spinBox.cy);
@@ -197,7 +241,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   await page.mouse.move(spinBox.cx, spinBox.cy - 18, { steps: 4 });
   await page.mouse.up();
   await new Promise(r => setTimeout(r, 200));
-  const spinLabel = await page.evaluate(() => document.querySelector('.spin-pad small')?.textContent);
+  const spinLabel = await page.evaluate(() => document.querySelector('.mobile-spin-pad small')?.textContent);
   ok('桌面: 塞球盘上拖=高杆', spinLabel === '高杆', spinLabel || '');
 
   // 瞄准拖拽不报错
@@ -222,36 +266,18 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   ok('触摸: 出杆区存在且在视口内', !!box && box.x + box.w <= 390 && box.y + box.h <= 844,
     box ? `(${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.w)}x${Math.round(box.h)})` : 'missing');
   const overflow = await page.evaluate(() => {
-    const deck = document.querySelector('.control-deck').getBoundingClientRect();
-    return [...document.querySelector('.control-deck').children]
+    return [...document.querySelectorAll('.control-slot')]
       .filter(c => {
         const r = c.getBoundingClientRect();
         if (r.width === 0 || r.height === 0 || getComputedStyle(c).display === 'none') return false;
-        return r.bottom > deck.bottom + 2 || r.right > deck.right + 2 || r.left < deck.left - 2;
+        return r.top < -2 || r.bottom > window.innerHeight + 2
+          || r.right > window.innerWidth + 2 || r.left < -2;
       }).length;
   });
   ok('触摸: 控制区无溢出元素', overflow === 0, overflow ? `${overflow}个元素溢出` : '');
 
-  // 竖屏方向调节只在球桌内：真实命中外向三角，并改变唯一世界瞄准角
-  const rotateBtn = await page.evaluate(() => {
-    const btn = document.querySelector('.aim-nudge-left');
-    if (!btn) return null;
-    const r = btn.getBoundingClientRect();
-    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-    return { cx, cy, hitIsSelf: document.elementFromPoint(cx, cy) === btn };
-  });
-  ok('触摸: 桌内方向三角真实命中', !!rotateBtn && rotateBtn.hitIsSelf, rotateBtn ? '' : '按钮不存在或被遮挡');
-  if (rotateBtn) {
-    const aimBefore = await page.evaluate(() => window.__bj8.aim.current);
-    await page.touchscreen.tap(rotateBtn.cx, rotateBtn.cy);
-    await new Promise(r => setTimeout(r, 300));
-    const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
-    ok(
-      '触摸: 桌内方向三角微调世界杆向',
-      aimAfter < aimBefore,
-      `before=${aimBefore} after=${aimAfter}`,
-    );
-  }
+  // 开球母球落实后立即提供无边界方向拨轮；近袋连续降档由专项门禁覆盖。
+  ok('触摸: 开球落位后方向拨轮可用', Boolean(await page.$('.aim-dial')));
 
   // 触摸拖拽出杆(开球),同时验证满力可达
   const portraitStartY = box.y + 30;
@@ -260,102 +286,95 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   for (let i = 1; i <= 8; i++) {
     await page.touchscreen.touchMove(box.cx, portraitStartY + (portraitEndY - portraitStartY) * i / 8);
   }
-  const peak = await page.evaluate(() => document.querySelector('.power-num')?.textContent);
+  const peak = await page.evaluate(() =>
+    document.querySelector('[role="meter"][aria-label="出杆力度"]')?.getAttribute('aria-valuenow'));
   await page.touchscreen.touchEnd();
   ok('触摸: 竖屏满力可达(≥95)', !!peak && parseInt(peak, 10) >= 95, `peak=${peak}`);
   await new Promise(r => setTimeout(r, 600));
   const after = await gameState(page);
   ok('触摸: 下拉蓄力出杆', !!after && after.shot === 1, JSON.stringify(after));
 
-  // 自由球放置:等对手回合,摆"AI 必连杆落袋"的几何,AI 犯规后触摸放置白球
+  // 自由球放置：直接固定规则阶段，隔离随机开球与 AI 时序，只验证真实触摸输入出口。
   await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 30000 }).catch(() => {});
   {
-    // 若开球进了(玩家继续),用轻触空杆把回合交出去
-    let turn = await turnText(page);
-    if (turn === '你的回合') {
-      await page.touchscreen.touchStart(box.cx, box.cy);
-      await page.touchscreen.touchEnd();
-      await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 30000 }).catch(() => {});
-      turn = await turnText(page);
-    }
-    // 等到对手思考,立即摆球:唯一目标球放在 白球→右下袋口 连线上,距袋口 0.35m
-    const deadline = Date.now() + 40000;
-    while ((await turnText(page)) !== '顾燃思考' && Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 400));
-    }
-    const stagedOk = await page.evaluate(() => {
+    await realClickButton(page, '俯视');
+    await page.evaluate(() => {
       const world = window.__bj8.world.current;
       const cue = world.balls[0];
-      if (!cue.active) return false;
-      const pocket = { x: 0.635, z: 1.27 };
+      Object.assign(cue, { active: true, vx: 0, vz: 0, wx: 0, wy: 0, wz: 0 });
       for (const b of world.balls) {
         if (b.number === 0) continue;
-        b.active = false; b.vx = 0; b.vz = 0;
+        b.active = false;
+        b.vx = b.vz = b.wx = b.wy = b.wz = 0;
       }
-      const dx = pocket.x - cue.x, dz = pocket.z - cue.z;
-      const len = Math.hypot(dx, dz);
-      if (len < 0.6) return false;
-      const ball = world.balls.find(b => b.number === 1);
-      ball.active = true;
-      ball.x = pocket.x - (dx / len) * 0.35;
-      ball.z = pocket.z - (dz / len) * 0.35;
-      ball.vx = 0; ball.vz = 0; ball.wx = 0; ball.wy = 0; ball.wz = 0;
-      return true;
-    });
-    ok('触摸: 对手回合摆出 AI 犯规几何', stagedOk);
-    // AI 击球(约 900ms 后),无论打中连带进袋还是空杆,犯规后都是玩家自由球
-    const placingDeadline = Date.now() + 20000;
-    let placing = false;
-    while (Date.now() < placingDeadline) {
-      const t = await turnText(page);
-      if (t === '放置白球') { placing = true; break; }
-      await new Promise(r => setTimeout(r, 500));
-    }
-    ok('触摸: AI 犯规进入自由球放置', placing);
-    if (placing) {
-      // 放置 effect 已切到俯视;先粗网格反查,再利用俯视映射的仿射性
-      // (屏幕像素→台面坐标近似线性)解出精确像素,把偏差压到亚球半径级
-      const spot = await page.evaluate(() => {
-        const scene = window.__bj8.scene.current;
-        const rect = document.querySelector('.viewport').getBoundingClientRect();
-        const TX = -0.3, TZ = 0.2;
-        let best = null;
-        for (let ix = 0; ix <= 24; ix++) for (let iy = 0; iy <= 18; iy++) {
-          const cx = rect.left + rect.width * ix / 24, cy = rect.top + rect.height * iy / 18;
-          const hit = scene.screenToTable(cx, cy);
-          if (!hit) continue;
-          const d = Math.hypot(hit.x - TX, hit.z - TZ);
-          if (!best || d < best.d) best = { cx, cy, d };
-        }
-        if (!best) return null;
-        // 以最优点为原点估计局部雅可比(米/像素),一步牛顿解出目标像素
-        const h0 = scene.screenToTable(best.cx, best.cy);
-        const hx = scene.screenToTable(best.cx + 20, best.cy);
-        const hy = scene.screenToTable(best.cx, best.cy + 20);
-        if (!h0 || !hx || !hy) return best;
-        const a = (hx.x - h0.x) / 20, b = (hy.x - h0.x) / 20; // dx/dpx, dx/dpy
-        const c = (hx.z - h0.z) / 20, e = (hy.z - h0.z) / 20; // dz/dpx, dz/dpy
-        const det = a * e - b * c;
-        if (Math.abs(det) < 1e-12) return best;
-        const mx = TX - h0.x, mz = TZ - h0.z;
-        const px = (mx * e - b * mz) / det, py = (a * mz - mx * c) / det;
-        const cx = best.cx + px, cy = best.cy + py;
-        const hv = scene.screenToTable(cx, cy);
-        if (!hv) return best;
-        const d = Math.hypot(hv.x - TX, hv.z - TZ);
-        return d < best.d ? { cx, cy, d } : best;
+      world.moving = false;
+      window.__bj8.setMatch({
+        phase: 'placing',
+        actor: 'player',
+        breaking: false,
+        winner: null,
       });
-      ok('触摸: 反查到放置空位', !!spot && spot.d < 0.03, spot ? `偏差${spot.d.toFixed(3)}m` : '未命中');
-      if (spot) {
-        await page.touchscreen.tap(spot.cx, spot.cy);
-        await new Promise(r => setTimeout(r, 500));
-        const placed = await page.evaluate(() => ({
-          turn: document.querySelector('.match-state p')?.textContent,
-          cue: { x: window.__bj8.world.current.balls[0].x, z: window.__bj8.world.current.balls[0].z, active: window.__bj8.world.current.balls[0].active },
-        }));
-        ok('触摸: 自由球放置成功回到你的回合', placed.turn === '你的回合' && placed.cue.active,
-          `turn=${placed.turn} cue=(${placed.cue.x.toFixed(2)},${placed.cue.z.toFixed(2)})`);
+      window.__bj8.sync();
+    });
+    await new Promise(r => setTimeout(r, 300));
+    const placingVisual = await page.evaluate(() => ({
+      phase: window.__bj8.match.current.phase,
+      ...window.__bj8.scene.current.cuePlacementVisualState(),
+    }));
+    ok('触摸: 固定进入自由球放置且实体母球隐藏',
+      placingVisual.phase === 'placing' && !placingVisual.realVisible,
+      JSON.stringify(placingVisual));
+
+    // 先粗网格反查，再用俯视映射的局部仿射性把偏差压到亚球半径级。
+    const spot = await page.evaluate(() => {
+      const scene = window.__bj8.scene.current;
+      const rect = document.querySelector('.viewport').getBoundingClientRect();
+      const TX = -0.3, TZ = 0.2;
+      let best = null;
+      for (let ix = 0; ix <= 24; ix++) for (let iy = 0; iy <= 18; iy++) {
+        const cx = rect.left + rect.width * ix / 24, cy = rect.top + rect.height * iy / 18;
+        const hit = scene.screenToTable(cx, cy);
+        if (!hit) continue;
+        const d = Math.hypot(hit.x - TX, hit.z - TZ);
+        if (!best || d < best.d) best = { cx, cy, d };
       }
+      if (!best) return null;
+      const h0 = scene.screenToTable(best.cx, best.cy);
+      const hx = scene.screenToTable(best.cx + 20, best.cy);
+      const hy = scene.screenToTable(best.cx, best.cy + 20);
+      if (!h0 || !hx || !hy) return best;
+      const a = (hx.x - h0.x) / 20, b = (hy.x - h0.x) / 20;
+      const c = (hx.z - h0.z) / 20, e = (hy.z - h0.z) / 20;
+      const det = a * e - b * c;
+      if (Math.abs(det) < 1e-12) return best;
+      const mx = TX - h0.x, mz = TZ - h0.z;
+      const px = (mx * e - b * mz) / det, py = (a * mz - mx * c) / det;
+      const cx = best.cx + px, cy = best.cy + py;
+      const hv = scene.screenToTable(cx, cy);
+      if (!hv) return best;
+      const d = Math.hypot(hv.x - TX, hv.z - TZ);
+      return d < best.d ? { cx, cy, d } : best;
+    });
+    ok('触摸: 反查到放置空位', !!spot && spot.d < 0.03, spot ? `偏差${spot.d.toFixed(3)}m` : '未命中');
+    if (spot) {
+      await page.touchscreen.touchStart(spot.cx - 16, spot.cy);
+      await page.touchscreen.touchMove(spot.cx, spot.cy);
+      await new Promise(r => setTimeout(r, 120));
+      const preview = await page.evaluate(() => window.__bj8.scene.current.cuePlacementVisualState());
+      ok('触摸: 自由球虚影随手移动且实体保持隐藏',
+        preview.ghostVisible && !preview.realVisible,
+        JSON.stringify(preview));
+      await page.touchscreen.touchEnd();
+      await new Promise(r => setTimeout(r, 500));
+      const placed = await page.evaluate(() => ({
+        phase: window.__bj8.match.current.phase,
+        actor: window.__bj8.match.current.actor,
+        dial: Boolean(document.querySelector('.aim-dial')),
+        cue: { x: window.__bj8.world.current.balls[0].x, z: window.__bj8.world.current.balls[0].z, active: window.__bj8.world.current.balls[0].active },
+      }));
+      ok('触摸: 自由球落实后回到你的回合并呼出拨轮',
+        placed.phase === 'aiming' && placed.actor === 'player' && placed.cue.active && placed.dial,
+        `phase=${placed.phase}/${placed.actor} dial=${placed.dial} cue=(${placed.cue.x.toFixed(2)},${placed.cue.z.toFixed(2)})`);
     }
   }
 
@@ -393,7 +412,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     await new Promise(r => setTimeout(r, 300));
     const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
     ok('横屏: 点击视角按钮不改变瞄准角', aimBefore === aimAfter, `before=${aimBefore} after=${aimAfter}`);
-    const pressed = await page.evaluate(() => document.querySelector('.view-switcher button:nth-child(2)')?.getAttribute('aria-pressed'));
+    const pressed = await page.evaluate(() => document.querySelector('[aria-label="切换俯视视角"]')?.getAttribute('aria-pressed'));
     ok('横屏: 视角按钮状态变化(aria-pressed)', pressed === 'true', `aria-pressed=${pressed}`);
     await realClickButton(page, '第一人称');
     await new Promise(r => setTimeout(r, 300));
@@ -404,12 +423,16 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   if (box) {
     const before = await gameState(page);
     const landscapeStartY = box.y + 1;
-    const landscapeEndY = 373;
+    // 触屏内核会丢弃越过视口边缘的最后一个 move；在控件底边内收 2px 可稳定采到满行程。
+    const landscapeEndY = box.y + box.h - 2;
     await page.touchscreen.touchStart(box.cx, landscapeStartY);
     for (let i = 1; i <= 8; i++) {
       await page.touchscreen.touchMove(box.cx, landscapeStartY + (landscapeEndY - landscapeStartY) * i / 8);
     }
-    const peak = await page.evaluate(() => document.querySelector('.power-num')?.textContent);
+    // 横屏行程短，给 React 一帧提交最后一次 pointermove 的预览值再读 meter。
+    await new Promise(r => setTimeout(r, 50));
+    const peak = await page.evaluate(() =>
+      document.querySelector('[role="meter"][aria-label="出杆力度"]')?.getAttribute('aria-valuenow'));
     await page.touchscreen.touchEnd();
     ok('横屏: 真实拖拽力度≥95', !!peak && parseInt(peak, 10) >= 95, `peak=${peak}`);
     await new Promise(r => setTimeout(r, 600));

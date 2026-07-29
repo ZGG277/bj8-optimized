@@ -33,8 +33,10 @@ export const TABLE = {
   width: 1.27,            // 台面宽 1.27m
   length: 2.54,           // 台面长 2.54m
   ballRadius: 0.028575,   // 球半径 57.15mm
+  // 二维落袋捕获半径是工程调校值，不等同于实体袋口量尺。
+  // 角袋沿用既有 68mm 手感；中袋由 62mm 收到 52mm，降低正面吸球容错。
   cornerPocketRadius: 0.068,
-  sidePocketRadius: 0.062,
+  sidePocketRadius: 0.052,
 } as const;
 
 export const PHYSICS_DT = 1 / 240;  // 240Hz 固定时间步
@@ -93,16 +95,62 @@ export type BilliardsWorld = {
   firstContact: number | null;
 };
 
-export type Pocket = { x: number; z: number; radius: number };
+export type Pocket = {
+  x: number;
+  z: number;
+  /** 球心沿袋口宽度方向的合法容错，供瞄准/规划共享。 */
+  radius: number;
+  /**
+   * 球心进入袋腔后的捕获半径。
+   * 中袋按半圆孔半径扣除部分球半径；角袋因二维模型缺少 45° 角尖
+   * 与重力下坠，使用单独标定值，详见常量旁说明。
+   */
+  captureRadius: number;
+};
+
+// 角袋在二维内核里没有实体 45° 角尖/重力下坠，因此沿用既有 68mm
+// 捕获深度；中袋使用收窄后的独立调校值，避免视觉与物理仍然过宽。
+const CORNER_POCKET_CAPTURE_RADIUS = 0.068;
+const SIDE_POCKET_CAPTURE_RADIUS = TABLE.sidePocketRadius;
 
 // 6个袋口：左上、左中、左下、右上、右中、右下
 export const POCKETS: readonly Pocket[] = [
-  { x: -TABLE.width / 2, z: -TABLE.length / 2, radius: TABLE.cornerPocketRadius },
-  { x: TABLE.width / 2, z: -TABLE.length / 2, radius: TABLE.cornerPocketRadius },
-  { x: -TABLE.width / 2, z: 0, radius: TABLE.sidePocketRadius },
-  { x: TABLE.width / 2, z: 0, radius: TABLE.sidePocketRadius },
-  { x: -TABLE.width / 2, z: TABLE.length / 2, radius: TABLE.cornerPocketRadius },
-  { x: TABLE.width / 2, z: TABLE.length / 2, radius: TABLE.cornerPocketRadius },
+  {
+    x: -TABLE.width / 2,
+    z: -TABLE.length / 2,
+    radius: TABLE.cornerPocketRadius,
+    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
+  },
+  {
+    x: TABLE.width / 2,
+    z: -TABLE.length / 2,
+    radius: TABLE.cornerPocketRadius,
+    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
+  },
+  {
+    x: -TABLE.width / 2,
+    z: 0,
+    radius: TABLE.sidePocketRadius,
+    captureRadius: SIDE_POCKET_CAPTURE_RADIUS,
+  },
+  {
+    x: TABLE.width / 2,
+    z: 0,
+    radius: TABLE.sidePocketRadius,
+    captureRadius: SIDE_POCKET_CAPTURE_RADIUS,
+  },
+  {
+    x: -TABLE.width / 2,
+    z: TABLE.length / 2,
+    radius: TABLE.cornerPocketRadius,
+    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
+  },
+  {
+    x: TABLE.width / 2,
+    z: TABLE.length / 2,
+    radius: TABLE.cornerPocketRadius,
+    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
+  },
 ];
 
 export type PlannedShot = { angle: number; power: number; target: number; pocket: number; spin?: CueSpin };
@@ -388,12 +436,46 @@ function pocketBall(world: BilliardsWorld, ball: BallState, pocketIndex: number)
   world.events.push({ type: "pocket", ball: ball.number, pocket: pocketIndex, time: world.time, speed });
 }
 
-function detectPocket(world: BilliardsWorld, ball: BallState): boolean {
+function segmentDistanceSquared(
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  pointX: number,
+  pointZ: number,
+): number {
+  const dx = toX - fromX;
+  const dz = toZ - fromZ;
+  const lengthSquared = dx * dx + dz * dz;
+  if (lengthSquared <= 1e-12) {
+    return (pointX - toX) ** 2 + (pointZ - toZ) ** 2;
+  }
+  const t = Math.max(
+    0,
+    Math.min(1, ((pointX - fromX) * dx + (pointZ - fromZ) * dz) / lengthSquared),
+  );
+  const nearestX = fromX + dx * t;
+  const nearestZ = fromZ + dz * t;
+  return (pointX - nearestX) ** 2 + (pointZ - nearestZ) ** 2;
+}
+
+function detectPocket(
+  world: BilliardsWorld,
+  ball: BallState,
+  previousX = ball.x,
+  previousZ = ball.z,
+): boolean {
   for (let index = 0; index < POCKETS.length; index += 1) {
     const pocket = POCKETS[index];
-    const dx = ball.x - pocket.x;
-    const dz = ball.z - pocket.z;
-    if (dx * dx + dz * dz <= pocket.radius * pocket.radius) {
+    const distanceSquared = segmentDistanceSquared(
+      previousX,
+      previousZ,
+      ball.x,
+      ball.z,
+      pocket.x,
+      pocket.z,
+    );
+    if (distanceSquared <= pocket.captureRadius * pocket.captureRadius) {
       pocketBall(world, ball, index);
       return true;
     }
@@ -402,8 +484,9 @@ function detectPocket(world: BilliardsWorld, ball: BallState): boolean {
 }
 
 function inPocketMouth(ball: BallState, axis: "x" | "z"): boolean {
+  // 仅留少量数值余量，防止恰好贴角尖的浮点抖动被库边和袋口反复争抢。
   const sideMouth = TABLE.sidePocketRadius * 1.05;
-  const cornerMouth = TABLE.cornerPocketRadius * 1.05;
+  const cornerMouth = CORNER_POCKET_CAPTURE_RADIUS * 1.05;
 
   if (axis === "x") {
     return Math.abs(ball.z) < sideMouth || Math.abs(Math.abs(ball.z) - TABLE.length / 2) < cornerMouth;
@@ -815,10 +898,12 @@ export function stepWorld(world: BilliardsWorld, dt = PHYSICS_DT) {
 
   for (const ball of world.balls) {
     if (!ball.active) continue;
+    const previousX = ball.x;
+    const previousZ = ball.z;
     ball.x += ball.vx * dt;
     ball.z += ball.vz * dt;
 
-    if (!detectPocket(world, ball)) {
+    if (!detectPocket(world, ball, previousX, previousZ)) {
       resolveCushions(world, ball);
     }
   }

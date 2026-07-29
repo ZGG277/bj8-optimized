@@ -14,4 +14,8 @@
 
 `use-shot-input.test.ts`: 键盘持续瞄准的帧率无关积分与速度封顶回归。
 
+`aim-dial.ts`: 无限横向拨轮的纯传动换算；远袋约 900px/周，进入 3.8× 有效袋口窗口后 smoothstep 连续降档，精瞄时约 180px 横跨完整袋口。
+
+`aim-dial.test.ts`: 粗档、接近区连续降速、精瞄全袋口行程与无边界方向符号回归。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

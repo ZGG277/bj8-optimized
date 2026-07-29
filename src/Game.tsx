@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：开球、双视角、桌内瞄准/杆法/蓄力输入、规则轮转、AI 回合、可拖动走位/复盘与竖屏 HUD
+[OUTPUT]: 对外提供完整对局编排：虚母球开球落位、双视角、桌内360°瞄准/无限拨轮/杆法/蓄力、规则轮转、AI 回合、走位复盘与竖屏 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -19,7 +19,6 @@ import { useAimInteraction } from './hooks/useAimInteraction';
 import { useOpponentAI } from './hooks/useOpponentAI';
 import { useAudioManager } from './hooks/useAudioManager';
 import { usePositionPlan } from './hooks/usePositionPlan';
-import { GameHeader } from './components/GameHeader';
 import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
 import { ControlDeck } from './components/ControlDeck';
@@ -37,7 +36,7 @@ export default function Game() {
     worldRef, worldView, setWorldView,
     match, matchRef, setMatch,
     viewMode, setViewMode,
-    camLift, setCamLift,
+    camLift,
     rating,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
@@ -75,7 +74,8 @@ export default function Game() {
   const shotCaptureRef = useRef<ShotCapture | null>(null);
   const [shotReview, setShotReview] = useState<ShotReview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [guidanceVisible, setGuidanceVisible] = useState(true);
+  // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
+  const [guidanceEnabled, setGuidanceEnabled] = useState(false);
 
   // 打开前的视角，关闭时恢复
   const prevViewModeRef = useRef(viewMode);
@@ -86,13 +86,14 @@ export default function Game() {
   const handleClosePlan = useCallback(() => {
     positionPlan.close();
     setViewMode(prevViewModeRef.current);
+    setGuidanceEnabled(false);
   }, [positionPlan, setViewMode]);
 
   // ── 复盘开合：▶ 对比切俯视 + 场景叠加；✕/💡 收起回 chip ──
   const prevReviewViewModeRef = useRef(viewMode);
   const handleOpenReview = useCallback(() => {
     if (!shotReview) return;
-    setGuidanceVisible(true);
+    setGuidanceEnabled(true);
     prevReviewViewModeRef.current = viewMode;
     setReviewOpen(true);
     setViewMode('overhead');
@@ -102,23 +103,24 @@ export default function Game() {
     setReviewOpen(false);
     scene3DRef.current?.showReviewOverlay(null);
     setViewMode(prevReviewViewModeRef.current);
+    setGuidanceEnabled(false);
   }, [setViewMode]);
 
-  // 💡 是规划与复盘的总开关：亮起展示可用提示，熄灭时同时清掉两类浮层。
+  // 💡 是规划与复盘的总开关：默认熄灭；复盘优先，规划仅在用户主动点亮时打开。
   const handleTogglePlan = useCallback(() => {
-    if (planOpen || reviewOpen || (shotReview && guidanceVisible)) {
+    if (guidanceEnabled) {
       if (planOpen) handleClosePlan();
       if (reviewOpen) handleCloseReview();
-      setGuidanceVisible(false);
+      setGuidanceEnabled(false);
       return;
     }
-    setGuidanceVisible(true);
-    if (positionPlan.status === 'ready') handleOpenPlan();
+    setGuidanceEnabled(true);
+    if (!shotReview && positionPlan.status === 'ready') handleOpenPlan();
   }, [
+    guidanceEnabled,
     planOpen,
     reviewOpen,
     shotReview,
-    guidanceVisible,
     positionPlan.status,
     handleCloseReview,
     handleClosePlan,
@@ -138,11 +140,8 @@ export default function Game() {
     if (planOpen && viewMode !== 'overhead') setViewMode('overhead');
   }, [planOpen, viewMode, setViewMode]);
 
-  const handleShowPlan = useCallback((plan: PositionPlan | null) => {
-    scene3DRef.current?.showPlanChain(plan);
-  }, []);
-  const handlePlayPlan = useCallback((plan: PositionPlan) => {
-    scene3DRef.current?.playPlanChain(plan);
+  const handleShowPlanStep = useCallback((plan: PositionPlan | null, stepIndex: number) => {
+    scene3DRef.current?.showPlanStep(plan, stepIndex);
   }, []);
 
   // ── 音效 ──
@@ -164,7 +163,7 @@ export default function Game() {
     // 新一杆出杆：上一杆复盘自动消失
     setShotReview(null);
     setReviewOpen(false);
-    setGuidanceVisible(false);
+    setGuidanceEnabled(false);
     scene3DRef.current?.showReviewOverlay(null);
 
     const doShot = () => {
@@ -217,12 +216,13 @@ export default function Game() {
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
-    handleCanvasClick,
-    precisionAim,
+    handlePointerCancel,
+    handleAimDialAdjust,
+    aimDialVisible,
+    aimDialSolution,
   } = useAimInteraction({
     scene3DRef,
     worldRef,
-    matchRef,
     viewMode,
     setAim,
     aimRef,
@@ -241,18 +241,9 @@ export default function Game() {
   const handleResetGame = useCallback(() => {
     resetGame(setAim);
     setSpin({ x: 0, y: 0 });
-    setGuidanceVisible(true);
+    setGuidanceEnabled(false);
     aimGhostDistRef.current = null;
   }, [resetGame, setAim, setSpin, aimGhostDistRef]);
-
-  /** 微调按钮在普通区域沿用固定步进，靠近可下袋窗口后自动缩到窗口宽度的 1/6。 */
-  const handleAimAdjust = useCallback((delta: number) => {
-    const solution = findPrecisionAim(worldRef.current, aimRef.current, legalTargets);
-    const adaptiveDelta = solution
-      ? Math.sign(delta) * Math.min(Math.abs(delta), solution.halfWidth / 6)
-      : delta;
-    setAim((angle) => angle + adaptiveDelta);
-  }, [legalTargets, setAim, worldRef]);
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
@@ -262,7 +253,8 @@ export default function Game() {
     shotCaptureRef.current = null;
     const review = capture ? buildShotReview(capture) : null;
     setShotReview(review);
-    setGuidanceVisible(Boolean(review));
+    // 只记录复盘，不主动打开；用户需要再次点亮 💡。
+    setGuidanceEnabled(false);
   }, [settleShotRaw, setViewMode]);
 
   // ── 物理模拟循环 ──
@@ -307,6 +299,13 @@ export default function Game() {
         scene: scene3DRef,
         aim: aimRef,
         match: matchRef,
+        // 专项门禁读取纯几何解，验证真实指针落点是否跨过精瞄边界。
+        precisionAt: (angle: number, multiplier?: number) => findPrecisionAim(
+          worldRef.current,
+          angle,
+          legalNumbers(worldRef.current, 'player', matchRef.current.playerGroup),
+          multiplier,
+        ),
         // 摆球调试后手动同步快照到 React 世界视图（正常对局中由物理循环/结算自动同步）
         sync: () => setWorldView(cloneWorld(worldRef.current)),
         // 浏览器专项门禁用于固定 actor/phase；只在 DEV 暴露，真实瞄准与出杆仍走指针事件
@@ -343,37 +342,31 @@ export default function Game() {
   // ── 渲染 ──
   return (
     <div className="game-shell">
-      <GameHeader match={match} shot={worldView.shot} />
       <Scoreboard match={match} worldView={worldView} />
       <TableStage
         viewMode={viewMode}
         match={match}
-        worldView={worldView}
-        canAim={canAim}
-        precisionAim={precisionAim}
+        aimDialVisible={aimDialVisible}
+        aimDialSolution={aimDialSolution}
         containerRef={containerRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onClick={handleCanvasClick}
-        onViewMode={setViewMode}
-        onRotate={(dir) => setAim(a => a + dir * Math.PI / 4)}
-        onElevate={(dir) => setCamLift(v => Math.min(0.22, Math.max(-0.02, v + dir * 0.03)))}
-        onAimAdjust={handleAimAdjust}
+        onPointerCancel={handlePointerCancel}
+        onAimDialAdjust={handleAimDialAdjust}
         onResetGame={handleResetGame}
       />
       <ControlDeck
+        viewMode={viewMode}
         canAim={canAim}
-        playerTurn={match.phase === 'aiming' && match.actor === 'player' && !worldView.moving}
         spin={spin}
         charging={charging}
         previewPower={previewPower}
         breaking={match.breaking}
         planStatus={positionPlan.status}
-        guidanceVisible={guidanceVisible}
+        guidanceEnabled={guidanceEnabled}
         hasReview={Boolean(shotReview)}
-        onAimAdjust={handleAimAdjust}
+        onViewMode={setViewMode}
         onSpinChange={setSpin}
         onTogglePlan={handleTogglePlan}
         onBeginCharge={beginCharge}
@@ -382,16 +375,15 @@ export default function Game() {
         onCancelCharge={cancelCharge}
         onTapShot={() => commitShot({ power: MIN_POWER, spin })}
       />
-      {planOpen && (
+      {guidanceEnabled && planOpen && (
         <PlanOverlay
           plans={positionPlan.plans}
           onClose={handleClosePlan}
-          onShowPlan={handleShowPlan}
-          onPlayPlan={handlePlayPlan}
+          onShowStep={handleShowPlanStep}
         />
       )}
       {/* 复盘讲上一杆、规划讲下一杆可共存；planOpen 时提示条位置让位给引导，chip 隐藏 */}
-      {guidanceVisible && shotReview && !planOpen && (
+      {guidanceEnabled && shotReview && !planOpen && (
         <ReviewOverlay
           review={shotReview}
           open={reviewOpen}

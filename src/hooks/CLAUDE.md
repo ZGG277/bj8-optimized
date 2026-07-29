@@ -12,7 +12,9 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `shot-settlement-guard.test.ts`: 同局重复 shotId 拒绝、跨局相同 shotId 可重新接收的回归。
 
-`useAimInteraction.ts`: 交互协调层，封装世界角点哪打哪、抓影子球、360° 粗瞄与近袋局部精瞄、Pointer 事件及自由球放置；精瞄几何委托 `aim/`。
+`useAimInteraction.ts`: 交互协调层，封装开球/自由球阶段跟手虚母球、Pointer 落位、世界角点哪打哪、抓影子球与 360° 粗瞄；母球或幽灵球落位后立即呼出无限拨轮，最近袋口锁定和连续变速分别委托 `aim/` 与 `input/aim-dial`。
+
+`useControlSlotDrag.ts`: 右侧单个控件槽位的编辑态拖动几何；由 ControlDeck 统一进入编辑后即时纵向移动，独立约束在黑色控制轨内并按控件键持久化位置。
 
 `useOpponentAI.ts`: AI 调度层，副作用 Hook——match.phase === 'opponent' 时自动调度 AI 回合（决策、击球、出杆动画），不关心 UI 交互或玩家输入。
 

@@ -31,13 +31,14 @@ class FakeWorker {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.doUnmock('./plan-worker?worker&inline');
   vi.resetModules();
   FakeWorker.instances = [];
 });
 
 describe('planPositionAsync 抢占与取消', () => {
   it('第二个请求取消并终止第一个，两个 Promise 都会结算', async () => {
-    vi.stubGlobal('Worker', FakeWorker);
+    vi.doMock('./plan-worker?worker&inline', () => ({ default: FakeWorker }));
     const { PlanCancelledError, planPositionAsync } = await import('./async');
     const world = createInitialWorld();
 

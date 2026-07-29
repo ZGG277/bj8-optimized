@@ -1,76 +1,232 @@
 /*
 [INPUT]: base.css 的令牌与 layout.css 的壳层几何
-[OUTPUT]: 对外提供视角工具条、桌内方向微调、右侧竖屏控制轨、可展开击球点、力度出杆合一控件及可拖动规划/复盘浮层样式
+[OUTPUT]: 对外提供长行程视角推杆、桌内方向微调、长按整轨进入编辑的右侧黑色控制轨、可展开击球点、力度出杆合一控件及可拖动规划/复盘浮层样式
 [POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
-/* 视角工具条:位于球桌视口内,自身拦截指针事件,不冒泡到瞄准 */
+/* 长行程视角推杆：顶端俯视、底端第一人称，行程与出杆区同高。 */
 .view-switcher {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  width: var(--control-rail-width);
+  height: 240px;
   display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
   background: rgba(7,10,9,0.8);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 4px;
+  border-radius: 14px;
   overflow: hidden;
   backdrop-filter: blur(8px);
-  z-index: 3;
 }
 
 .view-switcher button {
-  padding: 6px 12px;
+  width: 100%;
+  min-height: 28px;
+  flex: 0 0 28px;
+  padding: 2px 0;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: #828c87;
-  font-size: var(--fs-sm);
+  font-size: 9px;
   cursor: pointer;
 }
 
 .view-switcher button.active {
-  background: var(--green);
-  color: #09120e;
+  background: rgba(112, 199, 165, 0.16);
+  color: #dff9ee;
 }
 
-.table-aim-nudges {
+.view-slider-track {
+  position: relative;
+  min-height: 70px;
+  flex: 1 1 auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.view-slider-track::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  bottom: 12px;
+  width: 5px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.view-slider-fill {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 5px;
+  height: calc((100% - 24px) * var(--view-level));
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(0deg, rgba(112, 199, 165, 0.4), var(--green));
+  pointer-events: none;
+}
+
+.view-slider-thumb {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + (100% - 24px) * var(--view-level));
+  width: 36px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, 50%);
+  border: 1px solid rgba(112, 199, 165, 0.55);
+  border-radius: 11px;
+  background: linear-gradient(160deg, #3f8a6d, #285d49);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+  transition: bottom 150ms ease-out;
+}
+
+.view-slider-track:active .view-slider-thumb {
+  transition: none;
+}
+
+.view-slider-thumb i {
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(234, 255, 245, 0.82);
+  box-shadow: 0 -5px rgba(234, 255, 245, 0.3), 0 5px rgba(234, 255, 245, 0.3);
+}
+
+.control-deck {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.control-rail {
+  --control-rail-width: 54px;
+  position: fixed;
+  top: calc(var(--scoreboard-h) + 10px);
+  right: 9px;
+  bottom: auto;
+  z-index: 13;
+  width: var(--control-rail-width);
+  height: min(720px, calc(100vh - var(--scoreboard-h) - 20px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  border: 0;
+  border-radius: 15px;
+  background: rgba(3, 6, 5, 0.78);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.42), 0 8px 24px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.control-rail.is-editing {
+  outline: 1px solid rgba(112, 199, 165, 0.58);
+  outline-offset: 1px;
+  box-shadow:
+    inset 0 0 20px rgba(20, 54, 42, 0.5),
+    0 0 0 2px rgba(112, 199, 165, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.control-slot {
+  position: relative;
+  width: var(--control-rail-width);
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+  will-change: transform;
+}
+
+.control-rail.is-editing .control-slot {
+  cursor: grab;
+  touch-action: none;
+}
+
+.control-rail.is-editing .control-slot-body {
+  pointer-events: none;
+  animation: control-slot-wiggle 150ms ease-in-out infinite alternate;
+  transform-origin: 50% 50%;
+}
+
+.control-rail.is-editing .control-slot:nth-of-type(even) .control-slot-body {
+  animation-direction: alternate-reverse;
+  animation-delay: -70ms;
+}
+
+.control-rail.is-editing .spin-popover {
   display: none;
 }
 
-/* 控制区：信息居左，💡 走位/方向微调/击球点盘/出杆区依次靠右 */
-.control-deck {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto;
-  align-items: center;
-  gap: 14px;
-  padding: 0 14px;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
+.control-slot.is-dragging {
+  z-index: 15;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5));
+  cursor: grabbing;
 }
 
-.control-deck > .plan-button {
-  grid-column: 2;
+.control-slot.is-dragging .control-slot-body {
+  animation: none;
+  transform: scale(1.035);
 }
 
-/* 💡 走位按钮三态：is-lit(ready) 微光高亮 / is-open(showing) 描边表示展开中 /
-   is-dim(computing 呼吸；failed/idle 灰静态 disabled)；非玩家回合走 visibility（组件内注释） */
-.plan-button {
-  display: grid;
-  place-items: center;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.03);
-  color: #b8bfbb;
-  font-size: var(--fs-base);
-  cursor: pointer;
+.control-slot-body {
+  width: var(--control-rail-width);
+  min-height: 0;
+}
+
+.control-slot-shoot .control-slot-body {
+  height: 240px;
+  display: flex;
+}
+
+.control-slot-view .control-slot-body {
+  height: 240px;
+  display: flex;
+}
+
+.control-layout-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
   white-space: nowrap;
 }
 
-.plan-button.is-lit {
-  border-color: rgba(217,183,129,0.75);
-  color: var(--warm);
-  box-shadow: 0 0 14px rgba(217,183,129,0.4);
+@keyframes control-slot-wiggle {
+  from { transform: rotate(-0.7deg) translateY(-0.7px); }
+  to { transform: rotate(0.7deg) translateY(0.7px); }
+}
+
+.plan-button {
+  display: grid;
+  place-items: center;
+  width: var(--control-rail-width);
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(12, 16, 14, 0.78);
+  color: #b8bfbb;
+  font-size: var(--fs-base);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.plan-button span {
+  font-size: 21px;
 }
 
 .plan-button.is-open {
@@ -79,26 +235,24 @@
   box-shadow: inset 0 0 0 1px rgba(217,183,129,0.5), 0 0 10px rgba(217,183,129,0.25);
 }
 
-.plan-button.is-dim {
+.plan-button.is-off {
   color: #6b7270;
   border-color: rgba(255,255,255,0.08);
-  cursor: default;
+  filter: grayscale(1);
+  opacity: 0.52;
+  box-shadow: none;
 }
 
-.plan-button.is-dim:disabled {
-  opacity: 0.85;
-}
-
-/* computing 在 is-dim 灰底上保留呼吸提示 */
-.plan-button.is-dim.is-computing {
-  animation: pulse 1.2s ease-in-out infinite;
-  cursor: wait;
+.plan-button strong {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .aim-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: none;
 }
 
 .aim-controls button {
@@ -149,10 +303,99 @@
 
 .spin-control {
   position: relative;
+  width: var(--control-rail-width);
 }
 
-.spin-preview,
+.desktop-spin-pad {
+  display: none;
+}
+
+.spin-preview {
+  width: var(--control-rail-width);
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(12, 16, 14, 0.78);
+  color: var(--muted);
+  backdrop-filter: blur(8px);
+}
+
+.spin-preview-ball {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #cfc8b8 70%, #a89f8c);
+  box-shadow: inset -2px -3px 5px rgba(0,0,0,0.24);
+}
+
+.spin-preview-ball i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+  transform: translate(-50%, -50%);
+}
+
+.spin-preview small {
+  font-size: 9px;
+}
+
 .spin-popover {
+  position: absolute;
+  right: calc(100% + 9px);
+  bottom: 0;
+  z-index: 13;
+  width: 152px;
+  display: block;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 16px;
+  background: rgba(12, 16, 14, 0.9);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.46);
+  backdrop-filter: blur(12px);
+}
+
+.spin-popover-head {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.spin-popover-head button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+
+.mobile-spin-pad {
+  display: flex;
+  padding: 4px;
+}
+
+.mobile-spin-pad .spin-ball {
+  width: 124px;
+  height: 124px;
+}
+
+.mobile-spin-pad .spin-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.mobile-spin-pad small {
   display: none;
 }
 
@@ -206,10 +449,15 @@
 
 /* 力度与出杆合一：力度填充直接位于操作面内，不再并列第二根表。 */
 .shoot-zone {
+  width: var(--control-rail-width);
+  min-height: 0;
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 12px;
+  border-radius: 14px;
+  background: rgba(12, 16, 14, 0.58);
   user-select: none;
+  backdrop-filter: blur(8px);
 }
 
 .power-num {
@@ -222,14 +470,16 @@
 
 .shoot-pad {
   position: relative;
-  width: 106px;
-  height: 76px;
+  width: var(--control-rail-width);
+  height: 100%;
+  min-height: 150px;
+  max-height: 240px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  border-radius: 12px;
+  border-radius: 14px;
   background: linear-gradient(160deg, #3f8a6d, #2b6b52);
   border: 1px solid rgba(112,199,165,0.45);
   color: #eafff5;
@@ -244,7 +494,7 @@
 .shoot-pad strong {
   position: relative;
   z-index: 1;
-  font-size: var(--fs-3xl);
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.2em;
 }
@@ -252,7 +502,8 @@
 .shoot-pad small {
   position: relative;
   z-index: 1;
-  font-size: var(--fs-sm);
+  margin-top: auto;
+  font-size: 9px;
   opacity: 0.75;
 }
 
@@ -272,7 +523,12 @@
 }
 
 .shoot-pull-mark {
-  display: none;
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 12px;
+  font-size: 26px;
+  opacity: 0.62;
 }
 
 .shoot-pad.charging {
@@ -288,11 +544,143 @@
   filter: grayscale(0.7);
 }
 
-/* 走位规划提示条：顶部居中一条（高一行到两行），替代旧右侧面板/底部抽屉；
-   避开 GameHeader（左上）与记分板（右上），层级低于结束/介绍遮罩 */
+.aim-dial {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 8;
+  width: min(310px, calc(100% - 32px));
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 15px;
+  background: rgba(8, 13, 11, 0.7);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(7px);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: aim-dial-in 140ms ease-out;
+}
+
+@keyframes aim-dial-in {
+  from { opacity: 0; transform: translate(-50%, 5px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.aim-dial:focus-visible {
+  outline: 2px solid rgba(112, 199, 165, 0.82);
+  outline-offset: 2px;
+}
+
+.aim-dial.active {
+  background: rgba(8, 13, 11, 0.86);
+}
+
+.aim-dial-label {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.aim-dial-label strong {
+  color: rgba(231, 242, 237, 0.92);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+}
+
+.aim-dial-label small {
+  overflow: hidden;
+  color: rgba(188, 204, 196, 0.7);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aim-dial-window {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 11px;
+  background:
+    linear-gradient(90deg, rgba(6, 9, 8, 0.94), transparent 22%, transparent 78%, rgba(6, 9, 8, 0.94)),
+    rgba(20, 27, 24, 0.72);
+}
+
+.aim-dial-ticks {
+  position: absolute;
+  inset: 8px -24px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(224, 232, 228, 0.58) 0 1px,
+    transparent 1px 12px
+  );
+  transition: opacity 120ms ease;
+}
+
+.aim-dial-ticks::after {
+  content: '';
+  position: absolute;
+  inset: 9px 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(224, 232, 228, 0.85) 0 2px,
+    transparent 2px 48px
+  );
+}
+
+.aim-dial-window b {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.09), 0 0 12px rgba(255, 255, 255, 0.45);
+}
+
+.aim-dial.approach {
+  border-color: rgba(217, 179, 108, 0.54);
+}
+
+.aim-dial.approach .aim-dial-label strong {
+  color: #e7c17c;
+}
+
+.aim-dial.approach .aim-dial-window b {
+  background-color: #e7c17c;
+}
+
+.aim-dial.fine {
+  border-color: rgba(112, 199, 165, 0.66);
+}
+
+.aim-dial.fine .aim-dial-label strong {
+  color: var(--green);
+}
+
+.aim-dial.fine .aim-dial-window b {
+  background-color: var(--green);
+}
+
+.aim-dial.fine .aim-dial-ticks {
+  background-size: 8px 100%;
+}
+
+/* 走位规划提示条：顶部居中一条（高一行到两行），避开比分栏。 */
 .plan-bar {
   position: fixed;
-  top: calc(var(--topbar-h) + var(--scoreboard-h) + 4px);
+  top: calc(var(--scoreboard-h) + 4px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 12;
@@ -327,12 +715,12 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-.plan-bar-routes {
+.plan-step-tabs {
   display: flex;
   gap: 4px;
 }
 
-.plan-bar-routes button {
+.plan-step-tabs button {
   padding: 4px 7px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -343,7 +731,7 @@
   white-space: nowrap;
 }
 
-.plan-bar-routes button.active {
+.plan-step-tabs button.active {
   background: var(--green);
   border-color: var(--green);
   color: #09120e;
@@ -403,7 +791,7 @@
    与 plan-bar 互斥（Game 层保证 planOpen 时不渲染复盘 chip） */
 .review-float {
   position: fixed;
-  top: calc(var(--topbar-h) + var(--scoreboard-h) + 4px);
+  top: calc(var(--scoreboard-h) + 4px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 12;
@@ -506,16 +894,6 @@
     flex-direction: column;
     border-radius: 12px;
     z-index: 10;
-  }
-
-  .view-switcher button {
-    min-height: 42px;
-    padding: 5px 3px;
-    font-size: 11px;
-  }
-
-  .view-switcher .view-extra-button {
-    display: none;
   }
 
   .control-deck {
@@ -712,36 +1090,14 @@
     opacity: 0.62;
   }
 
-  .table-aim-nudges {
+  .aim-dial {
     position: absolute;
     left: 50%;
-    bottom: 18%;
+    bottom: 14%;
     z-index: 8;
     width: min(250px, calc(100% - 112px));
-    display: flex;
-    justify-content: space-between;
     transform: translateX(-50%);
-    pointer-events: none;
-  }
-
-  .table-aim-nudges button {
-    width: 52px;
-    height: 52px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 1px solid rgba(112, 199, 165, 0.42);
-    border-radius: 14px;
-    background: rgba(8, 13, 11, 0.52);
-    color: rgba(220, 255, 239, 0.9);
-    font-size: 27px;
-    text-shadow: 0 1px 8px rgba(0,0,0,0.7);
-    backdrop-filter: blur(5px);
-    pointer-events: auto;
-  }
-
-  .table-aim-nudges button:disabled {
-    opacity: 0.22;
+    grid-template-columns: 60px minmax(0, 1fr);
   }
 
   .plan-bar,
@@ -872,5 +1228,167 @@
   .shoot-pad {
     width: 104px;
     height: 84px;
+  }
+}
+
+/*
+ * 统一控制轨的最终响应式约束。
+ * 这一段刻意位于历史响应式规则之后，确保桌面/手机都使用相同的 54px 单列结构。
+ */
+@media (max-width: 640px) and (orientation: portrait) {
+  .control-rail {
+    top: 42px;
+    right: 6px;
+    bottom: auto;
+    width: var(--control-rail-width);
+    height: min(628px, calc(100vh - 50px));
+    gap: 6px;
+  }
+
+  .view-switcher,
+  .plan-button,
+  .spin-control,
+  .spin-preview,
+  .shoot-zone,
+  .shoot-pad {
+    width: var(--control-rail-width);
+  }
+
+  .view-switcher {
+    position: static;
+    transform: none;
+  }
+
+  .spin-control {
+    margin-top: 0;
+    align-self: stretch;
+  }
+
+  .spin-popover {
+    position: absolute;
+    right: calc(100% + 9px);
+    bottom: 0;
+  }
+
+  .shoot-zone {
+    align-self: stretch;
+    padding: 0;
+  }
+
+  .control-slot-shoot .control-slot-body {
+    height: min(228px, 32vh);
+  }
+
+  .control-slot-view .control-slot-body {
+    height: min(228px, 32vh);
+  }
+
+  .view-switcher {
+    height: 100%;
+  }
+
+  .shoot-pad {
+    height: 100%;
+    min-height: 174px;
+    max-height: min(228px, 32vh);
+    padding: 12px 2px 7px;
+  }
+
+  .aim-dial {
+    bottom: 13%;
+    max-width: calc(100% - 84px);
+    min-height: 56px;
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .plan-step-tabs,
+  .plan-bar-chips {
+    gap: 3px;
+  }
+
+  .plan-chip,
+  .plan-step-tabs button,
+  .plan-bar-prob,
+  .review-chip,
+  .review-bar,
+  .review-verdict,
+  .review-bar-message,
+  .review-bar-legend {
+    font-size: 10px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .control-rail {
+    top: calc(var(--hud-safe-top) + 8px);
+    right: 8px;
+    bottom: auto;
+    width: var(--control-rail-width);
+    height: calc(100vh - var(--hud-safe-top) - 16px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  .view-switcher,
+  .plan-button,
+  .spin-control,
+  .spin-preview,
+  .shoot-zone,
+  .shoot-pad {
+    width: var(--control-rail-width);
+  }
+
+  .view-switcher {
+    position: static;
+  }
+
+  .view-switcher button {
+    min-height: 22px;
+    flex-basis: 22px;
+    padding-block: 2px;
+  }
+
+  .plan-button {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .spin-control {
+    margin: 0;
+  }
+
+  .spin-preview {
+    height: 44px;
+  }
+
+  .spin-popover .spin-pad {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    padding: 4px;
+    background: transparent;
+  }
+
+  .shoot-zone {
+    padding: 0;
+  }
+
+  .control-slot-shoot .control-slot-body {
+    height: 92px;
+  }
+
+  .control-slot-view .control-slot-body {
+    height: 92px;
+  }
+
+  .view-switcher {
+    height: 100%;
+  }
+
+  .shoot-pad {
+    height: 100%;
+    min-height: 92px;
+    max-height: 150px;
   }
 }

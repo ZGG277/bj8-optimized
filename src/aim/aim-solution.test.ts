@@ -10,6 +10,7 @@ import {
   aimAngleForPocketOffset,
   findPrecisionAim,
   firstObjectHit,
+  PRECISION_ENTER_MULTIPLIER,
   precisionStillValid,
 } from './aim-solution';
 
@@ -54,6 +55,18 @@ describe('精瞄纯几何', () => {
     expect(center).toBeGreaterThan(Math.min(left, right));
     expect(center).toBeLessThan(Math.max(left, right));
     expect(precisionStillValid(world, center, [1], solution!)).toBe(true);
+  });
+
+  it('2.6× 近袋触发窗覆盖旧 1.6× 之外，并拒绝窗口外落点', () => {
+    const world = straight();
+    const center = aimAngleForPocketOffset(world, 1, 3, 0)!;
+    const centered = findPrecisionAim(world, center, [1])!;
+    const expandedAngle = center + centered.halfWidth * 2.1;
+    const outsideAngle = center + centered.halfWidth * (PRECISION_ENTER_MULTIPLIER + 0.2);
+
+    expect(findPrecisionAim(world, expandedAngle, [1])).not.toBeNull();
+    expect(findPrecisionAim(world, expandedAngle, [1], 1.6)).toBeNull();
+    expect(findPrecisionAim(world, outsideAngle, [1])).toBeNull();
   });
 
   it('首碰非法或目标球到袋口被挡时不进入精瞄', () => {

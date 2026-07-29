@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core、__bj8 调试句柄与 Scene3D 台面↔屏幕映射
-[OUTPUT]: 慢速近袋进入局部精瞄、袋口滑块连续变化、竖向退出与快速粗瞄不被吸附的真实指针断言
-[POS]: 360° 粗瞄 + 目标袋口精瞄双档交互的浏览器出口门禁
+[OUTPUT]: 开球虚母球跟手/落实、拨轮无条件呼出、360° 连续拨动、近袋平滑降档与页面稳定性断言
+[POS]: “摆球/幽灵球落位即显示无限拨轮 + 延长线近袋连续提精度”的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
@@ -13,6 +13,7 @@ const ok = (name, pass, detail = '') => {
   results.push({ name, pass, detail });
   console.log(`${pass ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const browser = await puppeteer.connect({
   browserURL: BROWSER_URL,
@@ -37,14 +38,41 @@ async function clickText(text) {
 
 await clickText('开始对局');
 await page.waitForFunction(() => window.__bj8?.match?.current?.phase === 'placing');
-await new Promise((resolve) => setTimeout(resolve, 500));
+await wait(500);
 
-// 开球放置必须走真实鼠标；俯视相机稳定后把白球放在开球区。
-const kitchen = await page.evaluate(() => window.__bj8.scene.current.tableToScreen(0, 0.82));
+const beforePlacement = await page.evaluate(() => window.__bj8.scene.current.cuePlacementVisualState());
+ok(
+  '摆球: 开球区未操作前不显示实体母球和预览球',
+  !beforePlacement.realVisible && !beforePlacement.ghostVisible,
+  JSON.stringify(beforePlacement),
+);
+
+const kitchen = await page.evaluate(() => window.__bj8.scene.current.tableToScreen(0.12, 0.82));
+await page.mouse.move(kitchen.x, kitchen.y, { steps: 8 });
+await wait(120);
+const hovering = await page.evaluate(() => window.__bj8.scene.current.cuePlacementVisualState());
+ok(
+  '摆球: 指针在合法开球区移动时只有虚母球跟手',
+  !hovering.realVisible && hovering.ghostVisible,
+  JSON.stringify(hovering),
+);
+
 await page.mouse.click(kitchen.x, kitchen.y);
 await page.waitForFunction(() => window.__bj8.match.current.phase === 'aiming');
+await wait(220);
+const placed = await page.evaluate(() => ({
+  ...window.__bj8.scene.current.cuePlacementVisualState(),
+  dial: Boolean(document.querySelector('.aim-dial')),
+  dialMode: document.querySelector('.aim-dial')?.className ?? '',
+}));
+ok(
+  '摆球: 点击落实体母球并立即呼出拨轮',
+  placed.realVisible && !placed.ghostVisible && placed.dial,
+  JSON.stringify(placed),
+);
+
 await clickText('俯视');
-await new Promise((resolve) => setTimeout(resolve, 700));
+await wait(700);
 
 // 固定一颗近右中袋直线路径：目标球→右中袋沿 +x，母球从后方斜向 ghost 点。
 const setup = await page.evaluate(() => {
@@ -61,79 +89,112 @@ const setup = await page.evaluate(() => {
   one.z = 0;
   const radius = 0.028575;
   const ghost = { x: one.x - radius * 2, z: 0 };
+  window.__bj8.setMatch({ breaking: false });
   window.__bj8.sync();
   return { ghost };
 });
-await new Promise((resolve) => setTimeout(resolve, 350));
+await wait(350);
 
-// 点 ghost 中心建立可进右中袋的中心杆向。
+const offTarget = await page.evaluate(() => {
+  const cue = window.__bj8.world.current.balls.find((ball) => ball.number === 0);
+  const angle = Math.atan2(0.3 - 0.05715 - cue.x, -(0 - cue.z)) - 0.24;
+  // 取母球前方较近点，避免屏幕落点被底部拨轮自身覆盖。
+  const distance = 0.32;
+  return window.__bj8.scene.current.tableToScreen(
+    cue.x + Math.sin(angle) * distance,
+    cue.z - Math.cos(angle) * distance,
+  );
+});
+await page.mouse.click(offTarget.x, offTarget.y);
+await wait(150);
+const coarse = await page.evaluate(() => ({
+  visible: Boolean(document.querySelector('.aim-dial')),
+  mode: document.querySelector('.aim-dial')?.className ?? '',
+}));
+ok(
+  '拨轮: 幽灵球落在非袋口候选方向也保持可见粗档',
+  coarse.visible && coarse.mode.includes('coarse'),
+  JSON.stringify(coarse),
+);
+
 const ghostScreen = await page.evaluate(
   ({ x, z }) => window.__bj8.scene.current.tableToScreen(x, z),
   setup.ghost,
 );
 await page.mouse.click(ghostScreen.x, ghostScreen.y);
-await new Promise((resolve) => setTimeout(resolve, 250));
-
-const linePoint = await page.evaluate(() => {
-  const cue = window.__bj8.world.current.balls[0];
-  const ghost = window.__bj8.scene.current.aimGhostPos();
-  return window.__bj8.scene.current.tableToScreen(
-    cue.x + (ghost.x - cue.x) * 0.55,
-    cue.z + (ghost.z - cue.z) * 0.55,
-  );
-});
-
-// 先竖向越过 8px 拖拽死区而不改变水平角，再慢速横拖进入袋口局部窗口。
-await page.mouse.move(linePoint.x, linePoint.y);
-await page.mouse.down();
-await page.mouse.move(linePoint.x, linePoint.y + 9);
-await page.mouse.move(linePoint.x + 3, linePoint.y + 9);
-const entered = await page.evaluate(() => ({
-  visible: Boolean(document.querySelector('.precision-aim')),
-  text: document.querySelector('.precision-aim strong')?.textContent ?? '',
-  marker: document.querySelector('.precision-aim-track i')?.getAttribute('style') ?? '',
+await wait(180);
+const fine = await page.evaluate(() => ({
+  visible: Boolean(document.querySelector('.aim-dial')),
+  mode: document.querySelector('.aim-dial')?.className ?? '',
+  label: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
 }));
 ok(
-  '精瞄: 慢速靠近可下袋窗口后进入',
-  entered.visible && entered.text.includes('1 号') && entered.text.includes('右中袋'),
-  JSON.stringify(entered),
+  '拨轮: 合法幽灵球落位后进入右中袋精瞄档',
+  fine.visible && fine.mode.includes('fine') && fine.label.includes('1号') && fine.label.includes('右中袋'),
+  JSON.stringify(fine),
 );
 
-await page.mouse.move(linePoint.x + 15, linePoint.y + 9, { steps: 4 });
-const markerAfter = await page.evaluate(
-  () => document.querySelector('.precision-aim-track i')?.getAttribute('style') ?? '',
-);
-ok('精瞄: 横拖连续改变袋口落点', markerAfter !== entered.marker, `${entered.marker} -> ${markerAfter}`);
-
-await page.mouse.move(linePoint.x + 15, linePoint.y + 42);
-const exited = await page.evaluate(() => !document.querySelector('.precision-aim'));
-ok('精瞄: 竖向移出 32px 退出到粗瞄', exited);
-await page.mouse.up();
-
-// 单次快速水平扫动跨过候选窗口，不得吸入精瞄。
-const fastLine = await page.evaluate(() => {
-  const cue = window.__bj8.world.current.balls[0];
-  const ghost = window.__bj8.scene.current.aimGhostPos();
-  return window.__bj8.scene.current.tableToScreen(
-    cue.x + (ghost.x - cue.x) * 0.55,
-    cue.z + (ghost.z - cue.z) * 0.55,
+const expandedPoint = await page.evaluate(() => {
+  const debug = window.__bj8;
+  const centered = debug.precisionAt(debug.aim.current, 8);
+  if (!centered) return null;
+  const angle = centered.centerAngle + centered.halfWidth * 3.2;
+  const cue = debug.world.current.balls.find((ball) => ball.number === 0);
+  const distance = 0.32;
+  const point = debug.scene.current.tableToScreen(
+    cue.x + Math.sin(angle) * distance,
+    cue.z - Math.cos(angle) * distance,
   );
+  return { ...point, expectedAngle: angle };
 });
-const aimBeforeFast = await page.evaluate(() => window.__bj8.aim.current);
-await page.mouse.move(fastLine.x, fastLine.y);
-await page.mouse.down();
-await page.mouse.move(fastLine.x + 80, fastLine.y);
-const fastState = await page.evaluate(() => ({
+if (!expandedPoint) throw new Error('expanded dial point unavailable');
+// 先移开当前瞄准线，避免目标点因离中心线太近被命中判定为“抓线”而不是新幽灵球落点。
+await page.mouse.click(offTarget.x, offTarget.y);
+await wait(100);
+const expandedHit = await page.evaluate(({ x, y }) => {
+  const element = document.elementFromPoint(x, y);
+  const dial = document.querySelector('.aim-dial')?.getBoundingClientRect();
+  return {
+    tag: element?.tagName ?? '',
+    className: element?.className ?? '',
+    dial: dial ? { x: dial.x, y: dial.y, right: dial.right, bottom: dial.bottom } : null,
+  };
+}, expandedPoint);
+await page.mouse.click(expandedPoint.x, expandedPoint.y);
+await wait(180);
+const approach = await page.evaluate(() => ({
+  visible: Boolean(document.querySelector('.aim-dial')),
+  mode: document.querySelector('.aim-dial')?.className ?? '',
   aim: window.__bj8.aim.current,
-  precision: Boolean(document.querySelector('.precision-aim')),
+  ratio: (() => {
+    const solution = window.__bj8.precisionAt(window.__bj8.aim.current, 8);
+    return solution ? Math.abs(solution.error) / solution.halfWidth : null;
+  })(),
 }));
-await page.mouse.up();
 ok(
-  '粗瞄: 快速横扫不被精瞄吸附',
-  !fastState.precision && Math.abs(fastState.aim - aimBeforeFast) > 0.2,
-  `before=${aimBeforeFast.toFixed(3)} after=${fastState.aim.toFixed(3)}`,
+  '拨轮: 旧精瞄窗外的扩大接近区进入平滑降档',
+  approach.visible && approach.mode.includes('approach'),
+  JSON.stringify({ ...approach, expectedAngle: expandedPoint.expectedAngle, point: expandedPoint, hit: expandedHit }),
 );
-ok('精瞄: 页面无 JS 错误', errors.length === 0, errors[0] ?? '');
+
+const dial = await page.$eval('.aim-dial', (element) => {
+  const rect = element.getBoundingClientRect();
+  return { x: rect.x + rect.width * 0.65, y: rect.y + rect.height / 2 };
+});
+const beforeDial = await page.evaluate(() => window.__bj8.aim.current);
+await page.mouse.move(dial.x, dial.y);
+await page.mouse.down();
+await page.mouse.move(dial.x + 42, dial.y, { steps: 12 });
+await page.mouse.up();
+await wait(120);
+const afterDial = await page.evaluate(() => window.__bj8.aim.current);
+ok(
+  '拨轮: 横向拨动平滑改变唯一世界杆向',
+  afterDial > beforeDial && afterDial - beforeDial < 0.2,
+  `${beforeDial} → ${afterDial}`,
+);
+
+ok('拨轮: 页面无 JS 错误', errors.length === 0, errors[0] ?? '');
 
 await page.close();
 await browser.disconnect();

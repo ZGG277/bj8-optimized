@@ -1,12 +1,13 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
-[OUTPUT]: 对外提供场景渲染、双视角相机、世界角瞄准辅助（射线/分离线/幽灵球靶点及抓取命中查询）、合法目标环、球杆动画、自由球幽灵、走位规划整链渲染与连续播放（showPlanChain/playPlanChain）、击球复盘对比渲染（showReviewOverlay）与屏幕↔台面坐标映射
+[OUTPUT]: 对外提供场景渲染、双视角相机、世界角瞄准辅助（射线/分离线/幽灵球靶点）、摆球阶段虚母球与实体显隐、合法目标环、球杆动画、走位/复盘渲染及屏幕↔台面坐标映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {
   TABLE,
   predictBallCollisionDirections,
@@ -25,8 +26,8 @@ import {
 const R = TABLE.ballRadius;
 const W = TABLE.width;
 const L = TABLE.length;
-const RAIL_H = 0.05;
-const RAIL_W = 0.085;
+const RAIL_H = 0.045;
+const RAIL_W = 0.07;
 const CUSHION_H = 0.038;
 const CUSHION_W = 0.048;
 // 第一人称杆后视角位姿基准（update() 与 screenToTableAt() 共用，禁两处各写一份）：
@@ -35,8 +36,11 @@ const FP_CAM_DIST = 0.72;
 const FP_CAM_SIDE = 0.015;
 const FP_CAM_HEIGHT = 0.16;
 const FP_LOOK_AHEAD = 0.42;
-const CORNER_R = TABLE.cornerPocketRadius;
-const SIDE_R = TABLE.sidePocketRadius;
+// 视觉开孔与二维捕获半径分开调校：角袋保持既有 105mm 视觉口径，
+// 中袋由约 120mm 收到 104mm，直接回应“中袋过大、过易进球”的验收反馈。
+const CORNER_HOLE_R = 0.0525;
+const SIDE_HOLE_R = 0.052;
+const POCKET_NOSE_R = 0.012;
 
 const POCKET_POS: [number, number][] = [
   [-W / 2, -L / 2], [W / 2, -L / 2],
@@ -143,6 +147,8 @@ export class Scene3D {
   private reviewGroup = new THREE.Group();
   /** 规划展示期间隐藏常规瞄准辅助与球杆，避免与规划图层互相干扰 */
   private planActive = false;
+  /** 单杆预览的虚拟起始局面；React 同步真实 world 时仍需保持第 2/3 杆球位。 */
+  private planStepPreviewWorld: BilliardsWorld | null = null;
   /** 整链播放：逐杆沿 display 路径插值移动真实球网格，杆间按 endWorld 衔接球位 */
   private planPlayAnim: {
     plan: PositionPlan;
@@ -245,7 +251,7 @@ export class Scene3D {
     clothShape.closePath();
     for (const [px, pz] of POCKET_POS) {
       const isSide = pz === 0;
-      const r = (isSide ? SIDE_R : CORNER_R) * 0.99;
+      const r = isSide ? SIDE_HOLE_R : CORNER_HOLE_R;
       const hole = new THREE.Path();
       hole.absarc(px, -pz, r, 0, Math.PI * 2, true); // shape 坐标 y 对应 -z
       clothShape.holes.push(hole);
@@ -279,16 +285,18 @@ export class Scene3D {
     const woodMat = new THREE.MeshPhysicalMaterial({
       map: woodTex,
       color: 0x8a6547,
-      roughness: 0.5,
+      bumpMap: woodTex,
+      bumpScale: 0.0012,
+      roughness: 0.28,
       metalness: 0.0,
-      clearcoat: 0.3,
-      clearcoatRoughness: 0.35,
-      envMapIntensity: 0.3,
+      clearcoat: 0.78,
+      clearcoatRoughness: 0.16,
+      envMapIntensity: 0.85,
     });
 
     const railJoin = (CUSHION_W + RAIL_W) * 2;
-    const railLong = new THREE.BoxGeometry(RAIL_W, RAIL_H, L + railJoin);
-    const railShort = new THREE.BoxGeometry(W + railJoin, RAIL_H, RAIL_W);
+    const railLong = new RoundedBoxGeometry(RAIL_W, RAIL_H, L + railJoin, 5, 0.011);
+    const railShort = new RoundedBoxGeometry(W + railJoin, RAIL_H, RAIL_W, 5, 0.011);
     // 台帮内缘贴着库边外侧（库边嵌在台帮与台面之间，绿色斜坡可见）
     const railOffset = CUSHION_W + RAIL_W / 2;
     const rails: THREE.Mesh[] = [];
@@ -323,8 +331,9 @@ export class Scene3D {
     profile.lineTo(0, CUSHION_H - 0.01);
     profile.closePath();
 
-    const cornerGap = CORNER_R * 0.88;
-    const sideGap = SIDE_R * 0.82;
+    // 圆鼻中心比开口边缘外移一个鼻头半径，库边段在同一点收束，不露尖锐绿楔。
+    const cornerGap = CORNER_HOLE_R + POCKET_NOSE_R;
+    const sideGap = SIDE_HOLE_R + POCKET_NOSE_R;
 
     const makeCushionSeg = (length: number) => {
       // 剖面在 XY 平面（x: 内侧0→外侧CUSHION_W，y: 高），挤出沿 +z 方向 length
@@ -361,27 +370,28 @@ export class Scene3D {
     }
 
     // ---- 袋口（皮口唇边 + 喉管 + 金属件） ----
-    // 真实中八袋口：角袋内沿约 105mm、中袋约 120mm；洞口呢料切边被皮口
-    // 唇边滚边压住收小，袋内是深色皮革喉管而非裸露黑洞；
-    // 角袋外沿有金属唇环，台帮转角顶面贴金属护板。
-    const MOUTH_R_CORNER = 0.0525;   // 角袋视觉开口半径（105mm 内沿）
-    const MOUTH_R_SIDE = 0.06;       // 中袋视觉开口半径（120mm 内沿）
-    const LIP_OVERHANG = 0.009;      // 皮口唇边外扩，盖住洞口呢料切边
+    // 袋口视觉口径独立于二维捕获半径：既能把中袋收窄，也不让黑洞尺寸
+    // 直接决定规划器与物理内核的球心容错。
+    const LIP_OVERHANG = 0.0065;     // 皮口唇边外扩，盖住洞口呢料切边
     const THROAT_DEPTH = 0.14;       // 皮口喉管纵深
 
     const linerMat = new THREE.MeshStandardMaterial({ color: 0x030303, roughness: 1, side: THREE.BackSide });
     const throatMat = new THREE.MeshStandardMaterial({
       map: leatherTex,
+      bumpMap: leatherTex,
+      bumpScale: 0.0015,
       color: 0x54402a, // 深棕皮革，远壁能接到灯光，不是纯黑死洞
-      roughness: 0.9,
+      roughness: 0.82,
       side: THREE.BackSide, // 从袋口俯视看到的是喉管内壁
     });
     const lipMat = new THREE.MeshPhysicalMaterial({
       map: leatherTex,
+      bumpMap: leatherTex,
+      bumpScale: 0.001,
       color: 0x5d3f28,
-      roughness: 0.78,
-      clearcoat: 0.2,
-      clearcoatRoughness: 0.55,
+      roughness: 0.68,
+      clearcoat: 0.32,
+      clearcoatRoughness: 0.42,
       side: THREE.DoubleSide, // 车削剖面外降段法线朝下，双面渲染避免唇边读成黑色
     });
     const brassMat = new THREE.MeshPhysicalMaterial({
@@ -389,6 +399,11 @@ export class Scene3D {
       metalness: 0.85,
       roughness: 0.45,
       envMapIntensity: 0.9,
+    });
+    const seamMat = new THREE.MeshStandardMaterial({
+      color: 0xb99a65,
+      roughness: 0.62,
+      metalness: 0.05,
     });
     // 皮口唇边剖面：从喉管内壁向上卷起、微凸后落回呢面，形成包边滚边
     const lipProfile = (mouthR: number) => [
@@ -400,9 +415,9 @@ export class Scene3D {
 
     for (const [px, pz] of POCKET_POS) {
       const isSide = pz === 0;
-      const pr = isSide ? SIDE_R : CORNER_R;
+      const pr = isSide ? SIDE_HOLE_R : CORNER_HOLE_R;
       const sx = Math.sign(px);
-      const mouthR = isSide ? MOUTH_R_SIDE : MOUTH_R_CORNER;
+      const mouthR = pr;
       const group = new THREE.Group();
       group.position.set(px, 0, pz);
 
@@ -418,9 +433,19 @@ export class Scene3D {
       lip.receiveShadow = true;
       group.add(lip);
 
+      // 皮口压线：略高于滚边的一圈浅色细线，在近景提供真实缝制层次。
+      const seam = new THREE.Mesh(
+        new THREE.TorusGeometry(mouthR + 0.0038, 0.00075, 5, 36, lipArc),
+        seamMat,
+      );
+      seam.rotation.x = Math.PI / 2;
+      seam.rotation.z = lipStart;
+      seam.position.y = 0.0048;
+      group.add(seam);
+
       // 皮口喉管：深色皮革漏斗，上沿接唇边、下接袋底
       const throat = new THREE.Mesh(
-        new THREE.CylinderGeometry(mouthR, mouthR * 0.95, THROAT_DEPTH, 28, 1, true),
+        new THREE.CylinderGeometry(mouthR * 0.965, mouthR * 0.78, THROAT_DEPTH, 36, 2, true),
         throatMat
       );
       throat.position.y = 0.001 - THROAT_DEPTH / 2;
@@ -487,7 +512,6 @@ export class Scene3D {
     // 真实球台袋口两侧是包呢的圆鼻库边尽头：中袋漏斗面近直角（约 103°），
     // 角袋漏斗面约 45°。角衬本体用顶视多边形挤出与库边同高同质，
     // 库边尽头内侧再各压一颗圆鼻短圆柱，消除尖锐绿楔的读感。
-    const NOSE_R = 0.012;        // 库边圆鼻半径
     const SIDE_JAW_TILT = 0.011; // 中袋漏斗面内倾量 ≈ CUSHION_W·tan(103°−90°)
     const jawMat = cushionMat.clone();
     jawMat.side = THREE.DoubleSide; // 部分朝向的形状为顺时针，防止斜面被剔除
@@ -505,7 +529,7 @@ export class Scene3D {
       this.tableGroup.add(mesh);
     };
     // 圆鼻：包呢短圆柱，半埋在库边尽头，朝袋口一侧鼓起
-    const noseGeo = new THREE.CylinderGeometry(NOSE_R, NOSE_R, CUSHION_H, 16);
+    const noseGeo = new THREE.CylinderGeometry(POCKET_NOSE_R, POCKET_NOSE_R, CUSHION_H, 20);
     const addNose = (x: number, z: number) => {
       const nose = new THREE.Mesh(noseGeo, cushionMat);
       nose.position.set(x, CUSHION_H / 2, z);
@@ -528,18 +552,29 @@ export class Scene3D {
         const sz = Math.sign(pz);
         // 角袋：沿 x 库边的角衬（斜面朝袋口）+ 圆鼻
         const AX: [number, number] = [sx * (W / 2 - cornerGap), sz * L / 2];
-        addJaw([AX, [AX[0] + sx * CORNER_R * 0.95, AX[1]], [AX[0], AX[1] + sz * jawDepth]]);
+        addJaw([AX, [AX[0] + sx * CORNER_HOLE_R * 0.95, AX[1]], [AX[0], AX[1] + sz * jawDepth]]);
         addNose(sx * (W / 2 - cornerGap), sz * (L / 2 + 0.002));
         // 角袋：沿 z 库边的角衬 + 圆鼻
         const AZ: [number, number] = [sx * W / 2, sz * (L / 2 - cornerGap)];
-        addJaw([AZ, [AZ[0], AZ[1] + sz * CORNER_R * 0.95], [AZ[0] + sx * jawDepth, AZ[1]]]);
+        addJaw([AZ, [AZ[0], AZ[1] + sz * CORNER_HOLE_R * 0.95], [AZ[0] + sx * jawDepth, AZ[1]]]);
         addNose(sx * (W / 2 + 0.002), sz * (L / 2 - cornerGap));
       }
     }
 
     // ---- 台裙与桌腿 ----
-    const skirtMat = new THREE.MeshPhysicalMaterial({ map: woodTex, color: 0x6b4630, roughness: 0.5, clearcoat: 0.3 });
-    const skirt = new THREE.Mesh(new THREE.BoxGeometry(W + RAIL_W * 1.4, 0.16, L + RAIL_W * 1.4), skirtMat);
+    const skirtMat = new THREE.MeshPhysicalMaterial({
+      map: woodTex,
+      bumpMap: woodTex,
+      bumpScale: 0.001,
+      color: 0x6b4630,
+      roughness: 0.36,
+      clearcoat: 0.58,
+      clearcoatRoughness: 0.24,
+    });
+    const skirt = new THREE.Mesh(
+      new RoundedBoxGeometry(W + RAIL_W * 1.4, 0.16, L + RAIL_W * 1.4, 5, 0.022),
+      skirtMat,
+    );
     skirt.position.y = -0.11;
     this.tableGroup.add(skirt);
 
@@ -770,6 +805,21 @@ export class Scene3D {
     }
   }
 
+  /** 浏览器门禁读取摆球阶段虚/实母球显隐，不作为业务状态来源。 */
+  cuePlacementVisualState(): {
+    realVisible: boolean;
+    ghostVisible: boolean;
+    ghostX: number;
+    ghostZ: number;
+  } {
+    return {
+      realVisible: this.ballMeshes[0]?.visible ?? false,
+      ghostVisible: this.ghostCue.visible,
+      ghostX: this.ghostCue.position.x,
+      ghostZ: this.ghostCue.position.z,
+    };
+  }
+
   setSpin(spin: { x: number; y: number }) {
     this.spin = spin;
   }
@@ -810,6 +860,7 @@ export class Scene3D {
   /** 清空规划图层并复位球网格到真实球局（播放动画会移动网格，必须恢复） */
   private clearPlan() {
     this.planPlayAnim = null;
+    this.planStepPreviewWorld = null;
     for (const child of [...this.planGroup.children]) {
       this.planGroup.remove(child);
       const mesh = child as THREE.Mesh;
@@ -823,6 +874,130 @@ export class Scene3D {
       else if (material) disposeOne(material);
     }
     if (this.lastWorld) this.sync(this.lastWorld); // 恢复被播放动画挪动/隐藏的球
+  }
+
+  private addPlanPolyline(
+    points: { x: number; z: number }[],
+    color: number,
+    opacity: number,
+  ) {
+    if (points.length < 2) return;
+    const geometry = new THREE.BufferGeometry().setFromPoints(
+      points.map((point) => new THREE.Vector3(point.x, 0.005, point.z)),
+    );
+    const line = new THREE.Line(
+      geometry,
+      new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
+    );
+    line.frustumCulled = false;
+    this.planGroup.add(line);
+  }
+
+  private addPlanRing(
+    inner: number,
+    outer: number,
+    color: number,
+    opacity: number,
+    x: number,
+    z: number,
+  ) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(inner, outer, 32),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.004, z);
+    this.planGroup.add(ring);
+  }
+
+  /** 把一杆的瞄准/轨迹/停位/目标袋画进 planGroup；是否显示 zone 由调用方控制。 */
+  private renderPlanStep(
+    step: PositionPlan['steps'][number],
+    stepIndex: number,
+    showAimAndZone: boolean,
+  ) {
+    const candidate = step.candidate;
+    const cueStart = step.display.cuePath[0];
+    if (!cueStart) return;
+    const color = PLAN_STEP_COLORS[stepIndex] ?? PLAN_STEP_COLORS[PLAN_STEP_COLORS.length - 1];
+
+    if (showAimAndZone) {
+      const dirX = Math.sin(candidate.angle);
+      const dirZ = -Math.cos(candidate.angle);
+      const ghostX = cueStart.x + dirX * candidate.cueDistance;
+      const ghostZ = cueStart.z + dirZ * candidate.cueDistance;
+      const aimGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(cueStart.x, 0.005, cueStart.z),
+        new THREE.Vector3(ghostX, 0.005, ghostZ),
+      ]);
+      const aimLine = new THREE.Line(
+        aimGeometry,
+        new THREE.LineDashedMaterial({
+          color: 0xffffff,
+          dashSize: 0.03,
+          gapSize: 0.02,
+          transparent: true,
+          opacity: 0.75,
+        }),
+      );
+      aimLine.computeLineDistances();
+      aimLine.frustumCulled = false;
+      this.planGroup.add(aimLine);
+      this.addPlanRing(R * 0.72, R * 0.98, 0xffffff, 0.55, ghostX, ghostZ);
+
+      if (step.zone.length >= 3) {
+        const shape = new THREE.Shape();
+        step.zone.forEach((point, index) => {
+          if (index === 0) shape.moveTo(point.x, -point.z);
+          else shape.lineTo(point.x, -point.z);
+        });
+        shape.closePath();
+        const zone = new THREE.Mesh(
+          new THREE.ShapeGeometry(shape),
+          new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.14,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          }),
+        );
+        zone.rotation.x = -Math.PI / 2;
+        zone.position.y = 0.001;
+        this.planGroup.add(zone);
+      }
+    }
+
+    this.addPlanPolyline(step.display.cuePath, color, 0.85);
+    this.addPlanPolyline(step.display.objectPath, color, 0.95);
+    this.addPlanRing(R * 0.35, R * 0.62, color, 0.8, step.cueEnd.x, step.cueEnd.z);
+
+    const objectStart = step.display.objectPath[0];
+    if (objectStart) {
+      this.addPlanRing(R * 1.12, R * 1.45, color, 0.85, objectStart.x, objectStart.z);
+    }
+
+    const pocketPosition = POCKET_POS[candidate.pocket];
+    if (!pocketPosition) return;
+    const [pocketX, pocketZ] = pocketPosition;
+    const pocketHoleRadius = candidate.pocket === 2 || candidate.pocket === 3
+      ? SIDE_HOLE_R
+      : CORNER_HOLE_R;
+    this.addPlanRing(
+      pocketHoleRadius * 1.04,
+      pocketHoleRadius * 1.24,
+      color,
+      0.7,
+      pocketX,
+      pocketZ,
+    );
+    this.planGroup.add(mkStepBadge(stepIndex + 1, color, pocketX, pocketZ));
   }
 
   /**
@@ -841,90 +1016,34 @@ export class Scene3D {
       return;
     }
 
-    const y = 0.005;
-    const mkPolyline = (points: { x: number; z: number }[], color: number, opacity: number) => {
-      const geo = new THREE.BufferGeometry().setFromPoints(
-        points.map((p) => new THREE.Vector3(p.x, y, p.z)),
-      );
-      const line = new THREE.Line(
-        geo,
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
-      );
-      line.frustumCulled = false;
-      this.planGroup.add(line);
-      return line;
-    };
-    const mkRing = (inner: number, outer: number, color: number, opacity: number, x: number, z: number) => {
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(inner, outer, 32),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false }),
-      );
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.set(x, 0.004, z);
-      this.planGroup.add(ring);
-    };
-
     plan.steps.forEach((step, i) => {
-      const cand = step.candidate;
-      const cueStart = step.display.cuePath[0];
-      if (!cueStart) return;
-      const color = PLAN_STEP_COLORS[i] ?? PLAN_STEP_COLORS[PLAN_STEP_COLORS.length - 1];
-
-      // 第 1 杆：瞄准线（母球→ghost）与 ghost 定位环（沿用瞄准辅助的白色虚线语言）
-      if (i === 0) {
-        const dirX = Math.sin(cand.angle);
-        const dirZ = -Math.cos(cand.angle);
-        const ghostX = cueStart.x + dirX * cand.cueDistance;
-        const ghostZ = cueStart.z + dirZ * cand.cueDistance;
-        const aimGeo = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(cueStart.x, y, cueStart.z),
-          new THREE.Vector3(ghostX, y, ghostZ),
-        ]);
-        const aimLine = new THREE.Line(
-          aimGeo,
-          new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.03, gapSize: 0.02, transparent: true, opacity: 0.75 }),
-        );
-        aimLine.computeLineDistances();
-        aimLine.frustumCulled = false;
-        this.planGroup.add(aimLine);
-        mkRing(R * 0.72, R * 0.98, 0xffffff, 0.55, ghostX, ghostZ);
-
-        // 走位区域：仅首杆，凸包多边形半透明填充，贴在台面上方 1mm 防 z-fighting
-        if (step.zone.length >= 3) {
-          const shape = new THREE.Shape();
-          step.zone.forEach((p, j) => {
-            if (j === 0) shape.moveTo(p.x, -p.z); // shape 的 y 轴对应世界 -z（与台面挖洞同约定）
-            else shape.lineTo(p.x, -p.z);
-          });
-          shape.closePath();
-          const zoneMesh = new THREE.Mesh(
-            new THREE.ShapeGeometry(shape),
-            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }),
-          );
-          zoneMesh.rotation.x = -Math.PI / 2;
-          zoneMesh.position.y = 0.001;
-          this.planGroup.add(zoneMesh);
-        }
-      }
-
-      // 母球/目标球预测轨迹（同杆同色）
-      if (step.display.cuePath.length >= 2) mkPolyline(step.display.cuePath, color, 0.85);
-      if (step.display.objectPath.length >= 2) mkPolyline(step.display.objectPath, color, 0.95);
-
-      // 母球停位终点标记
-      mkRing(R * 0.35, R * 0.62, color, 0.8, step.cueEnd.x, step.cueEnd.z);
-
-      // 目标球高亮环
-      const objStart = step.display.objectPath[0];
-      if (objStart) mkRing(R * 1.12, R * 1.45, color, 0.85, objStart.x, objStart.z);
-
-      // 目标袋口高亮环 + 序号标记（CanvasTexture sprite，颜色与该杆一致）
-      const [pocketX, pocketZ] = POCKET_POS[cand.pocket];
-      mkRing(CORNER_R * 1.05, CORNER_R * 1.35, color, 0.7, pocketX, pocketZ);
-      this.planGroup.add(mkStepBadge(i + 1, color, pocketX, pocketZ));
+      this.renderPlanStep(step, i, i === 0);
     });
 
     this.updateAimGuide(); // planActive 置位后隐藏常规瞄准辅助
+  }
+
+  /**
+   * 只展示选中的一杆。第 2/3 杆先把球网格贴到上一杆 endWorld，
+   * 使轨迹起点与画面球位一致；清除、越界或空计划都会恢复真实球局。
+   */
+  showPlanStep(plan: PositionPlan | null, stepIndex: number) {
+    this.clearPlan();
+    const validIndex = Number.isInteger(stepIndex)
+      && stepIndex >= 0
+      && stepIndex < (plan?.steps.length ?? 0);
+    this.planActive = plan !== null && validIndex;
+    if (!plan || !validIndex) {
+      this.updateAimGuide();
+      return;
+    }
+
+    if (stepIndex > 0) {
+      this.planStepPreviewWorld = plan.steps[stepIndex - 1]?.endWorld ?? null;
+      this.snapBallsTo(this.planStepPreviewWorld);
+    }
+    this.renderPlanStep(plan.steps[stepIndex], stepIndex, true);
+    this.updateAimGuide();
   }
 
   // ---- 击球复盘渲染（计划 vs 实际） ----
@@ -1038,6 +1157,7 @@ export class Scene3D {
    */
   playPlanChain(plan: PositionPlan) {
     if (!this.planActive || plan.steps.length === 0) return;
+    this.planStepPreviewWorld = null;
     this.planPlayAnim = { plan, stepIdx: 0, t: 0, phase: 'anim', phaseT: 0, snapped: false };
   }
 
@@ -1264,6 +1384,10 @@ export class Scene3D {
       if (ring.visible) ring.position.set(ball.x, 0.0025, ball.z);
     }
 
+    // 规划选中第 2/3 杆时，真实 world 仍是当前球局；同步完成后重新覆盖
+    // 虚拟起始球位，直到 showPlanStep(null/越界) 或 clearPlan 恢复真实局面。
+    if (this.planStepPreviewWorld) this.snapBallsTo(this.planStepPreviewWorld);
+
     this.updateAimGuide();
   }
 
@@ -1409,7 +1533,10 @@ export class Scene3D {
   update(cueX: number, cueZ: number, power: number, phase: string) {
     this.phase = phase;
     const cue = this.ballMeshes[0];
-    const cueActive = cue?.visible ?? false;
+    const cueActive = Boolean(this.lastWorld?.balls[0]?.active);
+    // 摆球阶段物理世界仍保留母球作为候选状态，但画面只显示跟手的半透明预览；
+    // 点击落实后下一次 sync 会恢复实体母球，避免一虚一实同时出现。
+    if (cue && phase === 'placing') cue.visible = false;
     const angle = this.totalAim();
 
     // ---- 相机 ----

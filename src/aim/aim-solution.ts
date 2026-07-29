@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 的 BilliardsWorld / TABLE / POCKETS 统一物理几何
-[OUTPUT]: 对外提供精瞄候选检测、袋口窗口反解、迟滞判定与 pocket 名称
+[OUTPUT]: 对外提供精瞄候选检测、拨轮最近袋口解、袋口窗口反解、迟滞判定与 pocket 名称
 [POS]: 纯瞄准几何层；把 360° 世界角映射为目标球→袋口的局部高精度窗口，不依赖 UI/规则/渲染
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -169,7 +169,7 @@ function pocketAimGeometry(
   };
 }
 
-function solutionForPocket(
+export function aimSolutionForPocket(
   world: BilliardsWorld,
   targetNumber: number,
   pocketIndex: number,
@@ -218,7 +218,7 @@ function solutionForPocket(
 
 /**
  * 只有当前首碰球合法、目标球到袋口无遮挡，且杆向进入袋口窗口附近时才返回精瞄解。
- * 这保证快速横拖仍可完整 360° 旋转，慢速靠近可进球窗口才切换到局部精度。
+ * 本函数只给出纯几何候选；是否激活浮层由交互层在用户选定幽灵球后决定。
  */
 export function findPrecisionAim(
   world: BilliardsWorld,
@@ -226,12 +226,26 @@ export function findPrecisionAim(
   legalTargets: readonly number[],
   multiplier = PRECISION_ENTER_MULTIPLIER,
 ): PrecisionAimSolution | null {
+  const best = findAimDialTarget(world, currentAngle, legalTargets);
+  if (!best || Math.abs(best.error) > best.halfWidth * multiplier) return null;
+  return best;
+}
+
+/**
+ * 拨轮的候选袋口不受精瞄触发窗限制：幽灵球落位后拨轮始终可用，
+ * 本函数只负责返回当前合法首碰球最接近的畅通袋口，供连续变速与提示使用。
+ */
+export function findAimDialTarget(
+  world: BilliardsWorld,
+  currentAngle: number,
+  legalTargets: readonly number[],
+): PrecisionAimSolution | null {
   const target = firstObjectHit(world, currentAngle);
   if (target === null || !legalTargets.includes(target)) return null;
   let best: PrecisionAimSolution | null = null;
   for (let pocket = 0; pocket < POCKETS.length; pocket += 1) {
-    const solution = solutionForPocket(world, target, pocket, currentAngle);
-    if (!solution || Math.abs(solution.error) > solution.halfWidth * multiplier) continue;
+    const solution = aimSolutionForPocket(world, target, pocket, currentAngle);
+    if (!solution) continue;
     if (!best || Math.abs(solution.error) / solution.halfWidth < Math.abs(best.error) / best.halfWidth) {
       best = solution;
     }
@@ -246,7 +260,7 @@ export function precisionStillValid(
   legalTargets: readonly number[],
   active: Pick<PrecisionAimSolution, 'target' | 'pocket'>,
 ): boolean {
-  const next = solutionForPocket(world, active.target, active.pocket, currentAngle);
+  const next = aimSolutionForPocket(world, active.target, active.pocket, currentAngle);
   return (
     legalTargets.includes(active.target) &&
     next !== null &&
