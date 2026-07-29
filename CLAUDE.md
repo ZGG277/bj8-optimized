@@ -14,7 +14,7 @@
 
 `index.html`: Vite HTML 入口，挂载 React 根节点并声明页面元数据。
 
-`README.md`: 项目说明（玩法、快速开始、质量门禁、浏览器回归、妙搭部署）。
+`README.md`: 项目说明（玩法、v1.3 视觉语言、快速开始、质量门禁、浏览器回归、妙搭部署）。
 
 `MOBILE_PORTRAIT_V12_ACCEPTANCE.md`: `codex/mobile-portrait-v1.2-20260728` 的竖屏信息架构、单手交互决策、30 项真实触控证据与人工验收重点。
 
@@ -33,6 +33,8 @@
 `PRECISION_AIM_V2_ACCEPTANCE.md`: `codex/precision-aim-v2-20260728` 的功能边界、双档精瞄操作规格、自动化证据与人工验收清单。
 
 `MULTIPLAYER_DESIGN.md`: 实时联网对战评估稿（两方案：Kimi 建站数据库轮询 vs 静态托管+实时层），含共用同步协议（快照权威+本地重放）、数据表/消息设计、利弊对比与开放问题；待 codex 审核后决策。
+
+`VISUAL_LANGUAGE_V13.md`: 视觉统一审计与三案比较；最终采用“静谧球房”为主、“竞技仪表”为辅的令牌化方案，并记录保持 54px 控制轨与既有手势几何不变的取舍和验收标准。
 
 `dist/`: Vite 生成产物，不作为源代码维护。
 

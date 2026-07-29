@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的令牌与 layout.css 的壳层几何
-[OUTPUT]: 对外提供长行程视角推杆、桌内方向微调、长按整轨进入编辑的右侧黑色控制轨、可展开击球点、力度出杆合一控件及可拖动规划/复盘浮层样式
+[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、方向微调、右侧控制轨、击球点、力度出杆及规划/复盘浮层样式
 [POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -13,11 +13,10 @@
   flex-direction: column;
   gap: 3px;
   padding: 4px;
-  background: rgba(7,10,9,0.8);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 14px;
+  background: var(--surface-control);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
   overflow: hidden;
-  backdrop-filter: blur(8px);
 }
 
 .view-switcher button {
@@ -26,16 +25,17 @@
   flex: 0 0 28px;
   padding: 2px 0;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: #828c87;
+  color: var(--text-tertiary);
   font-size: 9px;
   cursor: pointer;
 }
 
 .view-switcher button.active {
-  background: rgba(112, 199, 165, 0.16);
-  color: #dff9ee;
+  background: rgba(121, 215, 177, 0.14);
+  color: var(--green-bright);
+  box-shadow: inset 0 0 0 1px rgba(121, 215, 177, 0.14);
 }
 
 .view-slider-track {
@@ -81,10 +81,10 @@
   display: grid;
   place-items: center;
   transform: translate(-50%, 50%);
-  border: 1px solid rgba(112, 199, 165, 0.55);
-  border-radius: 11px;
-  background: linear-gradient(160deg, #3f8a6d, #285d49);
-  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(121, 215, 177, 0.58);
+  border-radius: var(--radius-control);
+  background: linear-gradient(160deg, #34795e, var(--green-deep));
+  box-shadow: var(--shadow-raised), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   pointer-events: none;
   transition: bottom 150ms ease-out;
 }
@@ -122,16 +122,21 @@
   align-items: stretch;
   gap: 7px;
   border: 0;
-  border-radius: 15px;
-  background: rgba(3, 6, 5, 0.78);
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.42), 0 8px 24px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(10px);
+  border-radius: var(--radius-panel);
+  background: var(--surface-1);
+  box-shadow:
+    var(--shadow-raised),
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: var(--blur-surface);
   pointer-events: auto;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    border-color var(--duration-base) var(--ease-ui),
+    box-shadow var(--duration-base) var(--ease-ui);
 }
 
 .control-rail.is-editing {
-  outline: 1px solid rgba(112, 199, 165, 0.58);
+  outline: 1px solid rgba(121, 215, 177, 0.62);
   outline-offset: 1px;
   box-shadow:
     inset 0 0 20px rgba(20, 54, 42, 0.5),
@@ -217,12 +222,11 @@
   min-height: 48px;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(12, 16, 14, 0.78);
-  color: #b8bfbb;
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  color: var(--text-secondary);
   font-size: var(--fs-base);
   cursor: pointer;
-  backdrop-filter: blur(8px);
 }
 
 .plan-button span {
@@ -230,14 +234,15 @@
 }
 
 .plan-button.is-open {
-  border-color: rgba(217,183,129,0.9);
+  border-color: rgba(216, 170, 91, 0.78);
   color: var(--warm);
-  box-shadow: inset 0 0 0 1px rgba(217,183,129,0.5), 0 0 10px rgba(217,183,129,0.25);
+  background: rgba(216, 170, 91, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(216, 170, 91, 0.22), 0 0 12px rgba(216, 170, 91, 0.16);
 }
 
 .plan-button.is-off {
-  color: #6b7270;
-  border-color: rgba(255,255,255,0.08);
+  color: var(--text-tertiary);
+  border-color: var(--line);
   filter: grayscale(1);
   opacity: 0.52;
   box-shadow: none;
@@ -320,10 +325,9 @@
   gap: 3px;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(12, 16, 14, 0.78);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
   color: var(--muted);
-  backdrop-filter: blur(8px);
 }
 
 .spin-preview-ball {
@@ -332,7 +336,10 @@
   height: 30px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff, #cfc8b8 70%, #a89f8c);
-  box-shadow: inset -2px -3px 5px rgba(0,0,0,0.24);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow:
+    inset -2px -3px 5px rgba(0,0,0,0.24),
+    0 0 0 2px rgba(121, 215, 177, 0.08);
 }
 
 .spin-preview-ball i {
@@ -340,7 +347,9 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--danger);
+  background: var(--green-deep);
+  border: 1px solid var(--green-bright);
+  box-shadow: 0 0 8px rgba(121, 215, 177, 0.48);
   transform: translate(-50%, -50%);
 }
 
@@ -356,11 +365,11 @@
   width: 152px;
   display: block;
   padding: 8px;
-  border: 1px solid rgba(255,255,255,0.13);
-  border-radius: 16px;
-  background: rgba(12, 16, 14, 0.9);
-  box-shadow: 0 18px 48px rgba(0,0,0,0.46);
-  backdrop-filter: blur(12px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
 }
 
 .spin-popover-head {
@@ -405,7 +414,8 @@
   height: 44px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #ffffff, #cfc8b8 70%, #a89f8c);
-  box-shadow: inset -3px -4px 8px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset -3px -4px 8px rgba(0,0,0,0.25), var(--shadow-raised);
   pointer-events: none;
 }
 
@@ -434,10 +444,10 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--danger);
-  border: 1px solid rgba(255,255,255,0.7);
+  background: var(--green-deep);
+  border: 1px solid var(--green-bright);
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 4px rgba(198,74,58,0.8);
+  box-shadow: 0 0 8px rgba(121, 215, 177, 0.54);
   transition: left 40ms, top 40ms;
 }
 
@@ -454,10 +464,9 @@
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  border-radius: 14px;
-  background: rgba(12, 16, 14, 0.58);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
   user-select: none;
-  backdrop-filter: blur(8px);
 }
 
 .power-num {
@@ -466,6 +475,7 @@
   font-family: var(--font-mono);
   font-size: var(--fs-xl);
   color: #f1fff8;
+  font-variant-numeric: tabular-nums;
 }
 
 .shoot-pad {
@@ -479,14 +489,16 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  border-radius: 14px;
-  background: linear-gradient(160deg, #3f8a6d, #2b6b52);
-  border: 1px solid rgba(112,199,165,0.45);
+  border-radius: var(--radius-control);
+  background:
+    linear-gradient(180deg, rgba(121, 215, 177, 0.12), transparent 34%),
+    linear-gradient(160deg, #34795e, var(--green-deep));
+  border: 1px solid rgba(121, 215, 177, 0.46);
   color: #eafff5;
   text-align: center;
   cursor: pointer;
   touch-action: none;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  box-shadow: var(--shadow-raised), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   overflow: hidden;
   isolation: isolate;
 }
@@ -513,7 +525,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(0deg, rgba(112, 199, 165, 0.8), rgba(72, 122, 103, 0.6));
+  background: linear-gradient(0deg, rgba(121, 215, 177, 0.88), rgba(74, 133, 105, 0.58));
   transition: height 40ms linear;
   pointer-events: none;
 }
@@ -532,8 +544,8 @@
 }
 
 .shoot-pad.charging {
-  background: linear-gradient(160deg, #d98a3a, #b3641f);
-  border-color: rgba(228,127,50,0.6);
+  background: linear-gradient(160deg, #c98642, #875020);
+  border-color: rgba(216, 170, 91, 0.72);
   transform: scale(0.97);
 }
 
@@ -557,11 +569,11 @@
   gap: 7px;
   padding: 6px 7px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 15px;
-  background: rgba(8, 13, 11, 0.7);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(7px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
   cursor: ew-resize;
   touch-action: none;
   user-select: none;
@@ -580,7 +592,7 @@
 }
 
 .aim-dial.active {
-  background: rgba(8, 13, 11, 0.86);
+  border-color: rgba(121, 215, 177, 0.38);
 }
 
 .aim-dial-label {
@@ -608,11 +620,11 @@
   position: relative;
   height: 46px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
   background:
     linear-gradient(90deg, rgba(6, 9, 8, 0.94), transparent 22%, transparent 78%, rgba(6, 9, 8, 0.94)),
-    rgba(20, 27, 24, 0.72);
+    var(--surface-control);
 }
 
 .aim-dial-ticks {
@@ -691,10 +703,11 @@
   gap: 6px;
   max-width: min(94vw, 760px);
   padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(17, 21, 20, 0.88);
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-raised);
+  backdrop-filter: var(--blur-overlay);
 }
 
 .overlay-drag-handle {
@@ -723,7 +736,7 @@
 .plan-step-tabs button {
   padding: 4px 7px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font-size: var(--fs-sm);
@@ -747,7 +760,7 @@
 /* 压缩打法 chip：与桌上轨迹分色一致（暖橙/青/紫） */
 .plan-chip {
   padding: 3px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
   white-space: nowrap;
   background: rgba(255, 255, 255, 0.05);
@@ -765,9 +778,9 @@
 
 .plan-bar-play {
   padding: 4px 10px;
-  border: 1px solid rgba(112, 199, 165, 0.45);
-  border-radius: 8px;
-  background: linear-gradient(160deg, #3f8a6d, #2b6b52);
+  border: 1px solid rgba(121, 215, 177, 0.45);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(160deg, #34795e, var(--green-deep));
   color: #eafff5;
   font-size: var(--fs-sm);
   cursor: pointer;
@@ -798,10 +811,11 @@
   display: flex;
   align-items: center;
   max-width: min(94vw, 760px);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(17, 21, 20, 0.88);
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-raised);
+  backdrop-filter: var(--blur-overlay);
 }
 
 .review-chip {
@@ -811,7 +825,7 @@
   padding: 6px 12px;
   min-width: 0;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--warm);
   font-size: var(--fs-sm);
@@ -928,9 +942,8 @@
     min-height: 48px;
     align-self: flex-end;
     padding: 0;
-    border-radius: 14px;
-    background: rgba(12, 16, 14, 0.74);
-    backdrop-filter: blur(8px);
+    border-radius: var(--radius-control);
+    background: var(--surface-control);
   }
 
   .plan-button span {
@@ -970,10 +983,9 @@
     gap: 3px;
     padding: 3px;
     border: 1px solid var(--line);
-    border-radius: 14px;
-    background: rgba(12, 16, 14, 0.78);
+    border-radius: var(--radius-control);
+    background: var(--surface-control);
     color: var(--muted);
-    backdrop-filter: blur(8px);
   }
 
   .spin-preview-ball {
@@ -1006,11 +1018,11 @@
     width: 152px;
     display: block;
     padding: 8px;
-    border: 1px solid rgba(255,255,255,0.13);
-    border-radius: 16px;
-    background: rgba(12, 16, 14, 0.88);
-    box-shadow: 0 18px 48px rgba(0,0,0,0.46);
-    backdrop-filter: blur(12px);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-panel);
+    background: var(--surface-2);
+    box-shadow: var(--shadow-overlay);
+    backdrop-filter: var(--blur-overlay);
   }
 
   .spin-popover-head {
@@ -1052,9 +1064,8 @@
   .shoot-zone {
     width: 64px;
     align-self: flex-end;
-    border-radius: 16px;
-    background: rgba(12, 16, 14, 0.58);
-    backdrop-filter: blur(8px);
+    border-radius: var(--radius-panel);
+    background: var(--surface-control);
   }
 
   .shoot-pad {
@@ -1108,9 +1119,9 @@
     max-width: calc(100vw - 92px);
     padding: 5px;
     justify-content: flex-start;
-    border-radius: 12px;
-    background: rgba(12, 16, 14, 0.76);
-    backdrop-filter: blur(8px);
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    backdrop-filter: var(--blur-overlay);
   }
 
   .review-float {
@@ -1188,14 +1199,14 @@
 
   /* 横屏：方向微调不再钉在左下，与击球点盘一起收入右下控件组 */
   .aim-controls {
-    background: rgba(17,21,20,0.7);
-    border-radius: 8px;
+    background: var(--surface-1);
+    border-radius: var(--radius-sm);
     padding: 4px;
   }
 
   /* 横屏：💡 走位按钮与右下控件组同风格悬浮 */
   .plan-button {
-    background: rgba(17,21,20,0.7);
+    background: var(--surface-control);
   }
 
   /* 横屏：击球点盘钉在左下并加大，与右下控件组分离 */
@@ -1204,8 +1215,8 @@
     left: 10px;
     bottom: 10px;
     z-index: 9;
-    background: rgba(17,21,20,0.7);
-    border-radius: 10px;
+    background: var(--surface-1);
+    border-radius: var(--radius-control);
     padding: 6px;
   }
 
@@ -1220,8 +1231,8 @@
   }
 
   .shoot-zone {
-    background: rgba(17,21,20,0.7);
-    border-radius: 12px;
+    background: var(--surface-control);
+    border-radius: var(--radius-control);
     padding: 8px;
   }
 
