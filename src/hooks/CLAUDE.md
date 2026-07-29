@@ -6,7 +6,7 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 ## 成员清单
 
-`useGameState.ts`: 状态管理收敛层，集中管理 Game 组件的所有状态（worldView/match/viewMode/camLift）与 ref（worldRef/matchRef），提供 resetGame/settleShotRaw/setMessage 等编排动作；新局同步重置 shot 结算守卫。
+`useGameState.ts`: 状态管理收敛层，集中管理物理/规则状态、长期玩家能力画像、陪练/挑战模式和本局锁定对手档案；提供 resetGame/settleShotRaw/recordPlayerShot 等动作，新局同步重置结算守卫并按最新画像匹配 AI。
 
 `shot-settlement-guard.ts`: 同杆去重与新局 reset 的纯幂等原语。
 
@@ -14,7 +14,7 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `useAimInteraction.ts`: 交互协调层，封装世界角点哪打哪、抓影子球、360° 粗瞄与近袋局部精瞄、Pointer 事件及自由球放置；精瞄几何委托 `aim/`。
 
-`useOpponentAI.ts`: AI 调度层，副作用 Hook——match.phase === 'opponent' 时自动调度 AI 回合（决策、击球、出杆动画），不关心 UI 交互或玩家输入。
+`useOpponentAI.ts`: AI 调度层，副作用 Hook——对手回合按局前档案调用 planner；陪练 1 层窄预算、挑战 2 层预算，理想杆在实际出杆时只采样一次瞄准/力度误差，失败降级旧直接进攻器。
 
 `useAudioManager.ts`: 音效协调层，管理 BilliardsAudio 初始化和物理事件音效播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents。
 

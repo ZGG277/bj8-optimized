@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；规则在 `match/`、自适应实力在 `opponent/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、AI 调度在 `hooks/useOpponentAI`、走位/复盘在 `planner/`；只把意图明确的玩家杆提交给能力模型，挑战局赛中不展示规划提示。
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
 
@@ -28,6 +28,8 @@
 
 `planner/`: 走位规划引擎（纯 TS，不碰 React/渲染）——几何候选 → erf 粗筛 → 蒙特卡洛精排 → 3 层精确终态前瞻，输出连续 1–3 杆方案；标定后重算概率、清组后转 8 号、仿真预算封顶、rng 注入可测。
 
+`opponent/`: 自适应对手纯领域层——按线路容错归一化玩家每杆表现，维护带置信度的长期能力画像；同一画像分别映射为略弱陪练和高一档挑战档案，每局开始生成后锁定。
+
 `spin-settle.test.ts`: 加塞停球收敛回归：满塞后原地残余侧旋须在数秒内归零（防 world.moving 仅靠 wy 长期不结束）。
 
 `break-variance.test.ts`: 开球方差回归：验证无 rng 时同力度开球结果确定，传 rng 时同力度连续开球的落袋组合与球堆分布出现差异。
@@ -37,9 +39,9 @@
 `audio.ts`: 基于 Web Audio 的无外部资源击球、碰撞、碰库与落袋合成音效。
 
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
-  - `useGameState`：集中管理对局状态（worldView/match/viewMode/camLift）与编排动作；新局重置 shot 结算守卫
+  - `useGameState`：集中管理对局状态、长期玩家画像、陪练/挑战模式与局间锁定对手档案；新局重置 shot 结算守卫
   - `useAimInteraction`：封装世界角点哪打哪、抓影子球、360° 粗瞄、近袋精瞄与自由球放置
-  - `useOpponentAI`：AI 对手回合调度，依赖 physics 击球与 match 规则状态机
+  - `useOpponentAI`：按锁定对手档案调用 planner 窄预算搜索并注入一次执行误差
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
   - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），玩家回合世界指纹变化时经可抢占 planner/async 后台搜索
   - `useDraggableOverlay`：规划/复盘共用的 Pointer 拖拽位移与视口边界约束
