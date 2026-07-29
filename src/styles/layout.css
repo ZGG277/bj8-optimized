@@ -410,8 +410,9 @@
 }
 
 .intro-card {
-  width: min(400px, 90%);
-  padding: 32px;
+  width: min(620px, 92%);
+  max-height: 94vh;
+  padding: 28px;
   background:
     radial-gradient(circle at 50% 0, rgba(121, 215, 177, 0.08), transparent 42%),
     var(--surface-2);
@@ -419,6 +420,7 @@
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-overlay), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   text-align: center;
+  overflow-y: auto;
 }
 
 .intro-kicker {
@@ -439,25 +441,122 @@
 }
 
 .intro-card p {
-  margin-top: 16px;
+  max-width: 470px;
+  margin: 12px auto 0;
   color: var(--muted);
   font-size: var(--fs-md);
   line-height: 1.7;
 }
 
-.start-btn {
-  margin-top: 24px;
-  padding: 12px 32px;
-  background: var(--green);
-  color: #08120e;
-  border: 1px solid rgba(154, 232, 200, 0.5);
+.skill-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 2px 12px;
+  max-width: 360px;
+  margin: 18px auto 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
   border-radius: var(--radius-control);
-  box-shadow:
-    0 8px 22px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  background: var(--surface-control);
+  text-align: left;
+}
+
+.skill-summary span,
+.skill-summary small {
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm);
+}
+
+.skill-summary strong {
+  color: var(--warm);
   font-size: var(--fs-xl);
-  font-weight: 700;
+}
+
+.skill-summary small {
+  grid-column: 2;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.mode-choice {
+  display: grid;
+  gap: 7px;
+  min-height: 142px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  color: var(--text-primary);
+  text-align: left;
   cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-ui),
+    border-color var(--duration-fast) var(--ease-ui),
+    background var(--duration-fast) var(--ease-ui);
+}
+
+.mode-choice:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.05);
+}
+
+.mode-choice.practice:hover {
+  border-color: rgba(121, 215, 177, 0.65);
+}
+
+.mode-choice.challenge:hover {
+  border-color: rgba(216, 170, 91, 0.7);
+}
+
+.mode-choice > span {
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.16em;
+}
+
+.mode-choice.challenge > span {
+  color: var(--warm);
+}
+
+.mode-choice strong {
+  font-family: 'Songti SC', serif;
+  font-size: var(--fs-2xl);
+  font-weight: 400;
+}
+
+.mode-choice small {
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+}
+
+.mode-choice em {
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm);
+  font-style: normal;
+}
+
+.mode-start {
+  align-self: end;
+  min-height: 38px;
+  margin-top: 3px;
+  border: 1px solid rgba(121, 215, 177, 0.55);
+  border-radius: var(--radius-sm);
+  background: rgba(121, 215, 177, 0.14);
+  color: var(--green-bright);
+  cursor: pointer;
+}
+
+.challenge .mode-start {
+  border-color: rgba(216, 170, 91, 0.55);
+  background: rgba(216, 170, 91, 0.12);
+  color: var(--warm);
 }
 
 .intro-tags {
@@ -477,7 +576,6 @@
 }
 
 @media (hover: hover) {
-  .start-btn:hover,
   .finish-mask button:hover {
     background: var(--green-bright);
     box-shadow:
@@ -487,9 +585,28 @@
   }
 }
 
-.start-btn:active,
 .finish-mask button:active {
   transform: translateY(1px);
+}
+
+@media (max-width: 560px) {
+  .intro-card {
+    padding: 22px 18px;
+  }
+
+  .intro-card h1 {
+    font-size: var(--fs-6xl);
+  }
+
+  .mode-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .mode-choice {
+    min-height: 112px;
+    padding: 12px 14px;
+  }
 }
 
 /* 名称编辑输入框 */
@@ -689,4 +806,49 @@
     top: calc(var(--hud-safe-top) + 8px);
   }
 
+  .intro-card {
+    width: min(760px, 96%);
+    max-height: calc(100vh - 12px);
+    padding: 10px 14px;
+  }
+
+  .intro-kicker {
+    font-size: var(--fs-xs);
+  }
+
+  .intro-card h1 {
+    margin-top: 2px;
+    font-size: var(--fs-4xl);
+  }
+
+  .intro-card p,
+  .intro-tags {
+    display: none;
+  }
+
+  .skill-summary {
+    max-width: 330px;
+    margin-top: 5px;
+    padding: 4px 10px;
+  }
+
+  .mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .mode-choice {
+    min-height: 104px;
+    gap: 3px;
+    padding: 7px 10px;
+  }
+
+  .mode-choice strong {
+    font-size: var(--fs-xl);
+  }
+
+  .mode-start {
+    min-height: 30px;
+  }
 }

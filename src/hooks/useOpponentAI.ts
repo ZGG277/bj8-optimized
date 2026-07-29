@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖 physics 击球/复位/合法目标、match 规则状态、Scene3D 出杆动画、audio 音效
-[OUTPUT]: 副作用 Hook：match.phase === 'opponent' 时自动调度 AI 回合
+[INPUT]: 依赖局前锁定 OpponentProfile、planner 异步搜索、physics 击球/复位、match 规则与场景动画
+[OUTPUT]: 副作用 Hook：对手回合按模式化决策深度与执行误差自动规划、击球
 [POS]: AI 调度层，只做对手回合的编排；不关心 UI 交互或玩家输入
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -15,13 +15,12 @@ import {
 } from '../physics';
 import type { BilliardsWorld } from '../physics';
 import { legalNumbers } from '../match/match-machine';
+import { gaussian } from '../planner/evaluate';
+import { planPositionAsync } from '../planner/async';
+import type { OpponentProfile } from '../opponent/model';
 import type { Scene3D } from '../Scene3D';
 import type { BilliardsAudio } from '../audio';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from '../match/types';
-
-function clamp(v: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, v));
-}
 
 interface OpponentAIProps {
   active: boolean;
@@ -29,7 +28,7 @@ interface OpponentAIProps {
   matchRef: React.RefObject<MatchState>;
   scene3DRef: React.RefObject<Scene3D | null>;
   audioRef: React.RefObject<BilliardsAudio | null>;
-  rating: number;
+  opponentProfile: OpponentProfile;
   playerGroup: MatchState['playerGroup'];
   setWorldView: React.Dispatch<React.SetStateAction<BilliardsWorld>>;
   setMatch: React.Dispatch<React.SetStateAction<MatchState>>;
@@ -43,7 +42,7 @@ export function useOpponentAI({
   matchRef,
   scene3DRef,
   audioRef,
-  rating,
+  opponentProfile,
   playerGroup,
   setWorldView,
   setMatch,
@@ -54,39 +53,73 @@ export function useOpponentAI({
 
   useEffect(() => {
     if (!active) return;
+    let cancelled = false;
 
     const timer = setTimeout(() => {
-      const world = worldRef.current;
-      if (isCueBallPocketed(world)) respotCueBall(world);
+      void (async () => {
+        const world = worldRef.current;
+        if (isCueBallPocketed(world)) respotCueBall(world);
 
-      const currentMatch = matchRef.current;
-      if (!currentMatch) return;
-      const legal = legalNumbers(world, 'opponent', currentMatch.playerGroup);
-      const opponentSkill = clamp(rating + 8, 26, 92);
-      const plan = planSimpleShot(world, legal, opponentSkill);
+        const currentMatch = matchRef.current;
+        if (!currentMatch) return;
+        const legal = legalNumbers(world, 'opponent', currentMatch.playerGroup);
 
-      const cue = getCueBall(world)!;
-      const fallback = world.balls.find(b => b.active && legal.includes(b.number));
-      const angle = plan?.angle ?? (fallback ? Math.atan2(fallback.x - cue.x, -(fallback.z - cue.z)) : 0);
-      const shotPower = plan?.power ?? 52;
+        let planned = null as Awaited<ReturnType<typeof planPositionAsync>>[number]['steps'][number] | null;
+        try {
+          const plans = await planPositionAsync(cloneWorld(world), legal, opponentProfile.planner);
+          if (cancelled) return;
+          const pickAlternative =
+            plans.length > 1 && Math.random() < opponentProfile.choiceTemperature;
+          const planIndex = pickAlternative
+            ? 1 + Math.floor(Math.random() * (plans.length - 1))
+            : 0;
+          planned = plans[planIndex]?.steps[0] ?? null;
+        } catch {
+          // Worker 失败或请求被取消时走旧直接进攻器，保证 AI 回合不会悬挂。
+        }
+        if (cancelled) return;
 
-      const doShot = () => {
-        strikeCueBall(world, angle, shotPower);
-        audioRef.current?.strike(shotPower);
-        onShotRef();
-        setWorldView(cloneWorld(world));
-        setMatch(m => ({ ...m, phase: 'rolling', messageKey: 'rolling', messageParams: {} }));
-      };
+        const fallbackPlan = planned
+          ? null
+          : planSimpleShot(world, legal, opponentProfile.effectiveLevel);
+        const cue = getCueBall(world)!;
+        const fallbackTarget = world.balls.find(b => b.active && legal.includes(b.number));
+        const baseAngle =
+          planned?.candidate.angle ??
+          fallbackPlan?.angle ??
+          (fallbackTarget ? Math.atan2(fallbackTarget.x - cue.x, -(fallbackTarget.z - cue.z)) : 0);
+        const basePower = planned?.candidate.power ?? fallbackPlan?.power ?? 52;
+        const spin = planned?.candidate.spin ?? { x: 0, y: 0 };
+        // planner 给出理想杆；实力只在实际出杆时采样一次，不根据结果重抽。
+        const angle = planned
+          ? baseAngle + gaussian(Math.random) * opponentProfile.aimSigma
+          : baseAngle;
+        const powerScale =
+          1 + (Math.random() * 2 - 1) * opponentProfile.powerJitter;
+        const shotPower = Math.min(100, Math.max(1, basePower * powerScale));
+        const target = planned?.candidate.target ?? fallbackPlan?.target;
 
-      setMessage(plan ? 'ai-choice' : 'ai-safe', { target: plan?.target });
-      const scene = scene3DRef.current;
-      if (scene) {
-        scene.triggerStrike({ cueX: cue.x, cueZ: cue.z, angle, power: shotPower, spin: { x: 0, y: 0 }, onContact: doShot });
-      } else {
-        doShot();
-      }
+        const doShot = () => {
+          strikeCueBall(world, angle, shotPower, spin);
+          audioRef.current?.strike(shotPower);
+          onShotRef();
+          setWorldView(cloneWorld(world));
+          setMatch(m => ({ ...m, phase: 'rolling', messageKey: 'rolling', messageParams: {} }));
+        };
+
+        setMessage(target ? 'ai-choice' : 'ai-safe', { target });
+        const scene = scene3DRef.current;
+        if (scene) {
+          scene.triggerStrike({ cueX: cue.x, cueZ: cue.z, angle, power: shotPower, spin, onContact: doShot });
+        } else {
+          doShot();
+        }
+      })();
     }, 900);
 
-    return () => clearTimeout(timer);
-  }, [active, worldRef, matchRef, scene3DRef, audioRef, rating, playerGroup, setWorldView, setMatch, setMessage, onShotRef]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [active, worldRef, matchRef, scene3DRef, audioRef, opponentProfile, playerGroup, setWorldView, setMatch, setMessage, onShotRef]);
 }

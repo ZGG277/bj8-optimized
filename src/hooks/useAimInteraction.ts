@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖 physics 台球世界、Scene3D 屏幕坐标映射、match 对局状态
-[OUTPUT]: 对外提供 360° 世界角粗瞄、幽灵球落位后的无限变速拨轮，以及跟手虚母球放置处理器
-[POS]: 交互协调层，把指针映射为世界瞄准角；袋口几何委托 aim/，拨轮传动委托 input/
+[OUTPUT]: 对外提供各视角高度一致的 360° 世界角粗瞄、幽灵球落位后的无限变速拨轮，以及跟手虚母球放置处理器
+[POS]: 交互协调层，把连续视角目标相机下的指针映射为世界瞄准角；袋口几何委托 aim/，拨轮传动委托 input/
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -21,8 +21,7 @@ import {
   aimDialAngleDelta,
   aimDialRatio,
 } from '../input/aim-dial';
-
-type ViewMode = 'first' | 'overhead';
+import { FIRST_PERSON_VIEW } from '../camera-view';
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
@@ -31,7 +30,7 @@ function clamp(v: number, min: number, max: number) {
 interface AimInteractionProps {
   scene3DRef: React.RefObject<Scene3D | null>;
   worldRef: React.MutableRefObject<BilliardsWorld>;
-  viewMode: ViewMode;
+  viewLevel: number;
   setAim: (angle: number) => void;
   aimRef: React.MutableRefObject<number>;
   aimGhostDistRef: React.MutableRefObject<number | null>;
@@ -42,13 +41,13 @@ interface AimInteractionProps {
   setMatch: React.Dispatch<React.SetStateAction<MatchState>>;
   setMessage: (key: MatchMessageKey, params?: MatchMessageParams) => void;
   setWorldView: React.Dispatch<React.SetStateAction<BilliardsWorld>>;
-  setViewMode: React.Dispatch<React.SetStateAction<ViewMode>>;
+  setViewLevel: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export function useAimInteraction({
   scene3DRef,
   worldRef,
-  viewMode,
+  viewLevel,
   setAim,
   aimRef,
   aimGhostDistRef,
@@ -59,7 +58,7 @@ export function useAimInteraction({
   setMatch,
   setMessage,
   setWorldView,
-  setViewMode,
+  setViewLevel,
   }: AimInteractionProps) {
   const dragRef = useRef<{ mode: 'aim' | 'ghost' | 'line'; downX: number; downY: number; dragging: boolean } | null>(null);
   const placementPointerRef = useRef<number | null>(null);
@@ -129,16 +128,14 @@ export function useAimInteraction({
   }, [canAim, clearAimDial, showAimDial]);
 
   /** 点哪打哪：把触点映射到台面坐标，瞄准线直接指向它。
-   *  第一人称下用目标相机位姿反算（screenToTableAt），避免活相机平滑插值造成反馈振荡；
+   *  所有高度都用连续视角的目标相机位姿反算（screenToTableAt），避免活相机平滑插值造成反馈振荡；
    *  若用户点到了母球身后半台，把落点按 x 坐标投影到前方半台，避免视角天旋地转。 */
   const aimAtPointer = useCallback((clientX: number, clientY: number, keepDist = false) => {
     const scene = scene3DRef.current;
     if (!scene) return;
     const cue = getCueBall(worldRef.current);
     if (!cue || !cue.active) return;
-    const hit = viewMode === 'first'
-      ? scene.screenToTableAt(clientX, clientY, aimRef.current)
-      : scene.screenToTable(clientX, clientY);
+    const hit = scene.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
     if (!hit) return;
     const dx = hit.x - cue.x;
     const dz = hit.z - cue.z;
@@ -151,7 +148,7 @@ export function useAimInteraction({
     if (!keepDist) aimGhostDistRef.current = dist;
     const worldAngle = Math.atan2(dx, -forwardDz);
     applyAim(worldAngle);
-  }, [viewMode, breaking, scene3DRef, worldRef, aimRef, aimGhostDistRef, applyAim]);
+  }, [viewLevel, breaking, scene3DRef, worldRef, aimRef, aimGhostDistRef, applyAim]);
 
   /** 抓影子球挪位：影子球跟随指针落到台面任意位置，白球过影子球心的延长线即杆向 */
   const moveGhostTo = useCallback((clientX: number, clientY: number) => {
@@ -159,9 +156,7 @@ export function useAimInteraction({
     if (!scene) return;
     const cue = getCueBall(worldRef.current);
     if (!cue || !cue.active) return;
-    const hit = viewMode === 'first'
-      ? scene.screenToTableAt(clientX, clientY, aimRef.current)
-      : scene.screenToTable(clientX, clientY);
+    const hit = scene.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
     if (!hit) return;
     const m = TABLE.ballRadius;
     const gx = clamp(hit.x, -TABLE.width / 2 + m, TABLE.width / 2 - m);
@@ -177,7 +172,7 @@ export function useAimInteraction({
     aimGhostDistRef.current = dist;
     const worldAngle = Math.atan2(dx, -forwardDz);
     applyAim(worldAngle);
-  }, [viewMode, breaking, scene3DRef, worldRef, aimRef, aimGhostDistRef, applyAim]);
+  }, [viewLevel, breaking, scene3DRef, worldRef, aimRef, aimGhostDistRef, applyAim]);
 
   const cuePlacementAt = useCallback((clientX: number, clientY: number): {
     x: number;
@@ -185,7 +180,7 @@ export function useAimInteraction({
     error: MatchMessageKey | null;
   } | null => {
     const scene = scene3DRef.current;
-    const hit = scene?.screenToTable(clientX, clientY);
+    const hit = scene?.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
     if (!hit) return null;
 
     const xLimit = TABLE.width / 2 - TABLE.ballRadius;
@@ -208,7 +203,7 @@ export function useAimInteraction({
       return { x: hit.x, z: hit.z, error: 'place-near-pocket' };
     }
     return { x: hit.x, z: hit.z, error: null };
-  }, [scene3DRef, worldRef, breaking]);
+  }, [scene3DRef, worldRef, breaking, aimRef, viewLevel]);
 
   const previewCuePlacement = useCallback((clientX: number, clientY: number) => {
     const scene = scene3DRef.current;
@@ -245,10 +240,10 @@ export function useAimInteraction({
     });
     scene3DRef.current?.setGhostCue(0, 0, false);
     pendingDialAfterPlacementRef.current = true;
-    if (breaking) setViewMode('first');
+    if (breaking) setViewLevel(FIRST_PERSON_VIEW);
     setMatch((current) => ({ ...current, phase: 'aiming', messageKey: 'placed', messageParams: {} }));
     setWorldView(cloneWorld(world));
-  }, [cuePlacementAt, worldRef, scene3DRef, breaking, setViewMode, setMatch, setWorldView, setMessage]);
+  }, [cuePlacementAt, worldRef, scene3DRef, breaking, setViewLevel, setMatch, setWorldView, setMessage]);
 
   /** 指针落点判定：幽灵球上=抓球挪位；瞄准线段上=抓线转角；其余=点哪打哪 */
   const pickDragMode = useCallback((clientX: number, clientY: number): 'aim' | 'ghost' | 'line' => {
@@ -257,9 +252,7 @@ export function useAimInteraction({
     if (!scene || !cue) return 'aim';
     const ghost = scene.aimGhostPos();
     if (!ghost) return 'aim';
-    const hit = viewMode === 'first'
-      ? scene.screenToTableAt(clientX, clientY, aimRef.current)
-      : scene.screenToTable(clientX, clientY);
+    const hit = scene.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
     if (!hit) return 'aim';
     if (Math.hypot(hit.x - ghost.x, hit.z - ghost.z) < 0.08) return 'ghost';
     const lx = ghost.x - cue.x;
@@ -271,7 +264,7 @@ export function useAimInteraction({
       if (t > 0.05 && t < 1.05 && perp < 0.022) return 'line';
     }
     return 'aim';
-  }, [scene3DRef, worldRef, viewMode, aimRef]);
+  }, [scene3DRef, worldRef, viewLevel, aimRef]);
 
   /** 指针按下 */
   const handlePointerDown = useCallback((e: React.PointerEvent) => {

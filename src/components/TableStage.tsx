@@ -1,5 +1,5 @@
 /*
-[INPUT]: 依赖 viewMode / match / 幽灵球落位后的拨轮状态与 pointer 事件处理器
+[INPUT]: 依赖连续 viewLevel / match / 幽灵球落位后的拨轮状态与 pointer 事件处理器
 [OUTPUT]: 渲染精简球桌区域（3D 视口、无限瞄准拨轮与回合/结束遮罩）
 [POS]: HUD 组件层，组合瞄准拨轮与 3D 视口；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -9,10 +9,8 @@ import { AimDial } from './AimDial';
 import type { MatchState } from '../match/types';
 import type { PrecisionAimSolution } from '../aim/aim-solution';
 
-type ViewMode = 'first' | 'overhead';
-
 interface TableStageProps {
-  viewMode: ViewMode;
+  viewLevel: number;
   match: MatchState;
   aimDialVisible: boolean;
   aimDialSolution: PrecisionAimSolution | null;
@@ -26,7 +24,7 @@ interface TableStageProps {
 }
 
 export function TableStage({
-  viewMode,
+  viewLevel,
   match,
   aimDialVisible,
   aimDialSolution,
@@ -42,7 +40,8 @@ export function TableStage({
     <section className="table-stage">
       <div
         ref={containerRef}
-        className={`viewport ${viewMode} ${match.phase === 'placing' ? 'placing' : ''}`}
+        className={`viewport ${viewLevel >= 0.995 ? 'overhead' : 'orbit'} ${match.phase === 'placing' ? 'placing' : ''}`}
+        data-view-level={viewLevel.toFixed(3)}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

@@ -1,7 +1,7 @@
 /*
-[INPUT]: 当前视角模式与切换回调
-[OUTPUT]: 对外提供顶端俯视/底端第一人称的长行程竖向推杆，支持拖动、端点点击与键盘操作
-[POS]: 控制组件层，只把连续指针行程归约为两种视角，不持有对局或相机状态
+[INPUT]: 当前归一化视角高度与连续调整回调
+[OUTPUT]: 对外提供可停留任意高度的长行程竖向推杆，支持拖动、端点点击与渐进键盘操作
+[POS]: 控制组件层，只转发 0..1 连续视角事实，不持有对局或相机状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useRef, useState } from 'react';
@@ -10,30 +10,36 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react';
-
-type ViewMode = 'first' | 'overhead';
+import {
+  FIRST_PERSON_VIEW,
+  OVERHEAD_VIEW,
+  clampViewLevel,
+  viewLevelLabel,
+} from '../camera-view';
 
 type Props = {
-  viewMode: ViewMode;
-  onViewMode: (mode: ViewMode) => void;
+  viewLevel: number;
+  onViewLevel: (level: number) => void;
 };
 
-const modeForLevel = (level: number): ViewMode => level >= 0.5 ? 'overhead' : 'first';
+/** 必须与 controls.css 轨道/填充上下 12px 的可见行程一致。 */
+const TRACK_INSET_PX = 12;
 
-/** 推杆跟随手指，越过中点切换视角，松手吸附到对应端点。 */
-export function ViewToolbar({ viewMode, onViewMode }: Props) {
+/** 推杆跟随手指并持续提交高度；松手停在原位，不再吸附端点。 */
+export function ViewToolbar({ viewLevel, onViewLevel }: Props) {
   const pointerIdRef = useRef<number | null>(null);
-  const levelRef = useRef(viewMode === 'overhead' ? 1 : 0);
+  const levelRef = useRef(clampViewLevel(viewLevel));
   const [dragLevel, setDragLevel] = useState<number | null>(null);
-  const level = dragLevel ?? (viewMode === 'overhead' ? 1 : 0);
+  const level = dragLevel ?? clampViewLevel(viewLevel);
+  if (pointerIdRef.current === null) levelRef.current = level;
 
   const updateFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const next = Math.min(1, Math.max(0, (rect.bottom - event.clientY) / rect.height));
+    const travel = Math.max(1, rect.height - TRACK_INSET_PX * 2);
+    const next = clampViewLevel((rect.bottom - TRACK_INSET_PX - event.clientY) / travel);
     levelRef.current = next;
     setDragLevel(next);
-    const nextMode = modeForLevel(next);
-    if (nextMode !== viewMode) onViewMode(nextMode);
+    onViewLevel(next);
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -55,7 +61,6 @@ export function ViewToolbar({ viewMode, onViewMode }: Props) {
     if (pointerIdRef.current !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
-    onViewMode(modeForLevel(levelRef.current));
     pointerIdRef.current = null;
     setDragLevel(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -64,12 +69,25 @@ export function ViewToolbar({ viewMode, onViewMode }: Props) {
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'End') {
+    let next: number | null = null;
+    if (event.key === 'ArrowUp') {
+      next = levelRef.current + 0.05;
+    } else if (event.key === 'PageUp') {
+      next = levelRef.current + 0.15;
+    } else if (event.key === 'End') {
+      next = OVERHEAD_VIEW;
+    } else if (event.key === 'ArrowDown') {
+      next = levelRef.current - 0.05;
+    } else if (event.key === 'PageDown') {
+      next = levelRef.current - 0.15;
+    } else if (event.key === 'Home') {
+      next = FIRST_PERSON_VIEW;
+    }
+    if (next !== null) {
       event.preventDefault();
-      onViewMode('overhead');
-    } else if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key === 'Home') {
-      event.preventDefault();
-      onViewMode('first');
+      const clamped = clampViewLevel(next);
+      levelRef.current = clamped;
+      onViewLevel(clamped);
     }
   };
 
@@ -80,10 +98,10 @@ export function ViewToolbar({ viewMode, onViewMode }: Props) {
     >
       <button
         type="button"
-        className={`view-mode-button view-mode-overhead ${viewMode === 'overhead' ? 'active' : ''}`}
-        aria-pressed={viewMode === 'overhead'}
+        className={`view-mode-button view-mode-overhead ${level >= 0.995 ? 'active' : ''}`}
+        aria-pressed={level >= 0.995}
         aria-label="切换俯视视角"
-        onClick={() => onViewMode('overhead')}
+        onClick={() => onViewLevel(OVERHEAD_VIEW)}
       >
         俯视
       </button>
@@ -96,7 +114,7 @@ export function ViewToolbar({ viewMode, onViewMode }: Props) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(level * 100)}
-        aria-valuetext={viewMode === 'overhead' ? '俯视' : '第一人称'}
+        aria-valuetext={viewLevelLabel(level)}
         style={{ '--view-level': level } as CSSProperties}
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
@@ -111,10 +129,10 @@ export function ViewToolbar({ viewMode, onViewMode }: Props) {
       </div>
       <button
         type="button"
-        className={`view-mode-button view-mode-first ${viewMode === 'first' ? 'active' : ''}`}
-        aria-pressed={viewMode === 'first'}
+        className={`view-mode-button view-mode-first ${level <= 0.005 ? 'active' : ''}`}
+        aria-pressed={level <= 0.005}
         aria-label="切换第一人称视角"
-        onClick={() => onViewMode('first')}
+        onClick={() => onViewLevel(FIRST_PERSON_VIEW)}
       >
         第一人称
       </button>
