@@ -8,6 +8,8 @@
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
 
+`opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；用既有 erf 容错模型归一击球难度，按合格样本更新等级/置信度并生成每局锁定的对手档案，不依赖 React/DOM。
+
 `input/`: 出杆输入层，纯换算（行程归一、按住满力、击球点单位圆）+ React 协调器；rAF 只做预览，最终力度由松开时刻真实事实决定。
 
 `aim/`: 纯精瞄几何层——世界角首碰检测、统一物理袋口、2R 走廊遮挡、含 throw 的袋口左右角尖反解；同时向无限拨轮提供不受呼出阈值限制的最近合法袋口解。
@@ -41,10 +43,10 @@
 `audio.ts`: 基于 Web Audio 的无外部资源击球、碰撞、碰库与落袋合成音效。
 
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
-  - `useGameState`：集中管理对局状态（worldView/match/viewLevel）与编排动作；新局重置 shot 结算守卫
+  - `useGameState`：集中管理对局状态（worldView/match/viewLevel）、持久化玩家能力与局间锁定对手档案；新局重置 shot 结算守卫
   - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出的无边界变速拨轮
   - `useControlSlotDrag`：编辑态下封装右侧四个控件各自的轨内纵向拖动、黑条约束与位置持久化
-  - `useOpponentAI`：AI 对手回合调度，依赖 physics 击球与 match 规则状态机
+  - `useOpponentAI`：按局前锁定档案控制搜索预算、选杆扰动与执行误差的 AI 回合调度
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
   - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），玩家回合世界指纹变化时经可抢占 planner/async 后台搜索
   - `useDraggableOverlay`：规划/复盘共用的 Pointer 拖拽位移与视口边界约束

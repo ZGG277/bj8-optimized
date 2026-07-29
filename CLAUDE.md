@@ -6,7 +6,7 @@
 
 ## 成员清单
 
-`src/`: 游戏业务源码，包含 physics 物理世界、aim 360°/近袋精瞄几何、match 纯规则状态机、planner 走位规划引擎（含可抢占 Web Worker 异步封装）、input 出杆输入层、components HUD 控件、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
+`src/`: 游戏业务源码，包含 physics 物理世界、aim 精瞄几何、match 规则状态机、opponent 玩家能力/模式化对手档案、planner 走位搜索、input 出杆、components HUD、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
 
 `scripts/`: 构建发布适配、浏览器交互、画面与场景对象验证脚本；含妙搭单 HTML 门禁、真实指针回归（41 断言）、手机竖屏（48 断言）、虚母球/无限拨轮（8 断言）、预测球路一致性（19 断言）及规划/规则/视觉专项，成员清单见 `scripts/CLAUDE.md`。
 

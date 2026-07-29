@@ -18,7 +18,7 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 `ReviewOverlay.tsx`: 半透明可拖动击球复盘浮层；折叠态一句话诊断，展开态展示 verdict、诊断与计划/实际图例，场景对比委托 Scene3D。
 
-`IntroScreen.tsx`: 开始界面，品牌标识与开始按钮。
+`IntroScreen.tsx`: 开始界面，展示持久化玩家水平/置信度，并提供陪练与挑战两种局前对手关系入口。
 
 `AimControls.tsx`: 兼容保留的键盘/按钮式瞄准微调组件；当前主球桌交互使用 AimDial。
 

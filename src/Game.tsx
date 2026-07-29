@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：虚母球开球落位、连续环绕视角、桌内360°瞄准/无限拨轮/杆法/蓄力、规则轮转、AI 回合、走位复盘与竖屏 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、动态能力记录、局间锁定 AI、连续环绕视角、360° 瞄准/无限拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -30,6 +30,14 @@ import type { PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
 import { OVERHEAD_VIEW } from './camera-view';
+import type { GameMode, PositionOutcome } from './opponent/model';
+
+type SkillShotCapture = {
+  target: number;
+  pocket: number;
+  tolerance: number;
+  assisted: boolean;
+};
 
 export default function Game() {
   // ── 对局编排状态 ──
@@ -37,7 +45,8 @@ export default function Game() {
     worldRef, worldView, setWorldView,
     match, matchRef, setMatch,
     viewLevel, setViewLevel,
-    rating,
+    playerSkill, gameMode, opponentProfile,
+    recordPlayerShot,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
 
@@ -68,10 +77,13 @@ export default function Game() {
   // positionPlan 对象每渲染换新身份；出杆捕获只需读 plans，用 ref 镜像避免 handleCommit 重建
   const positionPlanRef = useRef(positionPlan);
   positionPlanRef.current = positionPlan;
+  const guidanceAllowed = gameMode === 'practice';
+  const planConsultedRef = useRef(false);
 
   // ── 击球复盘（上一杆「计划 vs 实际」）──
   // 出杆瞬间在 handleCommit 的 doShot 里捕获快照；对手杆走 useOpponentAI 不经此路，天然只记玩家杆
   const shotCaptureRef = useRef<ShotCapture | null>(null);
+  const skillShotCaptureRef = useRef<SkillShotCapture | null>(null);
   const [shotReview, setShotReview] = useState<ShotReview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
@@ -80,9 +92,11 @@ export default function Game() {
   // 打开前的视角，关闭时恢复
   const prevViewLevelRef = useRef(viewLevel);
   const handleOpenPlan = useCallback(() => {
+    if (!guidanceAllowed) return;
+    planConsultedRef.current = true;
     prevViewLevelRef.current = viewLevel;
     positionPlan.open();
-  }, [viewLevel, positionPlan]);
+  }, [guidanceAllowed, viewLevel, positionPlan]);
   const handleClosePlan = useCallback(() => {
     positionPlan.close();
     setViewLevel(prevViewLevelRef.current);
@@ -108,6 +122,7 @@ export default function Game() {
 
   // 💡 是规划与复盘的总开关：默认熄灭；复盘优先，规划仅在用户主动点亮时打开。
   const handleTogglePlan = useCallback(() => {
+    if (!guidanceAllowed) return;
     if (guidanceEnabled) {
       if (planOpen) handleClosePlan();
       if (reviewOpen) handleCloseReview();
@@ -118,6 +133,7 @@ export default function Game() {
     if (!shotReview && positionPlan.status === 'ready') handleOpenPlan();
   }, [
     guidanceEnabled,
+    guidanceAllowed,
     planOpen,
     reviewOpen,
     shotReview,
@@ -167,6 +183,20 @@ export default function Game() {
     scene3DRef.current?.showReviewOverlay(null);
 
     const doShot = () => {
+      const currentMatch = matchRef.current;
+      const legal = legalNumbers(worldRef.current, 'player', currentMatch.playerGroup);
+      const declaredIntent = currentMatch.breaking
+        ? null
+        : findPrecisionAim(worldRef.current, angle, legal);
+      skillShotCaptureRef.current = declaredIntent
+        ? {
+            target: declaredIntent.target,
+            pocket: declaredIntent.pocket,
+            tolerance: declaredIntent.halfWidth,
+            assisted: planConsultedRef.current,
+          }
+        : null;
+      planConsultedRef.current = false;
       // 击球前快照（复盘捕获点）：strikeCueBall 会改写 worldRef，必须先克隆
       shotCaptureRef.current = {
         worldBefore: cloneWorld(worldRef.current),
@@ -177,6 +207,7 @@ export default function Game() {
       };
       if (!strikeCueBall(worldRef.current, angle, intent.power, intent.spin)) {
         shotCaptureRef.current = null;
+        skillShotCaptureRef.current = null;
         return;
       }
       // 每杆只在物理确认击球成功后复位中杆，避免动画取消时误清用户设置。
@@ -193,7 +224,7 @@ export default function Game() {
     } else {
       doShot();
     }
-  }, [worldRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch]);
+  }, [worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch]);
 
   // ── 出杆输入协调器 ──
   const {
@@ -238,16 +269,21 @@ export default function Game() {
   });
 
   // ── 重置游戏 ──
-  const handleResetGame = useCallback(() => {
-    resetGame(setAim);
+  const handleResetGame = useCallback((nextMode: GameMode) => {
+    resetGame(setAim, nextMode);
     setSpin({ x: 0, y: 0 });
     setGuidanceEnabled(false);
+    planConsultedRef.current = false;
+    skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
   }, [resetGame, setAim, setSpin, aimGhostDistRef]);
+  const handleReplay = useCallback(() => {
+    handleResetGame(gameMode);
+  }, [gameMode, handleResetGame]);
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
-    settleShotRaw(setViewLevel);
+    const settlement = settleShotRaw(setViewLevel);
     // 复盘生成：有捕获（玩家杆）→ 判定；无捕获（对手杆）→ 清掉旧复盘
     const capture = shotCaptureRef.current;
     shotCaptureRef.current = null;
@@ -255,7 +291,30 @@ export default function Game() {
     setShotReview(review);
     // 只记录复盘，不主动打开；用户需要再次点亮 💡。
     setGuidanceEnabled(false);
-  }, [settleShotRaw, setViewLevel]);
+
+    const skillCapture = skillShotCaptureRef.current;
+    skillShotCaptureRef.current = null;
+    if (settlement && skillCapture) {
+      const { facts, resolution } = settlement;
+      const messageKey = resolution.next.messageKey;
+      const foul = messageKey === 'foul' || messageKey === 'lose-8-foul';
+      const pocketed = facts.pocketed.includes(skillCapture.target);
+      const samePlan =
+        review?.planned.candidate.target === skillCapture.target &&
+        review.planned.candidate.pocket === skillCapture.pocket;
+      let position: PositionOutcome = 'unknown';
+      if (pocketed && samePlan) {
+        position = review.verdict === 'perfect' ? 'success' : 'miss';
+      }
+      recordPlayerShot({
+        tolerance: skillCapture.tolerance,
+        pocketed,
+        foul,
+        position,
+        assisted: skillCapture.assisted,
+      });
+    }
+  }, [recordPlayerShot, settleShotRaw, setViewLevel]);
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
@@ -275,7 +334,7 @@ export default function Game() {
     matchRef,
     scene3DRef,
     audioRef,
-    rating,
+    opponentProfile,
     playerGroup: match.playerGroup,
     setWorldView,
     setMatch,
@@ -353,7 +412,7 @@ export default function Game() {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onAimDialAdjust={handleAimDialAdjust}
-        onResetGame={handleResetGame}
+        onResetGame={handleReplay}
       />
       <ControlDeck
         viewLevel={viewLevel}
@@ -362,9 +421,9 @@ export default function Game() {
         charging={charging}
         previewPower={previewPower}
         breaking={match.breaking}
-        planStatus={positionPlan.status}
-        guidanceEnabled={guidanceEnabled}
-        hasReview={Boolean(shotReview)}
+        planStatus={guidanceAllowed ? positionPlan.status : 'idle'}
+        guidanceEnabled={guidanceAllowed && guidanceEnabled}
+        hasReview={guidanceAllowed && Boolean(shotReview)}
         onViewLevel={setViewLevel}
         onSpinChange={setSpin}
         onTogglePlan={handleTogglePlan}
@@ -374,7 +433,7 @@ export default function Game() {
         onCancelCharge={cancelCharge}
         onTapShot={() => commitShot({ power: MIN_POWER, spin })}
       />
-      {guidanceEnabled && planOpen && (
+      {guidanceAllowed && guidanceEnabled && planOpen && (
         <PlanOverlay
           plans={positionPlan.plans}
           onClose={handleClosePlan}
@@ -382,7 +441,7 @@ export default function Game() {
         />
       )}
       {/* 复盘讲上一杆、规划讲下一杆可共存；planOpen 时提示条位置让位给引导，chip 隐藏 */}
-      {guidanceEnabled && shotReview && !planOpen && (
+      {guidanceAllowed && guidanceEnabled && shotReview && !planOpen && (
         <ReviewOverlay
           review={shotReview}
           open={reviewOpen}
@@ -390,7 +449,9 @@ export default function Game() {
           onClose={handleCloseReview}
         />
       )}
-      {match.phase === 'intro' && <IntroScreen onStart={handleResetGame} />}
+      {match.phase === 'intro' && (
+        <IntroScreen playerSkill={playerSkill} onStart={handleResetGame} />
+      )}
     </div>
   );
 }
