@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 对手观战全台、独立环绕、交棒保留、全局点选冻结球台及手动回第一人称断言
+[OUTPUT]: 390×844 对手观战全台、独立环绕、交棒保留、触屏瞄准锁镜、全局点选冻结球台及手动回第一人称断言
 [POS]: 竖屏观战相机的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -234,6 +234,39 @@ ok(
   firstPerson.level <= 0.005 &&
     Math.abs(firstPerson.viewAzimuth - firstPerson.aim) < 1e-6,
   JSON.stringify(firstPerson),
+);
+
+// 第一人称触屏瞄准时固定画面；松手并结束微调窗口后才让镜头平滑跟上杆向。
+const touchAimTarget = await page.evaluate(() => {
+  const world = window.__bj8.world.current;
+  const cue = world.balls[0];
+  const aim = window.__bj8.aim.current;
+  const targetAim = aim + 0.18;
+  const target = {
+    x: cue.x + Math.sin(targetAim) * 0.55,
+    z: cue.z - Math.cos(targetAim) * 0.55,
+  };
+  const level = Number(document.querySelector('.viewport').getAttribute('data-view-level'));
+  const screen = window.__bj8.scene.current.tableToScreenAt(
+    target.x,
+    target.z,
+    window.__bj8.cameraViewAzimuth.current,
+    level,
+  );
+  return { targetAim, target, screen };
+});
+await page.touchscreen.touchStart(touchAimTarget.screen.x, touchAimTarget.screen.y);
+await wait(180);
+const touchAimLocked = await readCamera();
+await page.touchscreen.touchEnd();
+await wait(850);
+const touchAimFollowed = await readCamera();
+ok(
+  '手机瞄准操作期间球台保持固定，停止后镜头才平滑跟杆',
+  Math.abs(touchAimLocked.aim - firstPerson.aim) > 0.1 &&
+    Math.abs(touchAimLocked.viewAzimuth - firstPerson.viewAzimuth) < 1e-6 &&
+    Math.abs(touchAimFollowed.viewAzimuth - touchAimFollowed.aim) < 1e-6,
+  JSON.stringify({ firstPerson, touchAimTarget, touchAimLocked, touchAimFollowed }),
 );
 
 // 玩家自己升回全局视角：冻结进入瞬间的球台方位，点台面只更新瞄准与幽灵球。

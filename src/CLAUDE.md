@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；触屏粗瞄、幽灵球与精瞄拨轮操作期间短暂冻结低位相机，停止操作后再平滑跟杆，全局视角则持续固定；规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
 
