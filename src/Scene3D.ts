@@ -696,7 +696,23 @@ export class Scene3D {
 
       // 木框顶面的薄皮护口：沿袋口外半圈铺一条扁平硬挺的带状实体。
       // 顶面宽度足以在全台俯视中识别，厚度仅 1.6mm，避免再次出现软、厚、外凸的感觉。
-      const trimPoints = lipCurve.getPoints(48);
+      // 护口使用独立曲线，把两端藏进木帮一小段；袋腔内的深色袋唇仍沿原曲线落到 jaw 入口。
+      const trimLocalPoints = lipLocalPoints.map(([depth, lateral], index) => {
+        const isEnd = index === 0 || index === lipLocalPoints.length - 1;
+        return [
+          isEnd ? pocket.shelfDepth * 0.5 : depth,
+          lateral,
+        ] as [number, number];
+      });
+      const trimCurve = new THREE.CatmullRomCurve3(
+        trimLocalPoints.map(([depth, lateral]) => {
+          const point = pocketLocalToWorld(pocket, depth, lateral);
+          return new THREE.Vector3(point.x, 0, point.z);
+        }),
+        false,
+        'centripetal',
+      );
+      const trimPoints = trimCurve.getPoints(48);
       const trimWidth = pocket.kind === 'corner' ? 0.021 : 0.016;
       const trimTopY = RAIL_H + 0.004;
       const trimBottomY = trimTopY - 0.0016;
@@ -717,6 +733,15 @@ export class Scene3D {
           normalX *= -1;
           normalZ *= -1;
         }
+        const t = index / (trimPoints.length - 1);
+        const edgeDistance = Math.min(t, 1 - t);
+        const endBlend = 1 - THREE.MathUtils.smoothstep(edgeDistance, 0, 0.18);
+        normalX = THREE.MathUtils.lerp(normalX, pocket.outward.x, endBlend);
+        normalZ = THREE.MathUtils.lerp(normalZ, pocket.outward.z, endBlend);
+        const blendedNormalLength = Math.hypot(normalX, normalZ) || 1;
+        normalX /= blendedNormalLength;
+        normalZ /= blendedNormalLength;
+        // 端部曲线已与木帮平行，保留完整宽度做直截面衔接，避免归零收尖形成小三角。
         const leftX = point.x + normalX * trimWidth;
         const leftZ = point.z + normalZ * trimWidth;
         const rightX = point.x;
@@ -756,6 +781,7 @@ export class Scene3D {
       trimGeometry.computeVertexNormals();
       const topTrim = new THREE.Mesh(trimGeometry, pocketTopTrimMat);
       topTrim.name = `pocket-top-trim-${pocket.index}`;
+      topTrim.userData.seamlessEndCount = 2;
       topTrim.castShadow = true;
       topTrim.receiveShadow = true;
       this.tableGroup.add(topTrim);

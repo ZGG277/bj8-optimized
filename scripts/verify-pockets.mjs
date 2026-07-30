@@ -75,6 +75,7 @@ const pocketAnatomy = await page.evaluate(() => {
     pocketWraps: 0,
     mouths: 0,
     topTrims: 0,
+    seamlessTrimEnds: 0,
     lips: 0,
     wells: 0,
     bottoms: 0,
@@ -95,7 +96,10 @@ const pocketAnatomy = await page.evaluate(() => {
       object.name.startsWith('pocket-leather-wrap-')
     ) counts.pocketWraps += 1;
     if (object.name.startsWith('pocket-mouth-')) counts.mouths += 1;
-    if (object.name.startsWith('pocket-top-trim-')) counts.topTrims += 1;
+    if (object.name.startsWith('pocket-top-trim-')) {
+      counts.topTrims += 1;
+      counts.seamlessTrimEnds += Number(object.userData.seamlessEndCount ?? 0);
+    }
     if (object.name.startsWith('pocket-lip-')) counts.lips += 1;
     if (object.name.startsWith('pocket-well-')) counts.wells += 1;
     if (object.name.startsWith('pocket-bottom-')) counts.bottoms += 1;
@@ -111,6 +115,7 @@ ok(
     pocketAnatomy.pocketWraps === 0 &&
     pocketAnatomy.mouths === 6 &&
     pocketAnatomy.topTrims === 6 &&
+    pocketAnatomy.seamlessTrimEnds === 12 &&
     pocketAnatomy.lips === 6 &&
     pocketAnatomy.wells === 6 &&
     pocketAnatomy.bottoms === 6,
