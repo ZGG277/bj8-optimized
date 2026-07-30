@@ -41,6 +41,19 @@ async function realClickButton(page, text) {
   return true;
 }
 
+/** 纯视觉按钮没有 textContent，浏览器门禁通过无障碍名称定位并发出真实点击。 */
+async function realClickAria(page, ariaLabel) {
+  const box = await page.evaluate((label) => {
+    const element = document.querySelector(`[aria-label="${label}"]`);
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }, ariaLabel);
+  if (!box) return false;
+  await page.mouse.click(box.x, box.y);
+  return true;
+}
+
 async function placeCueBallInKitchen(page) {
   const candidates = await page.evaluate(() => {
     const r = document.querySelector('.viewport').getBoundingClientRect();
@@ -66,7 +79,11 @@ async function newGamePage(viewport) {
   await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
   await page.evaluate(() => {
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith('bj8-control-y:')) localStorage.removeItem(key);
+      if (
+        key.startsWith('bj8-control-y:') ||
+        key === 'guagua-billiards:control-layout:v3' ||
+        key === 'guagua-billiards:aim-assist:v1'
+      ) localStorage.removeItem(key);
     }
   });
   await page.reload({ waitUntil: 'networkidle0' });
@@ -149,7 +166,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     const turn = await turnText(page);
     if (turn === '你的回合') return true;
     if (turn === '放置白球') {
-      await realClickButton(page, '俯视');
+      await realClickAria(page, '切换俯视视角');
       await new Promise(r => setTimeout(r, 400));
       const candidates = await page.evaluate(() => {
         const r = document.querySelector('.viewport').getBoundingClientRect();
@@ -184,9 +201,9 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   const overflow = layout.items.filter(r => r.bottom > layout.deck.y + layout.deck.h + 2);
   ok('桌面: 控制区无溢出元素', overflow.length === 0, overflow.length ? `${overflow.length}个元素溢出` : '');
 
-  // 切视角:真实点击,aria-pressed 状态翻转,且不改变瞄准角
+  // 纯视觉端点按钮仍保留 aria；真实点击后状态翻转，且不改变瞄准角。
   const aimBeforeSwitch = await page.evaluate(() => window.__bj8.aim.current);
-  await realClickButton(page, '俯视');
+  await realClickAria(page, '切换俯视视角');
   await new Promise(r => setTimeout(r, 400));
   const pressed = await page.evaluate(() => ({
     first: document.querySelector('[aria-label="切换第一人称视角"]')?.getAttribute('aria-pressed'),
@@ -195,7 +212,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   ok('桌面: 切视角 aria-pressed 翻转', pressed.first === 'false' && pressed.overhead === 'true', JSON.stringify(pressed));
   const aimAfterSwitch = await page.evaluate(() => window.__bj8.aim.current);
   ok('桌面: 切视角不改变瞄准角', aimBeforeSwitch === aimAfterSwitch, `before=${aimBeforeSwitch} after=${aimAfterSwitch}`);
-  await realClickButton(page, '第一人称');
+  await realClickAria(page, '切换第一人称视角');
   await new Promise(r => setTimeout(r, 400));
 
   // 鼠标拖拽出杆
@@ -219,9 +236,10 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   // 键盘:空格按住 1350ms → 最终力度 81±2(真实 keyboard 事件,与帧率无关)
   await page.keyboard.down('Space');
   await new Promise(r => setTimeout(r, 1350));
+  const holdPower = await page.evaluate(() =>
+    Number(document.querySelector('[role="meter"][aria-label="出杆力度"]')?.getAttribute('aria-valuenow') ?? 0));
   await page.keyboard.up('Space');
   await new Promise(r => setTimeout(r, 250));
-  const holdPower = await page.evaluate(() => parseInt(document.querySelector('.power-num')?.textContent ?? '0', 10));
   ok('桌面: 空格1350ms力度81±2', Math.abs(holdPower - 81) <= 2, `power=${holdPower}`);
   ok('桌面: 空格出杆后回到你的回合', await stagePlayerAim(page));
 
@@ -241,7 +259,8 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   await page.mouse.move(spinBox.cx, spinBox.cy - 18, { steps: 4 });
   await page.mouse.up();
   await new Promise(r => setTimeout(r, 200));
-  const spinLabel = await page.evaluate(() => document.querySelector('.mobile-spin-pad small')?.textContent);
+  const spinLabel = await page.evaluate(() =>
+    document.querySelector('.mobile-spin-pad')?.getAttribute('aria-valuetext'));
   ok('桌面: 塞球盘上拖=高杆', spinLabel === '高杆', spinLabel || '');
 
   // 瞄准拖拽不报错
@@ -297,7 +316,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   // 自由球放置：直接固定规则阶段，隔离随机开球与 AI 时序，只验证真实触摸输入出口。
   await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 30000 }).catch(() => {});
   {
-    await realClickButton(page, '俯视');
+    await realClickAria(page, '切换俯视视角');
     await page.evaluate(() => {
       const world = window.__bj8.world.current;
       const cue = world.balls[0];
@@ -393,16 +412,22 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   // 出杆区应在右下四分之一区域
   ok('横屏: 出杆区位于右下角', box && box.cx > 812 * 0.6 && box.cy > 375 * 0.5, box ? `cx=${Math.round(box.cx)} cy=${Math.round(box.cy)}` : '');
 
-  // 视角按钮不被顶栏遮挡,elementFromPoint 命中按钮自身(开球前必为玩家回合)
+  // 纯视觉视角端点不被比分栏遮挡，命中自身或其图形子节点。
   const viewBtn = await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('.view-switcher button')].find(b => b.textContent === '俯视');
+    const btn = document.querySelector('[aria-label="切换俯视视角"]');
     if (!btn) return null;
     const r = btn.getBoundingClientRect();
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     const hit = document.elementFromPoint(cx, cy);
-    return { cx, cy, top: r.y, hitIsSelf: hit === btn, hitTag: hit ? `${hit.tagName}.${hit.className}` : 'null' };
+    return {
+      cx,
+      cy,
+      top: r.y,
+      hitIsSelf: hit === btn || btn.contains(hit),
+      hitTag: hit ? `${hit.tagName}.${hit.className}` : 'null',
+    };
   });
-  ok('横屏: 视角按钮不被遮挡(elementFromPoint)', !!viewBtn && viewBtn.hitIsSelf,
+  ok('横屏: 纯视觉视角端点不被遮挡(elementFromPoint)', !!viewBtn && viewBtn.hitIsSelf,
     viewBtn ? `top=${Math.round(viewBtn.top)} hit=${viewBtn.hitTag}` : '按钮不存在');
 
   // 真实点击切视角:aria-pressed 翻转,瞄准角不变
@@ -411,10 +436,10 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     await page.mouse.click(viewBtn.cx, viewBtn.cy);
     await new Promise(r => setTimeout(r, 300));
     const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
-    ok('横屏: 点击视角按钮不改变瞄准角', aimBefore === aimAfter, `before=${aimBefore} after=${aimAfter}`);
+    ok('横屏: 点击视角端点不改变瞄准角', aimBefore === aimAfter, `before=${aimBefore} after=${aimAfter}`);
     const pressed = await page.evaluate(() => document.querySelector('[aria-label="切换俯视视角"]')?.getAttribute('aria-pressed'));
-    ok('横屏: 视角按钮状态变化(aria-pressed)', pressed === 'true', `aria-pressed=${pressed}`);
-    await realClickButton(page, '第一人称');
+    ok('横屏: 视角端点状态变化(aria-pressed)', pressed === 'true', `aria-pressed=${pressed}`);
+    await realClickAria(page, '切换第一人称视角');
     await new Promise(r => setTimeout(r, 300));
   }
 

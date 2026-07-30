@@ -16,6 +16,7 @@ import {
   respotCueBall,
   clampAimToForwardHalf,
   predictBallCollisionDirections,
+  getPocketAimWindow,
   POCKETS,
   TABLE,
   PHYSICS_DT,
@@ -280,12 +281,16 @@ describe('碰撞物理测试', () => {
 });
 
 describe('落袋检测测试', () => {
-  it('中袋捕获半径比旧版 62mm 收窄，且明显小于角袋', () => {
+  it('六袋采用统一参数化口宽、圆弧角衬与台阶深度', () => {
     expect(TABLE.ballRadius * 2).toBeCloseTo(0.05715, 6);
-    expect(TABLE.cornerPocketRadius).toBeCloseTo(0.068, 6);
-    expect(TABLE.sidePocketRadius).toBeCloseTo(0.052, 6);
-    expect(TABLE.sidePocketRadius).toBeLessThan(0.062);
-    expect(POCKETS[2].captureRadius).toBeLessThan(POCKETS[0].captureRadius);
+    expect(POCKETS).toHaveLength(6);
+    expect(POCKETS[0].mouthWidth).toBeCloseTo(0.088, 6);
+    expect(POCKETS[2].mouthWidth).toBeCloseTo(0.092, 6);
+    expect(POCKETS[0].jawRadius).toBeCloseTo(0.102, 6);
+    expect(POCKETS[2].jawRadius).toBeCloseTo(0.064, 6);
+    expect(POCKETS[0].shelfDepth).toBeCloseTo(0.036, 6);
+    expect(POCKETS[2].shelfDepth).toBeCloseTo(0.024, 6);
+    expect(getPocketAimWindow(POCKETS[2]).halfWidth).toBeGreaterThan(0);
   });
 
   it('正对中袋的球可落袋，高速跨过窄捕获圈也不会穿透', () => {
@@ -308,7 +313,7 @@ describe('落袋检测测试', () => {
     for (const ball of world.balls) if (ball.number !== 0) ball.active = false;
     const cue = getCueBall(world)!;
     cue.x = TABLE.width / 2 - TABLE.ballRadius - 0.08;
-    cue.z = TABLE.sidePocketRadius + 0.006;
+    cue.z = getPocketAimWindow(POCKETS[3]).halfWidth + 0.006;
     cue.vx = 1.2;
     cue.vz = 0;
     world.moving = true;

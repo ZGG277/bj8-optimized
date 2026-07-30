@@ -7,6 +7,7 @@
 import {
   POCKETS,
   TABLE,
+  getPocketAimWindow,
   getCueBall,
   type BilliardsWorld,
   type CueSpin,
@@ -25,7 +26,6 @@ export function pocketName(index: number): string {
 
 // ---- 候选过滤常量 ----
 export const MAX_CUT_ANGLE = (75 * Math.PI) / 180; // 最大切球角 75°
-export const POCKET_EFFECTIVE_RATIO = 0.75;        // 袋口有效半径 = 物理半径 × 0.75（角尖内缩近似）
 export const MAX_CANDIDATES = 60;                  // 候选总数上限
 export const BASE_POWER_MIN = 38;
 export const BASE_POWER_MAX = 78;
@@ -72,23 +72,15 @@ function pathClear(
 
 /**
  * 进球容错半宽（pooltool required_precision 思路）：
- * 从目标球心分别瞄准袋口左右「角尖」（袋口中心 ± 有效半径，沿视线垂线偏移），
- * 两个出射方向夹角的一半即 Δφ。袋口有效半径取 pocket.radius × 0.75。
+ * 从目标球心分别瞄准统一物理几何给出的左右安全落点，
+ * 两个出射方向夹角的一半即 Δφ。
  */
 function shotTolerance(targetX: number, targetZ: number, pocket: Pocket): number {
-  const dx = pocket.x - targetX;
-  const dz = pocket.z - targetZ;
-  const distance = Math.hypot(dx, dz);
-  if (distance === 0) return 0;
-
-  const perpX = -dz / distance;
-  const perpZ = dx / distance;
-  const effectiveRadius = pocket.radius * POCKET_EFFECTIVE_RATIO;
-
-  const leftX = pocket.x + perpX * effectiveRadius;
-  const leftZ = pocket.z + perpZ * effectiveRadius;
-  const rightX = pocket.x - perpX * effectiveRadius;
-  const rightZ = pocket.z - perpZ * effectiveRadius;
+  const window = getPocketAimWindow(pocket);
+  const leftX = window.left.x;
+  const leftZ = window.left.z;
+  const rightX = window.right.x;
+  const rightZ = window.right.z;
 
   const angleLeft = Math.atan2(leftX - targetX, leftZ - targetZ);
   const angleRight = Math.atan2(rightX - targetX, rightZ - targetZ);
@@ -116,9 +108,10 @@ export function generateCandidates(world: BilliardsWorld, legal: number[]): Shot
 
     for (let pocketIndex = 0; pocketIndex < POCKETS.length; pocketIndex += 1) {
       const pocket = POCKETS[pocketIndex];
+      const aimWindow = getPocketAimWindow(pocket);
 
-      const pocketDx = pocket.x - target.x;
-      const pocketDz = pocket.z - target.z;
+      const pocketDx = aimWindow.center.x - target.x;
+      const pocketDz = aimWindow.center.z - target.z;
       const pocketDistance = Math.hypot(pocketDx, pocketDz);
       if (pocketDistance === 0) continue;
 
@@ -141,7 +134,14 @@ export function generateCandidates(world: BilliardsWorld, legal: number[]): Shot
       if (cutAngle > MAX_CUT_ANGLE) continue;
 
       // 两条路径无遮挡；cue→ghost 走廊同时保证 ghost 点处母球占位空间足够
-      if (!pathClear(world, target.x, target.z, pocket.x, pocket.z, new Set([target.number]))) continue;
+      if (!pathClear(
+        world,
+        target.x,
+        target.z,
+        aimWindow.center.x,
+        aimWindow.center.z,
+        new Set([target.number]),
+      )) continue;
       if (!pathClear(world, cue.x, cue.z, ghostX, ghostZ, new Set([0, target.number]))) continue;
 
       candidates.push({

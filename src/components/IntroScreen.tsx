@@ -32,11 +32,11 @@ export function IntroScreen({ playerSkill, onStart }: IntroScreenProps) {
       <div className="intro-card">
         <span className="intro-kicker">中式八球 · 物理模拟</span>
         <h1>瓜瓜台球</h1>
-        <p>选择这一局你想要的对手关系。实力只在开局匹配，局内不会追着比分变化。</p>
+        <p>选择这一局你想要的对手关系。每三杆更新一次评估，顾燃随后渐进匹配。</p>
         <div className="skill-summary" aria-label="当前能力评估">
           <span>当前水平</span>
           <strong>{levelLabel(playerSkill.level)} · {Math.round(playerSkill.level)}</strong>
-          <small>{confidenceText} · {Math.floor(playerSkill.qualifiedShots)} 杆有效样本</small>
+          <small>{confidenceText} · {Math.floor(playerSkill.totalPlayerShots)} 杆已记录</small>
         </div>
         <div className="mode-grid">
           <section className="mode-choice practice">
@@ -50,7 +50,7 @@ export function IntroScreen({ playerSkill, onStart }: IntroScreenProps) {
           </section>
           <section className="mode-choice challenge">
             <span>挑战</span>
-            <strong>高一档，整局锁定</strong>
+            <strong>高一档，持续挑战</strong>
             <small>顾燃 {levelLabel(challengeLevel)} · {challengeLevel}</small>
             <em>赛中关闭规划提示</em>
             <button className="mode-start" onClick={() => onStart('challenge')}>
@@ -61,7 +61,7 @@ export function IntroScreen({ playerSkill, onStart }: IntroScreenProps) {
         <div className="intro-tags">
           <span>240Hz物理</span>
           <span>动态评估</span>
-          <span>局内公平锁定</span>
+          <span>渐进匹配</span>
         </div>
       </div>
     </div>

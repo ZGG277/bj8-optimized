@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、动态能力记录、局间锁定 AI、独立观战环绕、360° 瞄准/无限拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、三杆批量能力与渐进 AI、独立观战环绕、360° 瞄准/无限拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -26,6 +26,7 @@ import { useAimInteraction } from './hooks/useAimInteraction';
 import { useOpponentAI } from './hooks/useOpponentAI';
 import { useAudioManager } from './hooks/useAudioManager';
 import { usePositionPlan } from './hooks/usePositionPlan';
+import { useAimAssist } from './hooks/useAimAssist';
 import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
 import { ControlDeck } from './components/ControlDeck';
@@ -45,9 +46,9 @@ import {
 import type { GameMode, PositionOutcome } from './opponent/model';
 
 type SkillShotCapture = {
-  target: number;
-  pocket: number;
-  tolerance: number;
+  target: number | null;
+  pocket: number | null;
+  tolerance: number | null;
   assisted: boolean;
 };
 
@@ -105,6 +106,7 @@ export default function Game() {
   const [reviewOpen, setReviewOpen] = useState(false);
   // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
   const [guidanceEnabled, setGuidanceEnabled] = useState(false);
+  const aimAssist = useAimAssist();
 
   // 打开前的视角，关闭时恢复
   const prevViewLevelRef = useRef(viewLevel);
@@ -227,14 +229,12 @@ export default function Game() {
       const declaredIntent = currentMatch.breaking
         ? null
         : findPrecisionAim(worldRef.current, angle, legal);
-      skillShotCaptureRef.current = declaredIntent
-        ? {
-            target: declaredIntent.target,
-            pocket: declaredIntent.pocket,
-            tolerance: declaredIntent.halfWidth,
-            assisted: planConsultedRef.current,
-          }
-        : null;
+      skillShotCaptureRef.current = {
+        target: declaredIntent?.target ?? null,
+        pocket: declaredIntent?.pocket ?? null,
+        tolerance: declaredIntent?.halfWidth ?? null,
+        assisted: planConsultedRef.current,
+      };
       planConsultedRef.current = false;
       // 击球前快照（复盘捕获点）：strikeCueBall 会改写 worldRef，必须先克隆
       shotCaptureRef.current = {
@@ -379,12 +379,15 @@ export default function Game() {
 
     const skillCapture = skillShotCaptureRef.current;
     skillShotCaptureRef.current = null;
-    if (settlement && skillCapture) {
+    if (settlement && skillCapture && capture) {
       const { facts, resolution } = settlement;
       const messageKey = resolution.next.messageKey;
       const foul = messageKey === 'foul' || messageKey === 'lose-8-foul';
-      const pocketed = facts.pocketed.includes(skillCapture.target);
+      const pocketed =
+        skillCapture.target !== null && facts.pocketed.includes(skillCapture.target);
       const samePlan =
+        skillCapture.target !== null &&
+        skillCapture.pocket !== null &&
         review?.planned.candidate.target === skillCapture.target &&
         review.planned.candidate.pocket === skillCapture.pocket;
       let position: PositionOutcome = 'unknown';
@@ -474,6 +477,7 @@ export default function Game() {
     scene.setViewLevel(viewLevel);
     scene.setAim(aim);
     scene.setCameraAzimuth(spectatorActive ? cameraAzimuth : aim);
+    scene.setAimAssistVisible(aimAssist.enabled);
     scene.setSpin(spin);
     scene.setAimGhostDist(aimGhostDistRef.current);
     // 合法目标高亮：只在玩家回合显示
@@ -482,24 +486,38 @@ export default function Game() {
 
     const cue = getCueBall(worldView);
     scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
-  }, [worldView, viewLevel, aim, cameraAzimuth, spectatorActive, previewPower, match, spin, aimGhostDistRef, legalTargets]);
+  }, [
+    worldView,
+    viewLevel,
+    aim,
+    cameraAzimuth,
+    spectatorActive,
+    aimAssist.enabled,
+    previewPower,
+    match,
+    spin,
+    aimGhostDistRef,
+    legalTargets,
+  ]);
 
   // ── 渲染 ──
   return (
     <div className="game-shell">
-      <Scoreboard match={match} worldView={worldView} />
+      <Scoreboard
+        match={match}
+        worldView={worldView}
+        playerSkill={playerSkill}
+        opponentProfile={opponentProfile}
+      />
       <TableStage
         viewLevel={viewLevel}
         spectatorActive={spectatorActive}
         match={match}
-        aimDialVisible={aimDialVisible}
-        aimDialSolution={aimDialSolution}
         containerRef={containerRef}
         onPointerDown={handleStagePointerDown}
         onPointerMove={handleStagePointerMove}
         onPointerUp={(event) => finishStagePointer(event, handlePointerUp)}
         onPointerCancel={(event) => finishStagePointer(event, handlePointerCancel)}
-        onAimDialAdjust={handleAimDialAdjust}
         onCameraRecenter={handleCameraRecenter}
         onResetGame={handleReplay}
       />
@@ -513,9 +531,14 @@ export default function Game() {
         planStatus={guidanceAllowed ? positionPlan.status : 'idle'}
         guidanceEnabled={guidanceAllowed && guidanceEnabled}
         hasReview={guidanceAllowed && Boolean(shotReview)}
+        aimAssistEnabled={aimAssist.enabled}
+        aimDialVisible={aimDialVisible}
+        aimDialSolution={aimDialSolution}
         onViewLevel={setViewLevel}
         onSpinChange={setSpin}
-        onTogglePlan={handleTogglePlan}
+        onToggleGuidance={handleTogglePlan}
+        onToggleAimAssist={aimAssist.toggle}
+        onAimDialAdjust={handleAimDialAdjust}
         onBeginCharge={beginCharge}
         onUpdateCharge={updateCharge}
         onReleaseCharge={releaseCharge}

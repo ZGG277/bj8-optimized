@@ -1,6 +1,6 @@
 /*
-[INPUT]: 可见状态、最近合法袋口解与相对像素拨动回调
-[OUTPUT]: 对外提供球桌内无边界横向密码轮；固定中心线、移动刻度、键盘与 Pointer 拨动
+[INPUT]: 可见状态、横/竖停靠方向、最近合法袋口解与相对像素拨动回调
+[OUTPUT]: 对外提供纯视觉无边界拨轮；以颜色、刻度密度和传动阻尼表达瞄准档位
 [POS]: 控制组件层；只采集相对位移与展示档位，不持有世界角或判断球路
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -11,11 +11,12 @@ import { aimDialMode } from '../input/aim-dial';
 interface AimDialProps {
   visible: boolean;
   solution: PrecisionAimSolution | null;
+  orientation: 'horizontal' | 'vertical';
   onAdjust: (pixelDelta: number) => void;
 }
 
-export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
-  const lastXRef = useRef<number | null>(null);
+export function AimDial({ visible, solution, orientation, onAdjust }: AimDialProps) {
+  const lastCoordRef = useRef<number | null>(null);
   const [tickOffset, setTickOffset] = useState(0);
   const [active, setActive] = useState(false);
   if (!visible) return null;
@@ -29,7 +30,7 @@ export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
       : '方向拨轮';
 
   const finish = (event: React.PointerEvent<HTMLDivElement>) => {
-    lastXRef.current = null;
+    lastCoordRef.current = null;
     setActive(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -38,23 +39,26 @@ export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
 
   return (
     <div
-      className={`aim-dial ${mode} ${active ? 'active' : ''}`}
+      className={`aim-dial ${mode} is-${orientation} ${active ? 'active' : ''}`}
       role="slider"
       tabIndex={0}
-      aria-label="横向拨轮调整击球方向"
+      aria-label="拨轮调整击球方向"
+      aria-orientation={orientation}
       aria-valuetext={label}
       onPointerDown={(event) => {
         event.stopPropagation();
         event.preventDefault();
-        lastXRef.current = event.clientX;
+        lastCoordRef.current =
+          orientation === 'vertical' ? event.clientY : event.clientX;
         setActive(true);
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
       onPointerMove={(event) => {
         if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-        const lastX = lastXRef.current ?? event.clientX;
-        const delta = event.clientX - lastX;
-        lastXRef.current = event.clientX;
+        const coordinate = orientation === 'vertical' ? event.clientY : event.clientX;
+        const last = lastCoordRef.current ?? coordinate;
+        const delta = coordinate - last;
+        lastCoordRef.current = coordinate;
         if (delta === 0) return;
         onAdjust(delta);
         setTickOffset((current) => (current + delta) % 24);
@@ -63,20 +67,22 @@ export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
       onPointerCancel={finish}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        const backward = orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft';
+        const forward = orientation === 'vertical' ? 'ArrowDown' : 'ArrowRight';
+        if (event.key !== backward && event.key !== forward) return;
         event.preventDefault();
-        onAdjust(event.key === 'ArrowLeft' ? -6 : 6);
-        setTickOffset((current) => (current + (event.key === 'ArrowLeft' ? -6 : 6)) % 24);
+        const delta = event.key === backward ? -6 : 6;
+        onAdjust(delta);
+        setTickOffset((current) => (current + delta) % 24);
       }}
     >
-      <div className="aim-dial-label" aria-hidden="true">
-        <strong>{mode === 'fine' ? '精瞄' : mode === 'approach' ? '接近' : '方向'}</strong>
-        <small>
-          {nearby ? `${solution.target}号 → ${solution.pocketName}` : '左右拨动'}
-        </small>
-      </div>
       <div className="aim-dial-window" aria-hidden="true">
-        <i className="aim-dial-ticks" style={{ backgroundPositionX: `${tickOffset}px` }} />
+        <i
+          className="aim-dial-ticks"
+          style={orientation === 'vertical'
+            ? { backgroundPositionY: `${tickOffset}px` }
+            : { backgroundPositionX: `${tickOffset}px` }}
+        />
         <b />
       </div>
     </div>

@@ -4,7 +4,7 @@
 [POS]: 控制组件层,只做事件到 CueSpin 的映射,几何事实计算委托 input/shot-input
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { CueSpin } from '../physics';
 import { clampSpin } from '../input/shot-input';
 
@@ -27,6 +27,12 @@ function spinLabel(spin: CueSpin): string {
 /** 击球点盘:拖拽定位击球点;键盘 ↑↓←→ 微调,0/Backspace 回中杆 */
 export function SpinControl({ spin, disabled, onSpinChange }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const pointerStartRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    moved: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (disabled || (spin.x === 0 && spin.y === 0)) setExpanded(false);
@@ -66,10 +72,32 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
         e.stopPropagation();
         if (disabled) return;
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-        applyPointer(e);
+        pointerStartRef.current = {
+          pointerId: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          moved: false,
+        };
       }}
       onPointerMove={(e) => {
-        if (!disabled && e.buttons) applyPointer(e);
+        const start = pointerStartRef.current;
+        if (disabled || !start || start.pointerId !== e.pointerId || !e.buttons) return;
+        if (!start.moved) {
+          if (Math.hypot(e.clientX - start.x, e.clientY - start.y) <= 4) return;
+          start.moved = true;
+        }
+        applyPointer(e);
+      }}
+      onPointerUp={(e) => {
+        const start = pointerStartRef.current;
+        if (!start || start.pointerId !== e.pointerId) return;
+        if (!start.moved) applyPointer(e);
+        pointerStartRef.current = null;
+      }}
+      onPointerCancel={(e) => {
+        if (pointerStartRef.current?.pointerId === e.pointerId) {
+          pointerStartRef.current = null;
+        }
       }}
       onKeyDown={onKeyDown}
     >
@@ -81,7 +109,6 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
           style={{ left: `${50 + spin.y * 38}%`, top: `${50 - spin.x * 38}%` }}
         />
       </div>
-      <small>{spinLabel(spin)}</small>
     </div>
   );
 
@@ -100,12 +127,11 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
         <span className="spin-preview-ball">
           <i style={{ left: `${50 + spin.y * 28}%`, top: `${50 - spin.x * 28}%` }} />
         </span>
-        <small>击球点</small>
       </button>
       {expanded && (
         <div className="spin-popover" role="dialog" aria-label="母球击球点调节">
           <div className="spin-popover-head">
-            <strong>{spinLabel(spin)}</strong>
+            <span className="spin-popover-ball" aria-hidden="true"><i /></span>
             <button type="button" aria-label="收起击球点调节" onClick={() => setExpanded(false)}>✕</button>
           </div>
           {pad('mobile-spin-pad')}

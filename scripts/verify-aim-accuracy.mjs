@@ -31,11 +31,14 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 
 await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+await page.evaluate(() => localStorage.removeItem('guagua-billiards:aim-assist:v1'));
+await page.reload({ waitUntil: 'networkidle0' });
 await new Promise(r => setTimeout(r, 2500));
 
 async function realClickButton(text) {
   const box = await page.evaluate((t) => {
-    const btn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes(t));
+    const btn = [...document.querySelectorAll('button')].find(b =>
+      b.textContent?.includes(t) || b.getAttribute('aria-label')?.includes(t));
     if (!btn) return null;
     const r = btn.getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
@@ -46,6 +49,12 @@ async function realClickButton(text) {
 }
 await realClickButton('开始对局');
 await new Promise(r => setTimeout(r, 800));
+
+// v1.4 辅助线首次默认关闭；专项门禁必须经灯泡图形面板显式打开。
+await realClickButton('打开辅助功能');
+await new Promise(r => setTimeout(r, 80));
+await realClickButton('瞄准辅助线');
+await new Promise(r => setTimeout(r, 120));
 
 // 开局先真实完成 placing；各几何用例随后只用 DEV 调试句柄固定 actor/phase 与摆位，
 // 瞄准、蓄力、出杆仍全部走真实鼠标，避免前一用例洗袋触发 AI 干扰下一用例。

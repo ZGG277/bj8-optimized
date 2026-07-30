@@ -1,7 +1,7 @@
 /*
-[INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收合格击球事实与可注入随机数
-[OUTPUT]: 玩家能力画像更新、陪练/挑战对手档案生成、等级/置信度展示与安全持久化
-[POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；局内档案由调用方创建后锁定
+[INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
+[OUTPUT]: 玩家三杆批量能力画像、陪练/挑战动态对手档案、等级/置信度展示与安全持久化
+[POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；局内档案按三杆批次限速重定向
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
 import { erfProb } from '../planner/evaluate';
@@ -11,7 +11,7 @@ export type PositionOutcome = 'success' | 'miss' | 'unknown';
 
 export type ShotSkillObservation = {
   /** 当前目标球→袋口线路可进球的瞄准容错半宽（rad） */
-  tolerance: number;
+  tolerance: number | null;
   pocketed: boolean;
   foul: boolean;
   position: PositionOutcome;
@@ -20,7 +20,7 @@ export type ShotSkillObservation = {
 };
 
 export type PlayerSkillProfile = {
-  version: 1;
+  version: 2;
   level: number;
   executionLevel: number;
   executionSigma: number;
@@ -31,16 +31,23 @@ export type PlayerSkillProfile = {
   positionSuccesses: number;
   foulAttempts: number;
   fouls: number;
+  /** 所有真实玩家出杆；用于稳定的三杆更新节奏。 */
+  totalPlayerShots: number;
+  /** 跨局、跨刷新保留，始终只有 0–2 条。 */
+  pendingObservations: ShotSkillObservation[];
+  /** 最近一次三杆批次带来的可见分数变化。 */
+  lastBatchDelta: number;
 };
 
 export type OpponentProfile = {
   mode: GameMode;
-  /** 对外显示的稳定档位，不含本局状态波动 */
+  /** 对外显示的 0–100 匹配档数字。 */
   tierLevel: number;
-  /** 本局实际能力，开局生成后锁定 */
+  /** 最新玩家画像对应的目标实力。 */
+  targetLevel: number;
+  /** 下一回合实际采用的能力，局内每批最多移动 3 分。 */
   effectiveLevel: number;
   label: string;
-  formOffset: number;
   aimSigma: number;
   powerJitter: number;
   choiceTemperature: number;
@@ -52,14 +59,17 @@ export type OpponentProfile = {
   };
 };
 
-export const PLAYER_SKILL_STORAGE_KEY = 'guagua-billiards:player-skill:v1';
+export const PLAYER_SKILL_STORAGE_KEY = 'guagua-billiards:player-skill:v2';
+export const LEGACY_PLAYER_SKILL_STORAGE_KEY = 'guagua-billiards:player-skill:v1';
 
 const MIN_SIGMA = 0.0025;
 const MAX_SIGMA = 0.03;
-const MIN_OPPONENT_LEVEL = 26;
-const MAX_OPPONENT_LEVEL = 92;
+const MIN_OPPONENT_LEVEL = 0;
+const MAX_OPPONENT_LEVEL = 100;
 const MAX_LEVEL_UP_PER_SHOT = 0.4;
 const MAX_LEVEL_DOWN_PER_SHOT = 0.2;
+const SHOTS_PER_BATCH = 3;
+const MAX_OPPONENT_STEP = 3;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -85,7 +95,7 @@ export function levelLabel(level: number): string {
 
 export function createPlayerSkillProfile(): PlayerSkillProfile {
   return {
-    version: 1,
+    version: 2,
     level: 50,
     executionLevel: 50,
     executionSigma: levelToSigma(50),
@@ -96,6 +106,9 @@ export function createPlayerSkillProfile(): PlayerSkillProfile {
     positionSuccesses: 0,
     foulAttempts: 0,
     fouls: 0,
+    totalPlayerShots: 0,
+    pendingObservations: [],
+    lastBatchDelta: 0,
   };
 }
 
@@ -105,37 +118,71 @@ function difficultyBucket(probability: number): 0 | 1 | 2 {
   return 2;
 }
 
+function normalizedObservation(observation: ShotSkillObservation): ShotSkillObservation {
+  return {
+    tolerance:
+      typeof observation.tolerance === 'number' &&
+      Number.isFinite(observation.tolerance) &&
+      observation.tolerance > 0
+        ? observation.tolerance
+        : null,
+    pocketed: Boolean(observation.pocketed),
+    foul: Boolean(observation.foul),
+    position:
+      observation.position === 'success' || observation.position === 'miss'
+        ? observation.position
+        : 'unknown',
+    assisted: Boolean(observation.assisted),
+  };
+}
+
 /**
- * 在线更新与 Elo 同构：实际结果 - 当前预测概率。
- * 预测来自项目既有 erf 容错模型，因此简单球失手比困难球失手降得多；
- * 每杆上下行分别封顶 0.4/0.2，保证 10 个样本最多 +4/-2。
+ * 把一批样本一次性折算为可见分数。执行维度仍逐杆消费“实际-预期”证据，
+ * 最终综合分只提交一次，因此三杆之间不会在 UI 上抖动。
  */
-export function applyShotObservation(
+export function applyShotBatch(
   profile: PlayerSkillProfile,
-  observation: ShotSkillObservation,
+  observations: ShotSkillObservation[],
 ): PlayerSkillProfile {
-  if (!Number.isFinite(observation.tolerance) || observation.tolerance <= 0) return profile;
-
-  const expected = clamp(erfProb(observation.tolerance, profile.executionSigma), 0.02, 0.98);
-  const result = observation.pocketed && !observation.foul ? 1 : 0;
-  const evidenceWeight = observation.assisted ? 0.55 : 1;
-  const rawExecutionDelta = (result - expected) * 0.65 * evidenceWeight;
-  const executionDelta = clamp(
-    rawExecutionDelta,
-    -MAX_LEVEL_DOWN_PER_SHOT,
-    MAX_LEVEL_UP_PER_SHOT,
-  );
-  const executionLevel = clamp(profile.executionLevel + executionDelta, 0, 100);
-
+  const batch = observations.slice(0, SHOTS_PER_BATCH);
+  let executionLevel = profile.executionLevel;
   const buckets: [number, number, number] = [...profile.difficultyBuckets];
-  buckets[difficultyBucket(expected)] += evidenceWeight;
+  let qualifiedShots = profile.qualifiedShots;
+  let positionAttempts = profile.positionAttempts;
+  let positionSuccesses = profile.positionSuccesses;
+  let foulAttempts = profile.foulAttempts;
+  let fouls = profile.fouls;
 
-  const positionObserved = observation.position !== 'unknown';
-  const positionAttempts = profile.positionAttempts + (positionObserved ? evidenceWeight : 0);
-  const positionSuccesses =
-    profile.positionSuccesses + (observation.position === 'success' ? evidenceWeight : 0);
-  const foulAttempts = profile.foulAttempts + evidenceWeight;
-  const fouls = profile.fouls + (observation.foul ? evidenceWeight : 0);
+  for (const raw of batch) {
+    const observation = normalizedObservation(raw);
+    const evidenceWeight = observation.assisted ? 0.55 : 1;
+    foulAttempts += evidenceWeight;
+    if (observation.foul) fouls += evidenceWeight;
+    if (observation.position !== 'unknown') {
+      positionAttempts += evidenceWeight;
+      if (observation.position === 'success') positionSuccesses += evidenceWeight;
+    }
+    if (observation.tolerance === null) continue;
+
+    const expected = clamp(
+      erfProb(observation.tolerance, levelToSigma(executionLevel)),
+      0.02,
+      0.98,
+    );
+    const result = observation.pocketed && !observation.foul ? 1 : 0;
+    const rawExecutionDelta = (result - expected) * 0.65 * evidenceWeight;
+    executionLevel = clamp(
+      executionLevel + clamp(
+        rawExecutionDelta,
+        -MAX_LEVEL_DOWN_PER_SHOT,
+        MAX_LEVEL_UP_PER_SHOT,
+      ),
+      0,
+      100,
+    );
+    buckets[difficultyBucket(expected)] += evidenceWeight;
+    qualifiedShots += evidenceWeight;
+  }
 
   // Beta(2,2) 先验让两个次要维度在冷启动时保持中性，不会凭一杆主导总等级。
   const positionScore = ((positionSuccesses + 2) / (positionAttempts + 4)) * 100;
@@ -143,18 +190,18 @@ export function applyShotObservation(
   const compositeTarget = executionLevel * 0.8 + positionScore * 0.12 + disciplineScore * 0.08;
   const compositeDelta = clamp(
     compositeTarget - profile.level,
-    -MAX_LEVEL_DOWN_PER_SHOT,
-    MAX_LEVEL_UP_PER_SHOT,
+    -MAX_LEVEL_DOWN_PER_SHOT * batch.length,
+    MAX_LEVEL_UP_PER_SHOT * batch.length,
   );
   const level = clamp(profile.level + compositeDelta, 0, 100);
 
-  const qualifiedShots = profile.qualifiedShots + evidenceWeight;
   const coveredBuckets = buckets.filter((count) => count >= 2).length;
   const confidence =
     Math.min(1, qualifiedShots / 30) * (0.6 + (coveredBuckets / buckets.length) * 0.4);
 
   return {
-    version: 1,
+    ...profile,
+    version: 2,
     level,
     executionLevel,
     executionSigma: levelToSigma(executionLevel),
@@ -165,6 +212,49 @@ export function applyShotObservation(
     positionSuccesses,
     foulAttempts,
     fouls,
+    lastBatchDelta: level - profile.level,
+  };
+}
+
+/** 兼容纯模型调用：立即应用单杆，但不参与生产环境的三杆队列。 */
+export function applyShotObservation(
+  profile: PlayerSkillProfile,
+  observation: ShotSkillObservation,
+): PlayerSkillProfile {
+  return applyShotBatch(profile, [observation]);
+}
+
+export type QueuedShotResult = {
+  profile: PlayerSkillProfile;
+  batchCompleted: boolean;
+};
+
+/** 每三次真实出杆才提交能力变化；未满三杆只持久化队列。 */
+export function queueShotObservation(
+  profile: PlayerSkillProfile,
+  observation: ShotSkillObservation,
+): QueuedShotResult {
+  const pending = [...profile.pendingObservations, normalizedObservation(observation)];
+  const totalPlayerShots = profile.totalPlayerShots + 1;
+  if (pending.length < SHOTS_PER_BATCH) {
+    return {
+      batchCompleted: false,
+      profile: {
+        ...profile,
+        totalPlayerShots,
+        pendingObservations: pending,
+        lastBatchDelta: 0,
+      },
+    };
+  }
+  const evaluated = applyShotBatch(profile, pending.slice(0, SHOTS_PER_BATCH));
+  return {
+    batchCompleted: true,
+    profile: {
+      ...evaluated,
+      totalPlayerShots,
+      pendingObservations: [],
+    },
   };
 }
 
@@ -176,44 +266,68 @@ export function confidenceAdjustedLevel(profile: PlayerSkillProfile): number {
 /** 模式档位不含 formOffset，可在开始页稳定展示。 */
 export function opponentTierFor(profile: PlayerSkillProfile, mode: GameMode): number {
   const adjusted = confidenceAdjustedLevel(profile);
-  if (mode === 'practice') {
-    return Math.round(clamp(adjusted - 5, MIN_OPPONENT_LEVEL, 88));
-  }
-  // 挑战选择玩家上方最近的 10 级档位；至少高约 5 级，最高不超过 92。
-  return clamp(Math.ceil((adjusted + 5) / 10) * 10, 40, MAX_OPPONENT_LEVEL);
+  return Math.round(clamp(
+    adjusted + (mode === 'practice' ? 3 : 10),
+    MIN_OPPONENT_LEVEL,
+    MAX_OPPONENT_LEVEL,
+  ));
+}
+
+function profileForLevel(
+  mode: GameMode,
+  targetLevel: number,
+  effectiveLevel: number,
+): OpponentProfile {
+  const safeTarget = clamp(targetLevel, MIN_OPPONENT_LEVEL, MAX_OPPONENT_LEVEL);
+  const safeEffective = clamp(effectiveLevel, MIN_OPPONENT_LEVEL, MAX_OPPONENT_LEVEL);
+  const aimSigma = levelToSigma(safeEffective);
+  const levelT = safeEffective / 100;
+
+  return {
+    mode,
+    tierLevel: Math.round(safeTarget),
+    targetLevel: safeTarget,
+    effectiveLevel: safeEffective,
+    label: levelLabel(safeTarget),
+    aimSigma,
+    powerJitter: 0.11 - levelT * 0.08,
+    choiceTemperature:
+      mode === 'practice'
+        ? 0.42 - levelT * 0.24
+        : 0.2 - levelT * 0.14,
+    planner: {
+      sigma: aimSigma,
+      samples:
+        mode === 'practice'
+          ? 8 + Math.round(levelT * 8)
+          : 12 + Math.round(levelT * 12),
+      maxDepth: mode === 'practice' ? 1 : 2,
+      simBudget:
+        mode === 'practice'
+          ? 1000 + Math.round(levelT * 1600)
+          : 2600 + Math.round(levelT * 3000),
+    },
+  };
 }
 
 export function createOpponentProfile(
   player: PlayerSkillProfile,
   mode: GameMode,
-  rng: () => number = Math.random,
 ): OpponentProfile {
-  const tierLevel = opponentTierFor(player, mode);
-  const formOffset = clamp((rng() * 2 - 1) * 3, -3, 3);
-  const effectiveLevel = clamp(
-    tierLevel + formOffset,
-    MIN_OPPONENT_LEVEL,
-    MAX_OPPONENT_LEVEL,
-  );
-  const aimSigma = levelToSigma(effectiveLevel);
-  const levelT = effectiveLevel / 100;
+  const targetLevel = opponentTierFor(player, mode);
+  return profileForLevel(mode, targetLevel, targetLevel);
+}
 
-  return {
-    mode,
-    tierLevel,
-    effectiveLevel,
-    label: levelLabel(tierLevel),
-    formOffset,
-    aimSigma,
-    powerJitter: 0.11 - levelT * 0.08,
-    choiceTemperature: mode === 'practice' ? 0.28 : 0.08,
-    planner: {
-      sigma: aimSigma,
-      samples: mode === 'practice' ? 10 : 16,
-      maxDepth: mode === 'practice' ? 1 : 2,
-      simBudget: mode === 'practice' ? 1600 : 4200,
-    },
-  };
+/** 玩家批次更新后重定向；下一次 AI 调度读取的新档案最多移动 3 分。 */
+export function retargetOpponentProfile(
+  current: OpponentProfile,
+  player: PlayerSkillProfile,
+  mode: GameMode = current.mode,
+  maxStep = MAX_OPPONENT_STEP,
+): OpponentProfile {
+  const targetLevel = opponentTierFor(player, mode);
+  const delta = clamp(targetLevel - current.effectiveLevel, -Math.abs(maxStep), Math.abs(maxStep));
+  return profileForLevel(mode, targetLevel, current.effectiveLevel + delta);
 }
 
 type StorageReader = Pick<Storage, 'getItem'>;
@@ -221,8 +335,8 @@ type StorageWriter = Pick<Storage, 'setItem'>;
 
 function parseProfile(value: unknown): PlayerSkillProfile | null {
   if (!value || typeof value !== 'object') return null;
-  const raw = value as Partial<PlayerSkillProfile>;
-  if (raw.version !== 1 || !Array.isArray(raw.difficultyBuckets)) return null;
+  const raw = value as Partial<Omit<PlayerSkillProfile, 'version'>> & { version?: number };
+  if ((raw.version !== 1 && raw.version !== 2) || !Array.isArray(raw.difficultyBuckets)) return null;
   const fallback = createPlayerSkillProfile();
   const difficultyBuckets: [number, number, number] = [
     Math.max(0, finite(raw.difficultyBuckets[0], 0)),
@@ -230,8 +344,13 @@ function parseProfile(value: unknown): PlayerSkillProfile | null {
     Math.max(0, finite(raw.difficultyBuckets[2], 0)),
   ];
   const executionLevel = clamp(finite(raw.executionLevel, fallback.executionLevel), 0, 100);
+  const pendingObservations =
+    raw.version === 2 && Array.isArray(raw.pendingObservations)
+      ? raw.pendingObservations.slice(0, SHOTS_PER_BATCH - 1).map(item =>
+          normalizedObservation(item as ShotSkillObservation))
+      : [];
   return {
-    version: 1,
+    version: 2,
     level: clamp(finite(raw.level, fallback.level), 0, 100),
     executionLevel,
     executionSigma: levelToSigma(executionLevel),
@@ -242,6 +361,9 @@ function parseProfile(value: unknown): PlayerSkillProfile | null {
     positionSuccesses: Math.max(0, finite(raw.positionSuccesses, 0)),
     foulAttempts: Math.max(0, finite(raw.foulAttempts, 0)),
     fouls: Math.max(0, finite(raw.fouls, 0)),
+    totalPlayerShots: Math.max(0, finite(raw.totalPlayerShots, 0)),
+    pendingObservations,
+    lastBatchDelta: finite(raw.lastBatchDelta, 0),
   };
 }
 
@@ -249,7 +371,9 @@ export function loadPlayerSkillProfile(storage?: StorageReader | null): PlayerSk
   if (!storage) return createPlayerSkillProfile();
   try {
     const saved = storage.getItem(PLAYER_SKILL_STORAGE_KEY);
-    return saved ? parseProfile(JSON.parse(saved)) ?? createPlayerSkillProfile() : createPlayerSkillProfile();
+    if (saved) return parseProfile(JSON.parse(saved)) ?? createPlayerSkillProfile();
+    const legacy = storage.getItem(LEGACY_PLAYER_SKILL_STORAGE_KEY);
+    return legacy ? parseProfile(JSON.parse(legacy)) ?? createPlayerSkillProfile() : createPlayerSkillProfile();
   } catch {
     return createPlayerSkillProfile();
   }

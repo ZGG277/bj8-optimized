@@ -1,26 +1,21 @@
 /*
-[INPUT]: 依赖连续 viewLevel / match / 观战状态 / 幽灵球拨轮与 pointer 事件处理器
-[OUTPUT]: 渲染 3D 球桌、无限瞄准拨轮、可交互观战提示、全台回正与结束遮罩
-[POS]: HUD 组件层，只组合并转发瞄准/观战事件；不持有对局或相机状态
+[INPUT]: 依赖连续 viewLevel / match / 观战状态与 pointer 事件处理器
+[OUTPUT]: 渲染 3D 球桌、轻量观战提示、纯视觉全台回正与结束遮罩
+[POS]: HUD 组件层；瞄准拨轮已并入统一可停靠控制层，相机/对局状态由上层持有
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import React from 'react';
-import { AimDial } from './AimDial';
 import type { MatchState } from '../match/types';
-import type { PrecisionAimSolution } from '../aim/aim-solution';
 
 interface TableStageProps {
   viewLevel: number;
   spectatorActive: boolean;
   match: MatchState;
-  aimDialVisible: boolean;
-  aimDialSolution: PrecisionAimSolution | null;
   containerRef: React.Ref<HTMLDivElement>;
   onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
   onPointerCancel: (e: React.PointerEvent) => void;
-  onAimDialAdjust: (pixelDelta: number) => void;
   onCameraRecenter: () => void;
   onResetGame: () => void;
 }
@@ -29,14 +24,11 @@ export function TableStage({
   viewLevel,
   spectatorActive,
   match,
-  aimDialVisible,
-  aimDialSolution,
   containerRef,
   onPointerDown,
   onPointerMove,
   onPointerUp,
   onPointerCancel,
-  onAimDialAdjust,
   onCameraRecenter,
   onResetGame,
 }: TableStageProps) {
@@ -51,12 +43,6 @@ export function TableStage({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
       >
-        <AimDial
-          visible={aimDialVisible}
-          solution={aimDialSolution}
-          onAdjust={onAimDialAdjust}
-        />
-
         {match.phase === 'opponent' && (
           <div className="turn-mask">
             <span className="thinking-dot" />
@@ -75,7 +61,7 @@ export function TableStage({
               onCameraRecenter();
             }}
           >
-            全台
+            <span className="camera-recenter-icon" aria-hidden="true"><i /></span>
           </button>
         )}
 

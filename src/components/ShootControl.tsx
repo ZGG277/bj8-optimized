@@ -1,6 +1,6 @@
 /*
-[INPUT]: 禁用/蓄力态、预览力度、开球标记与 begin/update/release/cancel/tap 回调
-[OUTPUT]: 对外提供力度与出杆合一的长行程控件(role=button 内含 role=meter,可 Tab 聚焦,Enter 轻杆)
+[INPUT]: 禁用/蓄力态、横竖停靠方向、预览力度与 begin/update/release/cancel/tap 回调
+[OUTPUT]: 对外提供无文字的球杆回缩/能量填充出杆控件，保留 meter 与键盘语义
 [POS]: 控制组件层,只负责手势出口与语义;力度事实由 input 层计算,物理击球由 Game 提交
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -10,6 +10,7 @@ type Props = {
   charging: boolean;
   power: number;
   breaking: boolean;
+  orientation: 'horizontal' | 'vertical';
   onBegin: (clientY: number, availableTravel: number) => void;
   onUpdate: (clientY: number) => void;
   onRelease: () => void;
@@ -18,12 +19,25 @@ type Props = {
   onTap: () => void;
 };
 
-export function ShootControl({ disabled, charging, power, breaking, onBegin, onUpdate, onRelease, onCancel, onTap }: Props) {
+export function ShootControl({
+  disabled,
+  charging,
+  power,
+  breaking,
+  orientation,
+  onBegin,
+  onUpdate,
+  onRelease,
+  onCancel,
+  onTap,
+}: Props) {
   const rounded = Math.round(power);
+  const coordinate = (event: React.PointerEvent) =>
+    orientation === 'vertical' ? event.clientY : event.clientX;
   return (
-    <div className="shoot-zone" onPointerDown={(e) => e.stopPropagation()}>
+    <div className={`shoot-zone is-${orientation}`} onPointerDown={(e) => e.stopPropagation()}>
       <div
-        className={`shoot-pad ${charging ? 'charging' : ''} ${disabled ? 'disabled' : ''}`}
+        className={`shoot-pad is-${orientation} ${charging ? 'charging' : ''} ${disabled ? 'disabled' : ''}`}
         role="button"
         aria-label={breaking ? '开球:下拉蓄力松开出杆,回车轻杆' : '出杆:下拉蓄力松开出杆,回车轻杆'}
         aria-disabled={disabled}
@@ -34,12 +48,15 @@ export function ShootControl({ disabled, charging, power, breaking, onBegin, onU
           if (disabled) return;
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
           const rect = e.currentTarget.getBoundingClientRect();
-          // 合一控件本身就是下拉轨道：从按下点到控件底边均为有效行程。
-          onBegin(e.clientY, Math.min(220, Math.max(72, rect.bottom - e.clientY)));
+          const start = coordinate(e);
+          const remaining = orientation === 'vertical'
+            ? rect.bottom - e.clientY
+            : rect.right - e.clientX;
+          onBegin(start, Math.min(220, Math.max(72, remaining)));
         }}
         onPointerMove={(e) => {
           e.preventDefault();
-          if (!disabled) onUpdate(e.clientY);
+          if (!disabled) onUpdate(coordinate(e));
         }}
         onPointerUp={(e) => {
           e.preventDefault();
@@ -57,17 +74,26 @@ export function ShootControl({ disabled, charging, power, breaking, onBegin, onU
       >
         <span
           className={`shoot-power-fill ${power > 85 ? 'hot' : ''}`}
-          style={{ height: `${power}%` }}
+          style={orientation === 'vertical'
+            ? { height: `${power}%` }
+            : { width: `${power}%` }}
           role="meter"
           aria-label="出杆力度"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={rounded}
         />
-        <span className="shoot-pull-mark" aria-hidden="true">↓</span>
-        <strong>{breaking ? '开球' : '出杆'}</strong>
-        {!breaking && <span className="power-num">{rounded}</span>}
-        <small>下拉 · 松开</small>
+        <span
+          className="shoot-cue-visual"
+          style={{ '--power': rounded } as React.CSSProperties}
+          aria-hidden="true"
+        >
+          <i />
+          <b />
+        </span>
+        <span className="shoot-energy-ticks" aria-hidden="true">
+          {Array.from({ length: 7 }, (_, index) => <i key={index} />)}
+        </span>
       </div>
     </div>
   );

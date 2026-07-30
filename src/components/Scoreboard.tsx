@@ -1,11 +1,12 @@
 /*
-[INPUT]: 依赖 physics 世界快照与 match 对局状态
-[OUTPUT]: 桌面渲染精简双方球组/比分；竖屏首行只渲染玩家球组与进球状态
+[INPUT]: 依赖 physics 世界快照、match 对局状态与双方 0–100 实力画像
+[OUTPUT]: 桌面/手机渲染双方姓名下的动态水平、球组与进球状态
 [POS]: HUD 组件层，只消费世界快照计算进球数；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import type { BilliardsWorld } from '../physics';
 import type { MatchState } from '../match/types';
+import type { OpponentProfile, PlayerSkillProfile } from '../opponent/model';
 
 const COLORS: Record<number, string> = {
   1: '#e8bf3f', 2: '#315eb4', 3: '#c64a3a', 4: '#6f4ba2', 5: '#e47f32', 6: '#3c8c5a', 7: '#7a2830', 8: '#171717',
@@ -15,9 +16,16 @@ const COLORS: Record<number, string> = {
 interface ScoreboardProps {
   match: MatchState;
   worldView: BilliardsWorld;
+  playerSkill: PlayerSkillProfile;
+  opponentProfile: OpponentProfile;
 }
 
-export function Scoreboard({ match, worldView }: ScoreboardProps) {
+export function Scoreboard({
+  match,
+  worldView,
+  playerSkill,
+  opponentProfile,
+}: ScoreboardProps) {
   const activeNumbers = new Set(worldView.balls.filter(b => b.active).map(b => b.number));
   const solidPotted = 7 - worldView.balls.filter(b => b.active && b.group === 'solid').length;
   const stripePotted = 7 - worldView.balls.filter(b => b.active && b.group === 'stripe').length;
@@ -31,30 +39,42 @@ export function Scoreboard({ match, worldView }: ScoreboardProps) {
   const groupClass = (n: number) => (n === 8 ? 'eight' : n < 8 ? 'solid' : 'stripe');
   const mobileLabel = match.breaking ? '开球' : playerGroupLabel;
   const mobileBalls = match.playerGroup ? playerBalls : [];
+  const playerLevel = Math.round(playerSkill.level);
+  const opponentLevel = Math.round(opponentProfile.effectiveLevel);
 
   return (
     <section className="scoreboard">
-      <div className="mobile-ball-status" aria-label={`我的球组：${mobileLabel}`}>
-        <strong>{mobileLabel}</strong>
-        {mobileBalls.length > 0 && (
-          <div className="mobile-ball-rack" aria-label="我的进球状态，灰色为已进">
-            {mobileBalls.map(n => (
-              <span
-                key={n}
-                className={`mini-ball ${groupClass(n)} ${!activeNumbers.has(n) ? 'down' : ''}`}
-                style={{ '--c': COLORS[n] } as React.CSSProperties}
-              >
-                {n}
-              </span>
-            ))}
-          </div>
-        )}
-        <small>{mobileBalls.length ? '灰色已进' : '进球后确定花色'}</small>
+      <div className="mobile-score-strip">
+        <div className="mobile-identity">
+          <strong>你</strong>
+          <span key={playerLevel} className="skill-level">{playerLevel}</span>
+        </div>
+        <div className="mobile-ball-status" aria-label={`我的球组：${mobileLabel}`}>
+          <strong>{mobileLabel}</strong>
+          {mobileBalls.length > 0 && (
+            <div className="mobile-ball-rack" aria-label="我的进球状态，灰色为已进">
+              {mobileBalls.map(n => (
+                <span
+                  key={n}
+                  className={`mini-ball ${groupClass(n)} ${!activeNumbers.has(n) ? 'down' : ''}`}
+                  style={{ '--c': COLORS[n] } as React.CSSProperties}
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="mobile-identity opponent">
+          <strong>顾燃</strong>
+          <span key={opponentLevel} className="skill-level">{opponentLevel}</span>
+        </div>
       </div>
       <div className="player-card">
         <div className="avatar me">我</div>
         <div className="identity">
           <strong>你</strong>
+          <span key={playerLevel} className="skill-level">{playerLevel}</span>
           <small>{playerGroupLabel}</small>
         </div>
         <div className="mini-rack">
@@ -78,6 +98,7 @@ export function Scoreboard({ match, worldView }: ScoreboardProps) {
         </div>
         <div className="identity right">
           <strong>顾燃</strong>
+          <span key={opponentLevel} className="skill-level">{opponentLevel}</span>
           <small>{opponentGroupLabel}</small>
         </div>
         <div className="avatar rival">燃</div>

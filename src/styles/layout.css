@@ -23,7 +23,7 @@
   backdrop-filter: var(--blur-surface);
 }
 
-.mobile-ball-status {
+.mobile-score-strip {
   display: none;
 }
 
@@ -67,7 +67,15 @@
   background: radial-gradient(circle at 35% 30%, #594a35, #171a18 70%);
 }
 
+.identity {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  column-gap: 5px;
+}
+
 .identity strong {
+  grid-column: 1 / -1;
   display: block;
   font-size: var(--fs-base);
   margin: 0;
@@ -86,6 +94,25 @@
   display: block;
   color: var(--dim);
   font-size: var(--fs-xs);
+}
+
+.skill-level {
+  display: inline-block;
+  color: var(--green-bright);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  animation: skill-level-pop 360ms var(--ease-ui);
+}
+
+.identity.right .skill-level {
+  color: var(--warm);
+}
+
+@keyframes skill-level-pop {
+  0% { opacity: 0.35; transform: translateY(2px) scale(0.86); }
+  65% { opacity: 1; transform: translateY(0) scale(1.12); }
+  100% { transform: scale(1); }
 }
 
 .identity.right {
@@ -349,18 +376,41 @@
   position: absolute;
   z-index: 5;
   top: 10px;
-  right: 10px;
-  min-width: 48px;
-  min-height: 36px;
-  padding: 0 12px;
+  right: 72px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  border-radius: 50%;
   color: var(--text-primary);
   background: var(--surface-2);
   box-shadow: var(--shadow-overlay);
   backdrop-filter: var(--blur-surface);
   cursor: pointer;
   touch-action: manipulation;
+}
+
+.camera-recenter-icon {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 15px;
+  margin: auto;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.88;
+}
+
+.camera-recenter-icon i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  transform: translate(-50%, -50%);
 }
 
 .camera-recenter:active {
@@ -723,13 +773,13 @@
 /* 竖屏手机布局 */
 @media (max-width: 640px) and (orientation: portrait) {
   .game-shell {
-    grid-template-rows: 34px minmax(0, 1fr);
+    grid-template-rows: 46px minmax(0, 1fr);
   }
 
   .scoreboard {
     display: block;
     min-width: 0;
-    height: 34px;
+    height: 46px;
     padding: 0;
     background: var(--surface-2);
     backdrop-filter: var(--blur-surface);
@@ -740,13 +790,53 @@
     display: none;
   }
 
-  .mobile-ball-status {
+  .mobile-score-strip {
     height: 100%;
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 0 7px;
+    gap: 5px;
+    padding: 0 5px;
+  }
+
+  .mobile-identity {
+    width: 34px;
+    flex: 0 0 34px;
+    display: grid;
+    justify-items: start;
+    line-height: 1;
+  }
+
+  .mobile-identity.opponent {
+    width: 42px;
+    flex-basis: 42px;
+    justify-items: end;
+    text-align: right;
+  }
+
+  .mobile-identity strong {
+    color: var(--text-primary);
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  .mobile-identity .skill-level {
+    margin-top: 3px;
+    font-size: 13px;
+  }
+
+  .mobile-identity.opponent .skill-level {
+    color: var(--warm);
+  }
+
+  .mobile-ball-status {
+    height: 100%;
+    min-width: 0;
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -778,15 +868,6 @@
     transform: scale(0.82);
   }
 
-  .mobile-ball-status small {
-    min-width: 0;
-    margin-left: auto;
-    color: var(--dim);
-    font-size: 9px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   .room-label,
   .shot-target,
   .view-hint {
@@ -801,7 +882,6 @@
 @media (max-width: 400px) and (orientation: portrait) {
   .mobile-ball-status {
     gap: 4px;
-    padding-inline: 5px;
   }
 
   .mobile-ball-status .mini-ball {

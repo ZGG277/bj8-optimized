@@ -1,6 +1,6 @@
 /*
 [INPUT]: base/layout/controls 三层样式之后加载；ThemeSwitcher 组件
-[OUTPUT]: 汇总青瓷、决赛之夜、霓虹球房三套主题，并提供常驻按钮组样式
+[OUTPUT]: 汇总青瓷、决赛之夜、霓虹球房三套主题，并提供调色盘折叠入口样式
 [POS]: 视觉主题层入口；主题规则以 :root[data-theme] 隔离，不改变游戏交互几何
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -13,24 +13,105 @@
   left: max(8px, env(safe-area-inset-left));
   bottom: max(8px, env(safe-area-inset-bottom));
   z-index: 40;
-  display: flex;
-  gap: 3px;
-  padding: 4px;
-  max-width: calc(100vw - 78px);
-  overflow-x: auto;
+}
+
+.theme-palette-button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border: 1px solid var(--line-strong);
-  border-radius: 11px;
+  border-radius: 50%;
   background: color-mix(in srgb, var(--surface-2) 92%, transparent);
   box-shadow: var(--shadow-raised);
   backdrop-filter: var(--blur-surface);
-  scrollbar-width: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
-.theme-switcher::-webkit-scrollbar {
+.theme-switcher.is-open .theme-palette-button {
+  border-color: color-mix(in srgb, var(--green) 64%, var(--line-strong));
+  background: color-mix(in srgb, var(--green) 14%, var(--surface-2));
+  transform: rotate(-8deg);
+}
+
+.theme-palette-icon {
+  position: relative;
+  width: 23px;
+  height: 19px;
+  display: block;
+  border: 1.5px solid currentColor;
+  border-radius: 58% 48% 54% 44%;
+  opacity: 0.9;
+}
+
+.theme-palette-icon::after {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: '';
+}
+
+.theme-palette-icon i {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  box-shadow: 0 0 5px currentColor;
+}
+
+.theme-palette-icon i:nth-child(1) {
+  top: 4px;
+  left: 4px;
+  color: #88c8b1;
+  background: currentColor;
+}
+
+.theme-palette-icon i:nth-child(2) {
+  top: 3px;
+  left: 11px;
+  color: #d5ba7d;
+  background: currentColor;
+}
+
+.theme-palette-icon i:nth-child(3) {
+  top: 10px;
+  left: 7px;
+  color: #51e1ea;
+  background: currentColor;
+}
+
+.theme-options {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 0;
+  display: flex;
+  gap: 3px;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface-2) 94%, transparent);
+  box-shadow: var(--shadow-raised);
+  backdrop-filter: var(--blur-surface);
+  scrollbar-width: none;
+  transform-origin: left bottom;
+  animation: theme-options-in 140ms ease-out;
+}
+
+.theme-options::-webkit-scrollbar {
   display: none;
 }
 
-.theme-switcher button {
+.theme-options button {
   min-height: 28px;
   padding: 4px 9px;
   border: 1px solid transparent;
@@ -42,26 +123,39 @@
   white-space: nowrap;
 }
 
-.theme-switcher button:hover {
+.theme-options button:hover {
   color: var(--text-primary);
 }
 
-.theme-switcher button.active {
+.theme-options button.active {
   border-color: var(--line-strong);
   background: color-mix(in srgb, var(--green) 18%, var(--surface-control));
   color: var(--text-primary);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+@keyframes theme-options-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (max-width: 640px) and (orientation: portrait) {
   .theme-switcher {
     left: max(6px, env(safe-area-inset-left));
     bottom: max(6px, env(safe-area-inset-bottom));
+  }
+
+  .theme-palette-button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .theme-options {
     gap: 2px;
     padding: 3px;
   }
 
-  .theme-switcher button {
+  .theme-options button {
     min-height: 26px;
     padding: 4px 7px;
     font-size: 10px;

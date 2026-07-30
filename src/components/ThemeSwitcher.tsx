@@ -1,10 +1,10 @@
 /*
 [INPUT]: 三套作用域主题 CSS、URL theme 参数、localStorage 与键盘输入
-[OUTPUT]: 对外提供首帧主题初始化、纯主题解析函数与常驻三按钮切换器
+[OUTPUT]: 对外提供首帧主题初始化、纯主题解析函数与调色盘折叠式三主题切换器
 [POS]: HUD 工具组件；与 Game 并列挂载，只改 html[data-theme]，不接触游戏状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export const THEME_OPTIONS = [
   { id: 'celadon', label: '青瓷', hint: '宋代天青玉质' },
@@ -71,16 +71,19 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
 }
 
 export default function ThemeSwitcher() {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState<ThemeId>(() => {
     const applied = document.documentElement.dataset.theme;
     return isThemeId(applied) ? applied : applyInitialTheme();
   });
+  const [open, setOpen] = useState(false);
 
   const select = (theme: ThemeId) => {
     setCurrent(theme);
     applyTheme(theme);
     persistTheme(theme);
     updateThemeUrl(theme);
+    setOpen(false);
   };
 
   useEffect(() => {
@@ -99,21 +102,65 @@ export default function ThemeSwitcher() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [current]);
 
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside, true);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside, true);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  const currentOption = THEME_OPTIONS.find(theme => theme.id === current)!;
+
   return (
-    <div className="theme-switcher" role="group" aria-label="视觉主题">
-      {THEME_OPTIONS.map(theme => (
-        <button
-          key={theme.id}
-          type="button"
-          data-theme-option={theme.id}
-          aria-pressed={current === theme.id}
-          className={current === theme.id ? 'active' : ''}
-          title={`${theme.hint}（快捷键 [ / ]）`}
-          onClick={() => select(theme.id)}
+    <div
+      ref={rootRef}
+      className={`theme-switcher ${open ? 'is-open' : ''}`}
+      data-current-theme={current}
+    >
+      <button
+        type="button"
+        className="theme-palette-button"
+        aria-label={`选择视觉主题，当前${currentOption.label}`}
+        aria-expanded={open}
+        aria-controls="theme-options"
+        title={`视觉主题：${currentOption.label}（快捷键 [ / ]）`}
+        onClick={() => setOpen(value => !value)}
+      >
+        <span className="theme-palette-icon" aria-hidden="true">
+          <i /><i /><i />
+        </span>
+      </button>
+      {open && (
+        <div
+          id="theme-options"
+          className="theme-options"
+          role="group"
+          aria-label="视觉主题"
         >
-          {theme.label}
-        </button>
-      ))}
+          {THEME_OPTIONS.map(theme => (
+            <button
+              key={theme.id}
+              type="button"
+              data-theme-option={theme.id}
+              aria-pressed={current === theme.id}
+              className={current === theme.id ? 'active' : ''}
+              title={theme.hint}
+              onClick={() => select(theme.id)}
+            >
+              {theme.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

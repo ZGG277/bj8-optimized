@@ -7,6 +7,7 @@
 import type { BilliardsWorld } from '../physics';
 import { simulateForDisplay, type DisplaySim } from './evaluate';
 import { POCKETS } from './candidates';
+import { getPocketAimWindow } from '../physics';
 import type { PlannedStep } from './search';
 
 type Point = { x: number; z: number };
@@ -40,6 +41,7 @@ export interface ShotReview {
 }
 
 const ZONE_TOL = 0.05; // 走位区判定外扩容差（m），zone 半径本身已带 0.05~0.09 余量
+const PERFECT_POWER_TOL = 12; // 力度明显偏离计划时，即使偶然停进宽容区也不称为“完美复现”
 
 /** 点是否在凸包（zone）内：同号叉积法，边容差折成 |cross| ≤ TOL×边长 */
 function inZone(p: Point, zone: Point[]): boolean {
@@ -136,12 +138,13 @@ const CUT_TOL = (2 * Math.PI) / 180; // 厚薄判定：实际切角与计划切�
  */
 function diagnosePotMiss(planned: PlannedStep, capture: ShotCapture, sim: DisplaySim): string {
   const pocket = POCKETS[planned.candidate.pocket];
+  const aimWindow = getPocketAimWindow(pocket);
   const objStart = planned.display.objectPath[0];
   const dep = objectDepartureDir(sim.objectPath);
   if (!objStart || !dep) return '目标球几乎没动——先检查瞄准线是否对准';
   // 偏侧：面向袋口时右手方向 = (-iz, ix)（y 轴向上，d×up），dot(dep, right) = cross(ideal, dep)
-  const ix = pocket.x - objStart.x;
-  const iz = pocket.z - objStart.z;
+  const ix = aimWindow.center.x - objStart.x;
+  const iz = aimWindow.center.z - objStart.z;
   const iLen = Math.hypot(ix, iz) || 1;
   const cross = (ix / iLen) * dep.z - (iz / iLen) * dep.x;
   const side = cross > 0 ? '右' : '左';
@@ -174,6 +177,17 @@ export function buildShotReview(capture: ShotCapture): ShotReview | null {
   };
   if (!pocketedTarget) {
     return { verdict: 'pot-miss', message: diagnosePotMiss(planned, capture, sim), planned, actual };
+  }
+  const powerDelta = capture.power - planned.candidate.power;
+  if (Math.abs(powerDelta) > PERFECT_POWER_TOL) {
+    return {
+      verdict: 'position-miss',
+      message: powerDelta > 0
+        ? '力度偏大，母球冲过了计划力点'
+        : '力度偏小，母球没达到计划力点',
+      planned,
+      actual,
+    };
   }
   if (sim.cueEnd && planned.zone.length >= 3 && inZone(sim.cueEnd, planned.zone)) {
     // 单步计划（无下一杆）只说完美复现；多步计划引导玩家照第 2 杆打

@@ -27,7 +27,9 @@ await page.waitForSelector('.intro-card button');
 
 async function clickText(text) {
   const point = await page.evaluate((label) => {
-    const button = [...document.querySelectorAll('button')].find((node) => node.textContent?.trim() === label);
+    const button = [...document.querySelectorAll('button')].find((node) =>
+      node.textContent?.trim() === label ||
+      node.getAttribute('aria-label')?.includes(label));
     if (!button) return null;
     const rect = button.getBoundingClientRect();
     return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };

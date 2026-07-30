@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 对手观战自动全台、独立横向环绕、一键回正及玩家视角恢复断言
+[OUTPUT]: 390×844 对手观战自动全台、独立横向环绕、无控件遮挡回正及玩家视角恢复断言
 [POS]: 竖屏观战相机的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -61,6 +61,21 @@ ok(
     opponentUi.hintPointerEvents === 'none' &&
     opponentUi.recenter,
   JSON.stringify(opponentUi),
+);
+const controlSeparation = await page.evaluate(() => {
+  const recenter = document.querySelector('.camera-recenter')?.getBoundingClientRect();
+  const rightRail = document.querySelector('.dock-rail-right')?.getBoundingClientRect();
+  if (!recenter || !rightRail) return null;
+  return {
+    gap: rightRail.left - recenter.right,
+    recenter: { left: recenter.left, right: recenter.right },
+    rightRail: { left: rightRail.left, right: rightRail.right },
+  };
+});
+ok(
+  '纯视觉回正按钮不覆盖右侧控制轨',
+  Boolean(controlSeparation && controlSeparation.gap >= 4),
+  JSON.stringify(controlSeparation),
 );
 
 await page.evaluate(() => window.__bj8.setMatch({
@@ -136,7 +151,7 @@ await page.touchscreen.tap(recenter.x, recenter.y);
 await wait(700);
 const afterRecenter = await readCamera();
 ok(
-  '“全台”一键恢复竖向球台与完整构图',
+  '纯视觉回正按钮恢复竖向球台与完整构图',
   Math.abs(afterRecenter.azimuth) < 1e-6 &&
     afterRecenter.corners.every(point =>
       point.x >= afterRecenter.viewport.left + 4 &&

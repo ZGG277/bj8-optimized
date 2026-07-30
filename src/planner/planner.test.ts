@@ -12,6 +12,7 @@ import {
   simulateUntilStop,
   pocketedThisShot,
   isCueBallPocketed,
+  getPocketAimWindow,
   TABLE,
   type BilliardsWorld,
 } from '../physics';
@@ -60,8 +61,9 @@ function cutShotPlacements(
   cueDist: number,
 ): { n: number; x: number; z: number }[] {
   const pocket = POCKETS[pocketIdx];
-  const dx = pocket.x - targetX;
-  const dz = pocket.z - targetZ;
+  const window = getPocketAimWindow(pocket);
+  const dx = window.center.x - targetX;
+  const dz = window.center.z - targetZ;
   const len = Math.hypot(dx, dz);
   const ux = dx / len;
   const uz = dz / len;

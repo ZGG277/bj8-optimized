@@ -22,21 +22,35 @@ import {
   BALL_RESTITUTION,
   BALL_THROW_FRICTION,
 } from './physics/collision-model';
+import {
+  createCushionSegments,
+  createPocketGeometries,
+  getPocketAimWindow,
+  worldToPocketLocal,
+  type CushionSegment,
+  type PocketGeometry,
+} from './physics/table-geometry';
 export {
   BALL_RESTITUTION,
   BALL_THROW_FRICTION,
   predictBallCollisionDirections,
   type PredictedCollisionDirections,
 } from './physics/collision-model';
+export {
+  getPocketAimWindow,
+  isInsidePocketShelf,
+  pocketLocalToWorld,
+  worldToPocketLocal,
+  type CushionSegment,
+  type PocketAimWindow,
+  type PocketGeometry,
+  type Point2,
+} from './physics/table-geometry';
 
 export const TABLE = {
   width: 1.27,            // 台面宽 1.27m
   length: 2.54,           // 台面长 2.54m
   ballRadius: 0.028575,   // 球半径 57.15mm
-  // 二维落袋捕获半径是工程调校值，不等同于实体袋口量尺。
-  // 角袋沿用既有 68mm 手感；中袋由 62mm 收到 52mm，降低正面吸球容错。
-  cornerPocketRadius: 0.068,
-  sidePocketRadius: 0.052,
 } as const;
 
 export const PHYSICS_DT = 1 / 240;  // 240Hz 固定时间步
@@ -84,7 +98,17 @@ export type CueSpin = { x: number; y: number };
 export type PhysicsEvent =
   | { type: "first-contact"; ball: number; time: number; speed: number }
   | { type: "cushion"; ball: number; time: number; speed: number }
-  | { type: "pocket"; ball: number; pocket: number; time: number; speed: number };
+  | {
+      type: "pocket";
+      ball: number;
+      pocket: number;
+      time: number;
+      speed: number;
+      entryX: number;
+      entryZ: number;
+      entryVx: number;
+      entryVz: number;
+    };
 
 export type BilliardsWorld = {
   balls: BallState[];
@@ -95,63 +119,13 @@ export type BilliardsWorld = {
   firstContact: number | null;
 };
 
-export type Pocket = {
-  x: number;
-  z: number;
-  /** 球心沿袋口宽度方向的合法容错，供瞄准/规划共享。 */
-  radius: number;
-  /**
-   * 球心进入袋腔后的捕获半径。
-   * 中袋按半圆孔半径扣除部分球半径；角袋因二维模型缺少 45° 角尖
-   * 与重力下坠，使用单独标定值，详见常量旁说明。
-   */
-  captureRadius: number;
-};
+export type Pocket = PocketGeometry;
 
-// 角袋在二维内核里没有实体 45° 角尖/重力下坠，因此沿用既有 68mm
-// 捕获深度；中袋使用收窄后的独立调校值，避免视觉与物理仍然过宽。
-const CORNER_POCKET_CAPTURE_RADIUS = 0.068;
-const SIDE_POCKET_CAPTURE_RADIUS = TABLE.sidePocketRadius;
-
-// 6个袋口：左上、左中、左下、右上、右中、右下
-export const POCKETS: readonly Pocket[] = [
-  {
-    x: -TABLE.width / 2,
-    z: -TABLE.length / 2,
-    radius: TABLE.cornerPocketRadius,
-    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
-  },
-  {
-    x: TABLE.width / 2,
-    z: -TABLE.length / 2,
-    radius: TABLE.cornerPocketRadius,
-    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
-  },
-  {
-    x: -TABLE.width / 2,
-    z: 0,
-    radius: TABLE.sidePocketRadius,
-    captureRadius: SIDE_POCKET_CAPTURE_RADIUS,
-  },
-  {
-    x: TABLE.width / 2,
-    z: 0,
-    radius: TABLE.sidePocketRadius,
-    captureRadius: SIDE_POCKET_CAPTURE_RADIUS,
-  },
-  {
-    x: -TABLE.width / 2,
-    z: TABLE.length / 2,
-    radius: TABLE.cornerPocketRadius,
-    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
-  },
-  {
-    x: TABLE.width / 2,
-    z: TABLE.length / 2,
-    radius: TABLE.cornerPocketRadius,
-    captureRadius: CORNER_POCKET_CAPTURE_RADIUS,
-  },
-];
+// 六袋顺序保持：左上、右上、左中、右中、左下、右下。
+// 袋口、库边、瞄准与渲染全部消费同一份参数化几何。
+export const POCKETS: readonly Pocket[] = createPocketGeometries(TABLE);
+export const CUSHION_SEGMENTS: readonly CushionSegment[] =
+  createCushionSegments(TABLE, POCKETS);
 
 export type PlannedShot = { angle: number; power: number; target: number; pocket: number; spin?: CueSpin };
 
@@ -382,9 +356,10 @@ export function planSimpleShot(world: BilliardsWorld, legalNumbers: number[], sk
 
     for (let pocketIndex = 0; pocketIndex < POCKETS.length; pocketIndex += 1) {
       const pocket = POCKETS[pocketIndex];
+      const aimWindow = getPocketAimWindow(pocket);
 
-      const pocketDx = pocket.x - target.x;
-      const pocketDz = pocket.z - target.z;
+      const pocketDx = aimWindow.center.x - target.x;
+      const pocketDz = aimWindow.center.z - target.z;
       const pocketDistance = Math.hypot(pocketDx, pocketDz);
       if (pocketDistance === 0) continue;
 
@@ -393,7 +368,14 @@ export function planSimpleShot(world: BilliardsWorld, legalNumbers: number[], sk
 
       if (Math.abs(ghostX) > TABLE.width / 2 || Math.abs(ghostZ) > TABLE.length / 2) continue;
 
-      if (!pathClear(world, target.x, target.z, pocket.x, pocket.z, new Set([target.number]))) continue;
+      if (!pathClear(
+        world,
+        target.x,
+        target.z,
+        aimWindow.center.x,
+        aimWindow.center.z,
+        new Set([target.number]),
+      )) continue;
       if (!pathClear(world, cue.x, cue.z, ghostX, ghostZ, new Set([0, target.number]))) continue;
 
       const cueDistance = Math.hypot(ghostX - cue.x, ghostZ - cue.z);
@@ -427,112 +409,203 @@ export function planSimpleShot(world: BilliardsWorld, legalNumbers: number[], sk
 
 function pocketBall(world: BilliardsWorld, ball: BallState, pocketIndex: number) {
   const speed = Math.hypot(ball.vx, ball.vz);
+  const entryX = ball.x;
+  const entryZ = ball.z;
+  const entryVx = ball.vx;
+  const entryVz = ball.vz;
   ball.active = false;
   ball.vx = 0;
   ball.vz = 0;
   ball.wx = 0;
   ball.wy = 0;
   ball.wz = 0;
-  world.events.push({ type: "pocket", ball: ball.number, pocket: pocketIndex, time: world.time, speed });
+  world.events.push({
+    type: "pocket",
+    ball: ball.number,
+    pocket: pocketIndex,
+    time: world.time,
+    speed,
+    entryX,
+    entryZ,
+    entryVx,
+    entryVz,
+  });
 }
 
-function segmentDistanceSquared(
-  fromX: number,
-  fromZ: number,
-  toX: number,
-  toZ: number,
-  pointX: number,
-  pointZ: number,
-): number {
-  const dx = toX - fromX;
-  const dz = toZ - fromZ;
-  const lengthSquared = dx * dx + dz * dz;
-  if (lengthSquared <= 1e-12) {
-    return (pointX - toX) ** 2 + (pointZ - toZ) ** 2;
-  }
-  const t = Math.max(
-    0,
-    Math.min(1, ((pointX - fromX) * dx + (pointZ - fromZ) * dz) / lengthSquared),
-  );
-  const nearestX = fromX + dx * t;
-  const nearestZ = fromZ + dz * t;
-  return (pointX - nearestX) ** 2 + (pointZ - nearestZ) ** 2;
+type BoundaryHit = {
+  time: number;
+  nx: number;
+  nz: number;
+  segment: CushionSegment;
+};
+
+function considerBoundaryHit(
+  current: BoundaryHit | null,
+  candidate: BoundaryHit | null,
+): BoundaryHit | null {
+  if (!candidate) return current;
+  if (!current || candidate.time < current.time - 1e-9) return candidate;
+  return current;
 }
 
-function detectPocket(
-  world: BilliardsWorld,
+function sweptEndpointHit(
   ball: BallState,
-  previousX = ball.x,
-  previousZ = ball.z,
-): boolean {
-  for (let index = 0; index < POCKETS.length; index += 1) {
-    const pocket = POCKETS[index];
-    const distanceSquared = segmentDistanceSquared(
-      previousX,
-      previousZ,
-      ball.x,
-      ball.z,
-      pocket.x,
-      pocket.z,
-    );
-    if (distanceSquared <= pocket.captureRadius * pocket.captureRadius) {
-      pocketBall(world, ball, index);
-      return true;
+  point: { x: number; z: number },
+  maxTime: number,
+  segment: CushionSegment,
+): BoundaryHit | null {
+  const ox = ball.x - point.x;
+  const oz = ball.z - point.z;
+  const a = ball.vx * ball.vx + ball.vz * ball.vz;
+  if (a <= 1e-12) return null;
+  const b = 2 * (ox * ball.vx + oz * ball.vz);
+  const c = ox * ox + oz * oz - R * R;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return null;
+  const root = Math.sqrt(disc);
+  const roots = [(-b - root) / (2 * a), (-b + root) / (2 * a)];
+  for (const time of roots) {
+    if (time < -1e-9 || time > maxTime + 1e-9) continue;
+    const hx = ball.x + ball.vx * Math.max(0, time);
+    const hz = ball.z + ball.vz * Math.max(0, time);
+    const length = Math.hypot(hx - point.x, hz - point.z) || 1;
+    const nx = (hx - point.x) / length;
+    const nz = (hz - point.z) / length;
+    if (ball.vx * nx + ball.vz * nz >= -1e-8) continue;
+    return { time: Math.max(0, time), nx, nz, segment };
+  }
+  return null;
+}
+
+function sweptSegmentHit(
+  ball: BallState,
+  segment: CushionSegment,
+  maxTime: number,
+): BoundaryHit | null {
+  const abx = segment.b.x - segment.a.x;
+  const abz = segment.b.z - segment.a.z;
+  const length = Math.hypot(abx, abz);
+  if (length <= 1e-9) return null;
+  const tx = abx / length;
+  const tz = abz / length;
+  const distance =
+    (ball.x - segment.a.x) * segment.inward.x +
+    (ball.z - segment.a.z) * segment.inward.z;
+  const normalVelocity = ball.vx * segment.inward.x + ball.vz * segment.inward.z;
+  let best: BoundaryHit | null = null;
+
+  if (normalVelocity < -1e-8) {
+    const time = distance <= R
+      ? 0
+      : (R - distance) / normalVelocity;
+    if (time >= -1e-9 && time <= maxTime + 1e-9) {
+      const hx = ball.x + ball.vx * Math.max(0, time);
+      const hz = ball.z + ball.vz * Math.max(0, time);
+      const projection = (hx - segment.a.x) * tx + (hz - segment.a.z) * tz;
+      if (projection >= -1e-8 && projection <= length + 1e-8) {
+        best = {
+          time: Math.max(0, time),
+          nx: segment.inward.x,
+          nz: segment.inward.z,
+          segment,
+        };
+      }
     }
   }
-  return false;
+
+  best = considerBoundaryHit(best, sweptEndpointHit(ball, segment.a, maxTime, segment));
+  best = considerBoundaryHit(best, sweptEndpointHit(ball, segment.b, maxTime, segment));
+  return best;
 }
 
-function inPocketMouth(ball: BallState, axis: "x" | "z"): boolean {
-  // 仅留少量数值余量，防止恰好贴角尖的浮点抖动被库边和袋口反复争抢。
-  const sideMouth = TABLE.sidePocketRadius * 1.05;
-  const cornerMouth = CORNER_POCKET_CAPTURE_RADIUS * 1.05;
-
-  if (axis === "x") {
-    return Math.abs(ball.z) < sideMouth || Math.abs(Math.abs(ball.z) - TABLE.length / 2) < cornerMouth;
+function earliestBoundaryHit(ball: BallState, maxTime: number): BoundaryHit | null {
+  let best: BoundaryHit | null = null;
+  for (const segment of CUSHION_SEGMENTS) {
+    best = considerBoundaryHit(best, sweptSegmentHit(ball, segment, maxTime));
   }
-  return Math.abs(Math.abs(ball.x) - TABLE.width / 2) < cornerMouth;
+  return best;
+}
+
+function earliestPocketDrop(
+  ball: BallState,
+  maxTime: number,
+): { time: number; pocket: number } | null {
+  let best: { time: number; pocket: number } | null = null;
+  for (const pocket of POCKETS) {
+    const local = worldToPocketLocal(pocket, ball);
+    const depthVelocity = ball.vx * pocket.outward.x + ball.vz * pocket.outward.z;
+    if (depthVelocity <= 1e-9) continue;
+    const time = local.depth >= pocket.shelfDepth
+      ? 0
+      : (pocket.shelfDepth - local.depth) / depthVelocity;
+    if (time < -1e-9 || time > maxTime + 1e-9) continue;
+    const hx = ball.x + ball.vx * Math.max(0, time);
+    const hz = ball.z + ball.vz * Math.max(0, time);
+    const atDrop = worldToPocketLocal(pocket, { x: hx, z: hz });
+    if (Math.abs(atDrop.lateral) > pocket.dropHalfWidth + 1e-7) continue;
+    if (!best || time < best.time) best = { time: Math.max(0, time), pocket: pocket.index };
+  }
+  return best;
+}
+
+function resolveBoundaryVelocity(
+  world: BilliardsWorld,
+  ball: BallState,
+  hit: BoundaryHit,
+) {
+  const incomingNormal = ball.vx * hit.nx + ball.vz * hit.nz;
+  if (incomingNormal >= 0) return;
+  const speed = Math.abs(incomingNormal);
+  const e = Math.max(CUSHION_E_MIN, CUSHION_E_BASE - CUSHION_E_SLOPE * speed);
+  const tx = -hit.nz;
+  const tz = hit.nx;
+  const tangentVelocity = ball.vx * tx + ball.vz * tz;
+  const outgoingNormal = -incomingNormal * e;
+  const outgoingTangent =
+    tangentVelocity * CUSHION_TANGENTIAL_KEEP + ball.wy * R * CUSHION_SPIN_KICK;
+  ball.vx = hit.nx * outgoingNormal + tx * outgoingTangent;
+  ball.vz = hit.nz * outgoingNormal + tz * outgoingTangent;
+  ball.wy *= CUSHION_SPIN_DAMP;
+  const roll = rollingSpin(ball.vx, ball.vz);
+  ball.wx = ball.wx * 0.4 + roll.wx * 0.6;
+  ball.wz = ball.wz * 0.4 + roll.wz * 0.6;
+  world.events.push({ type: "cushion", ball: ball.number, time: world.time, speed });
 }
 
 /**
- * 库边碰撞：法向速度相关恢复 + 切向摩擦 + 侧旋反踢
+ * 球心对直线库边与圆弧离散角衬做连续扫掠，按最早接触结算；
+ * 一固定步最多处理三次边界接触，避免高速球穿过袋角或在尖点无限迭代。
  */
-function resolveCushions(world: BilliardsWorld, ball: BallState) {
-  const xLimit = TABLE.width / 2 - R;
-  const zLimit = TABLE.length / 2 - R;
-  let hit = false;
-  let hitSpeed = 0;
+function advanceBallAgainstTable(world: BilliardsWorld, ball: BallState, dt: number) {
+  let remaining = dt;
+  for (let collision = 0; collision < 3 && remaining > 1e-8; collision += 1) {
+    const hit = earliestBoundaryHit(ball, remaining);
+    const drop = earliestPocketDrop(ball, remaining);
+    if (drop && (!hit || drop.time <= hit.time + 1e-9)) {
+      ball.x += ball.vx * drop.time;
+      ball.z += ball.vz * drop.time;
+      pocketBall(world, ball, drop.pocket);
+      return;
+    }
+    if (!hit) {
+      ball.x += ball.vx * remaining;
+      ball.z += ball.vz * remaining;
+      return;
+    }
 
-  // X方向库边（法向为 x）
-  if (Math.abs(ball.x) > xLimit && !inPocketMouth(ball, "x")) {
-    ball.x = Math.sign(ball.x) * xLimit;
-    const vn = Math.abs(ball.vx);
-    const e = Math.max(CUSHION_E_MIN, CUSHION_E_BASE - CUSHION_E_SLOPE * vn);
-    ball.vx = -ball.vx * e;
-    // 切向（z）摩擦衰减 + 侧旋反踢：ωy 把球往 ŷ×n̂ 方向踢
-    ball.vz = ball.vz * CUSHION_TANGENTIAL_KEEP + ball.wy * R * CUSHION_SPIN_KICK * -Math.sign(ball.x);
-    hit = true;
-    hitSpeed = vn;
+    ball.x += ball.vx * hit.time;
+    ball.z += ball.vz * hit.time;
+    remaining -= hit.time;
+    resolveBoundaryVelocity(world, ball, hit);
+    // 离开接触面一丝，避免下一轮把同一接触重复判为 t=0。
+    ball.x += hit.nx * 1e-7;
+    ball.z += hit.nz * 1e-7;
+    remaining = Math.max(0, remaining - 1e-8);
   }
 
-  // Z方向库边（法向为 z）
-  if (Math.abs(ball.z) > zLimit && !inPocketMouth(ball, "z")) {
-    ball.z = Math.sign(ball.z) * zLimit;
-    const vn = Math.abs(ball.vz);
-    const e = Math.max(CUSHION_E_MIN, CUSHION_E_BASE - CUSHION_E_SLOPE * vn);
-    ball.vz = -ball.vz * e;
-    ball.vx = ball.vx * CUSHION_TANGENTIAL_KEEP + ball.wy * R * CUSHION_SPIN_KICK * Math.sign(ball.z);
-    hit = true;
-    hitSpeed = Math.max(hitSpeed, vn);
-  }
-
-  if (hit) {
-    // 碰库消耗侧旋，并重估滚动自旋（让滑动摩擦接管后续演化）
-    ball.wy *= CUSHION_SPIN_DAMP;
-    const roll = rollingSpin(ball.vx, ball.vz);
-    ball.wx = ball.wx * 0.4 + roll.wx * 0.6;
-    ball.wz = ball.wz * 0.4 + roll.wz * 0.6;
-    world.events.push({ type: "cushion", ball: ball.number, time: world.time, speed: hitSpeed });
+  if (ball.active && remaining > 0) {
+    ball.x += ball.vx * remaining;
+    ball.z += ball.vz * remaining;
   }
 }
 
@@ -898,14 +971,7 @@ export function stepWorld(world: BilliardsWorld, dt = PHYSICS_DT) {
 
   for (const ball of world.balls) {
     if (!ball.active) continue;
-    const previousX = ball.x;
-    const previousZ = ball.z;
-    ball.x += ball.vx * dt;
-    ball.z += ball.vz * dt;
-
-    if (!detectPocket(world, ball, previousX, previousZ)) {
-      resolveCushions(world, ball);
-    }
+    advanceBallAgainstTable(world, ball, dt);
   }
 
   let collisionOccurred = true;

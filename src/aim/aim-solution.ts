@@ -7,6 +7,7 @@
 import {
   POCKETS,
   TABLE,
+  getPocketAimWindow,
   getCueBall,
   predictBallCollisionDirections,
   type BilliardsWorld,
@@ -14,7 +15,6 @@ import {
 } from '../physics';
 
 const R = TABLE.ballRadius;
-const EFFECTIVE_POCKET_RATIO = 0.75;
 export const PRECISION_ENTER_MULTIPLIER = 2.6;
 export const PRECISION_EXIT_MULTIPLIER = 4;
 
@@ -115,15 +115,14 @@ function pocketAimGeometry(
   const pocket = POCKETS[pocketIndex];
   if (!cue?.active || !target || !pocket) return null;
 
-  const pdx = pocket.x - target.x;
-  const pdz = pocket.z - target.z;
+  const aimWindow = getPocketAimWindow(pocket);
+  const clampedOffset = Math.max(-1, Math.min(1, offset));
+  const mouthX = aimWindow.center.x + pocket.tangent.x * clampedOffset * aimWindow.halfWidth;
+  const mouthZ = aimWindow.center.z + pocket.tangent.z * clampedOffset * aimWindow.halfWidth;
+  const pdx = mouthX - target.x;
+  const pdz = mouthZ - target.z;
   const pocketDistance = Math.hypot(pdx, pdz);
   if (pocketDistance <= 1e-9) return null;
-  const perpX = -pdz / pocketDistance;
-  const perpZ = pdx / pocketDistance;
-  const mouthOffset = Math.max(-1, Math.min(1, offset)) * pocket.radius * EFFECTIVE_POCKET_RATIO;
-  const mouthX = pocket.x + perpX * mouthOffset;
-  const mouthZ = pocket.z + perpZ * mouthOffset;
   const objectDx = mouthX - target.x;
   const objectDz = mouthZ - target.z;
   const objectDistance = Math.hypot(objectDx, objectDz);
@@ -179,7 +178,15 @@ export function aimSolutionForPocket(
   const target = world.balls.find((ball) => ball.number === targetNumber && ball.active);
   const pocket: Pocket | undefined = POCKETS[pocketIndex];
   if (!cue?.active || !target || !pocket) return null;
-  if (!pathClear(world, target.x, target.z, pocket.x, pocket.z, new Set([targetNumber]))) return null;
+  const aimWindow = getPocketAimWindow(pocket);
+  if (!pathClear(
+    world,
+    target.x,
+    target.z,
+    aimWindow.center.x,
+    aimWindow.center.z,
+    new Set([targetNumber]),
+  )) return null;
 
   const center = pocketAimGeometry(world, targetNumber, pocketIndex, 0);
   const leftAngle = aimAngleForPocketOffset(world, targetNumber, pocketIndex, -1);
