@@ -1715,9 +1715,9 @@ export class Scene3D {
     return true;
   }
 
-  /** 以指定世界瞄准角的目标相机位姿，把台面坐标投影到屏幕。 */
-  tableToScreenAt(x: number, z: number, aimAngle: number, viewLevel = this.viewLevel): { x: number; y: number } | null {
-    if (!this.positionVirtualCamera(aimAngle, viewLevel)) return null;
+  /** 以指定视觉相机方位的目标位姿，把台面坐标投影到屏幕。 */
+  tableToScreenAt(x: number, z: number, cameraAzimuth: number, viewLevel = this.viewLevel): { x: number; y: number } | null {
+    if (!this.positionVirtualCamera(cameraAzimuth, viewLevel)) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     const projected = new THREE.Vector3(x, 0, z).project(this.virtualCam);
     return {
@@ -1727,17 +1727,19 @@ export class Scene3D {
   }
 
   /**
-   * 以指定瞄准角和视角高度的目标相机位姿做射线(不经过平滑滞后的活相机)。
+   * 以指定视觉方位和视角高度的目标相机位姿做射线(不经过平滑滞后的活相机)。
    * 活相机 lerp 就位后与该位姿一致,用于确定性反算"屏幕点对应的台面点"
    * (回归测试的基准真值)。位姿公式与 update() 一致(静止瞄准态,power=0)。
    */
   screenToTableAt(
     clientX: number,
     clientY: number,
-    aimAngle: number,
+    cameraAzimuth: number,
     viewLevel = this.viewLevel,
   ): { x: number; z: number } | null {
-    if (!this.positionVirtualCamera(aimAngle, viewLevel)) return this.screenToTable(clientX, clientY);
+    if (!this.positionVirtualCamera(cameraAzimuth, viewLevel)) {
+      return this.screenToTable(clientX, clientY);
+    }
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;

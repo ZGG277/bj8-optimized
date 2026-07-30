@@ -1,7 +1,7 @@
 /*
-[INPUT]: 依赖 physics 台球世界、Scene3D 屏幕坐标映射、match 对局状态
-[OUTPUT]: 对外提供各视角高度一致的 360° 世界角粗瞄、幽灵球落位后的无限变速拨轮，以及跟手虚母球放置处理器
-[POS]: 交互协调层，把连续视角目标相机下的指针映射为世界瞄准角；袋口几何委托 aim/，拨轮传动委托 input/
+[INPUT]: 依赖 physics 台球世界、独立视觉相机方位、Scene3D 屏幕坐标映射与 match 状态
+[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、幽灵球拨轮与跟手虚母球放置
+[POS]: 交互协调层，把当前视觉相机下的指针映射为世界瞄准角；袋口几何委托 aim/，拨轮传动委托 input/
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -33,6 +33,7 @@ interface AimInteractionProps {
   viewLevel: number;
   setAim: (angle: number) => void;
   aimRef: React.MutableRefObject<number>;
+  cameraAzimuthRef: React.MutableRefObject<number>;
   aimGhostDistRef: React.MutableRefObject<number | null>;
   canAim: boolean;
   matchPhase: string;
@@ -50,6 +51,7 @@ export function useAimInteraction({
   viewLevel,
   setAim,
   aimRef,
+  cameraAzimuthRef,
   aimGhostDistRef,
   canAim,
   matchPhase,
@@ -135,7 +137,7 @@ export function useAimInteraction({
     if (!scene) return;
     const cue = getCueBall(worldRef.current);
     if (!cue || !cue.active) return;
-    const hit = scene.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
+    const hit = scene.screenToTableAt(clientX, clientY, cameraAzimuthRef.current, viewLevel);
     if (!hit) return;
     const dx = hit.x - cue.x;
     const dz = hit.z - cue.z;
@@ -148,7 +150,7 @@ export function useAimInteraction({
     if (!keepDist) aimGhostDistRef.current = dist;
     const worldAngle = Math.atan2(dx, -forwardDz);
     applyAim(worldAngle);
-  }, [viewLevel, breaking, scene3DRef, worldRef, aimRef, aimGhostDistRef, applyAim]);
+  }, [viewLevel, breaking, scene3DRef, worldRef, cameraAzimuthRef, aimGhostDistRef, applyAim]);
 
   /** 抓影子球挪位：影子球跟随指针落到台面任意位置，白球过影子球心的延长线即杆向 */
   const moveGhostTo = useCallback((clientX: number, clientY: number) => {
@@ -156,7 +158,7 @@ export function useAimInteraction({
     if (!scene) return;
     const cue = getCueBall(worldRef.current);
     if (!cue || !cue.active) return;
-    const hit = scene.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
+    const hit = scene.screenToTableAt(clientX, clientY, cameraAzimuthRef.current, viewLevel);
     if (!hit) return;
     const m = TABLE.ballRadius;
     const gx = clamp(hit.x, -TABLE.width / 2 + m, TABLE.width / 2 - m);
@@ -172,7 +174,7 @@ export function useAimInteraction({
     aimGhostDistRef.current = dist;
     const worldAngle = Math.atan2(dx, -forwardDz);
     applyAim(worldAngle);
-  }, [viewLevel, breaking, scene3DRef, worldRef, aimRef, aimGhostDistRef, applyAim]);
+  }, [viewLevel, breaking, scene3DRef, worldRef, cameraAzimuthRef, aimGhostDistRef, applyAim]);
 
   const cuePlacementAt = useCallback((clientX: number, clientY: number): {
     x: number;
@@ -180,7 +182,12 @@ export function useAimInteraction({
     error: MatchMessageKey | null;
   } | null => {
     const scene = scene3DRef.current;
-    const hit = scene?.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
+    const hit = scene?.screenToTableAt(
+      clientX,
+      clientY,
+      cameraAzimuthRef.current,
+      viewLevel,
+    );
     if (!hit) return null;
 
     const xLimit = TABLE.width / 2 - TABLE.ballRadius;
@@ -203,7 +210,7 @@ export function useAimInteraction({
       return { x: hit.x, z: hit.z, error: 'place-near-pocket' };
     }
     return { x: hit.x, z: hit.z, error: null };
-  }, [scene3DRef, worldRef, breaking, aimRef, viewLevel]);
+  }, [scene3DRef, worldRef, breaking, cameraAzimuthRef, viewLevel]);
 
   const previewCuePlacement = useCallback((clientX: number, clientY: number) => {
     const scene = scene3DRef.current;
@@ -252,7 +259,7 @@ export function useAimInteraction({
     if (!scene || !cue) return 'aim';
     const ghost = scene.aimGhostPos();
     if (!ghost) return 'aim';
-    const hit = scene.screenToTableAt(clientX, clientY, aimRef.current, viewLevel);
+    const hit = scene.screenToTableAt(clientX, clientY, cameraAzimuthRef.current, viewLevel);
     if (!hit) return 'aim';
     if (Math.hypot(hit.x - ghost.x, hit.z - ghost.z) < 0.08) return 'ghost';
     const lx = ghost.x - cue.x;
@@ -264,7 +271,7 @@ export function useAimInteraction({
       if (t > 0.05 && t < 1.05 && perp < 0.022) return 'line';
     }
     return 'aim';
-  }, [scene3DRef, worldRef, viewLevel, aimRef]);
+  }, [scene3DRef, worldRef, viewLevel, cameraAzimuthRef]);
 
   /** 指针按下 */
   const handlePointerDown = useCallback((e: React.PointerEvent) => {

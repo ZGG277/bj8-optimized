@@ -1,6 +1,6 @@
 /*
 [INPUT]: 母球位置、独立相机方位角、力度预览、归一化视角高度与视口宽高比
-[OUTPUT]: 对外提供连续视角钳制、竖屏全台适配、环绕手势换算与第一人称→俯视位姿
+[OUTPUT]: 对外提供连续视角钳制、竖屏全台适配、自由相机回接、环绕手势换算与相机位姿
 [POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -23,6 +23,8 @@ const TABLE_OUTER_HALF_WIDTH = 0.76;
 const TABLE_OUTER_HALF_LENGTH = 1.4;
 const TABLE_FIT_MARGIN = 1.23;
 const ORBIT_RADIANS_PER_PIXEL = 0.008;
+const CAMERA_REATTACH_START = 0.08;
+const CAMERA_FREE_LEVEL = 0.42;
 
 export type CameraPoint = {
   x: number;
@@ -49,6 +51,28 @@ export function normalizeCameraAzimuth(angle: number): number {
 export function cameraAzimuthAfterDrag(current: number, pixelDelta: number): number {
   if (!Number.isFinite(pixelDelta)) return normalizeCameraAzimuth(current);
   return normalizeCameraAzimuth(current - pixelDelta * ORBIT_RADIANS_PER_PIXEL);
+}
+
+/**
+ * 顾燃交棒后，高位继续使用观战方位；用户向第一人称拉动时，沿最短圆弧平滑回到杆向。
+ * detached=false 时保持既有玩家相机语义：所有高度都跟随瞄准角。
+ */
+export function cameraAzimuthAtView(
+  cameraAzimuth: number,
+  aimAngle: number,
+  viewLevel: number,
+  detached: boolean,
+): number {
+  const aim = normalizeCameraAzimuth(aimAngle);
+  if (!detached) return aim;
+  const level = clampViewLevel(viewLevel);
+  const raw = Math.min(
+    1,
+    Math.max(0, (level - CAMERA_REATTACH_START) / (CAMERA_FREE_LEVEL - CAMERA_REATTACH_START)),
+  );
+  const transition = raw * raw * (3 - 2 * raw);
+  const shortestDelta = normalizeCameraAzimuth(cameraAzimuth - aim);
+  return normalizeCameraAzimuth(aim + shortestDelta * transition);
 }
 
 /** 端点保留产品名称；中间高度直接给出可感知的百分比。 */

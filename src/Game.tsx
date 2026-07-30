@@ -41,6 +41,7 @@ import {
   OVERHEAD_VIEW,
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
+  cameraAzimuthAtView,
 } from './camera-view';
 import type { GameMode, PositionOutcome } from './opponent/model';
 
@@ -74,6 +75,7 @@ export default function Game() {
   const containerRef = useRef<HTMLDivElement>(null);
   const scene3DRef = useRef<Scene3D | null>(null);
   const [cameraAzimuth, setCameraAzimuth] = useState(FULL_TABLE_AZIMUTH);
+  const [cameraDetached, setCameraDetached] = useState(false);
   const cameraAzimuthRef = useRef(cameraAzimuth);
   cameraAzimuthRef.current = cameraAzimuth;
   const spectatorActive =
@@ -185,28 +187,20 @@ export default function Game() {
   // 瞄准值同步到 3D 场景用的 ref
   const aimRef = useRef(0);
   const resetSpinRef = useRef<() => void>(() => {});
-  const preSpectatorViewLevelRef = useRef(viewLevel);
   const spectatorWasActiveRef = useRef(false);
 
-  // 对手接管后切到竖屏友好的全台观战位；玩家重新进入瞄准回合时恢复原高度。
+  // 对手接管后切到竖屏友好的全台观战位；交棒后保留该高度与朝向。
   useEffect(() => {
     const wasActive = spectatorWasActiveRef.current;
     if (spectatorActive && !wasActive) {
-      preSpectatorViewLevelRef.current = viewLevel;
       const element = containerRef.current;
       const portrait = Boolean(element && element.clientWidth < element.clientHeight);
       setCameraAzimuth(portrait ? FULL_TABLE_AZIMUTH : aimRef.current);
+      setCameraDetached(true);
       setViewLevel(Math.max(viewLevel, SPECTATOR_VIEW_LEVEL));
-    } else if (
-      !spectatorActive &&
-      wasActive &&
-      match.phase === 'aiming' &&
-      match.actor === 'player'
-    ) {
-      setViewLevel(preSpectatorViewLevelRef.current);
     }
     spectatorWasActiveRef.current = spectatorActive;
-  }, [match.actor, match.phase, spectatorActive, setViewLevel, viewLevel]);
+  }, [spectatorActive, setViewLevel, viewLevel]);
 
   // ── 出杆提交：输入层只给 ShotIntent，这里负责球杆动画与物理击球 ──
   const handleCommit = useCallback((intent: ShotIntent) => {
@@ -280,6 +274,21 @@ export default function Game() {
     commitShot,
   } = useShotInput({ canShoot: canAim, onCommit: handleCommit, worldRef, breaking: match.breaking });
   resetSpinRef.current = () => setSpin({ x: 0, y: 0 });
+  const cameraViewAzimuth = cameraAzimuthAtView(
+    cameraAzimuth,
+    aim,
+    viewLevel,
+    cameraDetached,
+  );
+  const cameraViewAzimuthRef = useRef(cameraViewAzimuth);
+  cameraViewAzimuthRef.current = cameraViewAzimuth;
+
+  // 用户确实拉到第一人称后，恢复玩家回合“镜头跟杆向”的既有行为。
+  useEffect(() => {
+    if (!spectatorActive && cameraDetached && viewLevel <= 0.005) {
+      setCameraDetached(false);
+    }
+  }, [cameraDetached, spectatorActive, viewLevel]);
 
   // ── 瞄准交互（在 useShotInput 之后，以获取 setAim）──
   const {
@@ -296,6 +305,7 @@ export default function Game() {
     viewLevel,
     setAim,
     aimRef,
+    cameraAzimuthRef: cameraViewAzimuthRef,
     aimGhostDistRef,
     canAim,
     matchPhase: match.phase,
@@ -358,6 +368,7 @@ export default function Game() {
     setSpin({ x: 0, y: 0 });
     setGuidanceEnabled(false);
     setCameraAzimuth(FULL_TABLE_AZIMUTH);
+    setCameraDetached(false);
     planConsultedRef.current = false;
     skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
@@ -444,6 +455,7 @@ export default function Game() {
         aim: aimRef,
         match: matchRef,
         cameraAzimuth: cameraAzimuthRef,
+        cameraViewAzimuth: cameraViewAzimuthRef,
         // 专项门禁读取纯几何解，验证真实指针落点是否跨过精瞄边界。
         precisionAt: (angle: number, multiplier?: number) => findPrecisionAim(
           worldRef.current,
@@ -473,7 +485,7 @@ export default function Game() {
     aimRef.current = aim;
     scene.setViewLevel(viewLevel);
     scene.setAim(aim);
-    scene.setCameraAzimuth(spectatorActive ? cameraAzimuth : aim);
+    scene.setCameraAzimuth(cameraViewAzimuth);
     scene.setSpin(spin);
     scene.setAimGhostDist(aimGhostDistRef.current);
     // 合法目标高亮：只在玩家回合显示
@@ -482,7 +494,7 @@ export default function Game() {
 
     const cue = getCueBall(worldView);
     scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
-  }, [worldView, viewLevel, aim, cameraAzimuth, spectatorActive, previewPower, match, spin, aimGhostDistRef, legalTargets]);
+  }, [worldView, viewLevel, aim, cameraViewAzimuth, previewPower, match, spin, aimGhostDistRef, legalTargets]);
 
   // ── 渲染 ──
   return (

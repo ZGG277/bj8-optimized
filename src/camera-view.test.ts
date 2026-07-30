@@ -12,6 +12,7 @@ import {
   OVERHEAD_VIEW,
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
+  cameraAzimuthAtView,
   cameraPoseAt,
   clampViewLevel,
   normalizeCameraAzimuth,
@@ -61,6 +62,19 @@ describe('continuous camera view', () => {
     expect(cameraAfter).not.toBe(cameraBefore);
     expect(aimAngle).toBe(0.37);
     expect(normalizeCameraAzimuth(cameraAfter + Math.PI * 2)).toBeCloseTo(cameraAfter, 10);
+  });
+
+  it('顾燃交棒后高位保持观战方位，拉回第一人称时沿最短圆弧回接杆向', () => {
+    const cameraAzimuth = Math.PI - 0.1;
+    const aimAngle = -Math.PI + 0.1;
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.82, true))
+      .toBeCloseTo(cameraAzimuth, 10);
+    const middle = cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.25, true);
+    expect(Math.abs(normalizeCameraAzimuth(middle - aimAngle))).toBeLessThan(0.2);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0, true))
+      .toBeCloseTo(aimAngle, 10);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 1, false))
+      .toBeCloseTo(aimAngle, 10);
   });
 
   it.each([0, Math.PI / 2])(
