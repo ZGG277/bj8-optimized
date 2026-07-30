@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 vitest 与 opponent/model 纯函数
-[OUTPUT]: 覆盖难度归一、防抖、辅助降权、冷启动收缩、模式映射与持久化容错
+[OUTPUT]: 覆盖难度归一、防抖、辅助降权、冷启动收缩、模式映射、适量规划预算与持久化容错
 [POS]: 自适应对手领域层回归测试
 [PROTOCOL]: 模型字段或阈值变化时同步更新本文件与 model.ts 头部
 */
@@ -112,8 +112,10 @@ describe('opponent profile', () => {
     const challenge = createOpponentProfile(player, 'challenge', () => 1);
     expect(practice.tierLevel).toBe(59);
     expect(practice.planner.maxDepth).toBe(1);
+    expect(practice.planner.simBudget).toBe(240);
     expect(challenge.tierLevel).toBe(70);
     expect(challenge.planner.maxDepth).toBe(2);
+    expect(challenge.planner.simBudget).toBe(640);
     expect(challenge.formOffset).toBe(3);
     expect(challenge.aimSigma).toBeLessThan(practice.aimSigma);
   });

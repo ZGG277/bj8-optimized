@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收合格击球事实与可注入随机数
-[OUTPUT]: 玩家能力画像更新、陪练/挑战对手档案生成、等级/置信度展示与安全持久化
+[OUTPUT]: 玩家能力画像更新、适量搜索预算的陪练/挑战对手档案生成、等级/置信度展示与安全持久化
 [POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；局内档案由调用方创建后锁定
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
@@ -211,7 +211,7 @@ export function createOpponentProfile(
       sigma: aimSigma,
       samples: mode === 'practice' ? 10 : 16,
       maxDepth: mode === 'practice' ? 1 : 2,
-      simBudget: mode === 'practice' ? 1600 : 4200,
+      simBudget: mode === 'practice' ? 240 : 640,
     },
   };
 }

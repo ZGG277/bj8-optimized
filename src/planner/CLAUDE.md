@@ -18,9 +18,9 @@
 
 `plan-worker.ts`: Web Worker 入口——接收 { world, legal, opts }（纯 JSON 结构化克隆），跑 planPosition 回传 plans；Vite module worker，把 0.2–1s 搜索移出主线程。
 
-`async.ts`: 异步门面 planPositionAsync——内联 Blob Worker 随单 HTML 产物发布；新请求 reject 旧 Promise 并 terminate 旧 worker，随后按需重建，worker 创建失败降级主线程。
+`async.ts`: 异步门面 planPositionAsync / planPositionWithinDeadline——内联 Blob Worker 随单 HTML 产物发布；新请求 reject 旧 Promise 并 terminate 旧 worker，墙钟超时同样终止并返回专用错误；普通请求在 worker 创建失败时降级主线程，限时请求则立即失败，避免同步搜索阻塞截止时间。
 
-`async.test.ts`: FakeWorker 回归：第二请求抢占第一请求、旧 worker 终止、旧 Promise 以 PlanCancelledError 结算、新请求正常返回。
+`async.test.ts`: FakeWorker 回归：第二请求抢占第一请求、截止时间终止 worker、worker 不可用时限时请求立即失败、旧 Promise 以对应错误结算、新请求正常返回。
 
 `review.ts`: 击球复盘——出杆捕获快照（ShotCapture：击球前世界/杆参数/当时计划首步）在结算后把实际杆参数跑一遍 simulateForDisplay 无扰动仿真，与计划逐步比对出 ShotReview（perfect/position-miss/pot-miss + 一句话中文诊断 + 计划/实际轨迹对）。走位诊断主信号用母球行程总长差（±0.2m 阈值，碰库反弹拉长行程与力度同向，比停位投影稳健），行程相近看停位侧向偏差判杆法；未进球用实际切角 vs 计划 cutAngle 判厚薄（±2°），叉积符号判偏袋口左右侧；洗袋直接报力度偏大。无计划（planned=null）静默返回 null。
 

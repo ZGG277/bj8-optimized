@@ -1,6 +1,6 @@
 /*
 [INPUT]: 主线程的 BilliardsWorld 快照与合法目标球；plan-worker.ts（Vite 内联 module worker）
-[OUTPUT]: planPositionAsync 可取消异步走位搜索（Promise<PositionPlan[]>），新请求抢占旧 worker，失败降级主线程
+[OUTPUT]: planPositionAsync / planPositionWithinDeadline 可取消异步走位搜索，新请求抢占旧 worker，失败降级主线程
 [POS]: 规划层的异步门面——Worker 以 Blob 随主包发布，UI 不关心计算跑在 worker 还是主线程；不允许悬挂 Promise
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -18,6 +18,20 @@ export class PlanCancelledError extends Error {
   constructor() {
     super('plan request cancelled');
     this.name = 'PlanCancelledError';
+  }
+}
+
+export class PlanDeadlineExceededError extends Error {
+  constructor() {
+    super('plan request exceeded deadline');
+    this.name = 'PlanDeadlineExceededError';
+  }
+}
+
+export class PlanWorkerUnavailableError extends Error {
+  constructor() {
+    super('plan worker unavailable');
+    this.name = 'PlanWorkerUnavailableError';
   }
 }
 
@@ -72,6 +86,7 @@ export function planPositionAsync(
   world: BilliardsWorld,
   legal: number[],
   opts?: PlannerOptions,
+  allowMainThreadFallback = true,
 ): Promise<PositionPlan[]> {
   if (pendingResolve || pendingReject) cancelWorkerRequest();
   generation += 1;
@@ -79,6 +94,9 @@ export function planPositionAsync(
 
   const w = ensureWorker();
   if (!w) {
+    if (!allowMainThreadFallback) {
+      return Promise.reject(new PlanWorkerUnavailableError());
+    }
     // 降级：主线程直接算（包 Promise；堵塞约 0.2–1s，仅 worker 不可用时发生）
     return new Promise((resolve, reject) => {
       try {
@@ -98,6 +116,43 @@ export function planPositionAsync(
     pendingReject = reject;
     const request: PlanWorkerRequest = { gen, world, legal, opts: cleanOpts };
     w.postMessage(request);
+  });
+}
+
+/**
+ * 带墙钟上限的规划请求。超时会终止 worker，并以专用错误结算；
+ * 调用方可立即切到轻量选杆，避免设备性能差异把等待时间无限放大。
+ */
+export function planPositionWithinDeadline(
+  world: BilliardsWorld,
+  legal: number[],
+  opts: PlannerOptions | undefined,
+  deadlineMs: number,
+): Promise<PositionPlan[]> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cancelWorkerRequest();
+      reject(new PlanDeadlineExceededError());
+    }, Math.max(0, deadlineMs));
+
+    // 限时交互不能在主线程同步搜索：同步任务会阻塞定时器，无法兑现墙钟上限。
+    planPositionAsync(world, legal, opts, false).then(
+      (plans) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(plans);
+      },
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
   });
 }
 

@@ -16,7 +16,7 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `useControlSlotDrag.ts`: 右侧单个控件槽位的编辑态拖动几何；由 ControlDeck 统一进入编辑后即时纵向移动，独立约束在黑色控制轨内并按控件键持久化位置。
 
-`useOpponentAI.ts`: AI 调度层，副作用 Hook——match.phase === 'opponent' 时按局前锁定档案调度搜索深度、选杆扰动、执行误差、击球与出杆动画，不关心 UI 交互或玩家输入。
+`useOpponentAI.ts`: AI 调度层，副作用 Hook——match.phase === 'opponent' 时按局前锁定档案做适量搜索；500ms 自然停顿后最多等待后台规划 2s，超时取消并回退轻量选杆，使出杆思考约束在 3s 内；同时调度选杆扰动、执行误差、击球与出杆动画，不关心 UI 交互或玩家输入。
 
 `useAudioManager.ts`: 音效协调层，管理 BilliardsAudio 初始化和物理事件音效播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents。
 
