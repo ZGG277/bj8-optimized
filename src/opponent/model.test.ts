@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 vitest 与 opponent/model 纯函数
-[OUTPUT]: 覆盖三杆批量、难度归一、辅助降权、冷启动收缩、动态模式映射与 v1/v2 持久化
+[OUTPUT]: 覆盖三杆批量、难度归一、辅助降权、冷启动收缩、动态模式映射、适量规划预算与 v1/v2 持久化
 [POS]: 自适应对手领域层回归测试
 [PROTOCOL]: 模型字段或阈值变化时同步更新本文件与 model.ts 头部
 */
@@ -205,8 +205,10 @@ describe('opponent profile', () => {
     expect(practice.tierLevel).toBe(67);
     expect(practice.targetLevel).toBe(67);
     expect(practice.planner.maxDepth).toBe(1);
+    expect(practice.planner.simBudget).toBe(240);
     expect(challenge.tierLevel).toBe(74);
     expect(challenge.planner.maxDepth).toBe(2);
+    expect(challenge.planner.simBudget).toBe(640);
     expect(challenge.aimSigma).toBeLessThan(practice.aimSigma);
   });
 
@@ -223,7 +225,7 @@ describe('opponent profile', () => {
     expect(next.aimSigma).toBeLessThan(initial.aimSigma);
     expect(next.powerJitter).toBeLessThan(initial.powerJitter);
     expect(next.choiceTemperature).toBeLessThan(initial.choiceTemperature);
-    expect(next.planner.simBudget).toBeGreaterThan(initial.planner.simBudget);
+    expect(next.planner.simBudget).toBe(initial.planner.simBudget);
   });
 
   it('caps both mode targets at 100', () => {

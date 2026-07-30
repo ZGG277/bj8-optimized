@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
-[OUTPUT]: 玩家三杆批量能力画像、陪练/挑战动态对手档案、等级/置信度展示与安全持久化
+[OUTPUT]: 玩家三杆批量能力画像、适量搜索预算的陪练/挑战动态对手档案、等级/置信度展示与安全持久化
 [POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；局内档案按三杆批次限速重定向
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
@@ -302,10 +302,7 @@ function profileForLevel(
           ? 8 + Math.round(levelT * 8)
           : 12 + Math.round(levelT * 12),
       maxDepth: mode === 'practice' ? 1 : 2,
-      simBudget:
-        mode === 'practice'
-          ? 1000 + Math.round(levelT * 1600)
-          : 2600 + Math.round(levelT * 3000),
+      simBudget: mode === 'practice' ? 240 : 640,
     },
   };
 }
