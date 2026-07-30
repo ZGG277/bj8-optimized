@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供立体袋口、纵横屏全台适配相机、独立观战环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[OUTPUT]: 对外提供立体袋口、纵横屏全台适配相机、独立观战/全局环绕、全局段无遮挡桌面、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -24,6 +24,7 @@ import {
   CAMERA_FOV_DEGREES,
   cameraPoseAt,
   clampViewLevel,
+  isGlobalCameraView,
   normalizeCameraAzimuth,
 } from './camera-view';
 import {
@@ -1540,6 +1541,8 @@ export class Scene3D {
 
   setViewLevel(level: number) {
     this.viewLevel = clampViewLevel(level);
+    // 进入全局段就直接展示无遮挡桌面；相机继续抬升时不会穿过吊灯模型。
+    if (this.lampGroup) this.lampGroup.visible = !isGlobalCameraView(this.viewLevel);
   }
 
   setAim(angle: number) {
@@ -1969,9 +1972,9 @@ export class Scene3D {
     return true;
   }
 
-  /** 以指定世界瞄准角的目标相机位姿，把台面坐标投影到屏幕。 */
-  tableToScreenAt(x: number, z: number, aimAngle: number, viewLevel = this.viewLevel): { x: number; y: number } | null {
-    if (!this.positionVirtualCamera(aimAngle, viewLevel)) return null;
+  /** 以指定视觉相机方位的目标位姿，把台面坐标投影到屏幕。 */
+  tableToScreenAt(x: number, z: number, cameraAzimuth: number, viewLevel = this.viewLevel): { x: number; y: number } | null {
+    if (!this.positionVirtualCamera(cameraAzimuth, viewLevel)) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     const projected = new THREE.Vector3(x, 0, z).project(this.virtualCam);
     return {
@@ -1981,17 +1984,19 @@ export class Scene3D {
   }
 
   /**
-   * 以指定瞄准角和视角高度的目标相机位姿做射线(不经过平滑滞后的活相机)。
+   * 以指定视觉方位和视角高度的目标相机位姿做射线(不经过平滑滞后的活相机)。
    * 活相机 lerp 就位后与该位姿一致,用于确定性反算"屏幕点对应的台面点"
    * (回归测试的基准真值)。位姿公式与 update() 一致(静止瞄准态,power=0)。
    */
   screenToTableAt(
     clientX: number,
     clientY: number,
-    aimAngle: number,
+    cameraAzimuth: number,
     viewLevel = this.viewLevel,
   ): { x: number; z: number } | null {
-    if (!this.positionVirtualCamera(aimAngle, viewLevel)) return this.screenToTable(clientX, clientY);
+    if (!this.positionVirtualCamera(cameraAzimuth, viewLevel)) {
+      return this.screenToTable(clientX, clientY);
+    }
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;

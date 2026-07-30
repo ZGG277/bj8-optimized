@@ -1,6 +1,6 @@
 /*
 [INPUT]: camera-view 连续视角、独立方位角与竖屏全台适配纯几何
-[OUTPUT]: 锁定端点、任意高度、环绕独立性及竖屏六袋安全边界回归
+[OUTPUT]: 锁定端点、任意高度、全局视角阈值、环绕独立性及竖屏六袋安全边界回归
 [POS]: 连续视角相机回归测试
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -9,11 +9,14 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import {
   CAMERA_FOV_DEGREES,
   FIRST_PERSON_VIEW,
+  GLOBAL_CAMERA_VIEW_LEVEL,
   OVERHEAD_VIEW,
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
+  cameraAzimuthAtView,
   cameraPoseAt,
   clampViewLevel,
+  isGlobalCameraView,
   normalizeCameraAzimuth,
   viewLevelLabel,
 } from './camera-view';
@@ -27,6 +30,12 @@ describe('continuous camera view', () => {
     expect(viewLevelLabel(0)).toBe('第一人称');
     expect(viewLevelLabel(0.43)).toBe('视角高度 43%');
     expect(viewLevelLabel(1)).toBe('俯视');
+  });
+
+  it('全局高度从统一阈值开始冻结球台视觉方位', () => {
+    expect(isGlobalCameraView(GLOBAL_CAMERA_VIEW_LEVEL - 0.001)).toBe(false);
+    expect(isGlobalCameraView(GLOBAL_CAMERA_VIEW_LEVEL)).toBe(true);
+    expect(isGlobalCameraView(OVERHEAD_VIEW)).toBe(true);
   });
 
   it('高度随推杆位置单调抬升且中间值不会吸附端点', () => {
@@ -61,6 +70,19 @@ describe('continuous camera view', () => {
     expect(cameraAfter).not.toBe(cameraBefore);
     expect(aimAngle).toBe(0.37);
     expect(normalizeCameraAzimuth(cameraAfter + Math.PI * 2)).toBeCloseTo(cameraAfter, 10);
+  });
+
+  it('观战或主动全局模式保持视觉方位，拉回第一人称时沿最短圆弧回接杆向', () => {
+    const cameraAzimuth = Math.PI - 0.1;
+    const aimAngle = -Math.PI + 0.1;
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.82, true))
+      .toBeCloseTo(cameraAzimuth, 10);
+    const middle = cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.25, true);
+    expect(Math.abs(normalizeCameraAzimuth(middle - aimAngle))).toBeLessThan(0.2);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0, true))
+      .toBeCloseTo(aimAngle, 10);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 1, false))
+      .toBeCloseTo(aimAngle, 10);
   });
 
   it.each([0, Math.PI / 2])(
