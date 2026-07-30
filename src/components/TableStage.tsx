@@ -1,7 +1,7 @@
 /*
-[INPUT]: 依赖连续 viewLevel / match / 幽灵球落位后的拨轮状态与 pointer 事件处理器
-[OUTPUT]: 渲染精简球桌区域（3D 视口、无限瞄准拨轮与回合/结束遮罩）
-[POS]: HUD 组件层，组合瞄准拨轮与 3D 视口；不持有对局状态
+[INPUT]: 依赖连续 viewLevel / match / 观战状态 / 幽灵球拨轮与 pointer 事件处理器
+[OUTPUT]: 渲染 3D 球桌、无限瞄准拨轮、可交互观战提示、全台回正与结束遮罩
+[POS]: HUD 组件层，只组合并转发瞄准/观战事件；不持有对局或相机状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import React from 'react';
@@ -11,6 +11,7 @@ import type { PrecisionAimSolution } from '../aim/aim-solution';
 
 interface TableStageProps {
   viewLevel: number;
+  spectatorActive: boolean;
   match: MatchState;
   aimDialVisible: boolean;
   aimDialSolution: PrecisionAimSolution | null;
@@ -20,11 +21,13 @@ interface TableStageProps {
   onPointerUp: (e: React.PointerEvent) => void;
   onPointerCancel: (e: React.PointerEvent) => void;
   onAimDialAdjust: (pixelDelta: number) => void;
+  onCameraRecenter: () => void;
   onResetGame: () => void;
 }
 
 export function TableStage({
   viewLevel,
+  spectatorActive,
   match,
   aimDialVisible,
   aimDialSolution,
@@ -34,13 +37,14 @@ export function TableStage({
   onPointerUp,
   onPointerCancel,
   onAimDialAdjust,
+  onCameraRecenter,
   onResetGame,
 }: TableStageProps) {
   return (
     <section className="table-stage">
       <div
         ref={containerRef}
-        className={`viewport ${viewLevel >= 0.995 ? 'overhead' : 'orbit'} ${match.phase === 'placing' ? 'placing' : ''}`}
+        className={`viewport ${viewLevel >= 0.995 ? 'overhead' : 'orbit'} ${spectatorActive ? 'spectator' : ''} ${match.phase === 'placing' ? 'placing' : ''}`}
         data-view-level={viewLevel.toFixed(3)}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -56,8 +60,23 @@ export function TableStage({
         {match.phase === 'opponent' && (
           <div className="turn-mask">
             <span className="thinking-dot" />
-            <strong>顾燃计算中...</strong>
+            <strong>顾燃计算中 · 左右滑动看全台</strong>
           </div>
+        )}
+
+        {spectatorActive && (
+          <button
+            type="button"
+            className="camera-recenter"
+            aria-label="回正并显示完整球台"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onCameraRecenter();
+            }}
+          >
+            全台
+          </button>
         )}
 
         {match.phase === 'finished' && (

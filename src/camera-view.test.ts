@@ -1,15 +1,20 @@
 /*
-[INPUT]: camera-view 连续视角纯几何
-[OUTPUT]: 锁定端点兼容、任意高度停留、单调抬升与全高度环绕不变量
+[INPUT]: camera-view 连续视角、独立方位角与竖屏全台适配纯几何
+[OUTPUT]: 锁定端点、任意高度、环绕独立性及竖屏六袋安全边界回归
 [POS]: 连续视角相机回归测试
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { describe, expect, it } from 'vitest';
+import { PerspectiveCamera, Vector3 } from 'three';
 import {
+  CAMERA_FOV_DEGREES,
   FIRST_PERSON_VIEW,
   OVERHEAD_VIEW,
+  SPECTATOR_VIEW_LEVEL,
+  cameraAzimuthAfterDrag,
   cameraPoseAt,
   clampViewLevel,
+  normalizeCameraAzimuth,
   viewLevelLabel,
 } from './camera-view';
 
@@ -48,4 +53,44 @@ describe('continuous camera view', () => {
     expect(east.position.x).toBeCloseTo(-0.85, 10);
     expect(east.position.z).toBeCloseTo(0, 10);
   });
+
+  it('观战环绕只换算视觉方位角，不需要也不会返回瞄准事实', () => {
+    const aimAngle = 0.37;
+    const cameraBefore = -0.8;
+    const cameraAfter = cameraAzimuthAfterDrag(cameraBefore, 120);
+    expect(cameraAfter).not.toBe(cameraBefore);
+    expect(aimAngle).toBe(0.37);
+    expect(normalizeCameraAzimuth(cameraAfter + Math.PI * 2)).toBeCloseTo(cameraAfter, 10);
+  });
+
+  it.each([0, Math.PI / 2])(
+    '390×844 竖屏观战位姿在方位角 %s 下仍把木帮外缘留在安全边界内',
+    (cameraAzimuth) => {
+      const aspect = 324 / 810;
+      const pose = cameraPoseAt(
+        0,
+        0.55,
+        cameraAzimuth,
+        0,
+        SPECTATOR_VIEW_LEVEL,
+        aspect,
+      );
+      const camera = new PerspectiveCamera(CAMERA_FOV_DEGREES, aspect, 0.01, 60);
+      camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+      camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
+      camera.updateMatrixWorld(true);
+
+      const corners = [
+        [-0.76, -1.4],
+        [0.76, -1.4],
+        [-0.76, 1.4],
+        [0.76, 1.4],
+      ];
+      for (const [x, z] of corners) {
+        const projected = new Vector3(x, 0, z).project(camera);
+        expect(Math.abs(projected.x)).toBeLessThanOrEqual(0.94);
+        expect(Math.abs(projected.y)).toBeLessThanOrEqual(0.94);
+      }
+    },
+  );
 });

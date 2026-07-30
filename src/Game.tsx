@@ -1,10 +1,17 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、动态能力记录、局间锁定 AI、连续环绕视角、360° 瞄准/无限拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、动态能力记录、局间锁定 AI、独立观战环绕、360° 瞄准/无限拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   getCueBall,
   strikeCueBall,
@@ -29,7 +36,12 @@ import { Scene3D } from './Scene3D';
 import type { PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
-import { OVERHEAD_VIEW } from './camera-view';
+import {
+  FULL_TABLE_AZIMUTH,
+  OVERHEAD_VIEW,
+  SPECTATOR_VIEW_LEVEL,
+  cameraAzimuthAfterDrag,
+} from './camera-view';
 import type { GameMode, PositionOutcome } from './opponent/model';
 
 type SkillShotCapture = {
@@ -61,6 +73,11 @@ export default function Game() {
   // ── 3D 场景 ──
   const containerRef = useRef<HTMLDivElement>(null);
   const scene3DRef = useRef<Scene3D | null>(null);
+  const [cameraAzimuth, setCameraAzimuth] = useState(FULL_TABLE_AZIMUTH);
+  const cameraAzimuthRef = useRef(cameraAzimuth);
+  cameraAzimuthRef.current = cameraAzimuth;
+  const spectatorActive =
+    match.actor === 'opponent' && (match.phase === 'opponent' || match.phase === 'rolling');
 
   // 禁用移动端长按唤出复制/全选/分享菜单，避免干扰击球与蓄力
   useEffect(() => {
@@ -168,6 +185,28 @@ export default function Game() {
   // 瞄准值同步到 3D 场景用的 ref
   const aimRef = useRef(0);
   const resetSpinRef = useRef<() => void>(() => {});
+  const preSpectatorViewLevelRef = useRef(viewLevel);
+  const spectatorWasActiveRef = useRef(false);
+
+  // 对手接管后切到竖屏友好的全台观战位；玩家重新进入瞄准回合时恢复原高度。
+  useEffect(() => {
+    const wasActive = spectatorWasActiveRef.current;
+    if (spectatorActive && !wasActive) {
+      preSpectatorViewLevelRef.current = viewLevel;
+      const element = containerRef.current;
+      const portrait = Boolean(element && element.clientWidth < element.clientHeight);
+      setCameraAzimuth(portrait ? FULL_TABLE_AZIMUTH : aimRef.current);
+      setViewLevel(Math.max(viewLevel, SPECTATOR_VIEW_LEVEL));
+    } else if (
+      !spectatorActive &&
+      wasActive &&
+      match.phase === 'aiming' &&
+      match.actor === 'player'
+    ) {
+      setViewLevel(preSpectatorViewLevelRef.current);
+    }
+    spectatorWasActiveRef.current = spectatorActive;
+  }, [match.actor, match.phase, spectatorActive, setViewLevel, viewLevel]);
 
   // ── 出杆提交：输入层只给 ShotIntent，这里负责球杆动画与物理击球 ──
   const handleCommit = useCallback((intent: ShotIntent) => {
@@ -268,11 +307,57 @@ export default function Game() {
     setViewLevel,
   });
 
+  const orbitPointerRef = useRef<{ id: number; lastX: number } | null>(null);
+  const handleStagePointerDown = useCallback((event: ReactPointerEvent) => {
+    if (!spectatorActive) {
+      handlePointerDown(event);
+      return;
+    }
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    event.preventDefault();
+    orbitPointerRef.current = { id: event.pointerId, lastX: event.clientX };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [handlePointerDown, spectatorActive]);
+
+  const handleStagePointerMove = useCallback((event: ReactPointerEvent) => {
+    const orbit = orbitPointerRef.current;
+    if (!spectatorActive || !orbit || orbit.id !== event.pointerId) {
+      if (!spectatorActive) handlePointerMove(event);
+      return;
+    }
+    event.preventDefault();
+    const delta = event.clientX - orbit.lastX;
+    orbit.lastX = event.clientX;
+    setCameraAzimuth(current => cameraAzimuthAfterDrag(current, delta));
+  }, [handlePointerMove, spectatorActive]);
+
+  const finishStagePointer = useCallback((
+    event: ReactPointerEvent,
+    aimHandler: (event: ReactPointerEvent) => void,
+  ) => {
+    const orbit = orbitPointerRef.current;
+    if (spectatorActive && orbit?.id === event.pointerId) {
+      event.preventDefault();
+      orbitPointerRef.current = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      return;
+    }
+    aimHandler(event);
+  }, [spectatorActive]);
+
+  const handleCameraRecenter = useCallback(() => {
+    setCameraAzimuth(FULL_TABLE_AZIMUTH);
+    setViewLevel(current => Math.max(current, SPECTATOR_VIEW_LEVEL));
+  }, [setViewLevel]);
+
   // ── 重置游戏 ──
   const handleResetGame = useCallback((nextMode: GameMode) => {
     resetGame(setAim, nextMode);
     setSpin({ x: 0, y: 0 });
     setGuidanceEnabled(false);
+    setCameraAzimuth(FULL_TABLE_AZIMUTH);
     planConsultedRef.current = false;
     skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
@@ -358,6 +443,7 @@ export default function Game() {
         scene: scene3DRef,
         aim: aimRef,
         match: matchRef,
+        cameraAzimuth: cameraAzimuthRef,
         // 专项门禁读取纯几何解，验证真实指针落点是否跨过精瞄边界。
         precisionAt: (angle: number, multiplier?: number) => findPrecisionAim(
           worldRef.current,
@@ -387,6 +473,7 @@ export default function Game() {
     aimRef.current = aim;
     scene.setViewLevel(viewLevel);
     scene.setAim(aim);
+    scene.setCameraAzimuth(spectatorActive ? cameraAzimuth : aim);
     scene.setSpin(spin);
     scene.setAimGhostDist(aimGhostDistRef.current);
     // 合法目标高亮：只在玩家回合显示
@@ -395,7 +482,7 @@ export default function Game() {
 
     const cue = getCueBall(worldView);
     scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
-  }, [worldView, viewLevel, aim, previewPower, match, spin, aimGhostDistRef, legalTargets]);
+  }, [worldView, viewLevel, aim, cameraAzimuth, spectatorActive, previewPower, match, spin, aimGhostDistRef, legalTargets]);
 
   // ── 渲染 ──
   return (
@@ -403,15 +490,17 @@ export default function Game() {
       <Scoreboard match={match} worldView={worldView} />
       <TableStage
         viewLevel={viewLevel}
+        spectatorActive={spectatorActive}
         match={match}
         aimDialVisible={aimDialVisible}
         aimDialSolution={aimDialSolution}
         containerRef={containerRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
+        onPointerDown={handleStagePointerDown}
+        onPointerMove={handleStagePointerMove}
+        onPointerUp={(event) => finishStagePointer(event, handlePointerUp)}
+        onPointerCancel={(event) => finishStagePointer(event, handlePointerCancel)}
         onAimDialAdjust={handleAimDialAdjust}
+        onCameraRecenter={handleCameraRecenter}
         onResetGame={handleReplay}
       />
       <ControlDeck

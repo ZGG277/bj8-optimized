@@ -1,12 +1,15 @@
 /*
-[INPUT]: 母球位置、世界杆向、力度预览与归一化视角高度
-[OUTPUT]: 对外提供连续视角钳制、标签与第一人称→俯视的可测试相机位姿
+[INPUT]: 母球位置、独立相机方位角、力度预览、归一化视角高度与视口宽高比
+[OUTPUT]: 对外提供连续视角钳制、竖屏全台适配、环绕手势换算与第一人称→俯视位姿
 [POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 
 export const FIRST_PERSON_VIEW = 0;
 export const OVERHEAD_VIEW = 1;
+export const SPECTATOR_VIEW_LEVEL = 0.82;
+export const FULL_TABLE_AZIMUTH = 0;
+export const CAMERA_FOV_DEGREES = 46;
 
 const FP_CAM_DIST = 0.72;
 const FP_CAM_SIDE = 0.015;
@@ -15,6 +18,11 @@ const FP_LOOK_AHEAD = 0.42;
 const OVERHEAD_HEIGHT = 3.7;
 const OVERHEAD_ORBIT_RADIUS = 0.85;
 const OVERHEAD_LOOK_RADIUS = 0.05;
+/** 木帮外缘的半尺寸，略留 1cm 给阴影和抗锯齿边缘。 */
+const TABLE_OUTER_HALF_WIDTH = 0.76;
+const TABLE_OUTER_HALF_LENGTH = 1.4;
+const TABLE_FIT_MARGIN = 1.23;
+const ORBIT_RADIANS_PER_PIXEL = 0.008;
 
 export type CameraPoint = {
   x: number;
@@ -32,6 +40,17 @@ export function clampViewLevel(level: number): number {
   return Math.min(OVERHEAD_VIEW, Math.max(FIRST_PERSON_VIEW, level));
 }
 
+export function normalizeCameraAzimuth(angle: number): number {
+  if (!Number.isFinite(angle)) return FULL_TABLE_AZIMUTH;
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+/** 横向拖动只产生视觉方位角，不消费也不返回球杆瞄准角。 */
+export function cameraAzimuthAfterDrag(current: number, pixelDelta: number): number {
+  if (!Number.isFinite(pixelDelta)) return normalizeCameraAzimuth(current);
+  return normalizeCameraAzimuth(current - pixelDelta * ORBIT_RADIANS_PER_PIXEL);
+}
+
 /** 端点保留产品名称；中间高度直接给出可感知的百分比。 */
 export function viewLevelLabel(level: number): string {
   const clamped = clampViewLevel(level);
@@ -43,23 +62,51 @@ export function viewLevelLabel(level: number): string {
 const mix = (from: number, to: number, amount: number) => from + (to - from) * amount;
 
 /**
- * 相机在任意高度都消费同一个世界杆向：
- * - 低位以母球为轴，保持杆、视线、球路共线；
+ * 把旋转后的球台外框分别投影到屏幕横/纵轴，再由透视 FOV 反算最低高度。
+ * 竖屏的水平 FOV 最窄，因此方位角转到横台时会自动继续拉远，始终保留整台。
+ */
+export function overheadFitHeight(aspect: number, cameraAzimuth: number): number {
+  const safeAspect = Number.isFinite(aspect)
+    ? Math.min(4, Math.max(0.25, aspect))
+    : 16 / 9;
+  const angle = normalizeCameraAzimuth(cameraAzimuth);
+  const absSin = Math.abs(Math.sin(angle));
+  const absCos = Math.abs(Math.cos(angle));
+  const horizontalExtent =
+    TABLE_OUTER_HALF_WIDTH * absCos + TABLE_OUTER_HALF_LENGTH * absSin;
+  const verticalExtent =
+    TABLE_OUTER_HALF_WIDTH * absSin + TABLE_OUTER_HALF_LENGTH * absCos;
+  const tanHalfVerticalFov = Math.tan((CAMERA_FOV_DEGREES * Math.PI) / 360);
+  const heightForWidth = horizontalExtent / (tanHalfVerticalFov * safeAspect);
+  const heightForLength = verticalExtent / tanHalfVerticalFov;
+  return Math.max(
+    OVERHEAD_HEIGHT,
+    Math.max(heightForWidth, heightForLength) * TABLE_FIT_MARGIN,
+  );
+}
+
+/**
+ * 相机在任意高度都消费独立的视觉方位角：
+ * - 玩家低位传入瞄准角，保持杆、视线、球路共线；
+ * - 观战时传入 cameraAzimuth，转动镜头不会污染球杆或物理瞄准；
  * - 高位逐渐把轴心移到球台中心，确保整台可见；
- * - 俯视端仍保留 0.85m 环绕半径，转向时画面方向连续变化。
+ * - 高位高度按视口比例与台面方向自适应，竖屏也能看全六袋。
  */
 export function cameraPoseAt(
   cueX: number,
   cueZ: number,
-  aimAngle: number,
+  cameraAzimuth: number,
   previewPower: number,
   viewLevel: number,
+  aspect = 16 / 9,
 ): CameraPose {
   const level = clampViewLevel(viewLevel);
   const transition = level * level * (3 - 2 * level);
-  const sin = Math.sin(aimAngle);
-  const cos = Math.cos(aimAngle);
+  const angle = normalizeCameraAzimuth(cameraAzimuth);
+  const sin = Math.sin(angle);
+  const cos = Math.cos(angle);
   const firstDistance = FP_CAM_DIST + previewPower * 0.0022;
+  const overheadHeight = overheadFitHeight(aspect, angle);
 
   const firstPosition: CameraPoint = {
     x: cueX - sin * firstDistance + cos * FP_CAM_SIDE,
@@ -74,7 +121,7 @@ export function cameraPoseAt(
 
   const overheadPosition: CameraPoint = {
     x: -sin * OVERHEAD_ORBIT_RADIUS,
-    y: OVERHEAD_HEIGHT,
+    y: overheadHeight,
     z: cos * OVERHEAD_ORBIT_RADIUS,
   };
   const overheadLookAt: CameraPoint = {

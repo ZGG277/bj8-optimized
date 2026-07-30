@@ -10,7 +10,7 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 `Scoreboard.tsx`: 桌面渲染压缩后的玩家/对手球组与比分，不再显示 PLAYER/SPARRING 等装饰字；竖屏压成 34px 首行，只显示开球/开放球局/玩家球组及本组 7 球+8号，已进球灰化。
 
-`TableStage.tsx`: 球桌区域，组合 AimDial 与 3D 视口，包含回合遮罩与结束覆层；移除 PHYSICS WORLD、合法目标、拖拽提示等桌面装饰文案，视角工具条并入右侧控制轨。
+`TableStage.tsx`: 球桌区域，组合 AimDial 与 3D 视口；对手回合用不拦截触控的轻量提示替代整屏遮罩，并提供独立环绕与“全台”回正入口；结束覆层仍独占交互。
 
 `ControlDeck.tsx`: 桌面/手机共用 54px 右侧黑色单手轨，组合与出杆区等长的 ViewToolbar、始终保留位置且默认熄灭的灯泡总开关、SpinControl 与 ShootControl；长按整轨后四块一起轻微抖动，编辑态可在轨内分别上下移动，点击轨外锁定且不透传游戏操作。
 

@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
-[OUTPUT]: 对外提供场景渲染、连续环绕相机、世界角瞄准辅助（射线/分离线/幽灵球靶点）、摆球阶段虚母球与实体显隐、合法目标环、球杆动画、走位/复盘渲染及屏幕↔台面坐标映射
+[INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
+[OUTPUT]: 对外提供纵横屏全台适配相机、独立观战环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -15,7 +15,12 @@ import {
 } from './physics';
 import type { PositionPlan } from './planner/search';
 import type { ShotReview } from './planner/review';
-import { cameraPoseAt, clampViewLevel } from './camera-view';
+import {
+  CAMERA_FOV_DEGREES,
+  cameraPoseAt,
+  clampViewLevel,
+  normalizeCameraAzimuth,
+} from './camera-view';
 import {
   makeClothMaps,
   makeWoodTexture,
@@ -93,9 +98,14 @@ export class Scene3D {
   private virtualCam: THREE.PerspectiveCamera;
 
   private aimAngle = 0;
-  /** 0=第一人称，1=俯视；中间值可停留，并在所有高度共享世界杆向。 */
+  /** 纯视觉方位；玩家回合可跟随 aimAngle，观战回合由用户独立环绕。 */
+  private cameraAzimuth = 0;
+  /** 0=第一人称，1=俯视；中间值可停留。 */
   private viewLevel = 0;
   private phase = 'intro';
+  private lastCueX = 0;
+  private lastCueZ = 0;
+  private lastPreviewPower = 0;
 
   private targetCameraPos = new THREE.Vector3();
   private targetLookAt = new THREE.Vector3();
@@ -160,8 +170,8 @@ export class Scene3D {
     this.scene.background = new THREE.Color(0x07090a);
     this.scene.fog = new THREE.Fog(0x07090a, 4, 11);
 
-    this.camera = new THREE.PerspectiveCamera(46, element.clientWidth / element.clientHeight, 0.01, 60);
-    this.virtualCam = new THREE.PerspectiveCamera(46, element.clientWidth / element.clientHeight, 0.01, 60);
+    this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
+    this.virtualCam = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(element.clientWidth, element.clientHeight);
@@ -1303,9 +1313,25 @@ export class Scene3D {
     this.aimAngle = angle;
   }
 
-  /** 全局唯一瞄准事实：所有视角高度均消费同一个世界角。 */
-  private totalAim(): number {
-    return this.aimAngle;
+  setCameraAzimuth(angle: number) {
+    this.cameraAzimuth = normalizeCameraAzimuth(angle);
+  }
+
+  private updateCameraTarget() {
+    const cameraPose = cameraPoseAt(
+      this.lastCueX,
+      this.lastCueZ,
+      this.cameraAzimuth,
+      this.lastPreviewPower,
+      this.viewLevel,
+      this.camera.aspect,
+    );
+    this.targetCameraPos.set(
+      cameraPose.position.x,
+      cameraPose.position.y,
+      cameraPose.position.z,
+    );
+    this.targetLookAt.set(cameraPose.lookAt.x, cameraPose.lookAt.y, cameraPose.lookAt.z);
   }
 
   sync(world: BilliardsWorld) {
@@ -1389,7 +1415,7 @@ export class Scene3D {
     if (!show || !world) return;
 
     const cue = world.balls[0];
-    const angle = this.totalAim();
+    const angle = this.aimAngle;
     const dx = Math.sin(angle);
     const dz = -Math.cos(angle);
     const px = cue.x, pz = cue.z;
@@ -1521,21 +1547,18 @@ export class Scene3D {
 
   update(cueX: number, cueZ: number, power: number, phase: string) {
     this.phase = phase;
+    this.lastCueX = cueX;
+    this.lastCueZ = cueZ;
+    this.lastPreviewPower = power;
     const cue = this.ballMeshes[0];
     const cueActive = Boolean(this.lastWorld?.balls[0]?.active);
     // 摆球阶段物理世界仍保留母球作为候选状态，但画面只显示跟手的半透明预览；
     // 点击落实后下一次 sync 会恢复实体母球，避免一虚一实同时出现。
     if (cue && phase === 'placing') cue.visible = false;
-    const angle = this.totalAim();
+    const angle = this.aimAngle;
 
-    // ---- 相机：高度、轴心与方位角共用纯几何，滑杆和全局转向都不会触发模式跳变。 ----
-    const cameraPose = cameraPoseAt(cueX, cueZ, angle, power, this.viewLevel);
-    this.targetCameraPos.set(
-      cameraPose.position.x,
-      cameraPose.position.y,
-      cameraPose.position.z,
-    );
-    this.targetLookAt.set(cameraPose.lookAt.x, cameraPose.lookAt.y, cameraPose.lookAt.z);
+    // ---- 相机：视觉方位与球杆瞄准解耦；高度按当前视口比例确保高位全台可见。 ----
+    this.updateCameraTarget();
     // 相机只设目标位姿;平滑收敛在 render() 每帧执行。
     // 若在此处随 React 渲染推进,松手后 React 不再渲染,相机会冻结在半途。
 
@@ -1671,14 +1694,21 @@ export class Scene3D {
     };
   }
 
-  private positionVirtualCamera(aimAngle: number, viewLevel = this.viewLevel): boolean {
+  private positionVirtualCamera(cameraAzimuth: number, viewLevel = this.viewLevel): boolean {
     const cue = this.ballMeshes[0];
     if (!cue) return false;
     const cueX = cue.position.x;
     const cueZ = cue.position.z;
     this.virtualCam.aspect = this.camera.aspect;
     this.virtualCam.updateProjectionMatrix();
-    const pose = cameraPoseAt(cueX, cueZ, aimAngle, 0, viewLevel);
+    const pose = cameraPoseAt(
+      cueX,
+      cueZ,
+      cameraAzimuth,
+      0,
+      viewLevel,
+      this.virtualCam.aspect,
+    );
     this.virtualCam.position.set(pose.position.x, pose.position.y, pose.position.z);
     this.virtualCam.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
     this.virtualCam.updateMatrixWorld(true);
@@ -1726,6 +1756,7 @@ export class Scene3D {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.updateCameraTarget();
   };
 
   dispose() {

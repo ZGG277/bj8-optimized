@@ -166,6 +166,14 @@
   cursor: default;
 }
 
+.viewport.spectator {
+  cursor: grab;
+}
+
+.viewport.spectator:active {
+  cursor: grabbing;
+}
+
 /* 自由球放置模式:十字光标明示"点哪放哪" */
 .viewport.placing {
   cursor: crosshair;
@@ -301,13 +309,23 @@
 
 .turn-mask {
   position: absolute;
-  inset: 0;
+  z-index: 4;
+  top: 12px;
+  left: 50%;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  background: rgba(5,8,7,0.6);
-  backdrop-filter: blur(4px);
+  gap: 8px;
+  max-width: calc(100% - 132px);
+  padding: 7px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(5,8,7,0.72);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .thinking-dot {
@@ -319,10 +337,34 @@
 }
 
 .turn-mask strong {
-  margin-top: 10px;
-  font-family: 'Songti SC', serif;
-  font-size: var(--fs-4xl);
-  font-weight: 400;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+.camera-recenter {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  right: 10px;
+  min-width: 48px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--text-primary);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-surface);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.camera-recenter:active {
+  transform: scale(0.96);
 }
 
 /* 遮罩层级:结束/介绍高于一切 HUD 控件(z 10 以下) */
