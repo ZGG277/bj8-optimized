@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 对手观战全台、独立环绕、交棒保留、幽灵球拾取及手动回第一人称断言
+[OUTPUT]: 390×844 对手观战全台、独立环绕、交棒保留、全局点选冻结球台及手动回第一人称断言
 [POS]: 竖屏观战相机的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -82,6 +82,7 @@ const readCamera = () => page.evaluate(() => {
     azimuth,
     viewAzimuth,
     level,
+    lampVisible: scene.lampGroup?.visible ?? null,
     viewport: {
       left: viewport.left,
       right: viewport.right,
@@ -233,6 +234,46 @@ ok(
   firstPerson.level <= 0.005 &&
     Math.abs(firstPerson.viewAzimuth - firstPerson.aim) < 1e-6,
   JSON.stringify(firstPerson),
+);
+
+// 玩家自己升回全局视角：冻结进入瞬间的球台方位，点台面只更新瞄准与幽灵球。
+await page.focus('.view-slider-track');
+await page.keyboard.press('End');
+await wait(180);
+const playerGlobalBefore = await readCamera();
+const playerGlobalTarget = await page.evaluate(() => {
+  const target = { x: -0.28, z: 0.02 };
+  const level = Number(document.querySelector('.viewport').getAttribute('data-view-level'));
+  const screen = window.__bj8.scene.current.tableToScreenAt(
+    target.x,
+    target.z,
+    window.__bj8.cameraViewAzimuth.current,
+    level,
+  );
+  return { target, screen };
+});
+await page.touchscreen.tap(playerGlobalTarget.screen.x, playerGlobalTarget.screen.y);
+await wait(180);
+const playerGlobalAfter = await page.evaluate(() => ({
+  aim: window.__bj8.aim.current,
+  azimuth: window.__bj8.cameraAzimuth.current,
+  viewAzimuth: window.__bj8.cameraViewAzimuth.current,
+  ghost: window.__bj8.scene.current.aimGhostPos(),
+}));
+ok(
+  '玩家拉到全局模式直接显示无遮挡桌面，点球桌只调整瞄准、不转动整张球台',
+  Math.abs(playerGlobalBefore.level - 1) < 0.001 &&
+    firstPerson.lampVisible === true &&
+    playerGlobalBefore.lampVisible === false &&
+    Math.abs(playerGlobalAfter.aim - playerGlobalBefore.aim) > 0.05 &&
+    Math.abs(playerGlobalAfter.azimuth - playerGlobalBefore.azimuth) < 1e-6 &&
+    Math.abs(playerGlobalAfter.viewAzimuth - playerGlobalBefore.viewAzimuth) < 1e-6 &&
+    playerGlobalAfter.ghost &&
+    Math.hypot(
+      playerGlobalAfter.ghost.x - playerGlobalTarget.target.x,
+      playerGlobalAfter.ghost.z - playerGlobalTarget.target.z,
+    ) < 0.035,
+  JSON.stringify({ playerGlobalBefore, playerGlobalTarget, playerGlobalAfter }),
 );
 
 ok('观战相机流程无 JavaScript 错误', errors.length === 0, errors[0] || '');

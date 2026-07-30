@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、动态能力记录、局间锁定 AI、独立观战环绕、360° 瞄准/无限拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、动态能力记录、局间锁定 AI、独立观战/全局环绕、360° 瞄准/无限拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -42,6 +42,7 @@ import {
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
   cameraAzimuthAtView,
+  isGlobalCameraView,
 } from './camera-view';
 import type { GameMode, PositionOutcome } from './opponent/model';
 
@@ -283,7 +284,19 @@ export default function Game() {
   const cameraViewAzimuthRef = useRef(cameraViewAzimuth);
   cameraViewAzimuthRef.current = cameraViewAzimuth;
 
-  // 用户确实拉到第一人称后，恢复玩家回合“镜头跟杆向”的既有行为。
+  // 玩家主动升到全局高度时冻结进入瞬间的方位；点台面此后只调整瞄准/幽灵球。
+  useEffect(() => {
+    if (
+      !spectatorActive &&
+      !cameraDetached &&
+      isGlobalCameraView(viewLevel)
+    ) {
+      setCameraAzimuth(cameraViewAzimuthRef.current);
+      setCameraDetached(true);
+    }
+  }, [cameraDetached, spectatorActive, viewLevel]);
+
+  // 观战或主动进入全局视角后，只有确实拉到底才恢复“镜头跟杆向”。
   useEffect(() => {
     if (!spectatorActive && cameraDetached && viewLevel <= 0.005) {
       setCameraDetached(false);

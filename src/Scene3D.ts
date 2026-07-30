@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供纵横屏全台适配相机、独立观战环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[OUTPUT]: 对外提供纵横屏全台适配相机、独立观战环绕、全局段无遮挡桌面、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -19,6 +19,7 @@ import {
   CAMERA_FOV_DEGREES,
   cameraPoseAt,
   clampViewLevel,
+  isGlobalCameraView,
   normalizeCameraAzimuth,
 } from './camera-view';
 import {
@@ -1305,8 +1306,8 @@ export class Scene3D {
 
   setViewLevel(level: number) {
     this.viewLevel = clampViewLevel(level);
-    // 高位时吊灯会挡住台面；在进入灯体高度前隐藏，避免穿模。
-    if (this.lampGroup) this.lampGroup.visible = this.viewLevel < 0.78;
+    // 进入全局段就直接展示无遮挡桌面；相机继续抬升时不会穿过吊灯模型。
+    if (this.lampGroup) this.lampGroup.visible = !isGlobalCameraView(this.viewLevel);
   }
 
   setAim(angle: number) {
