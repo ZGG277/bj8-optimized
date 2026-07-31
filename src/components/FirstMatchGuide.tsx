@@ -13,6 +13,15 @@ type GuideCopy = {
   fallbackSelector?: string;
 };
 
+export type GuideAvoidRect = Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'>;
+
+type PositionForAnchorOptions = {
+  avoidRects?: ReadonlyArray<GuideAvoidRect>;
+  mobile?: boolean;
+  viewportHeight?: number;
+  viewportWidth?: number;
+};
+
 export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
   'break-place': {
     text: '放好白球',
@@ -55,38 +64,65 @@ type AnchorPosition = {
 
 const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 8;
+const MOBILE_BOTTOM_RESERVE = 82;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
 }
 
-function positionForAnchor(
+export function positionForAnchor(
   anchor: DOMRect,
   hint: DOMRect,
   tableAnchor: boolean,
+  {
+    avoidRects = [],
+    mobile = false,
+    viewportHeight = window.innerHeight,
+    viewportWidth = window.innerWidth,
+  }: PositionForAnchorOptions = {},
 ): AnchorPosition {
-  const maxLeft = window.innerWidth - hint.width - VIEWPORT_MARGIN;
-  const maxTop = window.innerHeight - hint.height - VIEWPORT_MARGIN;
+  const maxLeft = viewportWidth - hint.width - VIEWPORT_MARGIN;
+  const safeBottom = Math.min(
+    viewportHeight - VIEWPORT_MARGIN,
+    viewportHeight - (mobile ? MOBILE_BOTTOM_RESERVE : VIEWPORT_MARGIN),
+  );
+  const maxTop = safeBottom - hint.height;
+
+  const overlaps = (x: number, y: number) =>
+    avoidRects.some(({ left, right, top, bottom }) =>
+      x < right &&
+      x + hint.width > left &&
+      y < bottom &&
+      y + hint.height > top,
+    );
 
   if (tableAnchor) {
-    return {
-      left: clamp(anchor.left + 12, VIEWPORT_MARGIN, maxLeft),
-      top: clamp(anchor.bottom - hint.height - 12, VIEWPORT_MARGIN, maxTop),
-      side: 'table',
-    };
+    const left = clamp(anchor.left + 12, VIEWPORT_MARGIN, maxLeft);
+    const baseTop = clamp(anchor.bottom - hint.height - 12, VIEWPORT_MARGIN, maxTop);
+    const avoidedTop = Math.min(
+      baseTop,
+      ...avoidRects.map(rect => rect.top - hint.height - ANCHOR_GAP),
+    );
+    const avoidSafeTop = Number.isFinite(avoidedTop) ? avoidedTop : baseTop;
+    const top = clamp(
+      overlaps(left, avoidSafeTop) ? avoidSafeTop : baseTop,
+      VIEWPORT_MARGIN,
+      maxTop,
+    );
+    return { left, top, side: 'table' };
   }
 
   const horizontalControl = anchor.width > anchor.height * 1.35;
   if (horizontalControl) {
     const aboveTop = anchor.top - hint.height - ANCHOR_GAP;
     const useAbove = aboveTop >= VIEWPORT_MARGIN;
-    return {
+      return {
       left: clamp(
         anchor.left + anchor.width / 2 - hint.width / 2,
         VIEWPORT_MARGIN,
         maxLeft,
       ),
-      top: clamp(
+    top: clamp(
         useAbove ? aboveTop : anchor.bottom + ANCHOR_GAP,
         VIEWPORT_MARGIN,
         maxTop,
@@ -157,7 +193,7 @@ export function FirstMatchGuide({
     setPosition(null);
     let timer = 0;
     let last = '';
-    const update = () => {
+  const update = () => {
       timer = 0;
       const hint = hintRef.current;
       const anchor = selectors
@@ -167,10 +203,25 @@ export function FirstMatchGuide({
         setPosition(null);
         return;
       }
+      const avoidRects = [
+        document.querySelector<HTMLElement>('.theme-palette-button'),
+        document.querySelector<HTMLElement>('.control-deck'),
+      ]
+        .filter(Boolean)
+        .map(el => el!.getBoundingClientRect())
+        .filter(rect => rect.width > 0 && rect.height > 0);
       const next = positionForAnchor(
         anchor.getBoundingClientRect(),
         hint.getBoundingClientRect(),
         anchor.matches('.viewport'),
+        {
+          avoidRects,
+          mobile:
+            window.innerWidth <= 640 ||
+            window.matchMedia?.('(pointer: coarse)').matches === true,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+        },
       );
       const signature = `${Math.round(next.left)}:${Math.round(next.top)}:${next.side}`;
       if (signature !== last) {

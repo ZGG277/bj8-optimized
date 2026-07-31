@@ -12,6 +12,30 @@ import {
   saveFirstMatchGuideCompleted,
   shouldRunFirstMatchGuide,
 } from './first-match-guide';
+import { positionForAnchor } from './components/FirstMatchGuide';
+
+function rect(x: number, y: number, width: number, height: number): DOMRect {
+  return {
+    x,
+    y,
+    left: x,
+    top: y,
+    right: x + width,
+    bottom: y + height,
+    width,
+    height,
+    toJSON: () => ({
+      x,
+      y,
+      left: x,
+      top: y,
+      right: x + width,
+      bottom: y + height,
+      width,
+      height,
+    }),
+  };
+}
 
 function memoryStorage(initial?: Record<string, string>): Storage {
   const values = new Map(Object.entries(initial ?? {}));
@@ -93,5 +117,23 @@ describe('首局微提示状态机', () => {
     expect(guideStepAfterEvent('break-place', 'shot-committed')).toBe('player-view');
     expect(guideStepAfterEvent('break-coarse', 'shot-committed')).toBe('player-view');
     expect(guideStepAfterEvent('break-fine', 'shot-committed')).toBe('player-view');
+  });
+
+  it('390×844 移动端桌面锚定提示避让主题按钮，不与左下角控件重叠', () => {
+    const anchor = rect(0, 0, 390, 844);
+    const hint = rect(0, 0, 84, 44);
+    const themeButton = rect(6, 800, 38, 38);
+    const position = positionForAnchor(anchor, hint, true, {
+      mobile: true,
+      viewportWidth: 390,
+      viewportHeight: 844,
+      avoidRects: [themeButton],
+    });
+
+    expect(position.left).toBe(12);
+    expect(position.top).toBe(718);
+    expect(position.top + hint.height).toBeLessThanOrEqual(themeButton.top);
+    expect(position.top).toBeGreaterThanOrEqual(8);
+    expect(position.top + hint.height).toBeLessThanOrEqual(844 - 8);
   });
 });
