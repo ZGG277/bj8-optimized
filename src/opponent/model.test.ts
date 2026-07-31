@@ -1,12 +1,13 @@
 /*
 [INPUT]: 依赖 vitest 与 opponent/model 纯函数
-[OUTPUT]: 覆盖三杆批量、难度归一、辅助降权、冷启动收缩、动态模式映射、适量规划预算与 v1/v2 持久化
+[OUTPUT]: 覆盖三杆批量、难度归一、辅助降权、冷启动收缩、顾燃袋口内执行误差、动态模式映射、适量规划预算与 v1/v2 持久化
 [POS]: 自适应对手领域层回归测试
 [PROTOCOL]: 模型字段或阈值变化时同步更新本文件与 model.ts 头部
 */
 import { describe, expect, it } from 'vitest';
 import {
   LEGACY_PLAYER_SKILL_STORAGE_KEY,
+  OPPONENT_AIM_WINDOW_FRACTION,
   PLAYER_SKILL_STORAGE_KEY,
   applyShotObservation,
   confidenceAdjustedLevel,
@@ -17,6 +18,7 @@ import {
   opponentTierFor,
   queueShotObservation,
   retargetOpponentProfile,
+  sampleOpponentAimOffset,
   savePlayerSkillProfile,
 } from './model';
 
@@ -191,6 +193,11 @@ describe('player skill model', () => {
 });
 
 describe('opponent profile', () => {
+  const sequence = (...values: number[]) => {
+    let index = 0;
+    return () => values[index++ % values.length];
+  };
+
   it('shrinks an uncertain player toward the neutral level', () => {
     const uncertain = { ...createPlayerSkillProfile(), level: 90, confidence: 0 };
     expect(confidenceAdjustedLevel(uncertain)).toBe(50);
@@ -232,6 +239,25 @@ describe('opponent profile', () => {
     const elite = { ...createPlayerSkillProfile(), level: 100, confidence: 1 };
     expect(opponentTierFor(elite, 'practice')).toBe(100);
     expect(opponentTierFor(elite, 'challenge')).toBe(100);
+  });
+
+  it('把高斯长尾连续压回当前杆向安全窗口内', () => {
+    const tolerance = 0.01;
+    const offset = sampleOpponentAimOffset(
+      0.03,
+      tolerance,
+      sequence(1e-12, 0),
+    );
+    expect(Math.abs(offset)).toBeLessThanOrEqual(
+      tolerance * OPPONENT_AIM_WINDOW_FRACTION,
+    );
+    expect(Math.abs(offset)).toBeGreaterThan(tolerance * 0.7);
+  });
+
+  it('同一随机手误下，高水平 sigma 更靠近袋口中心', () => {
+    const weak = sampleOpponentAimOffset(0.02, 0.02, sequence(0.9, 0));
+    const strong = sampleOpponentAimOffset(0.0025, 0.02, sequence(0.9, 0));
+    expect(Math.abs(strong)).toBeLessThan(Math.abs(weak));
   });
 });
 

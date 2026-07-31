@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供含台内圆弧凹口、浅驼皮圈、白色菱形网袋和收尖绿呢角衬的真实六袋结构，以及纵横屏全台适配相机、独立观战/全局环绕、全局段无遮挡桌面、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[OUTPUT]: 对外提供含台内圆弧凹口、浅驼皮圈、白色菱形网袋和收尖绿呢角衬的真实六袋结构，以及移动端节能预算、静止按需渲染、纵横屏全台适配相机、独立观战/全局环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -34,6 +34,7 @@ import {
   makeBallTexture,
   makeCueBallTexture,
 } from './textures';
+import { renderBudgetFor } from './render-policy';
 
 const R = TABLE.ballRadius;
 const W = TABLE.width;
@@ -143,6 +144,8 @@ export class Scene3D {
 
   private animationId = 0;
   private running = false;
+  private renderFrameCount = 0;
+  private shadowMapSize: 1024 | 2048;
 
   // ---- 走位规划渲染 ----
   /** 规划图层：瞄准线/轨迹/走位区域/序号标记，showPlanChain(null) 整体清空 */
@@ -166,6 +169,14 @@ export class Scene3D {
   constructor(element: HTMLElement) {
     this.element = element;
 
+    const renderBudget = renderBudgetFor({
+      width: element.clientWidth,
+      height: element.clientHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      coarsePointer: window.matchMedia?.('(pointer: coarse)').matches ?? false,
+    });
+    this.shadowMapSize = renderBudget.shadowMapSize;
+
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x07090a);
     this.scene.fog = new THREE.Fog(0x07090a, 4, 11);
@@ -173,11 +184,16 @@ export class Scene3D {
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
     this.virtualCam = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: renderBudget.powerPreference,
+    });
     this.renderer.setSize(element.clientWidth, element.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(renderBudget.pixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // 阴影只在球/球杆/规划动画实际变化时刷新；静止镜头移动复用同一张光照图。
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     element.appendChild(this.renderer.domElement);
@@ -217,7 +233,7 @@ export class Scene3D {
     const key = new THREE.DirectionalLight(0xfff2dd, 2.6);
     key.position.set(0.6, 2.6, 0.4);
     key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.mapSize.set(this.shadowMapSize, this.shadowMapSize);
     key.shadow.camera.near = 0.5;
     key.shadow.camera.far = 6;
     key.shadow.camera.left = -1.4;
@@ -1136,6 +1152,7 @@ export class Scene3D {
   /** 设置瞄准幽灵球靶点距离（白球心起算）；null = 自动取首触点距离 */
   setAimGhostDist(d: number | null) {
     this.aimGhostDist = d;
+    this.requestRender();
   }
 
   /** 瞄准幽灵球当前台面位置（不可见时 null），供输入层做抓取命中判定 */
@@ -1153,6 +1170,7 @@ export class Scene3D {
         Math.min(L / 2 - R, Math.max(-L / 2 + R, z))
       );
     }
+    this.requestRender();
   }
 
   /** 浏览器门禁读取摆球阶段虚/实母球显隐，不作为业务状态来源。 */
@@ -1172,10 +1190,12 @@ export class Scene3D {
 
   setSpin(spin: { x: number; y: number }) {
     this.spin = spin;
+    this.requestRender(true);
   }
 
   setLegalTargets(numbers: number[]) {
     this.legalTargets = new Set(numbers);
+    this.requestRender();
   }
 
   legalTargetCount(): number {
@@ -1361,6 +1381,7 @@ export class Scene3D {
     this.planActive = plan !== null;
     if (!plan || plan.steps.length === 0) {
       this.updateAimGuide();
+      this.requestRender();
       return;
     }
 
@@ -1369,6 +1390,7 @@ export class Scene3D {
     });
 
     this.updateAimGuide(); // planActive 置位后隐藏常规瞄准辅助
+    this.requestRender();
   }
 
   /**
@@ -1383,6 +1405,7 @@ export class Scene3D {
     this.planActive = plan !== null && validIndex;
     if (!plan || !validIndex) {
       this.updateAimGuide();
+      this.requestRender();
       return;
     }
 
@@ -1392,6 +1415,7 @@ export class Scene3D {
     }
     this.renderPlanStep(plan.steps[stepIndex], stepIndex, true);
     this.updateAimGuide();
+    this.requestRender();
   }
 
   // ---- 击球复盘渲染（计划 vs 实际） ----
@@ -1424,7 +1448,10 @@ export class Scene3D {
    */
   showReviewOverlay(review: ShotReview | null) {
     this.clearReview();
-    if (!review) return;
+    if (!review) {
+      this.requestRender();
+      return;
+    }
 
     const y = 0.006; // 比规划图层(0.005)略高，防同屏 z-fighting
     const PLAN_COLOR = PLAN_STEP_COLORS[0];
@@ -1482,6 +1509,7 @@ export class Scene3D {
       sprite.position.set(review.actual.cueEnd.x, 0.055, review.actual.cueEnd.z);
       this.reviewGroup.add(sprite);
     }
+    this.requestRender();
   }
 
   /** 把球网格直接贴合到指定世界的球位（整链播放的杆间衔接；不走落袋动画、不改 lastWorld） */
@@ -1507,6 +1535,7 @@ export class Scene3D {
     if (!this.planActive || plan.steps.length === 0) return;
     this.planStepPreviewWorld = null;
     this.planPlayAnim = { plan, stepIdx: 0, t: 0, phase: 'anim', phaseT: 0, snapped: false };
+    this.requestRender(true);
   }
 
   /** 整链播放推进（render 每帧调用） */
@@ -1634,6 +1663,7 @@ export class Scene3D {
     };
     this.strikeAnim = anim;
     this.cueGroup.visible = true;
+    this.requestRender(true);
     // 兜底：rAF 被浏览器节流（后台标签页）时，按墙钟时间到点直接触球，
     // 保证"松手必出杆"，动画只是表现层
     setTimeout(() => {
@@ -1643,6 +1673,7 @@ export class Scene3D {
         this.strikeAnim = null;
         anim.fired = true;
         anim.onContact?.();
+        this.requestRender(true);
       }
     }, dur1 * 1000 + 100);
   }
@@ -1651,14 +1682,17 @@ export class Scene3D {
     this.viewLevel = clampViewLevel(level);
     // 进入全局段就直接展示无遮挡桌面；相机继续抬升时不会穿过吊灯模型。
     if (this.lampGroup) this.lampGroup.visible = !isGlobalCameraView(this.viewLevel);
+    this.requestRender();
   }
 
   setAim(angle: number) {
     this.aimAngle = angle;
+    this.requestRender(true);
   }
 
   setCameraAzimuth(angle: number) {
     this.cameraAzimuth = normalizeCameraAzimuth(angle);
+    this.requestRender();
   }
 
   private updateCameraTarget() {
@@ -1681,6 +1715,7 @@ export class Scene3D {
   setAimAssistVisible(visible: boolean) {
     this.aimAssistVisible = visible;
     this.updateAimGuide();
+    this.requestRender();
   }
 
   sync(world: BilliardsWorld) {
@@ -1764,6 +1799,7 @@ export class Scene3D {
     if (this.planStepPreviewWorld) this.snapBallsTo(this.planStepPreviewWorld);
 
     this.updateAimGuide();
+    this.requestRender(world.moving || this.dropAnims.size > 0);
   }
 
   /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球+靶点影子球 */
@@ -1953,9 +1989,29 @@ export class Scene3D {
     // sync() 先于本方法被调用，updateAimGuide 依赖的 phase 在此刻才更新——
     // 用最新 phase 重算一次瞄准辅助，避免开局幽灵球要等下一次交互才显示
     this.updateAimGuide();
+    this.requestRender(true);
   }
 
-  /** 渲染循环：推进落袋动画并渲染 */
+  /** 相机或显式动画仍未收敛时才需要下一帧；静止球桌不维持空转 rAF。 */
+  private hasFrameWork(): boolean {
+    const cameraMoving =
+      this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
+      this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8;
+    return cameraMoving || this.strikeAnim !== null || this.dropAnims.size > 0 || this.planPlayAnim !== null;
+  }
+
+  private requestRender(refreshShadows = false) {
+    if (refreshShadows) this.renderer.shadowMap.needsUpdate = true;
+    if (!this.running || this.animationId !== 0) return;
+    this.animationId = requestAnimationFrame(() => {
+      this.animationId = 0;
+      if (!this.running) return;
+      this.render();
+      if (this.hasFrameWork()) this.requestRender(this.strikeAnim !== null || this.dropAnims.size > 0 || this.planPlayAnim !== null);
+    });
+  }
+
+  /** 渲染一帧：推进落袋/球杆/规划动画；是否续帧由 requestRender 决定。 */
   render() {
     const dt = Math.min(0.05, this.clock.getDelta());
 
@@ -2019,22 +2075,25 @@ export class Scene3D {
     this.updatePlanPlay(dt);
 
     this.renderer.render(this.scene, this.camera);
+    this.renderFrameCount += 1;
   }
 
   start() {
     if (this.running) return;
     this.running = true;
-    const loop = () => {
-      if (!this.running) return;
-      this.animationId = requestAnimationFrame(loop);
-      this.render();
-    };
-    this.animationId = requestAnimationFrame(loop);
+    this.clock.start();
+    this.requestRender(true);
   }
 
   stop() {
     this.running = false;
     if (this.animationId) cancelAnimationFrame(this.animationId);
+    this.animationId = 0;
+  }
+
+  /** 浏览器性能验收读取累计真实渲染帧数；不参与业务状态。 */
+  renderedFrames(): number {
+    return this.renderFrameCount;
   }
 
   screenToTable(clientX: number, clientY: number): { x: number; z: number } | null {
@@ -2124,6 +2183,7 @@ export class Scene3D {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.updateCameraTarget();
+    this.requestRender();
   };
 
   dispose() {

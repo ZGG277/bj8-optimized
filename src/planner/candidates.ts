@@ -72,18 +72,29 @@ function pathClear(
 
 /**
  * 进球容错半宽（pooltool required_precision 思路）：
- * 从目标球心分别瞄准统一物理几何给出的左右安全落点，
- * 两个出射方向夹角的一半即 Δφ。
+ * 从目标球心分别瞄准统一物理几何给出的左右安全落点，再反解对应 ghost 点；
+ * 以母球中心看两个 ghost 点的杆向夹角一半作为 Δφ。直接使用目标球出射角会把
+ * 切球线路的手上容错错当成袋口张角，导致 AI 执行误差与真实杆向不在同一量纲。
  */
-function shotTolerance(targetX: number, targetZ: number, pocket: Pocket): number {
+function shotTolerance(
+  cueX: number,
+  cueZ: number,
+  targetX: number,
+  targetZ: number,
+  pocket: Pocket,
+): number {
   const window = getPocketAimWindow(pocket);
-  const leftX = window.left.x;
-  const leftZ = window.left.z;
-  const rightX = window.right.x;
-  const rightZ = window.right.z;
+  const cueAngleForMouth = (mouthX: number, mouthZ: number) => {
+    const outX = mouthX - targetX;
+    const outZ = mouthZ - targetZ;
+    const outLength = Math.hypot(outX, outZ);
+    const ghostX = targetX - (outX / outLength) * R * 2;
+    const ghostZ = targetZ - (outZ / outLength) * R * 2;
+    return Math.atan2(ghostX - cueX, -(ghostZ - cueZ));
+  };
 
-  const angleLeft = Math.atan2(leftX - targetX, leftZ - targetZ);
-  const angleRight = Math.atan2(rightX - targetX, rightZ - targetZ);
+  const angleLeft = cueAngleForMouth(window.left.x, window.left.z);
+  const angleRight = cueAngleForMouth(window.right.x, window.right.z);
   let diff = Math.abs(angleLeft - angleRight);
   if (diff > Math.PI) diff = 2 * Math.PI - diff;
   return diff / 2;
@@ -150,7 +161,7 @@ export function generateCandidates(world: BilliardsWorld, legal: number[]): Shot
         angle: Math.atan2(cueDx, -cueDz),
         power: Math.min(BASE_POWER_MAX, Math.max(BASE_POWER_MIN, 35 + (cueDistance + pocketDistance) * 15)),
         spin: { x: 0, y: 0 },
-        tolerance: shotTolerance(target.x, target.z, pocket),
+        tolerance: shotTolerance(cue.x, cue.z, target.x, target.z, pocket),
         cueDistance,
         pocketDistance,
         cutAngle,

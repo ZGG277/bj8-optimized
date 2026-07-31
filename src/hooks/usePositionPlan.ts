@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖 physics 世界快照、match 对局状态、planner/async 异步走位搜索
-[OUTPUT]: 对外提供 { status, plans, error, open, close }：玩家回合自动后台预算走位方案
+[INPUT]: 依赖用户显式点亮提示、physics 世界快照、match 对局状态、planner/async 异步走位搜索
+[OUTPUT]: 对外提供 { status, plans, error, open, close }：只在提示开启时预算玩家走位方案
 [POS]: 规划集成层——状态机 idle→computing→ready→showing（failed 兜底），不承担渲染
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -16,6 +16,7 @@ export type PositionPlanStatus = 'idle' | 'computing' | 'ready' | 'showing' | 'f
 interface UsePositionPlanProps {
   worldView: BilliardsWorld;
   match: MatchState;
+  enabled: boolean;
 }
 
 /** 世界状态指纹：active 球号+坐标+分组；出杆/进球/摆球后必然变化，瞄准拖拽不影响。
@@ -30,14 +31,24 @@ export function planFingerprint(world: BilliardsWorld, playerGroup: MatchState['
   return `${playerGroup ?? 'open'}#${balls}`;
 }
 
+/** 走位搜索的产品门控：只有用户显式点亮且玩家已进入静止瞄准态才允许计算。 */
+export function shouldComputePositionPlan(
+  enabled: boolean,
+  world: BilliardsWorld,
+  match: MatchState,
+): boolean {
+  return enabled && match.phase === 'aiming' && match.actor === 'player' && !world.moving;
+}
+
 /**
  * 后台预算触发规则：
- * - 进入玩家瞄准回合且世界指纹变化 → 自动 planPositionAsync（对手打完立即预算，轮到玩家已就绪）
+ * - 用户点亮提示且处于玩家瞄准回合、世界指纹变化 → planPositionAsync
+ * - 灯泡熄灭时不创建 Worker、不做 8000 次后台仿真，避免手机无意耗电
  * - 玩家连续进攻（出杆结算后回到 aiming）→ 指纹变化，自然重新预算
  * - 玩家出杆/对手回合/滚动中 → cancelPendingPlan 丢弃陈旧结果，回到 idle
  * - showing（规划视图打开）期间不重新触发、不取消——视图里的数据保持自洽
  */
-export function usePositionPlan({ worldView, match }: UsePositionPlanProps) {
+export function usePositionPlan({ worldView, match, enabled }: UsePositionPlanProps) {
   const [status, setStatus] = useState<PositionPlanStatus>('idle');
   const [plans, setPlans] = useState<PositionPlan[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -46,7 +57,7 @@ export function usePositionPlan({ worldView, match }: UsePositionPlanProps) {
   const lastFingerprintRef = useRef('');
 
   useEffect(() => {
-    const playerAiming = match.phase === 'aiming' && match.actor === 'player' && !worldView.moving;
+    const playerAiming = shouldComputePositionPlan(enabled, worldView, match);
 
     if (!playerAiming) {
       // 出杆/对手回合/滚动/放置：丢弃陈旧结果（showing 由 open() 进入，此时不可能）
@@ -91,7 +102,7 @@ export function usePositionPlan({ worldView, match }: UsePositionPlanProps) {
         setError(String(err));
         setStatus('failed');
       });
-  }, [worldView, match]);
+  }, [worldView, match, enabled]);
 
   /** 打开规划视图：仅 ready 可进入 showing */
   const open = useCallback(() => {

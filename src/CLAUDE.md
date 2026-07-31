@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按 placing、有效粗瞄、用户显式切档后的有效精瞄与成功出杆推进首局核心提示，视角/杆法/布局只作非阻塞发现，跳过、下一杆成功出杆或首局结束后持久收起；手动相机模式把球桌拖动路由到独立视觉方位并复用连续高度控件，退出后固定所选画面直到下一次瞄准；正常触屏粗瞄、幽灵球与精瞄拨轮操作期间短暂冻结低位相机，停止操作后再平滑跟杆，全局视角持续固定；规则在 `match/`、输入在 `input/`、离线袋口解在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按真实操作推进首局提示；走位 Worker 只在用户点亮灯泡后启动，结果就绪自动展开，熄灭/出杆立即取消；手动相机路由到独立视觉方位，触屏瞄准期间短暂冻结低位相机；规则在 `match/`、输入在 `input/`、AI 在 `hooks/useOpponentAI`、走位在 `hooks/usePositionPlan`、物理时钟在 `simulation/`，DEV 调试句柄只用于浏览器门禁。
 
 `first-match-guide.ts`: 首局引导纯产品状态机；只有零出杆记录且无完成标记的新用户启用，以放球、拖动结束角度变化、拨轮有效角度变化和成功出杆约束核心节奏，视角/杆法/布局是可跳过的非阻塞发现，容错读写 `guagua-billiards:first-match-guide:v1`，不依赖 React/DOM 或规则实现。
 
@@ -30,7 +30,11 @@
 
 `camera-view.test.ts`: 连续高度不吸附、相机高度单调、手动相机交互路由、全局视角阈值、视觉方位独立、自由相机回接、各高度 180° 环绕与 390×844 竖屏全台安全边界回归。
 
-`Scene3D.ts`: Three.js 场景适配器，消费统一 PocketGeometry 生成外轮廓仅四角圆弧、内沿真实切出四个圆润收肩角袋/两个中袋的一体式木质外框，连续台呢切口、直库/圆弧角衬，以及与物理同位的 8/7mm 台内圆弧凹口、窄幅浅驼皮圈、跨过精确角衬锚点且端头藏入库边的细缝边、六层十八股白色菱形网袋、退居网后的收口斜壁与下沉暗底；袋口不附加粗黑软圈或外凸包边，并按入袋速度方向下坠；球杆瞄准角与纯视觉相机方位分离，观战及交棒后的玩家高位可保持独立方位，高位按视口比例全台适配并在进入全局段时隐藏吊灯、直接展示无遮挡桌面；活相机与屏幕拾取虚拟相机共享 `camera-view` 位姿；另负责预测辅助、摆球、合法目标环、球杆、走位/复盘与 rAF 相机平滑。
+`Scene3D.ts`: Three.js 场景适配器；移动端消费 `render-policy` 的 1.25×/1024/low-power 预算，阴影仅动态刷新，球桌静止且相机/动画收敛后停止 rAF；消费统一 PocketGeometry 生成台内凹口、皮圈、网袋与暗底，球杆瞄准角和纯视觉相机方位分离；另负责预测辅助、摆球、合法目标环、球杆、走位/复盘与按需相机平滑。
+
+`render-policy.ts`: 不依赖 Three.js 的纯渲染预算；以粗指针或视口短边识别手机，输出像素比、阴影贴图和 GPU 功耗偏好。
+
+`render-policy.test.ts`: 390×844、844×390 手机与 1280×800 桌面的渲染预算回归。
 
 `physics.ts`: 以米为单位的 240 Hz 确定性二维台球内核，公开统一 `TABLE/POCKETS/CUSHION_SEGMENTS` 与共享球碰走向预测；球心对直库/圆弧角衬做连续扫掠，一固定步最多三次边界接触，解析求交越过 8/7mm 台内半椭圆捕获弧即发出含入袋位置/速度的事件。球球碰撞按 TOI 回滚，叉路接触三联立。
 
@@ -52,9 +56,9 @@
   - `useGameState`：集中管理对局状态、跨刷新三杆玩家画像与局内渐进对手档案；新局重置 shot 结算守卫
   - `useAimAssist`：默认关闭且容错持久化的预测辅助线偏好
   - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出、轻点显式切换固定精瞄档的无边界拨轮
-  - `useOpponentAI`：每次调度消费最新有效对手档案，控制搜索预算、选杆扰动与执行误差
+  - `useOpponentAI`：每次调度消费最新有效对手档案，控制搜索预算、选杆扰动与袋口容错内的执行误差
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
-  - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），玩家回合世界指纹变化时经可抢占 planner/async 后台搜索
+  - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在灯泡显式点亮后经可抢占 planner/async 搜索
   - `useDraggableOverlay`：规划/复盘共用的 Pointer 拖拽位移与视口边界约束
 
 `utils/`: 纯工具函数层，不依赖 React 或 DOM：

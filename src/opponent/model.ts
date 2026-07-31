@@ -1,10 +1,10 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
-[OUTPUT]: 玩家三杆批量能力画像、适量搜索预算的陪练/挑战动态对手档案、等级/置信度展示与安全持久化
+[OUTPUT]: 玩家三杆批量能力画像、袋口容错内的顾燃执行误差、适量搜索预算的陪练/挑战动态对手档案、等级/置信度展示与安全持久化
 [POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；局内档案按三杆批次限速重定向
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
-import { erfProb } from '../planner/evaluate';
+import { erfProb, gaussian } from '../planner/evaluate';
 
 export type GameMode = 'practice' | 'challenge';
 export type PositionOutcome = 'success' | 'miss' | 'unknown';
@@ -70,6 +70,7 @@ const MAX_LEVEL_UP_PER_SHOT = 0.4;
 const MAX_LEVEL_DOWN_PER_SHOT = 0.2;
 const SHOTS_PER_BATCH = 3;
 const MAX_OPPONENT_STEP = 3;
+export const OPPONENT_AIM_WINDOW_FRACTION = 0.82;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -83,6 +84,23 @@ function finite(value: unknown, fallback: number): number {
 export function levelToSigma(level: number): number {
   const t = clamp(level, 0, 100) / 100;
   return MAX_SIGMA * Math.pow(MIN_SIGMA / MAX_SIGMA, t);
+}
+
+/**
+ * 顾燃的能力差异仍由 sigma 决定，但不允许高斯分布的无限长尾把已选定的袋口
+ * 明显瞄到安全窗口之外。tanh 保留连续手感：低水平更常靠近窗口边缘，高水平
+ * 更集中在中心；力度、杆法与选杆仍可造成自然失误。
+ */
+export function sampleOpponentAimOffset(
+  sigma: number,
+  tolerance: number,
+  rng: () => number = Math.random,
+): number {
+  if (!Number.isFinite(sigma) || sigma <= 0) return 0;
+  const raw = gaussian(rng) * sigma;
+  if (!Number.isFinite(tolerance) || tolerance <= 0) return raw;
+  const limit = tolerance * OPPONENT_AIM_WINDOW_FRACTION;
+  return Math.tanh(raw / limit) * limit;
 }
 
 export function levelLabel(level: number): string {
