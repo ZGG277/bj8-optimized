@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按 placing、有效粗瞄、有效拨轮与成功出杆推进首局核心提示，视角/杆法/布局只作非阻塞发现，跳过、下一杆成功出杆或首局结束后持久收起；手动相机模式把球桌拖动路由到独立视觉方位并复用连续高度控件，退出后固定所选画面直到下一次瞄准；正常触屏粗瞄、幽灵球与精瞄拨轮操作期间短暂冻结低位相机，停止操作后再平滑跟杆，全局视角持续固定；规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按 placing、有效粗瞄、用户显式切档后的有效精瞄与成功出杆推进首局核心提示，视角/杆法/布局只作非阻塞发现，跳过、下一杆成功出杆或首局结束后持久收起；手动相机模式把球桌拖动路由到独立视觉方位并复用连续高度控件，退出后固定所选画面直到下一次瞄准；正常触屏粗瞄、幽灵球与精瞄拨轮操作期间短暂冻结低位相机，停止操作后再平滑跟杆，全局视角持续固定；规则在 `match/`、输入在 `input/`、离线袋口解在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
 
 `first-match-guide.ts`: 首局引导纯产品状态机；只有零出杆记录且无完成标记的新用户启用，以放球、拖动结束角度变化、拨轮有效角度变化和成功出杆约束核心节奏，视角/杆法/布局是可跳过的非阻塞发现，容错读写 `guagua-billiards:first-match-guide:v1`，不依赖 React/DOM 或规则实现。
 
@@ -16,9 +16,9 @@
 
 `layout/`: 五控件布局纯领域层；维护 desktop/portrait/landscape 三套自由或右/底停靠位置，负责 8px 钳制、48px 吸附、沿边落点、碰撞避让、容量与 v2→v3 迁移。
 
-`input/`: 出杆与拨轮输入层，纯换算（行程归一、按住满力、击球点单位圆、可靠 Pointer 压力→拨轮紧度）+ React 协调器；rAF 只做预览，最终力度由松开时刻真实事实决定。
+`input/`: 出杆与拨轮输入层，纯换算（行程归一、按住满力、击球点单位圆、用户显式粗/精双档、可靠 Pointer 压力→拨轮紧度）+ React 协调器；rAF 只做预览，最终力度由松开时刻真实事实决定。
 
-`aim/`: 纯精瞄几何层——世界角首碰检测、统一物理袋口、2R 走廊遮挡、含 throw 的袋口左右角尖反解；同时向无限拨轮提供不受呼出阈值限制的最近合法袋口解。
+`aim/`: 纯袋口瞄准几何层——世界角首碰检测、统一物理袋口、2R 走廊遮挡、含 throw 的袋口左右角尖反解；供规划、调试与可选辅助消费，不参与玩家拨轮的粗/精切档。
 
 `components/`: HUD 控制组件（双方动态水平、首局控件邻近提示、灯泡图形面板、无文字视角/击球点/蓄力/横竖拨轮、五控件自由拖放与双边停靠、规划/复盘浮层、主题切换器、球桌视口与开始界面），只转发事件，不持有对局规则。
 
@@ -30,13 +30,13 @@
 
 `camera-view.test.ts`: 连续高度不吸附、相机高度单调、手动相机交互路由、全局视角阈值、视觉方位独立、自由相机回接、各高度 180° 环绕与 390×844 竖屏全台安全边界回归。
 
-`Scene3D.ts`: Three.js 场景适配器，消费统一 PocketGeometry 生成外轮廓仅四角圆弧、内沿真实切出四个圆润收肩角袋/两个中袋的一体式木质外框，连续台呢切口、直库/圆弧角衬，以及按真实球台照片校准的窄幅浅驼皮圈、跨过精确角衬锚点且端头藏入库边的细缝边、六层十八股白色菱形网袋、退居网后的收口斜壁与下沉暗底；袋口不附加粗黑软圈或外凸包边，并按入袋速度方向下坠；球杆瞄准角与纯视觉相机方位分离，观战及交棒后的玩家高位可保持独立方位，高位按视口比例全台适配并在进入全局段时隐藏吊灯、直接展示无遮挡桌面；活相机与屏幕拾取虚拟相机共享 `camera-view` 位姿；另负责预测辅助、摆球、合法目标环、球杆、走位/复盘与 rAF 相机平滑。
+`Scene3D.ts`: Three.js 场景适配器，消费统一 PocketGeometry 生成外轮廓仅四角圆弧、内沿真实切出四个圆润收肩角袋/两个中袋的一体式木质外框，连续台呢切口、直库/圆弧角衬，以及与物理同位的 8/7mm 台内圆弧凹口、窄幅浅驼皮圈、跨过精确角衬锚点且端头藏入库边的细缝边、六层十八股白色菱形网袋、退居网后的收口斜壁与下沉暗底；袋口不附加粗黑软圈或外凸包边，并按入袋速度方向下坠；球杆瞄准角与纯视觉相机方位分离，观战及交棒后的玩家高位可保持独立方位，高位按视口比例全台适配并在进入全局段时隐藏吊灯、直接展示无遮挡桌面；活相机与屏幕拾取虚拟相机共享 `camera-view` 位姿；另负责预测辅助、摆球、合法目标环、球杆、走位/复盘与 rAF 相机平滑。
 
-`physics.ts`: 以米为单位的 240 Hz 确定性二维台球内核，公开统一 `TABLE/POCKETS/CUSHION_SEGMENTS` 与共享球碰走向预测；球心对直库/圆弧角衬做连续扫掠，一固定步最多三次边界接触，越过台阶不可返回线才发出含入袋位置/速度的事件。球球碰撞按 TOI 回滚，叉路接触三联立。
+`physics.ts`: 以米为单位的 240 Hz 确定性二维台球内核，公开统一 `TABLE/POCKETS/CUSHION_SEGMENTS` 与共享球碰走向预测；球心对直库/圆弧角衬做连续扫掠，一固定步最多三次边界接触，解析求交越过 8/7mm 台内半椭圆捕获弧即发出含入袋位置/速度的事件。球球碰撞按 TOI 回滚，叉路接触三联立。
 
-`physics/`: 可复用纯碰撞与袋口几何子模块；角袋 92mm/中袋 94mm 的六袋参数、恢复/throw 参数、直线/圆弧库边段、台阶及安全瞄准窗口由 physics、aim、planner 和 Scene3D 共享。
+`physics/`: 可复用纯碰撞与袋口几何子模块；角袋 100mm/中袋 102mm 的六袋参数、8/7mm 台内捕获弧、恢复/throw 参数、直线/圆弧库边段、台阶及安全瞄准窗口由 physics、aim、planner 和 Scene3D 共享。
 
-`physics.test.ts`: 物理内核单元测试与手感指标，覆盖共享碰撞预测、纯 z 逆序三球链、落袋事件等回归；六袋专项矩阵位于 `physics/table-geometry.test.ts`。
+`physics.test.ts`: 物理内核单元测试与手感指标，覆盖共享碰撞预测、纯 z 逆序三球链、台内圆弧捕获参数与落袋事件等回归；六袋专项矩阵位于 `physics/table-geometry.test.ts`。
 
 `planner/`: 走位规划引擎（纯 TS，不碰 React/渲染）——几何候选 → erf 粗筛 → 蒙特卡洛精排 → 3 层精确终态前瞻，输出连续 1–3 杆方案；标定后重算概率、清组后转 8 号、仿真预算封顶、rng 注入可测。
 
@@ -51,7 +51,7 @@
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
   - `useGameState`：集中管理对局状态、跨刷新三杆玩家画像与局内渐进对手档案；新局重置 shot 结算守卫
   - `useAimAssist`：默认关闭且容错持久化的预测辅助线偏好
-  - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出的无边界变速拨轮
+  - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出、轻点显式切换固定精瞄档的无边界拨轮
   - `useOpponentAI`：每次调度消费最新有效对手档案，控制搜索预算、选杆扰动与执行误差
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
   - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），玩家回合世界指纹变化时经可抢占 planner/async 后台搜索

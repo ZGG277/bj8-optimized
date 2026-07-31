@@ -295,7 +295,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   });
   ok('触摸: 控制区无溢出元素', overflow === 0, overflow ? `${overflow}个元素溢出` : '');
 
-  // 开球母球落实后立即提供无边界方向拨轮；近袋连续降档由专项门禁覆盖。
+  // 开球母球落实后立即提供无边界方向拨轮；显式粗/精切档由专项门禁覆盖。
   ok('触摸: 开球落位后方向拨轮可用', Boolean(await page.$('.aim-dial')));
 
   // 触摸拖拽出杆(开球),同时验证满力可达

@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖 vitest、../physics 世界构造、./search 的 planPosition、./review 的 buildShotReview
-[OUTPUT]: 对外提供击球复盘层单元测试（无导出）：perfect / 力度偏小 / 力度偏大 / 瞄偏（pot-miss）四场景判定与文案
-[POS]: 复盘层的可失败断言网；场景用种子化 planPosition 的真实 plans[0].steps[0]（与生产同源，避免手造不切实际的计划）
+[OUTPUT]: 对外提供击球复盘层单元测试（无导出）：perfect / 可进球的力度偏小 / 力度偏大 / 瞄偏（pot-miss）四场景判定与文案
+[POS]: 复盘层的可失败断言网；场景用种子化 planPosition 的真实首步，力度偏小用例只抬高计划参考力以隔离诊断分支
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { describe, it, expect } from 'vitest';
@@ -76,9 +76,18 @@ describe('buildShotReview 复盘判定', () => {
     expect(review!.message).toContain('完美复现');
   });
 
-  it('力度 −20 → position-miss / 力度偏小', () => {
+  it('实际沿真实可进球轨迹，但比计划参考力度低 13 → position-miss / 力度偏小', () => {
     const { world, step } = setup();
-    const review = buildShotReview(makeCapture(world, step, { power: step.candidate.power - 20 }));
+    const strongerPlan: PlannedStep = {
+      ...step,
+      candidate: {
+        ...step.candidate,
+        power: step.candidate.power + 13,
+      },
+    };
+    const review = buildShotReview(makeCapture(world, strongerPlan, {
+      power: step.candidate.power,
+    }));
     expect(review).not.toBeNull();
     expect(review!.actual.pocketedTarget).toBe(true);
     expect(review!.verdict).toBe('position-miss');

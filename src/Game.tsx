@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、三杆批量能力与渐进 AI、独立观战/手动环绕、触屏瞄准锁镜、360° 瞄准/无限拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、三杆批量能力与渐进 AI、独立观战/手动环绕、触屏瞄准锁镜、360° 粗瞄/手动切档精瞄拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -436,8 +436,9 @@ export default function Game() {
     handlePointerUp,
     handlePointerCancel,
     handleAimDialAdjust,
+    toggleAimDialPrecision,
     aimDialVisible,
-    aimDialSolution,
+    aimDialPrecisionActive,
   } = useAimInteraction({
     scene3DRef,
     worldRef,
@@ -449,7 +450,6 @@ export default function Game() {
     canAim,
     matchPhase: match.phase,
     breaking: match.breaking,
-    legalTargets,
     setMatch,
     setMessage,
     setWorldView,
@@ -542,13 +542,13 @@ export default function Game() {
     }
     if ((coarsePointer || resumePinnedCamera) && canAim) {
       if (!isGlobalCameraView(viewLevel)) lockTouchAimCamera();
-      const adjusted = handleAimDialAdjust(pixelDelta, pressureGain);
-      if (adjusted) advanceFirstMatchGuide('fine-aim-adjusted');
+      const adjustedMode = handleAimDialAdjust(pixelDelta, pressureGain);
+      if (adjustedMode === 'fine') advanceFirstMatchGuide('fine-aim-adjusted');
       releaseTouchAimCameraLater();
       return;
     }
-    const adjusted = handleAimDialAdjust(pixelDelta, pressureGain);
-    if (adjusted) advanceFirstMatchGuide('fine-aim-adjusted');
+    const adjustedMode = handleAimDialAdjust(pixelDelta, pressureGain);
+    if (adjustedMode === 'fine') advanceFirstMatchGuide('fine-aim-adjusted');
   }, [
     advanceFirstMatchGuide,
     canAim,
@@ -773,7 +773,7 @@ export default function Game() {
         hasReview={guidanceAllowed && Boolean(shotReview)}
         aimAssistEnabled={aimAssist.enabled}
         aimDialVisible={aimDialVisible}
-        aimDialSolution={aimDialSolution}
+        aimDialPrecisionActive={aimDialPrecisionActive}
         onViewLevel={handleGuideViewLevel}
         onToggleManualCamera={handleToggleManualCamera}
         onSpinChange={handleGuideSpinChange}
@@ -781,6 +781,7 @@ export default function Game() {
         onToggleGuidance={handleTogglePlan}
         onToggleAimAssist={aimAssist.toggle}
         onAimDialAdjust={handleStableAimDialAdjust}
+        onToggleAimDialPrecision={toggleAimDialPrecision}
         onBeginCharge={beginCharge}
         onUpdateCharge={updateCharge}
         onReleaseCharge={releaseCharge}

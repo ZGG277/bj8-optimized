@@ -1,6 +1,6 @@
 /*
-[INPUT]: 五个游戏控件状态、手动相机、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
-[OUTPUT]: 纯视觉五控件层；支持合成层逐帧自由拖动、右/底吸附、跨边转向、长按布局、真实布局变化事实与 v3 持久化
+[INPUT]: 五个游戏控件状态、手动相机、显式精瞄档、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
+[OUTPUT]: 纯视觉五控件层；转发粗精切档并支持合成层逐帧自由拖动、右/底吸附、跨边转向、长按布局、真实布局变化事实与 v3 持久化
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
@@ -10,7 +10,6 @@ import { AimDial } from './AimDial';
 import { SpinControl } from './SpinControl';
 import { ShootControl } from './ShootControl';
 import { ViewToolbar } from './ViewToolbar';
-import type { PrecisionAimSolution } from '../aim/aim-solution';
 import type { CueSpin } from '../physics';
 import type { PositionPlanStatus } from '../hooks/usePositionPlan';
 import { aimDialPressureProfile } from '../input/aim-dial';
@@ -265,7 +264,7 @@ interface ControlDeckProps {
   hasReview: boolean;
   aimAssistEnabled: boolean;
   aimDialVisible: boolean;
-  aimDialSolution: PrecisionAimSolution | null;
+  aimDialPrecisionActive: boolean;
   onViewLevel: (level: number) => void;
   onToggleManualCamera: () => void;
   onSpinChange: (spin: CueSpin) => void;
@@ -273,6 +272,7 @@ interface ControlDeckProps {
   onToggleGuidance: () => void;
   onToggleAimAssist: () => void;
   onAimDialAdjust: (pixelDelta: number, pressureGain?: number) => void;
+  onToggleAimDialPrecision: () => void;
   onBeginCharge: (coordinate: number, availableTravel: number) => void;
   onUpdateCharge: (coordinate: number) => void;
   onReleaseCharge: () => void;
@@ -314,7 +314,7 @@ export function ControlDeck({
   hasReview,
   aimAssistEnabled,
   aimDialVisible,
-  aimDialSolution,
+  aimDialPrecisionActive,
   onViewLevel,
   onToggleManualCamera,
   onSpinChange,
@@ -322,6 +322,7 @@ export function ControlDeck({
   onToggleGuidance,
   onToggleAimAssist,
   onAimDialAdjust,
+  onToggleAimDialPrecision,
   onBeginCharge,
   onUpdateCharge,
   onReleaseCharge,
@@ -773,14 +774,15 @@ export function ControlDeck({
     aimDial: aimDialVisible ? (
       <AimDial
         visible
-        solution={aimDialSolution}
+        precisionActive={aimDialPrecisionActive}
         orientation={axisFor('aimDial', layout.aimDial)}
         onAdjust={onAimDialAdjust}
+        onTogglePrecision={onToggleAimDialPrecision}
       />
     ) : null,
   }), [
     aimAssistEnabled,
-    aimDialSolution,
+    aimDialPrecisionActive,
     aimDialVisible,
     assistMenuOpen,
     breaking,
@@ -793,6 +795,7 @@ export function ControlDeck({
     layout,
     manualCameraActive,
     onAimDialAdjust,
+    onToggleAimDialPrecision,
     onBeginCharge,
     onCancelCharge,
     onReleaseCharge,

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 公共袋口几何、固定步仿真与 vitest
-[OUTPUT]: 对外提供六袋对称、安全入口、擦角/挂袋及高速防穿透回归（无导出）
+[OUTPUT]: 对外提供六袋对称、台内圆弧捕获、安全入口、擦角/挂袋及高速防穿透回归（无导出）
 [POS]: 袋口视觉与物理统一模型的验收网；入口预测必须能由真实物理复现
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -12,12 +12,15 @@ import {
   createInitialWorld,
   POCKET_MOUTH_PRESET,
   POCKET_MOUTH_WIDTH_PRESETS,
+  getPocketCaptureDepth,
   getCueBall,
   getPocketAimWindow,
+  isInsidePocketCapture,
   isInsidePocketShelf,
   pocketLocalToWorld,
   simulateUntilStop,
   stepWorld,
+  worldToPocketLocal,
   type BilliardsWorld,
   type PocketGeometry,
 } from '../physics';
@@ -123,9 +126,38 @@ describe('PocketGeometry 参数与六袋对称', () => {
       expect((window.left.z + window.right.z) / 2).toBeCloseTo(window.center.z, 8);
     }
   });
+
+  it('六袋共享小幅台内圆弧，中心最深并在安全窗口两侧收回袋口线', () => {
+    for (const pocket of POCKETS) {
+      expect(pocket.captureInset).toBeCloseTo(
+        pocket.kind === 'corner' ? 0.008 : 0.007,
+        8,
+      );
+      expect(getPocketCaptureDepth(pocket, 0)).toBeCloseTo(-pocket.captureInset, 8);
+      expect(getPocketCaptureDepth(pocket, pocket.dropHalfWidth)).toBeCloseTo(0, 8);
+      expect(getPocketCaptureDepth(pocket, -pocket.dropHalfWidth)).toBeCloseTo(0, 8);
+      expect(getPocketCaptureDepth(pocket, pocket.dropHalfWidth + 0.0001)).toBeNull();
+    }
+  });
 });
 
 describe('袋口扫掠、台阶与不可返回线', () => {
+  it('六袋来球越过台内圆弧即落袋，不再要求球心深入外侧台阶', () => {
+    for (const pocket of POCKETS) {
+      const world = sendBallToPocket(pocket, 1.6);
+      const event = world.events.find(
+        item => item.type === 'pocket' && item.pocket === pocket.index,
+      );
+      expect(event?.type).toBe('pocket');
+      if (event?.type !== 'pocket') continue;
+      const entry = { x: event.entryX, z: event.entryZ };
+      const local = worldToPocketLocal(pocket, entry);
+      expect(local.depth).toBeCloseTo(-pocket.captureInset, 5);
+      expect(local.depth).toBeLessThan(0);
+      expect(isInsidePocketCapture(pocket, entry)).toBe(true);
+    }
+  });
+
   it('六袋在慢/中/高速下，中心及安全窗口左右边界均真实落袋', () => {
     for (const pocket of POCKETS) {
       const window = getPocketAimWindow(pocket);
@@ -189,7 +221,7 @@ describe('袋口扫掠、台阶与不可返回线', () => {
       expect(event?.type).toBe('pocket');
       if (event?.type !== 'pocket') continue;
       expect(Math.hypot(event.entryVx, event.entryVz)).toBeGreaterThan(5);
-      expect(isInsidePocketShelf(pocket, {
+      expect(isInsidePocketCapture(pocket, {
         x: event.entryX,
         z: event.entryZ,
       })).toBe(true);

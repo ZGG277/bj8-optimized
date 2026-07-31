@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖台面长宽与球半径等纯数值参数
-[OUTPUT]: 对外提供角袋/中袋统一袋口/库边几何、袋口局部坐标与安全瞄准窗口
+[OUTPUT]: 对外提供角袋/中袋统一袋口/库边几何、内侧圆弧捕获区、袋口局部坐标与安全瞄准窗口
 [POS]: 纯物理几何层；physics、aim、planner 与 Scene3D 的袋口单一事实来源
 [PROTOCOL]: 变更时更新此头部，然后检查 physics/CLAUDE.md 与 ../CLAUDE.md
 */
@@ -32,6 +32,8 @@ export type PocketGeometry = {
   mouthWidth: number;
   jawRadius: number;
   shelfDepth: number;
+  /** 袋口向台内切入的圆弧深度；球心越过该圆弧即进入落袋捕获区。 */
+  captureInset: number;
   mouthCenter: Point2;
   outward: Point2;
   tangent: Point2;
@@ -58,6 +60,8 @@ export const POCKET_MOUTH_WIDTH_PRESETS = {
 
 /** 当前使用版本：想测哪个版本改这里即可。 */
 export const ACTIVE_POCKET_MOUTH_PRESET: PocketMouthWidthPreset = 'wide';
+/** 保留公共测试/调试接口的兼容名称。 */
+export const POCKET_MOUTH_PRESET = ACTIVE_POCKET_MOUTH_PRESET;
 
 const {
   corner: CORNER_MOUTH_WIDTH,
@@ -67,6 +71,8 @@ const CORNER_JAW_RADIUS = 0.102;
 const SIDE_JAW_RADIUS = 0.064;
 const CORNER_SHELF_DEPTH = 0.036;
 const SIDE_SHELF_DEPTH = 0.024;
+const CORNER_CAPTURE_INSET = 0.008;
+const SIDE_CAPTURE_INSET = 0.007;
 const JAW_STEPS = 12;
 const AIM_CLEARANCE = 0.00075;
 
@@ -168,6 +174,7 @@ function makePocket(
   const mouthWidth = kind === 'corner' ? CORNER_MOUTH_WIDTH : SIDE_MOUTH_WIDTH;
   const jawRadius = kind === 'corner' ? CORNER_JAW_RADIUS : SIDE_JAW_RADIUS;
   const shelfDepth = kind === 'corner' ? CORNER_SHELF_DEPTH : SIDE_SHELF_DEPTH;
+  const captureInset = kind === 'corner' ? CORNER_CAPTURE_INSET : SIDE_CAPTURE_INSET;
   const mouthHalfWidth = mouthWidth / 2;
 
   const outward = kind === 'corner'
@@ -202,6 +209,7 @@ function makePocket(
     mouthWidth,
     jawRadius,
     shelfDepth,
+    captureInset,
     mouthCenter,
     outward,
     tangent,
@@ -301,6 +309,25 @@ export function getPocketAimWindow(pocket: PocketGeometry): PocketAimWindow {
     right: pocketLocalToWorld(pocket, pocket.shelfDepth, pocket.dropHalfWidth),
     halfWidth: pocket.dropHalfWidth,
   };
+}
+
+/**
+ * 球心可落袋边界在台内形成半椭圆凹弧：中心最深，靠近安全窗口两侧平滑收回袋口线。
+ * 返回 null 表示横向位置已超出安全落袋宽度。
+ */
+export function getPocketCaptureDepth(
+  pocket: PocketGeometry,
+  lateral: number,
+): number | null {
+  if (Math.abs(lateral) > pocket.dropHalfWidth) return null;
+  const ratio = lateral / pocket.dropHalfWidth;
+  return -pocket.captureInset * Math.sqrt(Math.max(0, 1 - ratio * ratio));
+}
+
+export function isInsidePocketCapture(pocket: PocketGeometry, point: Point2): boolean {
+  const local = worldToPocketLocal(pocket, point);
+  const captureDepth = getPocketCaptureDepth(pocket, local.lateral);
+  return captureDepth !== null && local.depth >= captureDepth - 1e-7;
 }
 
 export function isInsidePocketShelf(pocket: PocketGeometry, point: Point2): boolean {
