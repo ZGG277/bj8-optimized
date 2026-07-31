@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖台面长宽与球半径等纯数值参数
-[OUTPUT]: 对外提供角袋 92mm/中袋 94mm 的统一袋口/库边几何、袋口局部坐标与安全瞄准窗口
+[OUTPUT]: 对外提供角袋/中袋统一袋口/库边几何、袋口局部坐标与安全瞄准窗口
 [POS]: 纯物理几何层；physics、aim、planner 与 Scene3D 的袋口单一事实来源
 [PROTOCOL]: 变更时更新此头部，然后检查 physics/CLAUDE.md 与 ../CLAUDE.md
 */
@@ -47,9 +47,22 @@ export type PocketAimWindow = {
   halfWidth: number;
 };
 
-/** 六袋各放宽 2mm：角袋 92mm、中袋 94mm，单侧净窗口各增加 1mm。 */
-const CORNER_MOUTH_WIDTH = 0.092;
-const SIDE_MOUTH_WIDTH = 0.094;
+export type PocketMouthWidthPreset = 'tight' | 'roomy' | 'wide';
+
+/** 口袋口宽版本（单位：m）。默认使用 roomy，兼顾偏大口与一定冗余。 */
+export const POCKET_MOUTH_WIDTH_PRESETS = {
+  tight: { corner: 0.092, side: 0.094 },
+  roomy: { corner: 0.096, side: 0.098 },
+  wide: { corner: 0.100, side: 0.102 },
+} as const;
+
+/** 当前使用版本：想测哪个版本改这里即可。 */
+export const ACTIVE_POCKET_MOUTH_PRESET: PocketMouthWidthPreset = 'roomy';
+
+const {
+  corner: CORNER_MOUTH_WIDTH,
+  side: SIDE_MOUTH_WIDTH,
+} = POCKET_MOUTH_WIDTH_PRESETS[ACTIVE_POCKET_MOUTH_PRESET];
 const CORNER_JAW_RADIUS = 0.102;
 const SIDE_JAW_RADIUS = 0.064;
 const CORNER_SHELF_DEPTH = 0.036;

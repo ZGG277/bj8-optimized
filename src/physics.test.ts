@@ -18,10 +18,14 @@ import {
   predictBallCollisionDirections,
   getPocketAimWindow,
   POCKETS,
+  POCKET_MOUTH_PRESET,
+  POCKET_MOUTH_WIDTH_PRESETS,
   TABLE,
   PHYSICS_DT,
   type BilliardsWorld,
 } from './physics';
+
+const activePocketMouthWidth = POCKET_MOUTH_WIDTH_PRESETS[POCKET_MOUTH_PRESET];
 
 describe('出杆机制测试', () => {
   let world: BilliardsWorld;
@@ -284,8 +288,8 @@ describe('落袋检测测试', () => {
   it('六袋采用统一参数化口宽、圆弧角衬与台阶深度', () => {
     expect(TABLE.ballRadius * 2).toBeCloseTo(0.05715, 6);
     expect(POCKETS).toHaveLength(6);
-    expect(POCKETS[0].mouthWidth).toBeCloseTo(0.092, 6);
-    expect(POCKETS[2].mouthWidth).toBeCloseTo(0.094, 6);
+    expect(POCKETS[0].mouthWidth).toBeCloseTo(activePocketMouthWidth.corner, 6);
+    expect(POCKETS[2].mouthWidth).toBeCloseTo(activePocketMouthWidth.side, 6);
     expect(POCKETS[0].jawRadius).toBeCloseTo(0.102, 6);
     expect(POCKETS[2].jawRadius).toBeCloseTo(0.064, 6);
     expect(POCKETS[0].shelfDepth).toBeCloseTo(0.036, 6);

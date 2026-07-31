@@ -41,9 +41,12 @@ export {
   isInsidePocketShelf,
   pocketLocalToWorld,
   worldToPocketLocal,
+  ACTIVE_POCKET_MOUTH_PRESET,
+  POCKET_MOUTH_WIDTH_PRESETS,
   type CushionSegment,
   type PocketAimWindow,
   type PocketGeometry,
+  type PocketMouthWidthPreset,
   type Point2,
 } from './physics/table-geometry';
 

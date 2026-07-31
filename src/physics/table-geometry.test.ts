@@ -10,6 +10,8 @@ import {
   POCKETS,
   TABLE,
   createInitialWorld,
+  POCKET_MOUTH_PRESET,
+  POCKET_MOUTH_WIDTH_PRESETS,
   getCueBall,
   getPocketAimWindow,
   isInsidePocketShelf,
@@ -19,6 +21,8 @@ import {
   type BilliardsWorld,
   type PocketGeometry,
 } from '../physics';
+
+const activePocketMouthWidth = POCKET_MOUTH_WIDTH_PRESETS[POCKET_MOUTH_PRESET];
 
 function isolatedWorld(): BilliardsWorld {
   const world = createInitialWorld();
@@ -53,6 +57,11 @@ function isInLegalTableArea(x: number, z: number): boolean {
 }
 
 describe('PocketGeometry 参数与六袋对称', () => {
+  it('不同口袋版本切换配置可复用', () => {
+    expect(activePocketMouthWidth.corner).toBeGreaterThan(0);
+    expect(activePocketMouthWidth.side).toBeGreaterThan(0);
+  });
+
   it('保持既有索引/中心坐标，并按角袋和中袋镜像', () => {
     expect(POCKETS.map(pocket => [pocket.x, pocket.z])).toEqual([
       [-TABLE.width / 2, -TABLE.length / 2],
@@ -64,27 +73,25 @@ describe('PocketGeometry 参数与六袋对称', () => {
     ]);
     expect(POCKETS[0].mouthWidth).toBe(POCKETS[1].mouthWidth);
     expect(POCKETS.filter(pocket => pocket.kind === 'corner')
-      .every(pocket => pocket.mouthWidth === 0.092)).toBe(true);
+      .every(pocket => pocket.mouthWidth === activePocketMouthWidth.corner)).toBe(true);
     expect(POCKETS.filter(pocket => pocket.kind === 'side')
-      .every(pocket => pocket.mouthWidth === 0.094)).toBe(true);
+      .every(pocket => pocket.mouthWidth === activePocketMouthWidth.side)).toBe(true);
     expect(POCKETS[0].jawRadius).toBe(POCKETS[5].jawRadius);
     expect(POCKETS[2].shelfDepth).toBe(POCKETS[3].shelfDepth);
     expect(POCKETS.every(pocket => pocket.jawSegments.length === 24)).toBe(true);
   });
 
-  it('六袋相对上一版各新增 1mm 单侧净窗口容错', () => {
-    const historicalCornerHalfWidth =
-      0.09 / 2 - TABLE.ballRadius - 0.00075;
-    const historicalSideHalfWidth =
-      0.092 / 2 - TABLE.ballRadius - 0.00075;
+  it('六袋安全窗口与口径配置一致', () => {
+    const expectedCornerHalfWidth = activePocketMouthWidth.corner / 2 - TABLE.ballRadius - 0.00075;
+    const expectedSideHalfWidth = activePocketMouthWidth.side / 2 - TABLE.ballRadius - 0.00075;
 
     for (const pocket of POCKETS.filter(item => item.kind === 'corner')) {
       expect(getPocketAimWindow(pocket).halfWidth)
-        .toBeCloseTo(historicalCornerHalfWidth + 0.001, 8);
+        .toBeCloseTo(expectedCornerHalfWidth, 8);
       const world = sendBallToPocket(
         pocket,
         1.6,
-        historicalCornerHalfWidth + 0.0005,
+        expectedCornerHalfWidth + 0.0005,
       );
       expect(getCueBall(world)?.active, `corner=${pocket.index}`).toBe(false);
       expect(world.events.some(event =>
@@ -93,11 +100,11 @@ describe('PocketGeometry 参数与六袋对称', () => {
 
     for (const pocket of POCKETS.filter(item => item.kind === 'side')) {
       expect(getPocketAimWindow(pocket).halfWidth)
-        .toBeCloseTo(historicalSideHalfWidth + 0.001, 8);
+        .toBeCloseTo(expectedSideHalfWidth, 8);
       const world = sendBallToPocket(
         pocket,
         1.6,
-        historicalSideHalfWidth + 0.0005,
+        expectedSideHalfWidth + 0.0005,
       );
       expect(getCueBall(world)?.active, `side=${pocket.index}`).toBe(false);
       expect(world.events.some(event =>
