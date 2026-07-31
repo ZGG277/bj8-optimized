@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖局前锁定 OpponentProfile、带 2s 截止时间的 planner 异步搜索、physics 击球/复位、match 规则与场景动画
-[OUTPUT]: 副作用 Hook：对手回合适量规划，超时回退轻量选杆，并在约 3s 内击球
+[INPUT]: 依赖局前锁定 OpponentProfile、带 2s 截止时间的 planner 异步搜索、袋口容错执行误差、physics 击球/复位、match 规则与场景动画
+[OUTPUT]: 副作用 Hook：对手回合适量规划，超时回退轻量选杆，避免长尾歪瞄并在约 3s 内击球
 [POS]: AI 调度层，只做对手回合的编排；不关心 UI 交互或玩家输入
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -15,9 +15,8 @@ import {
 } from '../physics';
 import type { BilliardsWorld } from '../physics';
 import { legalNumbers } from '../match/match-machine';
-import { gaussian } from '../planner/evaluate';
 import { planPositionWithinDeadline } from '../planner/async';
-import type { OpponentProfile } from '../opponent/model';
+import { sampleOpponentAimOffset, type OpponentProfile } from '../opponent/model';
 import type { Scene3D } from '../Scene3D';
 import type { BilliardsAudio } from '../audio';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from '../match/types';
@@ -101,7 +100,11 @@ export function useOpponentAI({
         const spin = planned?.candidate.spin ?? { x: 0, y: 0 };
         // planner 给出理想杆；实力只在实际出杆时采样一次，不根据结果重抽。
         const angle = planned
-          ? baseAngle + gaussian(Math.random) * opponentProfile.aimSigma
+          ? baseAngle + sampleOpponentAimOffset(
+              opponentProfile.aimSigma,
+              planned.candidate.tolerance,
+              Math.random,
+            )
           : baseAngle;
         const powerScale =
           1 + (Math.random() * 2 - 1) * opponentProfile.powerJitter;

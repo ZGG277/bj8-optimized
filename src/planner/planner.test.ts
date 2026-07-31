@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 vitest、../physics 世界构造与 ./candidates、./evaluate、./search 的公开接口
-[OUTPUT]: 对外提供走位规划层单元测试（无导出）：几何候选、概率单调性、遮挡过滤、整链结构、清组转 8 号、预算截断
+[OUTPUT]: 对外提供走位规划层单元测试（无导出）：杆向容错、几何候选、概率单调性、遮挡过滤、整链结构、清组转 8 号、预算截断
 [POS]: 规划层的可失败断言网；全部用种子化 mulberry32 保证确定性
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -117,6 +117,35 @@ describe('generateCandidates 几何候选', () => {
     const farProb = monteCarloShot(farWorld, farCand, 48, 0.006, mulberry32(7)).prob;
 
     expect(nearProb).toBeGreaterThan(farProb);
+  });
+
+  it('容错使用母球杆向量纲：同一目标袋，母球越远角度窗口越窄', () => {
+    const near = generateCandidates(placeWorld(STRAIGHT), [1])
+      .find((candidate) => candidate.target === 1 && candidate.pocket === 3)!;
+    const far = generateCandidates(placeWorld([
+      { n: 0, x: -0.3, z: 0 },
+      { n: 1, x: 0.5, z: 0 },
+    ]), [1]).find((candidate) => candidate.target === 1 && candidate.pocket === 3)!;
+
+    expect(near.tolerance).toBeGreaterThan(far.tolerance);
+    expect(far.tolerance).toBeGreaterThan(0);
+  });
+
+  it('直球安全窗口两侧的顾燃执行杆仍能真实进目标球', () => {
+    const world = placeWorld(STRAIGHT);
+    const base = generateCandidates(world, [1])
+      .find((candidate) => candidate.target === 1 && candidate.pocket === 3)!;
+    for (const sign of [-1, 1]) {
+      const sim = cloneWorld(world);
+      strikeCueBall(
+        sim,
+        base.angle + sign * base.tolerance * 0.82,
+        base.power + 6,
+        { x: -0.35, y: 0 },
+      );
+      simulateUntilStop(sim);
+      expect(pocketedThisShot(sim)).toContain(1);
+    }
   });
 
   it('遮挡局面：非合法球挡住母球路径时该候选不出现', () => {

@@ -698,8 +698,10 @@ export function ControlDeck({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [updatePlacement]);
 
+  // 按需规划从 idle 开始：玩家瞄准时必须允许先点亮，Worker 才会进入 computing。
+  // 已点亮时保持可用，用户可在计算中途再次点击熄灭并取消。
   const guidanceAvailable =
-    planStatus === 'ready' || planStatus === 'showing' || hasReview;
+    canAim || guidanceEnabled || planStatus === 'ready' || planStatus === 'showing' || hasReview;
   const guidanceStateClass = guidanceEnabled ? 'is-open' : 'is-off';
 
   const nodes = useMemo<Record<DockItemId, ReactNode>>(() => ({

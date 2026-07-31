@@ -16,7 +16,7 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 `FirstMatchGuide.test.tsx`: 服务端静态结构回归，锁定短文案、具名跳过入口，并拒绝“下一步/完成”按钮回潮。
 
-`ControlDeck.tsx`: 五控件统一编排层；组合含手动相机入口的 ViewToolbar、灯泡双开关、SpinControl、ShootControl 与显式粗/精切档 AimDial，按 desktop/portrait/landscape 恢复布局。触屏长按 340ms（14px 防抖）、鼠标长按 420ms（8px 防抖）后接管 Pointer 捕获，保持原 DOM 节点并用 rAF + transform 逐帧拖动；靠右/底 48px 吸附并保留沿边落点，同边落到另一控件时交换位置，其他冲突做最近空位避让，并仅在真实位移后上报布局变化。快速原手势照常工作，拖动期间不改变数值、不误出杆也不逐帧写本地存储。
+`ControlDeck.tsx`: 五控件统一编排层；组合含手动相机入口的 ViewToolbar、灯泡双开关、SpinControl、ShootControl 与显式粗/精切档 AimDial，按 desktop/portrait/landscape 恢复布局。玩家静止瞄准时允许从 idle 点亮走位开关以启动按需 Worker，计算中仍可熄灭取消。触屏长按 340ms（14px 防抖）、鼠标长按 420ms 后接管 Pointer 捕获并逐帧跟手；靠右/底吸附、同边换位，其他冲突做最近空位避让。
 
 `PlanOverlay.tsx`: 半透明紧凑走位浮层；只取最高概率方案，默认第 1 杆，用户点击第 2/3 杆标签后才切换对应单杆路线；带独立拖拽手柄，场景渲染委托 Scene3D。
 

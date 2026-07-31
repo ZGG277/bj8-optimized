@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、三杆批量能力与渐进 AI、独立观战/手动环绕、触屏瞄准锁镜、360° 粗瞄/手动切档精瞄拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、三杆批量能力与渐进 AI、按需节能走位预算、独立观战/手动环绕、触屏瞄准锁镜、360° 粗瞄/手动切档精瞄拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -116,14 +116,19 @@ export default function Game() {
   }, []);
 
   // ── 走位规划（后台预算 + 覆盖层状态机）──
-  const positionPlan = usePositionPlan({ worldView, match });
+  const guidanceAllowed = gameMode === 'practice';
+  const [guidanceEnabled, setGuidanceEnabled] = useState(false);
+  const positionPlan = usePositionPlan({
+    worldView,
+    match,
+    enabled: guidanceAllowed && guidanceEnabled,
+  });
   const planOpen = positionPlan.status === 'showing';
   // 规划视图打开期间禁用瞄准输入（最小侵入：只压低 canAim，不动交互层内部）
   const canAim = canAimBase && !planOpen;
   // positionPlan 对象每渲染换新身份；出杆捕获只需读 plans，用 ref 镜像避免 handleCommit 重建
   const positionPlanRef = useRef(positionPlan);
   positionPlanRef.current = positionPlan;
-  const guidanceAllowed = gameMode === 'practice';
   const planConsultedRef = useRef(false);
 
   // ── 击球复盘（上一杆「计划 vs 实际」）──
@@ -133,7 +138,6 @@ export default function Game() {
   const [shotReview, setShotReview] = useState<ShotReview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
-  const [guidanceEnabled, setGuidanceEnabled] = useState(false);
   const aimAssist = useAimAssist();
   const [firstMatchGuideStep, setFirstMatchGuideStep] =
     useState<FirstMatchGuideStep | null>(() =>
@@ -197,6 +201,18 @@ export default function Game() {
     setViewLevel(prevViewLevelRef.current);
     setGuidanceEnabled(false);
   }, [positionPlan, setViewLevel]);
+
+  // 灯泡点亮后才启动 Worker；结果到达时自动展开，不要求用户重复点击。
+  useEffect(() => {
+    if (
+      guidanceEnabled &&
+      !shotReview &&
+      positionPlan.status === 'ready' &&
+      !planOpen
+    ) {
+      handleOpenPlan();
+    }
+  }, [guidanceEnabled, shotReview, positionPlan.status, planOpen, handleOpenPlan]);
 
   // ── 复盘开合：▶ 对比切俯视 + 场景叠加；✕/💡 收起回 chip ──
   const prevReviewViewLevelRef = useRef(viewLevel);
