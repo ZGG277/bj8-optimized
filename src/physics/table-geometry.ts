@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖台面长宽与球半径等纯数值参数
-[OUTPUT]: 对外提供中式台球袋口/库边统一几何、袋口局部坐标与安全瞄准窗口
+[OUTPUT]: 对外提供角袋 92mm/中袋 94mm 的统一袋口/库边几何、袋口局部坐标与安全瞄准窗口
 [POS]: 纯物理几何层；physics、aim、planner 与 Scene3D 的袋口单一事实来源
 [PROTOCOL]: 变更时更新此头部，然后检查 physics/CLAUDE.md 与 ../CLAUDE.md
 */
@@ -47,9 +47,9 @@ export type PocketAimWindow = {
   halfWidth: number;
 };
 
-/** 四个角袋由 88mm 小幅放宽到 90mm；中袋维持原规格。 */
-const CORNER_MOUTH_WIDTH = 0.09;
-const SIDE_MOUTH_WIDTH = 0.092;
+/** 六袋各放宽 2mm：角袋 92mm、中袋 94mm，单侧净窗口各增加 1mm。 */
+const CORNER_MOUTH_WIDTH = 0.092;
+const SIDE_MOUTH_WIDTH = 0.094;
 const CORNER_JAW_RADIUS = 0.102;
 const SIDE_JAW_RADIUS = 0.064;
 const CORNER_SHELF_DEPTH = 0.036;

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 DEV __bj8 场景句柄
-[OUTPUT]: 桌面俯视、角袋近景、中袋近景、390×844 竖屏四帧袋口视觉回归及页面错误门禁
+[OUTPUT]: 六袋结构、角袋皮口跨接连续性、桌面俯视/角袋/中袋/竖屏四帧视觉回归及页面错误门禁
 [POS]: PocketGeometry 物理/视觉一体化的浏览器出口验收；只改调试页内世界，不写游戏数据
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md 与 README.md
 */
@@ -77,6 +77,8 @@ const pocketAnatomy = await page.evaluate(() => {
     topTrims: 0,
     seamlessTrimEnds: 0,
     lips: 0,
+    cornerLipJawAnchors: 0,
+    minCornerLipExtensionMm: Number.POSITIVE_INFINITY,
     wells: 0,
     bottoms: 0,
   };
@@ -100,7 +102,17 @@ const pocketAnatomy = await page.evaluate(() => {
       counts.topTrims += 1;
       counts.seamlessTrimEnds += Number(object.userData.seamlessEndCount ?? 0);
     }
-    if (object.name.startsWith('pocket-lip-')) counts.lips += 1;
+    if (object.name.startsWith('pocket-lip-')) {
+      counts.lips += 1;
+      const jawAnchorCount = Number(object.userData.jawAnchorCount ?? 0);
+      if (jawAnchorCount > 0) {
+        counts.cornerLipJawAnchors += jawAnchorCount;
+        counts.minCornerLipExtensionMm = Math.min(
+          counts.minCornerLipExtensionMm,
+          Number(object.userData.joinExtensionMm ?? 0),
+        );
+      }
+    }
     if (object.name.startsWith('pocket-well-')) counts.wells += 1;
     if (object.name.startsWith('pocket-bottom-')) counts.bottoms += 1;
   });
@@ -117,6 +129,8 @@ ok(
     pocketAnatomy.topTrims === 6 &&
     pocketAnatomy.seamlessTrimEnds === 12 &&
     pocketAnatomy.lips === 6 &&
+    pocketAnatomy.cornerLipJawAnchors === 8 &&
+    pocketAnatomy.minCornerLipExtensionMm >= 7 &&
     pocketAnatomy.wells === 6 &&
     pocketAnatomy.bottoms === 6,
   JSON.stringify(pocketAnatomy),

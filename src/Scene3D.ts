@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供立体袋口、纵横屏全台适配相机、独立观战/全局环绕、全局段无遮挡桌面、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[OUTPUT]: 对外提供六袋立体袋腔与角袋无缝皮口、纵横屏全台适配相机、独立观战/全局环绕、全局段无遮挡桌面、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -675,9 +675,9 @@ export class Scene3D {
       mouth.renderOrder = 2;
       this.tableGroup.add(mouth);
 
-      // 只包住袋口外半圈，不做悬浮的完整圆环；两端落在共享 jaw 的入口，
-      // 中间沿袋腔向外回弯，使俯视和低机位都能读出“袋唇”而不是“缺口”。
-      const lipLocalPoints: Array<[number, number]> = [
+      // 只包住袋口外半圈，不做悬浮的完整圆环；中间沿袋腔向外回弯，
+      // 使俯视和低机位都能读出“袋唇”而不是“缺口”。
+      const trimSourceLocalPoints: Array<[number, number]> = [
         [-mouthInset * 0.16, -halfWidth * 0.98],
         [pocket.shelfDepth * 0.58, -halfWidth * 1.06],
         [centerDepth + depthRadius * 0.52, -halfWidth * 0.72],
@@ -686,6 +686,19 @@ export class Scene3D {
         [pocket.shelfDepth * 0.58, halfWidth * 1.06],
         [-mouthInset * 0.16, halfWidth * 0.98],
       ];
+      // 四个角袋的黑色软袋唇显式穿过两侧 jaw 入口，并继续向台内藏入约 8mm。
+      // 旧曲线直接从 jaw 附近起步，Tube 端帽与圆弧库边在斜视角会露出一小段断缝。
+      // 增加“隐藏端点 → 精确 jaw 锚点”后，端帽被库边覆盖，曲线切向仍连续。
+      const cornerJoinExtension = mouthInset * 0.55;
+      const lipLocalPoints: Array<[number, number]> = pocket.kind === 'corner'
+        ? [
+            [-cornerJoinExtension, -halfWidth * 0.94],
+            [0, -halfWidth],
+            ...trimSourceLocalPoints.slice(1, -1),
+            [0, halfWidth],
+            [-cornerJoinExtension, halfWidth * 0.94],
+          ]
+        : trimSourceLocalPoints;
       const lipCurve = new THREE.CatmullRomCurve3(
         lipLocalPoints.map(([depth, lateral]) => {
           const point = pocketLocalToWorld(pocket, depth, lateral);
@@ -698,8 +711,8 @@ export class Scene3D {
       // 木框顶面的薄皮护口：沿袋口外半圈铺一条扁平硬挺的带状实体。
       // 顶面宽度足以在全台俯视中识别，厚度仅 1.6mm，避免再次出现软、厚、外凸的感觉。
       // 护口使用独立曲线，把两端藏进木帮一小段；袋腔内的深色袋唇仍沿原曲线落到 jaw 入口。
-      const trimLocalPoints = lipLocalPoints.map(([depth, lateral], index) => {
-        const isEnd = index === 0 || index === lipLocalPoints.length - 1;
+      const trimLocalPoints = trimSourceLocalPoints.map(([depth, lateral], index) => {
+        const isEnd = index === 0 || index === trimSourceLocalPoints.length - 1;
         return [
           isEnd ? pocket.shelfDepth * 0.5 : depth,
           lateral,
@@ -798,6 +811,10 @@ export class Scene3D {
         pocketLipMat,
       );
       lip.name = `pocket-lip-${pocket.index}`;
+      lip.userData.jawAnchorCount = pocket.kind === 'corner' ? 2 : 0;
+      lip.userData.joinExtensionMm = pocket.kind === 'corner'
+        ? cornerJoinExtension * 1000
+        : 0;
       lip.castShadow = true;
       lip.receiveShadow = true;
       this.tableGroup.add(lip);

@@ -64,25 +64,28 @@ describe('PocketGeometry 参数与六袋对称', () => {
     ]);
     expect(POCKETS[0].mouthWidth).toBe(POCKETS[1].mouthWidth);
     expect(POCKETS.filter(pocket => pocket.kind === 'corner')
-      .every(pocket => pocket.mouthWidth === 0.09)).toBe(true);
-    expect(POCKETS.filter(pocket => pocket.kind === 'side')
       .every(pocket => pocket.mouthWidth === 0.092)).toBe(true);
+    expect(POCKETS.filter(pocket => pocket.kind === 'side')
+      .every(pocket => pocket.mouthWidth === 0.094)).toBe(true);
     expect(POCKETS[0].jawRadius).toBe(POCKETS[5].jawRadius);
     expect(POCKETS[2].shelfDepth).toBe(POCKETS[3].shelfDepth);
     expect(POCKETS.every(pocket => pocket.jawSegments.length === 24)).toBe(true);
   });
 
-  it('角袋新增 1mm 单侧净窗口容错，而中袋边界保持不变', () => {
+  it('六袋相对上一版各新增 1mm 单侧净窗口容错', () => {
     const historicalCornerHalfWidth =
-      0.088 / 2 - TABLE.ballRadius - 0.00075;
+      0.09 / 2 - TABLE.ballRadius - 0.00075;
     const historicalSideHalfWidth =
       0.092 / 2 - TABLE.ballRadius - 0.00075;
-    const newlyAcceptedLateral = historicalCornerHalfWidth + 0.0005;
 
     for (const pocket of POCKETS.filter(item => item.kind === 'corner')) {
       expect(getPocketAimWindow(pocket).halfWidth)
         .toBeCloseTo(historicalCornerHalfWidth + 0.001, 8);
-      const world = sendBallToPocket(pocket, 1.6, newlyAcceptedLateral);
+      const world = sendBallToPocket(
+        pocket,
+        1.6,
+        historicalCornerHalfWidth + 0.0005,
+      );
       expect(getCueBall(world)?.active, `corner=${pocket.index}`).toBe(false);
       expect(world.events.some(event =>
         event.type === 'pocket' && event.pocket === pocket.index)).toBe(true);
@@ -90,7 +93,15 @@ describe('PocketGeometry 参数与六袋对称', () => {
 
     for (const pocket of POCKETS.filter(item => item.kind === 'side')) {
       expect(getPocketAimWindow(pocket).halfWidth)
-        .toBeCloseTo(historicalSideHalfWidth, 8);
+        .toBeCloseTo(historicalSideHalfWidth + 0.001, 8);
+      const world = sendBallToPocket(
+        pocket,
+        1.6,
+        historicalSideHalfWidth + 0.0005,
+      );
+      expect(getCueBall(world)?.active, `side=${pocket.index}`).toBe(false);
+      expect(world.events.some(event =>
+        event.type === 'pocket' && event.pocket === pocket.index)).toBe(true);
     }
   });
 
@@ -127,14 +138,23 @@ describe('袋口扫掠、台阶与不可返回线', () => {
 
   it('安全窗口外的直线来球撞袋角并留在合法区域', () => {
     for (const pocket of POCKETS) {
-      const outside = getPocketAimWindow(pocket).halfWidth + 0.006;
+      const outside = getPocketAimWindow(pocket).halfWidth + 0.008;
       for (const lateral of [-outside, outside]) {
         const world = sendBallToPocket(pocket, 1.6, lateral);
         const cue = getCueBall(world)!;
         expect(cue.active, `pocket=${pocket.index}, lateral=${lateral}`).toBe(true);
-        expect(world.events.some(event => event.type === 'cushion')).toBe(true);
-        expect(world.events.some(event => event.type === 'pocket')).toBe(false);
-        expect(isInLegalTableArea(cue.x, cue.z)).toBe(true);
+        expect(
+          world.events.some(event => event.type === 'cushion'),
+          `missing cushion: pocket=${pocket.index}, lateral=${lateral}`,
+        ).toBe(true);
+        expect(
+          world.events.some(event => event.type === 'pocket'),
+          `unexpected pocket: pocket=${pocket.index}, lateral=${lateral}`,
+        ).toBe(false);
+        expect(
+          isInLegalTableArea(cue.x, cue.z),
+          `left legal area: pocket=${pocket.index}, lateral=${lateral}, final=(${cue.x},${cue.z})`,
+        ).toBe(true);
       }
     }
   });
