@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 DEV __bj8 场景句柄
-[OUTPUT]: 六袋浅驼皮圈/白色菱形网袋/细缝边结构、角袋跨接连续性、桌面俯视/角袋/中袋/竖屏四帧视觉回归及页面错误门禁
+[OUTPUT]: 六袋台内圆弧凹口/浅驼皮圈/白色菱形网袋/细缝边结构、角袋跨接连续性、四机位视觉回归及页面错误门禁
 [POS]: PocketGeometry 物理/视觉一体化的浏览器出口验收；只改调试页内世界，不写游戏数据
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md 与 README.md
 */
@@ -74,6 +74,9 @@ const pocketAnatomy = await page.evaluate(() => {
     roundedCornerPockets: 0,
     pocketWraps: 0,
     mouths: 0,
+    inwardArcMouths: 0,
+    minCaptureInsetMm: Number.POSITIVE_INFINITY,
+    maxCaptureInsetMm: 0,
     topTrims: 0,
     seamlessTrimEnds: 0,
     tanLeatherCaps: 0,
@@ -109,7 +112,15 @@ const pocketAnatomy = await page.evaluate(() => {
       object.name.startsWith('pocket-wood-') ||
       object.name.startsWith('pocket-leather-wrap-')
     ) counts.pocketWraps += 1;
-    if (object.name.startsWith('pocket-mouth-')) counts.mouths += 1;
+    if (object.name.startsWith('pocket-mouth-')) {
+      counts.mouths += 1;
+      if (object.userData.captureShape === 'inward-arc') {
+        counts.inwardArcMouths += 1;
+        const insetMm = Number(object.userData.captureInsetMm ?? 0);
+        counts.minCaptureInsetMm = Math.min(counts.minCaptureInsetMm, insetMm);
+        counts.maxCaptureInsetMm = Math.max(counts.maxCaptureInsetMm, insetMm);
+      }
+    }
     if (object.name.startsWith('pocket-top-trim-')) {
       counts.topTrims += 1;
       counts.seamlessTrimEnds += Number(object.userData.seamlessEndCount ?? 0);
@@ -169,6 +180,9 @@ ok(
     pocketAnatomy.roundedCornerPockets === 4 &&
     pocketAnatomy.pocketWraps === 0 &&
     pocketAnatomy.mouths === 6 &&
+    pocketAnatomy.inwardArcMouths === 6 &&
+    pocketAnatomy.minCaptureInsetMm >= 7 &&
+    pocketAnatomy.maxCaptureInsetMm <= 8.01 &&
     pocketAnatomy.topTrims === 6 &&
     pocketAnatomy.seamlessTrimEnds === 12 &&
     pocketAnatomy.tanLeatherCaps === 6 &&

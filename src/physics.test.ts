@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 vitest 与 physics 物理内核的全部公开接口
-[OUTPUT]: 对外提供物理内核单元测试与手感指标（无导出），由 npm run check 执行
+[OUTPUT]: 对外提供含台内圆弧捕获的物理内核单元测试与手感指标（无导出），由 npm run check 执行
 [POS]: 物理层的可失败断言网：出杆、滑动/滚动、碰库、落袋、走位与边界；摆球走无参固定摆法保证可复现
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -294,6 +294,8 @@ describe('落袋检测测试', () => {
     expect(POCKETS[2].jawRadius).toBeCloseTo(0.064, 6);
     expect(POCKETS[0].shelfDepth).toBeCloseTo(0.036, 6);
     expect(POCKETS[2].shelfDepth).toBeCloseTo(0.024, 6);
+    expect(POCKETS[0].captureInset).toBeCloseTo(0.008, 6);
+    expect(POCKETS[2].captureInset).toBeCloseTo(0.007, 6);
     expect(getPocketAimWindow(POCKETS[2]).halfWidth).toBeGreaterThan(0);
   });
 
@@ -312,12 +314,12 @@ describe('落袋检测测试', () => {
     expect(world.events.some((event) => event.type === 'pocket' && event.pocket === 3)).toBe(true);
   });
 
-  it('偏出中袋净球心窗口的球应碰库，不应被袋口吸走', () => {
+  it('整段明确偏出中袋安全窗口的球应碰库，不应被圆弧吸走', () => {
     const world = createInitialWorld();
     for (const ball of world.balls) if (ball.number !== 0) ball.active = false;
     const cue = getCueBall(world)!;
     cue.x = TABLE.width / 2 - TABLE.ballRadius - 0.08;
-    cue.z = getPocketAimWindow(POCKETS[3]).halfWidth + 0.006;
+    cue.z = getPocketAimWindow(POCKETS[3]).halfWidth + 0.012;
     cue.vx = 1.2;
     cue.vz = 0;
     world.moving = true;

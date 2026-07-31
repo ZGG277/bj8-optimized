@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖 physics 台球世界、独立视觉相机方位、Scene3D 屏幕坐标映射与 match 状态
-[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、幽灵球拨轮、跟手虚母球放置与真实瞄准变化事实
-[POS]: 交互协调层，把当前视觉相机下的指针映射为世界瞄准角；袋口几何委托 aim/，拨轮传动委托 input/
+[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、显式切档精瞄拨轮、跟手虚母球放置与真实瞄准变化事实
+[POS]: 交互协调层，把当前视觉相机下的指针映射为世界瞄准角；拨轮只消费用户选择的档位，不自动探测袋口
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -10,16 +10,8 @@ import type { BilliardsWorld } from '../physics';
 import type { Scene3D } from '../Scene3D';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from '../match/types';
 import {
-  aimSolutionForPocket,
-  findAimDialTarget,
-  firstObjectHit,
-  type PrecisionAimSolution,
-} from '../aim/aim-solution';
-import {
-  AIM_DIAL_APPROACH_RATIO,
-  AIM_DIAL_UNLOCK_RATIO,
   aimDialAngleDelta,
-  aimDialRatio,
+  type AimDialMode,
 } from '../input/aim-dial';
 import { FIRST_PERSON_VIEW } from '../camera-view';
 import { isMeaningfulGuideAimChange } from '../first-match-guide';
@@ -42,7 +34,6 @@ interface AimInteractionProps {
   canAim: boolean;
   matchPhase: string;
   breaking: boolean;
-  legalTargets: number[];
   setMatch: React.Dispatch<React.SetStateAction<MatchState>>;
   setMessage: (key: MatchMessageKey, params?: MatchMessageParams) => void;
   setWorldView: React.Dispatch<React.SetStateAction<BilliardsWorld>>;
@@ -61,7 +52,6 @@ export function useAimInteraction({
   canAim,
   matchPhase,
   breaking,
-  legalTargets,
   setMatch,
   setMessage,
   setWorldView,
@@ -78,10 +68,9 @@ export function useAimInteraction({
   const placementPointerRef = useRef<number | null>(null);
   // 'line' 模式下用相对增量旋转，避免手机端绝对映射导致的方向跳变
   const lineLastXRef = useRef<number | null>(null);
-  const aimDialLockRef = useRef<Pick<PrecisionAimSolution, 'target' | 'pocket'> | null>(null);
   const pendingDialAfterPlacementRef = useRef(false);
   const [aimDialVisible, setAimDialVisible] = useState(false);
-  const [aimDialSolution, setAimDialSolution] = useState<PrecisionAimSolution | null>(null);
+  const [aimDialPrecisionActive, setAimDialPrecisionActive] = useState(false);
   // 用 ref 持有 setAim 避免与 useShotInput 的循环依赖
   const setAimRef = useRef(setAim);
   setAimRef.current = setAim;
@@ -96,37 +85,13 @@ export function useAimInteraction({
     return next;
   }, [breaking, worldRef, aimRef]);
 
-  const resolveAimDialSolution = useCallback((angle: number): PrecisionAimSolution | null => {
-    const world = worldRef.current;
-    const lock = aimDialLockRef.current;
-    if (
-      lock &&
-      legalTargets.includes(lock.target) &&
-      firstObjectHit(world, angle) === lock.target
-    ) {
-      const locked = aimSolutionForPocket(world, lock.target, lock.pocket, angle);
-      if (locked && (aimDialRatio(locked) ?? Infinity) <= AIM_DIAL_UNLOCK_RATIO) {
-        return locked;
-      }
-      aimDialLockRef.current = null;
-    }
-
-    const nearest = findAimDialTarget(world, angle, legalTargets);
-    if (nearest && (aimDialRatio(nearest) ?? Infinity) <= AIM_DIAL_APPROACH_RATIO) {
-      aimDialLockRef.current = { target: nearest.target, pocket: nearest.pocket };
-    }
-    return nearest;
-  }, [worldRef, legalTargets]);
-
-  const showAimDial = useCallback((angle = aimRef.current) => {
+  const showAimDial = useCallback(() => {
     setAimDialVisible(true);
-    setAimDialSolution(resolveAimDialSolution(angle));
-  }, [aimRef, resolveAimDialSolution]);
+  }, []);
 
   const clearAimDial = useCallback(() => {
-    aimDialLockRef.current = null;
     setAimDialVisible(false);
-    setAimDialSolution(null);
+    setAimDialPrecisionActive(false);
   }, []);
 
   // 出杆或回合切换清掉拨轮；开球/自由球落位后的下一帧立即呼出。
@@ -332,15 +297,14 @@ export function useAimInteraction({
       const lastX = lineLastXRef.current ?? e.clientX;
       const deltaX = e.clientX - lastX;
       // 球桌瞄准线始终是粗档：约 400px 转完整一周，保证 360° 可达。
-      const nextAngle = applyAim(aimRef.current + deltaX * (Math.PI / 200));
-      if (aimDialVisible) setAimDialSolution(resolveAimDialSolution(nextAngle));
+      applyAim(aimRef.current + deltaX * (Math.PI / 200));
       lineLastXRef.current = e.clientX;
     } else if (drag.mode === 'ghost') {
       moveGhostTo(e.clientX, e.clientY);
     } else {
       aimAtPointer(e.clientX, e.clientY, false);
     }
-  }, [canAim, matchPhase, previewCuePlacement, aimAtPointer, moveGhostTo, aimRef, applyAim, aimDialVisible, resolveAimDialSolution]);
+  }, [canAim, matchPhase, previewCuePlacement, aimAtPointer, moveGhostTo, aimRef, applyAim]);
 
   /** 指针抬起：摆球落实体母球；粗瞄只有拖动结束且角度真实变化才对外发事实。 */
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
@@ -386,20 +350,27 @@ export function useAimInteraction({
     }
   }, [matchPhase, scene3DRef, clearAimDial]);
 
-  const handleAimDialAdjust = useCallback((pixelDelta: number, pressureGain = 1): boolean => {
-    if (!canAim || !aimDialVisible || pixelDelta === 0) return false;
+  const handleAimDialAdjust = useCallback((
+    pixelDelta: number,
+    pressureGain = 1,
+  ): AimDialMode | null => {
+    if (!canAim || !aimDialVisible || pixelDelta === 0) return null;
     const current = aimRef.current;
-    const solution = resolveAimDialSolution(current);
     const next = applyAim(
-      current + aimDialAngleDelta(pixelDelta, solution, pressureGain),
+      current + aimDialAngleDelta(pixelDelta, aimDialPrecisionActive, pressureGain),
     );
-    setAimDialSolution(resolveAimDialSolution(next));
-    return isMeaningfulGuideAimChange(
+    const adjusted = isMeaningfulGuideAimChange(
       current,
       next,
       GUIDE_FINE_AIM_MIN_RADIANS,
     );
-  }, [canAim, aimDialVisible, aimRef, resolveAimDialSolution, applyAim]);
+    return adjusted ? (aimDialPrecisionActive ? 'fine' : 'coarse') : null;
+  }, [canAim, aimDialVisible, aimRef, aimDialPrecisionActive, applyAim]);
+
+  const toggleAimDialPrecision = useCallback(() => {
+    if (!canAim || !aimDialVisible) return;
+    setAimDialPrecisionActive(current => !current);
+  }, [canAim, aimDialVisible]);
 
   return {
     handlePointerDown,
@@ -407,7 +378,8 @@ export function useAimInteraction({
     handlePointerUp,
     handlePointerCancel,
     handleAimDialAdjust,
+    toggleAimDialPrecision,
     aimDialVisible,
-    aimDialSolution,
+    aimDialPrecisionActive,
   };
 }

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖常量表与纯数学；禁止依赖 React、DOM、规则状态或渲染层
-[OUTPUT]: 对外输出 240 Hz 确定性世界：步进、统一袋口几何、首碰/碰库/落袋事件、合法目标推导与击球接口
+[OUTPUT]: 对外输出 240 Hz 确定性世界：步进、统一袋口内弧捕获几何、首碰/碰库/落袋事件、合法目标推导与击球接口
 [POS]: 物理内核层，规则与 UI 的事实来源；所有时间积分必须以 PHYSICS_DT 固定步长进行
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -25,6 +25,7 @@ import {
 import {
   createCushionSegments,
   createPocketGeometries,
+  getPocketCaptureDepth,
   getPocketAimWindow,
   worldToPocketLocal,
   type CushionSegment,
@@ -38,10 +39,13 @@ export {
 } from './physics/collision-model';
 export {
   getPocketAimWindow,
+  getPocketCaptureDepth,
+  isInsidePocketCapture,
   isInsidePocketShelf,
   pocketLocalToWorld,
   worldToPocketLocal,
   ACTIVE_POCKET_MOUTH_PRESET,
+  POCKET_MOUTH_PRESET,
   POCKET_MOUTH_WIDTH_PRESETS,
   type CushionSegment,
   type PocketAimWindow,
@@ -538,14 +542,57 @@ function earliestPocketDrop(
     const local = worldToPocketLocal(pocket, ball);
     const depthVelocity = ball.vx * pocket.outward.x + ball.vz * pocket.outward.z;
     if (depthVelocity <= 1e-9) continue;
-    const time = local.depth >= pocket.shelfDepth
-      ? 0
-      : (pocket.shelfDepth - local.depth) / depthVelocity;
-    if (time < -1e-9 || time > maxTime + 1e-9) continue;
-    const hx = ball.x + ball.vx * Math.max(0, time);
-    const hz = ball.z + ball.vz * Math.max(0, time);
-    const atDrop = worldToPocketLocal(pocket, { x: hx, z: hz });
-    if (Math.abs(atDrop.lateral) > pocket.dropHalfWidth + 1e-7) continue;
+    const lateralVelocity = ball.vx * pocket.tangent.x + ball.vz * pocket.tangent.z;
+    const insideAt = (time: number) => {
+      const depth = local.depth + depthVelocity * time;
+      const lateral = local.lateral + lateralVelocity * time;
+      const captureDepth = getPocketCaptureDepth(pocket, lateral);
+      return captureDepth !== null && depth >= captureDepth - 1e-9;
+    };
+    let time: number | null = insideAt(0) ? 0 : null;
+
+    // 台内捕获边界是一段半椭圆。解析求交可在 240Hz 高速步进中避免穿过 7–8mm 凹弧。
+    if (time === null) {
+      const depthScale = pocket.captureInset;
+      const lateralScale = pocket.dropHalfWidth;
+      const a = (depthVelocity / depthScale) ** 2 +
+        (lateralVelocity / lateralScale) ** 2;
+      const b = 2 * (
+        local.depth * depthVelocity / (depthScale ** 2) +
+        local.lateral * lateralVelocity / (lateralScale ** 2)
+      );
+      const c = (local.depth / depthScale) ** 2 +
+        (local.lateral / lateralScale) ** 2 - 1;
+      const discriminant = b * b - 4 * a * c;
+      if (a > 1e-12 && discriminant >= 0) {
+        const root = Math.sqrt(discriminant);
+        for (const candidate of [(-b - root) / (2 * a), (-b + root) / (2 * a)]) {
+          if (candidate < -1e-9 || candidate > maxTime + 1e-9) continue;
+          const clampedTime = Math.max(0, candidate);
+          const depth = local.depth + depthVelocity * clampedTime;
+          if (depth <= 1e-7 && insideAt(clampedTime)) {
+            time = time === null ? clampedTime : Math.min(time, clampedTime);
+          }
+        }
+      }
+    }
+
+    // 极斜来球也可能从横向进入已越过袋口线的捕获区；用边界候选补齐该连续情况。
+    if (time === null) {
+      const candidates = [
+        -local.depth / depthVelocity,
+        lateralVelocity === 0 ? Infinity : (pocket.dropHalfWidth - local.lateral) / lateralVelocity,
+        lateralVelocity === 0 ? Infinity : (-pocket.dropHalfWidth - local.lateral) / lateralVelocity,
+      ].filter(candidate => candidate >= -1e-9 && candidate <= maxTime + 1e-9);
+      for (const candidate of candidates) {
+        const clampedTime = Math.max(0, candidate);
+        if (insideAt(clampedTime)) {
+          time = time === null ? clampedTime : Math.min(time, clampedTime);
+        }
+      }
+    }
+
+    if (time === null) continue;
     if (!best || time < best.time) best = { time: Math.max(0, time), pocket: pocket.index };
   }
   return best;

@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的令牌与 layout.css 的壳层几何
-[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、手动相机入口、方向微调、右侧控制轨、击球点、力度出杆、首局上下文提示及规划/复盘浮层样式
+[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、手动相机入口、手动切档方向拨轮、右侧控制轨、击球点、力度出杆、首局上下文提示及规划/复盘浮层样式
 [POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -687,16 +687,19 @@
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.09), 0 0 12px rgba(255, 255, 255, 0.45);
 }
 
-.aim-dial.approach {
-  border-color: rgba(217, 179, 108, 0.54);
-}
-
-.aim-dial.approach .aim-dial-label strong {
-  color: #e7c17c;
-}
-
-.aim-dial.approach .aim-dial-window b {
-  background-color: #e7c17c;
+.aim-dial-window b::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+  background: rgba(8, 12, 10, 0.62);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
 .aim-dial.fine {
@@ -709,6 +712,12 @@
 
 .aim-dial.fine .aim-dial-window b {
   background-color: var(--green);
+}
+
+.aim-dial.fine .aim-dial-window b::after {
+  border-color: currentColor;
+  background: rgba(112, 199, 165, 0.3);
+  transform: translate(-50%, -50%) scale(0.78);
 }
 
 .aim-dial.fine .aim-dial-ticks {
@@ -1624,10 +1633,6 @@
   width: auto;
   height: 2px;
   transform: translateY(-50%);
-}
-
-.aim-dial.approach {
-  box-shadow: 0 0 0 1px rgba(217, 179, 108, 0.2), var(--shadow-overlay);
 }
 
 .aim-dial.fine {

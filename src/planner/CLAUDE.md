@@ -24,6 +24,6 @@
 
 `review.ts`: 击球复盘——出杆捕获快照（ShotCapture：击球前世界/杆参数/当时计划首步）在结算后把实际杆参数跑一遍 simulateForDisplay 无扰动仿真，与计划逐步比对出 ShotReview（perfect/position-miss/pot-miss + 一句话中文诊断 + 计划/实际轨迹对）。走位诊断主信号用母球行程总长差（±0.2m 阈值，碰库反弹拉长行程与力度同向，比停位投影稳健），行程相近看停位侧向偏差判杆法；未进球用实际切角 vs 计划 cutAngle 判厚薄（±2°），叉积符号判偏袋口左右侧；洗袋直接报力度偏大。无计划（planned=null）静默返回 null。
 
-`review.test.ts`: 复盘层单元测试——场景用种子化 planPosition 的真实 plans[0].steps[0]（与生产同源），覆盖 perfect（参数照抄）/力度∓20 走位偏差/瞄偏 pot-miss 厚薄与偏袋口文案/无计划返回 null；全部确定性。
+`review.test.ts`: 复盘层单元测试——场景用种子化 planPosition 的真实 plans[0].steps[0]，覆盖 perfect（参数照抄）/真实可进球轨迹低于计划参考力/偏大力度走位偏差/瞄偏 pot-miss 厚薄与偏袋口文案/无计划返回 null；低力用例只抬高计划参考值以隔离复盘诊断，不受规划器最低可进球力度漂移影响。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

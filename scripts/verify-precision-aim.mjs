@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core、__bj8 调试句柄与 Scene3D 台面↔屏幕映射
-[OUTPUT]: 开球虚母球跟手/落实、拨轮无条件呼出、360° 连续拨动、近袋平滑降档与页面稳定性断言
-[POS]: “摆球/幽灵球落位即显示无限拨轮 + 延长线近袋连续提精度”的浏览器出口门禁
+[OUTPUT]: 开球虚母球跟手/落实、拨轮无条件呼出、近袋不自动变档、显式轻点精瞄与页面稳定性断言
+[POS]: “摆球后显示无限拨轮 + 用户显式切换固定精瞄档”的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
@@ -125,66 +125,36 @@ const ghostScreen = await page.evaluate(
 );
 await page.mouse.click(ghostScreen.x, ghostScreen.y);
 await wait(180);
-const fine = await page.evaluate(() => ({
+const nearPocket = await page.evaluate(() => ({
   visible: Boolean(document.querySelector('.aim-dial')),
   mode: document.querySelector('.aim-dial')?.className ?? '',
   label: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
 }));
 ok(
-  '拨轮: 合法幽灵球落位后进入右中袋精瞄档',
-  fine.visible && fine.mode.includes('fine') && fine.label.includes('1号') && fine.label.includes('右中袋'),
-  JSON.stringify(fine),
+  '拨轮: 合法幽灵球落位后仍保持粗档，不自动探测袋口切档',
+  nearPocket.visible &&
+    nearPocket.mode.includes('coarse') &&
+    nearPocket.label.includes('轻点启用精瞄'),
+  JSON.stringify(nearPocket),
 );
 
-const expandedAngle = await page.evaluate(() => {
-  const debug = window.__bj8;
-  const centered = debug.precisionAt(debug.aim.current, 8);
-  if (!centered) return null;
-  return centered.centerAngle + centered.halfWidth * 3.2;
+const dialCenter = await page.$eval('.aim-dial', (element) => {
+  const rect = element.getBoundingClientRect();
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 });
-if (expandedAngle === null) throw new Error('expanded dial angle unavailable');
-// 先移开当前瞄准线，避免目标点因离中心线太近被命中判定为“抓线”而不是新幽灵球落点。
-await page.mouse.click(offTarget.x, offTarget.y);
-await wait(100);
-// 连续镜头在俯视端仍随世界杆向环绕；移动瞄准线后必须按“当前目标相机位姿”
-// 重新投影扩大接近区的台面点，不能复用旧固定俯视相机下的屏幕坐标。
-const expandedPoint = await page.evaluate((angle) => {
-  const debug = window.__bj8;
-  const cue = debug.world.current.balls.find((ball) => ball.number === 0);
-  const distance = 0.32;
-  const point = debug.scene.current.tableToScreenAt(
-    cue.x + Math.sin(angle) * distance,
-    cue.z - Math.cos(angle) * distance,
-    debug.aim.current,
-    1,
-  );
-  return point ? { ...point, expectedAngle: angle } : null;
-}, expandedAngle);
-if (!expandedPoint) throw new Error('expanded dial point unavailable');
-const expandedHit = await page.evaluate(({ x, y }) => {
-  const element = document.elementFromPoint(x, y);
-  const dial = document.querySelector('.aim-dial')?.getBoundingClientRect();
-  return {
-    tag: element?.tagName ?? '',
-    className: element?.className ?? '',
-    dial: dial ? { x: dial.x, y: dial.y, right: dial.right, bottom: dial.bottom } : null,
-  };
-}, expandedPoint);
-await page.mouse.click(expandedPoint.x, expandedPoint.y);
-await wait(180);
-const approach = await page.evaluate(() => ({
-  visible: Boolean(document.querySelector('.aim-dial')),
+await page.mouse.click(dialCenter.x, dialCenter.y);
+await wait(120);
+const manualFine = await page.evaluate(() => ({
   mode: document.querySelector('.aim-dial')?.className ?? '',
-  aim: window.__bj8.aim.current,
-  ratio: (() => {
-    const solution = window.__bj8.precisionAt(window.__bj8.aim.current, 8);
-    return solution ? Math.abs(solution.error) / solution.halfWidth : null;
-  })(),
+  active: document.querySelector('.aim-dial')?.getAttribute('data-precision-active'),
+  label: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
 }));
 ok(
-  '拨轮: 旧精瞄窗外的扩大接近区进入平滑降档',
-  approach.visible && approach.mode.includes('approach'),
-  JSON.stringify({ ...approach, expectedAngle: expandedPoint.expectedAngle, point: expandedPoint, hit: expandedHit }),
+  '拨轮: 轻点后才显式进入精瞄档',
+  manualFine.mode.includes('fine') &&
+    manualFine.active === 'true' &&
+    manualFine.label.includes('精瞄已启用'),
+  JSON.stringify(manualFine),
 );
 
 const dial = await page.$eval('.aim-dial', (element) => {
@@ -199,8 +169,8 @@ await page.mouse.up();
 await wait(120);
 const afterDial = await page.evaluate(() => window.__bj8.aim.current);
 ok(
-  '拨轮: 横向拨动平滑改变唯一世界杆向',
-  afterDial > beforeDial && afterDial - beforeDial < 0.2,
+  '拨轮: 手动精瞄后横向拨动以固定低速改变唯一世界杆向',
+  afterDial > beforeDial && afterDial - beforeDial < 0.08,
   `${beforeDial} → ${afterDial}`,
 );
 
