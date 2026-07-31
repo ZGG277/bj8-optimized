@@ -50,7 +50,6 @@ import {
 import type { GameMode, PositionOutcome } from './opponent/model';
 import {
   guideStepAfterEvent,
-  nextFirstMatchGuideStep,
   saveFirstMatchGuideCompleted,
   shouldRunFirstMatchGuide,
   type FirstMatchGuideEvent,
@@ -144,24 +143,24 @@ export default function Game() {
       )
         ? 'break-place'
         : null);
-
-  const advanceFirstMatchGuide = useCallback((event: FirstMatchGuideEvent) => {
-    setFirstMatchGuideStep(current =>
-      current ? guideStepAfterEvent(current, event) : null);
-  }, []);
+  const firstMatchGuideStepRef = useRef(firstMatchGuideStep);
+  firstMatchGuideStepRef.current = firstMatchGuideStep;
   const finishFirstMatchGuide = useCallback(() => {
     saveFirstMatchGuideCompleted(browserStorage());
+    firstMatchGuideStepRef.current = null;
     setFirstMatchGuideStep(null);
   }, []);
-  const handleFirstMatchGuideNext = useCallback(() => {
-    if (!firstMatchGuideStep) return;
-    const next = nextFirstMatchGuideStep(firstMatchGuideStep);
+  const advanceFirstMatchGuide = useCallback((event: FirstMatchGuideEvent) => {
+    const current = firstMatchGuideStepRef.current;
+    if (!current) return;
+    const next = guideStepAfterEvent(current, event);
     if (!next) {
       finishFirstMatchGuide();
       return;
     }
+    firstMatchGuideStepRef.current = next;
     setFirstMatchGuideStep(next);
-  }, [finishFirstMatchGuide, firstMatchGuideStep]);
+  }, [finishFirstMatchGuide]);
 
   // 放球完成直接进入开球瞄准；首局结束即永久收起，避免第二局继续打扰。
   useEffect(() => {
@@ -455,6 +454,9 @@ export default function Game() {
     setMessage,
     setWorldView,
     setViewLevel,
+    onCoarseAimAdjusted: () => {
+      advanceFirstMatchGuide('coarse-aim-adjusted');
+    },
   });
 
   const stageInteractionMode = cameraInteractionMode(
@@ -481,9 +483,7 @@ export default function Game() {
     }
     if (event.pointerType === 'touch' && canAim) lockTouchAimCamera();
     handlePointerDown(event);
-    if (canAim) advanceFirstMatchGuide('aim-used');
   }, [
-    advanceFirstMatchGuide,
     canAim,
     clearTouchAimCameraTimer,
     handlePointerDown,
@@ -531,7 +531,6 @@ export default function Game() {
     pixelDelta: number,
     pressureGain = 1,
   ) => {
-    if (canAim) advanceFirstMatchGuide('aim-used');
     const coarsePointer = typeof window !== 'undefined' &&
       window.matchMedia?.('(pointer: coarse)').matches;
     const resumePinnedCamera = manualCameraPinned && canAim;
@@ -543,11 +542,13 @@ export default function Game() {
     }
     if ((coarsePointer || resumePinnedCamera) && canAim) {
       if (!isGlobalCameraView(viewLevel)) lockTouchAimCamera();
-      handleAimDialAdjust(pixelDelta, pressureGain);
+      const adjusted = handleAimDialAdjust(pixelDelta, pressureGain);
+      if (adjusted) advanceFirstMatchGuide('fine-aim-adjusted');
       releaseTouchAimCameraLater();
       return;
     }
-    handleAimDialAdjust(pixelDelta, pressureGain);
+    const adjusted = handleAimDialAdjust(pixelDelta, pressureGain);
+    if (adjusted) advanceFirstMatchGuide('fine-aim-adjusted');
   }, [
     advanceFirstMatchGuide,
     canAim,
@@ -565,14 +566,22 @@ export default function Game() {
   }, [setViewLevel]);
 
   const handleGuideViewLevel = useCallback((level: number) => {
+    const adjusted = Math.abs(level - viewLevel) > 0.0005;
     setViewLevel(level);
-    if (canAim) advanceFirstMatchGuide('view-used');
-  }, [advanceFirstMatchGuide, canAim, setViewLevel]);
+    if (canAim && adjusted) advanceFirstMatchGuide('view-adjusted');
+  }, [advanceFirstMatchGuide, canAim, setViewLevel, viewLevel]);
 
   const handleGuideSpinChange = useCallback((nextSpin: typeof spin) => {
+    const adjusted =
+      Math.abs(nextSpin.x - spin.x) > 0.0005 ||
+      Math.abs(nextSpin.y - spin.y) > 0.0005;
     setSpin(nextSpin);
-    advanceFirstMatchGuide('spin-used');
-  }, [advanceFirstMatchGuide, setSpin]);
+    if (canAim && adjusted) advanceFirstMatchGuide('spin-adjusted');
+  }, [advanceFirstMatchGuide, canAim, setSpin, spin]);
+
+  const handleGuideLayoutAdjusted = useCallback(() => {
+    advanceFirstMatchGuide('layout-adjusted');
+  }, [advanceFirstMatchGuide]);
 
   // ── 重置游戏 ──
   const handleResetGame = useCallback((nextMode: GameMode) => {
@@ -768,6 +777,7 @@ export default function Game() {
         onViewLevel={handleGuideViewLevel}
         onToggleManualCamera={handleToggleManualCamera}
         onSpinChange={handleGuideSpinChange}
+        onLayoutAdjusted={handleGuideLayoutAdjusted}
         onToggleGuidance={handleTogglePlan}
         onToggleAimAssist={aimAssist.toggle}
         onAimDialAdjust={handleStableAimDialAdjust}
@@ -804,7 +814,6 @@ export default function Game() {
               (match.phase === 'aiming' && match.actor === 'player')
             )
           }
-          onNext={handleFirstMatchGuideNext}
           onSkip={finishFirstMatchGuide}
         />
       )}

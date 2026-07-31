@@ -1,8 +1,8 @@
 /*
-[INPUT]: 首次引导本地存储、当前引导步骤与真实交互事件
-[OUTPUT]: 对外提供首局引导步骤状态机，以及容错的完成状态读写
+[INPUT]: 首次引导本地存储、当前微提示与已经发生的真实交互事实
+[OUTPUT]: 对外提供非阻塞首局引导状态机、有效角度变化判定与容错完成状态读写
 [POS]: 纯产品状态层；不依赖 React、DOM、物理或对局规则实现
-[PROTOCOL]: 步骤、存储协议或转移变化时更新本注释、对应测试与 CLAUDE.md
+[PROTOCOL]: 提示、存储协议或转移变化时更新本注释、对应测试与 CLAUDE.md
 */
 
 export const FIRST_MATCH_GUIDE_STORAGE_KEY =
@@ -10,23 +10,24 @@ export const FIRST_MATCH_GUIDE_STORAGE_KEY =
 
 export const FIRST_MATCH_GUIDE_STEPS = [
   'break-place',
-  'break-aim',
+  'break-coarse',
+  'break-fine',
   'break-power',
-  'player-aim',
-  'view',
-  'spin',
-  'power',
-  'layout',
+  'player-view',
+  'player-spin',
+  'player-layout',
 ] as const;
 
 export type FirstMatchGuideStep = typeof FIRST_MATCH_GUIDE_STEPS[number];
 
 export type FirstMatchGuideEvent =
   | 'cue-placed'
-  | 'aim-used'
+  | 'coarse-aim-adjusted'
+  | 'fine-aim-adjusted'
   | 'shot-committed'
-  | 'view-used'
-  | 'spin-used';
+  | 'view-adjusted'
+  | 'spin-adjusted'
+  | 'layout-adjusted';
 
 export function shouldRunFirstMatchGuide(
   storage: Storage | null,
@@ -52,36 +53,53 @@ export function saveFirstMatchGuideCompleted(storage: Storage | null): void {
   }
 }
 
-export function nextFirstMatchGuideStep(
-  step: FirstMatchGuideStep,
-): FirstMatchGuideStep | null {
-  const index = FIRST_MATCH_GUIDE_STEPS.indexOf(step);
-  return FIRST_MATCH_GUIDE_STEPS[index + 1] ?? null;
+export function isMeaningfulGuideAimChange(
+  startAngle: number,
+  endAngle: number,
+  minimumRadians: number,
+): boolean {
+  if (
+    !Number.isFinite(startAngle) ||
+    !Number.isFinite(endAngle) ||
+    !Number.isFinite(minimumRadians) ||
+    minimumRadians < 0
+  ) {
+    return false;
+  }
+  const delta = Math.atan2(
+    Math.sin(endAngle - startAngle),
+    Math.cos(endAngle - startAngle),
+  );
+  return Math.abs(delta) >= minimumRadians;
 }
 
 /**
- * 真实操作只跨过它已经证明掌握的步骤；不匹配的事件保持当前提示。
- * 出杆是强事实：即使用户没点“下一步”，也直接结束本轮瞄准/蓄力教学。
+ * 核心节奏只由放球、有效瞄准和成功出杆推进。
+ * 视角/杆法/布局是非阻塞发现：可按真实操作切换，也可由下一次成功出杆直接收敛。
  */
 export function guideStepAfterEvent(
   step: FirstMatchGuideStep,
   event: FirstMatchGuideEvent,
-): FirstMatchGuideStep {
-  if (event === 'cue-placed' && step === 'break-place') return 'break-aim';
-  if (event === 'aim-used' && step === 'break-aim') return 'break-power';
-  if (event === 'aim-used' && step === 'player-aim') return 'view';
-  if (
-    event === 'shot-committed' &&
-    (
-      step === 'break-place' ||
-      step === 'break-aim' ||
-      step === 'break-power'
-    )
-  ) {
-    return 'player-aim';
+): FirstMatchGuideStep | null {
+  if (event === 'shot-committed') {
+    return step.startsWith('break-') ? 'player-view' : null;
   }
-  if (event === 'shot-committed' && step === 'power') return 'layout';
-  if (event === 'view-used' && step === 'view') return 'spin';
-  if (event === 'spin-used' && step === 'spin') return 'power';
+
+  if (step === 'break-place' && event === 'cue-placed') return 'break-coarse';
+  if (step === 'break-coarse' && event === 'coarse-aim-adjusted') return 'break-fine';
+  if (
+    (step === 'break-coarse' || step === 'break-fine') &&
+    event === 'fine-aim-adjusted'
+  ) {
+    return 'break-power';
+  }
+  if (step === 'player-view' && event === 'view-adjusted') return 'player-spin';
+  if (
+    (step === 'player-view' || step === 'player-spin') &&
+    event === 'spin-adjusted'
+  ) {
+    return 'player-layout';
+  }
+  if (step.startsWith('player-') && event === 'layout-adjusted') return null;
   return step;
 }
