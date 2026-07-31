@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的令牌与 layout.css 的壳层几何
-[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、手动相机入口、方向微调、右侧控制轨、击球点、力度出杆及规划/复盘浮层样式
+[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、手动相机入口、方向微调、右侧控制轨、击球点、力度出杆、首局上下文提示及规划/复盘浮层样式
 [POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -2252,6 +2252,125 @@
   right: auto;
   bottom: 0;
   height: 100% !important;
+}
+
+/* 首局引导：跟随真实控件/球桌锚点的非模态小气泡，不锁住球桌操作。 */
+.first-match-guide {
+  position: fixed;
+  z-index: 14;
+  width: min(210px, calc(100vw - 20px));
+  padding: 10px 11px 9px;
+  border: 1px solid color-mix(in srgb, var(--green) 56%, var(--line));
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.first-match-guide::after {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--green) 56%, var(--line));
+  border-right: 1px solid color-mix(in srgb, var(--green) 56%, var(--line));
+  background: var(--surface-2);
+  content: '';
+}
+
+.first-match-guide.is-left::after {
+  right: -5px;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.first-match-guide.is-right::after {
+  left: -5px;
+  transform: translateY(-50%) rotate(225deg);
+}
+
+.first-match-guide.is-above::after {
+  top: auto;
+  right: 24px;
+  bottom: -5px;
+  transform: rotate(135deg);
+}
+
+.first-match-guide.is-below::after {
+  top: -5px;
+  right: 24px;
+  transform: rotate(-45deg);
+}
+
+.first-match-guide.is-table::after {
+  display: none;
+}
+
+.first-match-guide-eyebrow {
+  display: block;
+  color: var(--green-bright);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.08em;
+}
+
+.first-match-guide > strong {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--fs-base);
+  font-weight: 650;
+}
+
+.first-match-guide > p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+
+.first-match-guide-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.first-match-guide-actions button {
+  min-height: 34px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.first-match-guide .guide-skip {
+  border: 0;
+  color: var(--text-tertiary);
+  background: transparent;
+}
+
+.first-match-guide .guide-next {
+  border: 1px solid color-mix(in srgb, var(--green) 70%, transparent);
+  color: #07110d;
+  background: var(--green);
+  font-weight: 700;
+}
+
+.first-match-guide-actions button:focus-visible {
+  outline: 2px solid var(--green-bright);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .first-match-guide {
+    padding: 9px 10px 8px;
+  }
+
+  .first-match-guide > p {
+    line-height: 1.38;
+  }
 }
 
 /*

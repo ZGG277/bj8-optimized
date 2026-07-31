@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、三杆批量能力与渐进 AI、独立观战/手动环绕、触屏瞄准锁镜、360° 瞄准/无限拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、三杆批量能力与渐进 AI、独立观战/手动环绕、触屏瞄准锁镜、360° 瞄准/无限拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -33,6 +33,7 @@ import { ControlDeck } from './components/ControlDeck';
 import { PlanOverlay } from './components/PlanOverlay';
 import { ReviewOverlay } from './components/ReviewOverlay';
 import { IntroScreen } from './components/IntroScreen';
+import { FirstMatchGuide } from './components/FirstMatchGuide';
 import { Scene3D } from './Scene3D';
 import type { PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
@@ -47,6 +48,14 @@ import {
   isGlobalCameraView,
 } from './camera-view';
 import type { GameMode, PositionOutcome } from './opponent/model';
+import {
+  guideStepAfterEvent,
+  nextFirstMatchGuideStep,
+  saveFirstMatchGuideCompleted,
+  shouldRunFirstMatchGuide,
+  type FirstMatchGuideEvent,
+  type FirstMatchGuideStep,
+} from './first-match-guide';
 
 type SkillShotCapture = {
   target: number | null;
@@ -56,6 +65,15 @@ type SkillShotCapture = {
 };
 
 const TOUCH_AIM_CAMERA_RELEASE_MS = 650;
+
+function browserStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 export default function Game() {
   // ── 对局编排状态 ──
@@ -118,6 +136,54 @@ export default function Game() {
   // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
   const [guidanceEnabled, setGuidanceEnabled] = useState(false);
   const aimAssist = useAimAssist();
+  const [firstMatchGuideStep, setFirstMatchGuideStep] =
+    useState<FirstMatchGuideStep | null>(() =>
+      shouldRunFirstMatchGuide(
+        browserStorage(),
+        playerSkill.totalPlayerShots,
+      )
+        ? 'break-place'
+        : null);
+
+  const advanceFirstMatchGuide = useCallback((event: FirstMatchGuideEvent) => {
+    setFirstMatchGuideStep(current =>
+      current ? guideStepAfterEvent(current, event) : null);
+  }, []);
+  const finishFirstMatchGuide = useCallback(() => {
+    saveFirstMatchGuideCompleted(browserStorage());
+    setFirstMatchGuideStep(null);
+  }, []);
+  const handleFirstMatchGuideNext = useCallback(() => {
+    if (!firstMatchGuideStep) return;
+    const next = nextFirstMatchGuideStep(firstMatchGuideStep);
+    if (!next) {
+      finishFirstMatchGuide();
+      return;
+    }
+    setFirstMatchGuideStep(next);
+  }, [finishFirstMatchGuide, firstMatchGuideStep]);
+
+  // 放球完成直接进入开球瞄准；首局结束即永久收起，避免第二局继续打扰。
+  useEffect(() => {
+    if (!firstMatchGuideStep) return;
+    if (match.phase === 'finished') {
+      finishFirstMatchGuide();
+      return;
+    }
+    if (
+      firstMatchGuideStep === 'break-place' &&
+      match.phase === 'aiming' &&
+      match.actor === 'player'
+    ) {
+      advanceFirstMatchGuide('cue-placed');
+    }
+  }, [
+    advanceFirstMatchGuide,
+    finishFirstMatchGuide,
+    firstMatchGuideStep,
+    match.actor,
+    match.phase,
+  ]);
 
   // 打开前的视角，关闭时恢复
   const prevViewLevelRef = useRef(viewLevel);
@@ -253,6 +319,7 @@ export default function Game() {
         skillShotCaptureRef.current = null;
         return;
       }
+      advanceFirstMatchGuide('shot-committed');
       // 每杆只在物理确认击球成功后复位中杆，避免动画取消时误清用户设置。
       resetSpinRef.current();
       playStrike(intent.power);
@@ -267,7 +334,7 @@ export default function Game() {
     } else {
       doShot();
     }
-  }, [worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch]);
+  }, [advanceFirstMatchGuide, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch]);
 
   // ── 出杆输入协调器 ──
   const {
@@ -414,7 +481,9 @@ export default function Game() {
     }
     if (event.pointerType === 'touch' && canAim) lockTouchAimCamera();
     handlePointerDown(event);
+    if (canAim) advanceFirstMatchGuide('aim-used');
   }, [
+    advanceFirstMatchGuide,
     canAim,
     clearTouchAimCameraTimer,
     handlePointerDown,
@@ -462,6 +531,7 @@ export default function Game() {
     pixelDelta: number,
     pressureGain = 1,
   ) => {
+    if (canAim) advanceFirstMatchGuide('aim-used');
     const coarsePointer = typeof window !== 'undefined' &&
       window.matchMedia?.('(pointer: coarse)').matches;
     const resumePinnedCamera = manualCameraPinned && canAim;
@@ -479,6 +549,7 @@ export default function Game() {
     }
     handleAimDialAdjust(pixelDelta, pressureGain);
   }, [
+    advanceFirstMatchGuide,
     canAim,
     clearTouchAimCameraTimer,
     handleAimDialAdjust,
@@ -492,6 +563,16 @@ export default function Game() {
     setCameraAzimuth(FULL_TABLE_AZIMUTH);
     setViewLevel(current => Math.max(current, SPECTATOR_VIEW_LEVEL));
   }, [setViewLevel]);
+
+  const handleGuideViewLevel = useCallback((level: number) => {
+    setViewLevel(level);
+    if (canAim) advanceFirstMatchGuide('view-used');
+  }, [advanceFirstMatchGuide, canAim, setViewLevel]);
+
+  const handleGuideSpinChange = useCallback((nextSpin: typeof spin) => {
+    setSpin(nextSpin);
+    advanceFirstMatchGuide('spin-used');
+  }, [advanceFirstMatchGuide, setSpin]);
 
   // ── 重置游戏 ──
   const handleResetGame = useCallback((nextMode: GameMode) => {
@@ -660,6 +741,7 @@ export default function Game() {
         viewLevel={viewLevel}
         spectatorActive={spectatorActive}
         manualCameraActive={manualCameraActive}
+        firstMatchGuideActive={Boolean(firstMatchGuideStep)}
         match={match}
         containerRef={containerRef}
         onPointerDown={handleStagePointerDown}
@@ -683,9 +765,9 @@ export default function Game() {
         aimAssistEnabled={aimAssist.enabled}
         aimDialVisible={aimDialVisible}
         aimDialSolution={aimDialSolution}
-        onViewLevel={setViewLevel}
+        onViewLevel={handleGuideViewLevel}
         onToggleManualCamera={handleToggleManualCamera}
-        onSpinChange={setSpin}
+        onSpinChange={handleGuideSpinChange}
         onToggleGuidance={handleTogglePlan}
         onToggleAimAssist={aimAssist.toggle}
         onAimDialAdjust={handleStableAimDialAdjust}
@@ -709,6 +791,21 @@ export default function Game() {
           open={reviewOpen}
           onOpen={handleOpenReview}
           onClose={handleCloseReview}
+        />
+      )}
+      {firstMatchGuideStep && (
+        <FirstMatchGuide
+          step={firstMatchGuideStep}
+          visible={
+            !planOpen &&
+            !reviewOpen &&
+            (
+              (match.phase === 'placing' && match.breaking) ||
+              (match.phase === 'aiming' && match.actor === 'player')
+            )
+          }
+          onNext={handleFirstMatchGuideNext}
+          onSkip={finishFirstMatchGuide}
         />
       )}
       {match.phase === 'intro' && (
