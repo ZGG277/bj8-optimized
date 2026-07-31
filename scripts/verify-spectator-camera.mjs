@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 对手观战全台、独立环绕、控件避让、交棒保留、触屏瞄准锁镜、全局点选冻结球台及手动回第一人称断言
+[OUTPUT]: 390×844 对手观战全台、显式手动相机、控件避让、交棒保留、触屏瞄准锁镜、全局点选冻结球台及手动回第一人称断言
 [POS]: 竖屏观战相机的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -180,6 +180,128 @@ ok(
     Math.abs(handedOff.viewAzimuth - beforeHandoff.viewAzimuth) < 1e-6 &&
     !handedOff.recenter,
   JSON.stringify({ playerLevel, beforeHandoff, handedOff }),
+);
+
+const manualCameraUi = await page.evaluate(() => {
+  const button = document.querySelector('.manual-camera-button');
+  const switcher = document.querySelector('.view-switcher');
+  if (!button || !switcher) return null;
+  const rect = button.getBoundingClientRect();
+  const parent = switcher.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+    width: rect.width,
+    height: rect.height,
+    text: button.textContent?.trim() ?? '',
+    label: button.getAttribute('aria-label'),
+    pressed: button.getAttribute('aria-pressed'),
+    insideViewControl:
+      rect.left >= parent.left && rect.right <= parent.right &&
+      rect.top >= parent.top && rect.bottom <= parent.bottom,
+  };
+});
+ok(
+  '手动视角入口是视角控件内的紧凑纯图形按钮',
+  Boolean(
+    manualCameraUi &&
+    manualCameraUi.width >= 20 &&
+    manualCameraUi.height >= 20 &&
+    manualCameraUi.text === '' &&
+    manualCameraUi.label === '开启手动视角' &&
+    manualCameraUi.pressed === 'false' &&
+    manualCameraUi.insideViewControl
+  ),
+  JSON.stringify(manualCameraUi),
+);
+
+await page.touchscreen.tap(manualCameraUi.x, manualCameraUi.y);
+await wait(120);
+await page.evaluate(() => {
+  const world = window.__bj8.world.current;
+  const cue = world.balls[0];
+  Object.assign(cue, {
+    active: true,
+    x: 0,
+    z: 0.55,
+    vx: 0,
+    vz: 0,
+    wx: 0,
+    wy: 0,
+    wz: 0,
+  });
+  for (const ball of world.balls) {
+    if (ball.number !== 0) ball.active = false;
+  }
+  world.moving = false;
+  window.__bj8.sync();
+});
+await wait(120);
+const manualBefore = await page.evaluate(() => ({
+  aim: window.__bj8.aim.current,
+  azimuth: window.__bj8.cameraAzimuth.current,
+  viewAzimuth: window.__bj8.cameraViewAzimuth.current,
+  level: Number(document.querySelector('.viewport').getAttribute('data-view-level')),
+  ghost: window.__bj8.scene.current.aimGhostPos(),
+  pressed: document.querySelector('.manual-camera-button')?.getAttribute('aria-pressed'),
+  mode: document.querySelector('.viewport')?.getAttribute('data-camera-mode'),
+}));
+await page.touchscreen.touchStart(viewport.x, viewport.y);
+await page.touchscreen.touchMove(viewport.dragX, viewport.y);
+await page.touchscreen.touchEnd();
+await page.focus('.view-slider-track');
+await page.keyboard.press('ArrowDown');
+await page.keyboard.press('ArrowDown');
+await wait(180);
+const manualAdjusted = await readCamera();
+manualAdjusted.ghost = await page.evaluate(
+  () => window.__bj8.scene.current.aimGhostPos(),
+);
+manualAdjusted.pressed = await page.$eval(
+  '.manual-camera-button',
+  element => element.getAttribute('aria-pressed'),
+);
+manualAdjusted.mode = await page.$eval(
+  '.viewport',
+  element => element.getAttribute('data-camera-mode'),
+);
+ok(
+  '手动视角可独立调整方位和高度，不改变瞄准角或幽灵球',
+  manualBefore.pressed === 'true' &&
+    manualBefore.mode === 'manual' &&
+    manualAdjusted.pressed === 'true' &&
+    manualAdjusted.mode === 'manual' &&
+    Math.abs(manualAdjusted.azimuth - manualBefore.azimuth) > 0.15 &&
+    manualAdjusted.level < manualBefore.level - 0.09 &&
+    Math.abs(manualAdjusted.aim - manualBefore.aim) < 1e-10 &&
+    manualBefore.ghost &&
+    manualAdjusted.ghost &&
+    Math.hypot(
+      manualAdjusted.ghost.x - manualBefore.ghost.x,
+      manualAdjusted.ghost.z - manualBefore.ghost.z,
+    ) < 1e-8,
+  JSON.stringify({ manualBefore, manualAdjusted }),
+);
+
+await page.touchscreen.tap(manualCameraUi.x, manualCameraUi.y);
+await wait(850);
+const manualExited = await readCamera();
+manualExited.pressed = await page.$eval(
+  '.manual-camera-button',
+  element => element.getAttribute('aria-pressed'),
+);
+manualExited.mode = await page.$eval(
+  '.viewport',
+  element => element.getAttribute('data-camera-mode'),
+);
+ok(
+  '退出手动视角后保留所选画面，等待下一次瞄准操作',
+  manualExited.pressed === 'false' &&
+    manualExited.mode === 'aim' &&
+    Math.abs(manualExited.level - manualAdjusted.level) < 0.001 &&
+    Math.abs(manualExited.viewAzimuth - manualAdjusted.viewAzimuth) < 1e-6 &&
+    Math.abs(manualExited.aim - manualAdjusted.aim) < 1e-10,
+  JSON.stringify({ manualAdjusted, manualExited }),
 );
 
 // 固定一个无障碍局面，用交棒后的视觉相机投影台面点，再走真实触摸选择幽灵球。

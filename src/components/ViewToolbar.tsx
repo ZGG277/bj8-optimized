@@ -1,6 +1,6 @@
 /*
-[INPUT]: 当前归一化视角高度、停靠方向与连续调整回调
-[OUTPUT]: 对外提供无文字、可横竖转向且可停任意高度的视角推杆
+[INPUT]: 当前归一化视角高度、手动相机状态、停靠方向与调整回调
+[OUTPUT]: 对外提供无文字手动相机入口，以及可横竖转向且可停任意高度的视角推杆
 [POS]: 控制组件层，只转发 0..1 连续视角事实，不持有对局或相机状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -19,15 +19,23 @@ import {
 
 type Props = {
   viewLevel: number;
+  manualCameraActive: boolean;
   orientation: 'horizontal' | 'vertical';
   onViewLevel: (level: number) => void;
+  onToggleManualCamera: () => void;
 };
 
 /** 必须与 controls.css 轨道/填充上下 12px 的可见行程一致。 */
 const TRACK_INSET_PX = 12;
 
 /** 推杆跟随手指并持续提交高度；松手停在原位，不再吸附端点。 */
-export function ViewToolbar({ viewLevel, orientation, onViewLevel }: Props) {
+export function ViewToolbar({
+  viewLevel,
+  manualCameraActive,
+  orientation,
+  onViewLevel,
+  onToggleManualCamera,
+}: Props) {
   const pointerIdRef = useRef<number | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const levelRef = useRef(clampViewLevel(viewLevel));
@@ -112,15 +120,26 @@ export function ViewToolbar({ viewLevel, orientation, onViewLevel }: Props) {
       className={`view-switcher is-${orientation}`}
       onClick={(e) => e.stopPropagation()}
     >
-      <button
-        type="button"
-        className={`view-mode-button view-mode-overhead ${level >= 0.995 ? 'active' : ''}`}
-        aria-pressed={level >= 0.995}
-        aria-label="切换俯视视角"
-        onClick={() => onViewLevel(OVERHEAD_VIEW)}
-      >
-        <span className="view-icon view-icon-overhead" aria-hidden="true"><i /></span>
-      </button>
+      <div className="view-mode-cluster">
+        <button
+          type="button"
+          className={`view-mode-button view-mode-overhead ${level >= 0.995 ? 'active' : ''}`}
+          aria-pressed={level >= 0.995}
+          aria-label="切换俯视视角"
+          onClick={() => onViewLevel(OVERHEAD_VIEW)}
+        >
+          <span className="view-icon view-icon-overhead" aria-hidden="true"><i /></span>
+        </button>
+        <button
+          type="button"
+          className={`view-mode-button manual-camera-button ${manualCameraActive ? 'active' : ''}`}
+          aria-pressed={manualCameraActive}
+          aria-label={manualCameraActive ? '退出手动视角' : '开启手动视角'}
+          onClick={onToggleManualCamera}
+        >
+          <span className="manual-camera-icon" aria-hidden="true"><i /></span>
+        </button>
+      </div>
       <div
         className="view-slider-track"
         role="slider"

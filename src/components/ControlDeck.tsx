@@ -1,5 +1,5 @@
 /*
-[INPUT]: 五个游戏控件状态、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
+[INPUT]: 五个游戏控件状态、手动相机、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
 [OUTPUT]: 纯视觉五控件层；支持合成层逐帧自由拖动、右/底吸附、跨边转向、长按布局与 v3 持久化
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
@@ -254,6 +254,7 @@ function DockableControlSlot({
 
 interface ControlDeckProps {
   viewLevel: number;
+  manualCameraActive: boolean;
   canAim: boolean;
   spin: CueSpin;
   charging: boolean;
@@ -266,6 +267,7 @@ interface ControlDeckProps {
   aimDialVisible: boolean;
   aimDialSolution: PrecisionAimSolution | null;
   onViewLevel: (level: number) => void;
+  onToggleManualCamera: () => void;
   onSpinChange: (spin: CueSpin) => void;
   onToggleGuidance: () => void;
   onToggleAimAssist: () => void;
@@ -300,6 +302,7 @@ function axisFor(id: DockItemId, placement: Placement): Axis {
 
 export function ControlDeck({
   viewLevel,
+  manualCameraActive,
   canAim,
   spin,
   charging,
@@ -312,6 +315,7 @@ export function ControlDeck({
   aimDialVisible,
   aimDialSolution,
   onViewLevel,
+  onToggleManualCamera,
   onSpinChange,
   onToggleGuidance,
   onToggleAimAssist,
@@ -694,8 +698,10 @@ export function ControlDeck({
     view: (
       <ViewToolbar
         viewLevel={viewLevel}
+        manualCameraActive={manualCameraActive}
         orientation={axisFor('view', layout.view)}
         onViewLevel={onViewLevel}
+        onToggleManualCamera={onToggleManualCamera}
       />
     ),
     bulb: (
@@ -778,6 +784,7 @@ export function ControlDeck({
     guidanceStateClass,
     hasReview,
     layout,
+    manualCameraActive,
     onAimDialAdjust,
     onBeginCharge,
     onCancelCharge,
@@ -786,6 +793,7 @@ export function ControlDeck({
     onTapShot,
     onToggleAimAssist,
     onToggleGuidance,
+    onToggleManualCamera,
     onUpdateCharge,
     onViewLevel,
     planStatus,

@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的尺寸与色彩令牌
-[OUTPUT]: 对外提供统一烟熏表面的壳层、桌面比分/竖屏球组状态、球桌舞台、遮罩与品牌开始界面响应式布局
+[OUTPUT]: 对外提供统一烟熏表面的壳层、桌面比分/竖屏球组状态、手动相机球桌舞台、遮罩与品牌开始界面响应式布局
 [POS]: 样式体系的布局层,只管几何与层级结构;控件内部样式归 controls.css
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -415,6 +415,14 @@
 
 .camera-recenter:active {
   transform: scale(0.96);
+}
+
+.viewport.camera-manual {
+  cursor: grab;
+}
+
+.viewport.camera-manual:active {
+  cursor: grabbing;
 }
 
 /* 遮罩层级:结束/介绍高于一切 HUD 控件(z 10 以下) */

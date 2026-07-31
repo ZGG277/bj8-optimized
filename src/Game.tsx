@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、三杆批量能力与渐进 AI、独立观战/全局环绕、触屏瞄准锁镜、360° 瞄准/无限拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、三杆批量能力与渐进 AI、独立观战/手动环绕、触屏瞄准锁镜、360° 瞄准/无限拨轮与走位复盘 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -43,6 +43,7 @@ import {
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
   cameraAzimuthAtView,
+  cameraInteractionMode,
   isGlobalCameraView,
 } from './camera-view';
 import type { GameMode, PositionOutcome } from './opponent/model';
@@ -81,7 +82,10 @@ export default function Game() {
   const [cameraAzimuth, setCameraAzimuth] = useState(FULL_TABLE_AZIMUTH);
   const [cameraDetached, setCameraDetached] = useState(false);
   const [touchAimCameraLocked, setTouchAimCameraLocked] = useState(false);
+  const [manualCameraActive, setManualCameraActive] = useState(false);
+  const [manualCameraPinned, setManualCameraPinned] = useState(false);
   const touchAimCameraTimerRef = useRef<number | null>(null);
+  const manualAimTransitionPointerRef = useRef<number | null>(null);
   const cameraAzimuthRef = useRef(cameraAzimuth);
   cameraAzimuthRef.current = cameraAzimuth;
   const spectatorActive =
@@ -280,14 +284,15 @@ export default function Game() {
     commitShot,
   } = useShotInput({ canShoot: canAim, onCommit: handleCommit, worldRef, breaking: match.breaking });
   resetSpinRef.current = () => setSpin({ x: 0, y: 0 });
-  const cameraViewAzimuth = touchAimCameraLocked
-    ? cameraAzimuth
-    : cameraAzimuthAtView(
-        cameraAzimuth,
-        aim,
-        viewLevel,
-        cameraDetached,
-      );
+  const cameraViewAzimuth =
+    touchAimCameraLocked || manualCameraActive || manualCameraPinned
+      ? cameraAzimuth
+      : cameraAzimuthAtView(
+          cameraAzimuth,
+          aim,
+          viewLevel,
+          cameraDetached,
+        );
   const cameraViewAzimuthRef = useRef(cameraViewAzimuth);
   cameraViewAzimuthRef.current = cameraViewAzimuth;
 
@@ -311,6 +316,21 @@ export default function Game() {
       setTouchAimCameraLocked(false);
     }, TOUCH_AIM_CAMERA_RELEASE_MS);
   }, [clearTouchAimCameraTimer]);
+
+  const handleToggleManualCamera = useCallback(() => {
+    clearTouchAimCameraTimer();
+    manualAimTransitionPointerRef.current = null;
+    setTouchAimCameraLocked(false);
+    if (manualCameraActive) {
+      setManualCameraActive(false);
+      setManualCameraPinned(true);
+      return;
+    }
+    setCameraAzimuth(cameraViewAzimuthRef.current);
+    setCameraDetached(true);
+    setManualCameraPinned(false);
+    setManualCameraActive(true);
+  }, [clearTouchAimCameraTimer, manualCameraActive]);
 
   useEffect(
     () => () => clearTouchAimCameraTimer(),
@@ -370,37 +390,58 @@ export default function Game() {
     setViewLevel,
   });
 
+  const stageInteractionMode = cameraInteractionMode(
+    spectatorActive,
+    manualCameraActive,
+  );
   const orbitPointerRef = useRef<{ id: number; lastX: number } | null>(null);
   const handleStagePointerDown = useCallback((event: ReactPointerEvent) => {
-    if (!spectatorActive) {
-      if (event.pointerType === 'touch' && canAim) lockTouchAimCamera();
-      handlePointerDown(event);
+    if (stageInteractionMode === 'orbit') {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      orbitPointerRef.current = { id: event.pointerId, lastX: event.clientX };
+      event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    event.preventDefault();
-    orbitPointerRef.current = { id: event.pointerId, lastX: event.clientX };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }, [canAim, handlePointerDown, lockTouchAimCamera, spectatorActive]);
+    if (manualCameraPinned && canAim) {
+      clearTouchAimCameraTimer();
+      setCameraAzimuth(cameraViewAzimuthRef.current);
+      setManualCameraPinned(false);
+      if (!isGlobalCameraView(viewLevel)) {
+        setTouchAimCameraLocked(true);
+        manualAimTransitionPointerRef.current = event.pointerId;
+      }
+    }
+    if (event.pointerType === 'touch' && canAim) lockTouchAimCamera();
+    handlePointerDown(event);
+  }, [
+    canAim,
+    clearTouchAimCameraTimer,
+    handlePointerDown,
+    lockTouchAimCamera,
+    manualCameraPinned,
+    stageInteractionMode,
+    viewLevel,
+  ]);
 
   const handleStagePointerMove = useCallback((event: ReactPointerEvent) => {
     const orbit = orbitPointerRef.current;
-    if (!spectatorActive || !orbit || orbit.id !== event.pointerId) {
-      if (!spectatorActive) handlePointerMove(event);
+    if (stageInteractionMode !== 'orbit' || !orbit || orbit.id !== event.pointerId) {
+      if (stageInteractionMode === 'aim') handlePointerMove(event);
       return;
     }
     event.preventDefault();
     const delta = event.clientX - orbit.lastX;
     orbit.lastX = event.clientX;
     setCameraAzimuth(current => cameraAzimuthAfterDrag(current, delta));
-  }, [handlePointerMove, spectatorActive]);
+  }, [handlePointerMove, stageInteractionMode]);
 
   const finishStagePointer = useCallback((
     event: ReactPointerEvent,
     aimHandler: (event: ReactPointerEvent) => void,
   ) => {
     const orbit = orbitPointerRef.current;
-    if (spectatorActive && orbit?.id === event.pointerId) {
+    if (stageInteractionMode === 'orbit' && orbit?.id === event.pointerId) {
       event.preventDefault();
       orbitPointerRef.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -409,8 +450,13 @@ export default function Game() {
       return;
     }
     aimHandler(event);
-    if (event.pointerType === 'touch') releaseTouchAimCameraLater();
-  }, [releaseTouchAimCameraLater, spectatorActive]);
+    const manualTransition =
+      manualAimTransitionPointerRef.current === event.pointerId;
+    if (manualTransition) manualAimTransitionPointerRef.current = null;
+    if (event.pointerType === 'touch' || manualTransition) {
+      releaseTouchAimCameraLater();
+    }
+  }, [releaseTouchAimCameraLater, stageInteractionMode]);
 
   const handleStableAimDialAdjust = useCallback((
     pixelDelta: number,
@@ -418,8 +464,15 @@ export default function Game() {
   ) => {
     const coarsePointer = typeof window !== 'undefined' &&
       window.matchMedia?.('(pointer: coarse)').matches;
-    if (coarsePointer && canAim && !isGlobalCameraView(viewLevel)) {
-      lockTouchAimCamera();
+    const resumePinnedCamera = manualCameraPinned && canAim;
+    if (resumePinnedCamera) {
+      clearTouchAimCameraTimer();
+      setCameraAzimuth(cameraViewAzimuthRef.current);
+      setManualCameraPinned(false);
+      if (!isGlobalCameraView(viewLevel)) setTouchAimCameraLocked(true);
+    }
+    if ((coarsePointer || resumePinnedCamera) && canAim) {
+      if (!isGlobalCameraView(viewLevel)) lockTouchAimCamera();
       handleAimDialAdjust(pixelDelta, pressureGain);
       releaseTouchAimCameraLater();
       return;
@@ -427,8 +480,10 @@ export default function Game() {
     handleAimDialAdjust(pixelDelta, pressureGain);
   }, [
     canAim,
+    clearTouchAimCameraTimer,
     handleAimDialAdjust,
     lockTouchAimCamera,
+    manualCameraPinned,
     releaseTouchAimCameraLater,
     viewLevel,
   ]);
@@ -447,6 +502,9 @@ export default function Game() {
     setCameraDetached(false);
     clearTouchAimCameraTimer();
     setTouchAimCameraLocked(false);
+    setManualCameraActive(false);
+    setManualCameraPinned(false);
+    manualAimTransitionPointerRef.current = null;
     planConsultedRef.current = false;
     skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
@@ -601,6 +659,7 @@ export default function Game() {
       <TableStage
         viewLevel={viewLevel}
         spectatorActive={spectatorActive}
+        manualCameraActive={manualCameraActive}
         match={match}
         containerRef={containerRef}
         onPointerDown={handleStagePointerDown}
@@ -612,6 +671,7 @@ export default function Game() {
       />
       <ControlDeck
         viewLevel={viewLevel}
+        manualCameraActive={manualCameraActive}
         canAim={canAim}
         spin={spin}
         charging={charging}
@@ -624,6 +684,7 @@ export default function Game() {
         aimDialVisible={aimDialVisible}
         aimDialSolution={aimDialSolution}
         onViewLevel={setViewLevel}
+        onToggleManualCamera={handleToggleManualCamera}
         onSpinChange={setSpin}
         onToggleGuidance={handleTogglePlan}
         onToggleAimAssist={aimAssist.toggle}

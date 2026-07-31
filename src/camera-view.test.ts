@@ -1,6 +1,6 @@
 /*
 [INPUT]: camera-view 连续视角、独立方位角与竖屏全台适配纯几何
-[OUTPUT]: 锁定端点、任意高度、全局视角阈值、环绕独立性及竖屏六袋安全边界回归
+[OUTPUT]: 锁定端点、任意高度、手动视角路由、全局视角阈值、环绕独立性及竖屏六袋安全边界回归
 [POS]: 连续视角相机回归测试
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -14,6 +14,7 @@ import {
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
   cameraAzimuthAtView,
+  cameraInteractionMode,
   cameraPoseAt,
   clampViewLevel,
   isGlobalCameraView,
@@ -36,6 +37,12 @@ describe('continuous camera view', () => {
     expect(isGlobalCameraView(GLOBAL_CAMERA_VIEW_LEVEL - 0.001)).toBe(false);
     expect(isGlobalCameraView(GLOBAL_CAMERA_VIEW_LEVEL)).toBe(true);
     expect(isGlobalCameraView(OVERHEAD_VIEW)).toBe(true);
+  });
+
+  it('手动视角把球桌手势路由给相机，退出后恢复瞄准路由', () => {
+    expect(cameraInteractionMode(false, true)).toBe('orbit');
+    expect(cameraInteractionMode(true, false)).toBe('orbit');
+    expect(cameraInteractionMode(false, false)).toBe('aim');
   });
 
   it('高度随推杆位置单调抬升且中间值不会吸附端点', () => {
@@ -63,7 +70,7 @@ describe('continuous camera view', () => {
     expect(east.position.z).toBeCloseTo(0, 10);
   });
 
-  it('观战环绕只换算视觉方位角，不需要也不会返回瞄准事实', () => {
+  it('观战或手动环绕只换算视觉方位角，不需要也不会返回瞄准事实', () => {
     const aimAngle = 0.37;
     const cameraBefore = -0.8;
     const cameraAfter = cameraAzimuthAfterDrag(cameraBefore, 120);

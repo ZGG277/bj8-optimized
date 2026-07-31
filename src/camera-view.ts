@@ -1,6 +1,6 @@
 /*
 [INPUT]: 母球位置、独立相机方位角、力度预览、归一化视角高度与视口宽高比
-[OUTPUT]: 对外提供连续视角钳制、全局视角判定、竖屏全台适配、自由相机回接、环绕手势换算与相机位姿
+[OUTPUT]: 对外提供连续视角钳制、交互路由、全局视角判定、竖屏全台适配、自由相机回接、环绕手势换算与相机位姿
 [POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -37,6 +37,8 @@ export type CameraPose = {
   lookAt: CameraPoint;
 };
 
+export type CameraInteractionMode = 'aim' | 'orbit';
+
 export function clampViewLevel(level: number): number {
   if (!Number.isFinite(level)) return FIRST_PERSON_VIEW;
   return Math.min(OVERHEAD_VIEW, Math.max(FIRST_PERSON_VIEW, level));
@@ -50,6 +52,14 @@ export function normalizeCameraAzimuth(angle: number): number {
 /** 到达全局高度后，点台面只改变瞄准事实，不再带动整张球台转向。 */
 export function isGlobalCameraView(level: number): boolean {
   return clampViewLevel(level) >= GLOBAL_CAMERA_VIEW_LEVEL;
+}
+
+/** 观战或显式手动视角只消费相机手势；普通玩家状态才把球桌手势交给瞄准。 */
+export function cameraInteractionMode(
+  spectatorActive: boolean,
+  manualCameraActive: boolean,
+): CameraInteractionMode {
+  return spectatorActive || manualCameraActive ? 'orbit' : 'aim';
 }
 
 /** 横向拖动只产生视觉方位角，不消费也不返回球杆瞄准角。 */
