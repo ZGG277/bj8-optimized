@@ -1,6 +1,6 @@
 /*
 [INPUT]: 五个游戏控件状态、手动相机、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
-[OUTPUT]: 纯视觉五控件层；支持合成层逐帧自由拖动、右/底吸附、跨边转向、长按布局与 v3 持久化
+[OUTPUT]: 纯视觉五控件层；支持合成层逐帧自由拖动、右/底吸附、跨边转向、长按布局、真实布局变化事实与 v3 持久化
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
@@ -269,6 +269,7 @@ interface ControlDeckProps {
   onViewLevel: (level: number) => void;
   onToggleManualCamera: () => void;
   onSpinChange: (spin: CueSpin) => void;
+  onLayoutAdjusted: () => void;
   onToggleGuidance: () => void;
   onToggleAimAssist: () => void;
   onAimDialAdjust: (pixelDelta: number, pressureGain?: number) => void;
@@ -317,6 +318,7 @@ export function ControlDeck({
   onViewLevel,
   onToggleManualCamera,
   onSpinChange,
+  onLayoutAdjusted,
   onToggleGuidance,
   onToggleAimAssist,
   onAimDialAdjust,
@@ -651,9 +653,14 @@ export function ControlDeck({
       if (!docked) {
         updatePlacement(profileRef.current, drag.id, drag.latest);
       }
+      const layoutAdjusted = Math.hypot(
+        drag.latestClientX - drag.startX,
+        drag.latestClientY - drag.startY,
+      ) > 2;
       dragRef.current = null;
       setDraggingId(null);
       setSnapPreview(null);
+      if (layoutAdjusted) onLayoutAdjusted();
     };
 
     window.addEventListener('pointermove', onPointerMove, true);
@@ -666,7 +673,7 @@ export function ControlDeck({
       window.removeEventListener('pointerup', finish, true);
       window.removeEventListener('pointercancel', finish, true);
     };
-  }, [dockAtPosition, updatePlacement]);
+  }, [dockAtPosition, onLayoutAdjusted, updatePlacement]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

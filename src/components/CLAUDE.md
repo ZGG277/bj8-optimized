@@ -12,9 +12,11 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 `TableStage.tsx`: 精简球桌区域；AimDial 已并入统一五控件层。显式暴露瞄准/手动相机模式供触控门禁与光标反馈；首局在顾燃等待及实际击球阶段持续显示“顾燃正在击球”，其他对局区分计算/击球文案，提示均不拦截触控；另提供独立环绕与纯视觉全台回正入口，结束覆层仍独占交互。
 
-`FirstMatchGuide.tsx`: 首局非模态上下文气泡；按步骤寻找球桌、拨轮、视角、击球点或蓄力控件真实 DOM 锚点，随控件出现/移动/视口变化立即重新避让定位，提供触控、键鼠文案、继续/完成/跳过按钮与 aria-live 语义。
+`FirstMatchGuide.tsx`: 首局非模态一行微提示；按步骤寻找球桌、拨轮、视角、击球点或蓄力控件真实 DOM 锚点，以标签自身实测宽高随控件出现/移动/视口变化立即避让定位；提示本体穿透交互，只保留 44px 弱化 ×，具备跳过新手引导的 aria 名称与 live 语义，不提供手动“下一步”。
 
-`ControlDeck.tsx`: 五控件统一编排层；组合含手动相机入口的 ViewToolbar、灯泡双开关、SpinControl、ShootControl 与 AimDial，按 desktop/portrait/landscape 恢复布局。触屏长按 340ms（14px 防抖）、鼠标长按 420ms（8px 防抖）后接管 Pointer 捕获，保持原 DOM 节点并用 rAF + transform 逐帧拖动；靠右/底 48px 吸附并保留沿边落点，同边落到另一控件时交换位置，其他冲突做最近空位避让。快速原手势照常工作，拖动期间不改变数值、不误出杆也不逐帧写本地存储。
+`FirstMatchGuide.test.tsx`: 服务端静态结构回归，锁定短文案、具名跳过入口，并拒绝“下一步/完成”按钮回潮。
+
+`ControlDeck.tsx`: 五控件统一编排层；组合含手动相机入口的 ViewToolbar、灯泡双开关、SpinControl、ShootControl 与 AimDial，按 desktop/portrait/landscape 恢复布局。触屏长按 340ms（14px 防抖）、鼠标长按 420ms（8px 防抖）后接管 Pointer 捕获，保持原 DOM 节点并用 rAF + transform 逐帧拖动；靠右/底 48px 吸附并保留沿边落点，同边落到另一控件时交换位置，其他冲突做最近空位避让，并仅在真实位移后上报布局变化。快速原手势照常工作，拖动期间不改变数值、不误出杆也不逐帧写本地存储。
 
 `PlanOverlay.tsx`: 半透明紧凑走位浮层；只取最高概率方案，默认第 1 杆，用户点击第 2/3 杆标签后才切换对应单杆路线；带独立拖拽手柄，场景渲染委托 Scene3D。
 

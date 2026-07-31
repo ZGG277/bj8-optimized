@@ -4,11 +4,11 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；首次未完成用户按 placing/aiming/opponent 与真实控件操作推进首局引导，跳过、完成或首局结束后持久收起；手动相机模式把球桌拖动路由到独立视觉方位并复用连续高度控件，退出后固定所选画面直到下一次瞄准；正常触屏粗瞄、幽灵球与精瞄拨轮操作期间短暂冻结低位相机，停止操作后再平滑跟杆，全局视角持续固定；规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按 placing、有效粗瞄、有效拨轮与成功出杆推进首局核心提示，视角/杆法/布局只作非阻塞发现，跳过、下一杆成功出杆或首局结束后持久收起；手动相机模式把球桌拖动路由到独立视觉方位并复用连续高度控件，退出后固定所选画面直到下一次瞄准；正常触屏粗瞄、幽灵球与精瞄拨轮操作期间短暂冻结低位相机，停止操作后再平滑跟杆，全局视角持续固定；规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
 
-`first-match-guide.ts`: 首局引导纯产品状态机；只有零出杆记录且无完成标记的新用户启用，以放球、瞄准、出杆、视角和击球点真实事件约束八步推进，容错读写 `guagua-billiards:first-match-guide:v1`，不依赖 React/DOM 或规则实现。
+`first-match-guide.ts`: 首局引导纯产品状态机；只有零出杆记录且无完成标记的新用户启用，以放球、拖动结束角度变化、拨轮有效角度变化和成功出杆约束核心节奏，视角/杆法/布局是可跳过的非阻塞发现，容错读写 `guagua-billiards:first-match-guide:v1`，不依赖 React/DOM 或规则实现。
 
-`first-match-guide.test.ts`: 首次/完成存储、受限存储降级、事件推进、越级防护与快速出杆收敛回归。
+`first-match-guide.test.ts`: 首次/完成存储、受限存储降级、误触与环绕角阈值、真实事件推进、越级防护、可选发现及快速出杆收敛回归。
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
 

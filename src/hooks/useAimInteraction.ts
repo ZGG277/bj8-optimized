@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 台球世界、独立视觉相机方位、Scene3D 屏幕坐标映射与 match 状态
-[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、幽灵球拨轮与跟手虚母球放置
+[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、幽灵球拨轮、跟手虚母球放置与真实瞄准变化事实
 [POS]: 交互协调层，把当前视觉相机下的指针映射为世界瞄准角；袋口几何委托 aim/，拨轮传动委托 input/
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -22,6 +22,10 @@ import {
   aimDialRatio,
 } from '../input/aim-dial';
 import { FIRST_PERSON_VIEW } from '../camera-view';
+import { isMeaningfulGuideAimChange } from '../first-match-guide';
+
+const GUIDE_COARSE_AIM_MIN_RADIANS = 0.003;
+const GUIDE_FINE_AIM_MIN_RADIANS = 0.000001;
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
@@ -43,6 +47,7 @@ interface AimInteractionProps {
   setMessage: (key: MatchMessageKey, params?: MatchMessageParams) => void;
   setWorldView: React.Dispatch<React.SetStateAction<BilliardsWorld>>;
   setViewLevel: React.Dispatch<React.SetStateAction<number>>;
+  onCoarseAimAdjusted: () => void;
 }
 
 export function useAimInteraction({
@@ -61,8 +66,15 @@ export function useAimInteraction({
   setMessage,
   setWorldView,
   setViewLevel,
+  onCoarseAimAdjusted,
   }: AimInteractionProps) {
-  const dragRef = useRef<{ mode: 'aim' | 'ghost' | 'line'; downX: number; downY: number; dragging: boolean } | null>(null);
+  const dragRef = useRef<{
+    mode: 'aim' | 'ghost' | 'line';
+    downX: number;
+    downY: number;
+    startAngle: number;
+    dragging: boolean;
+  } | null>(null);
   const placementPointerRef = useRef<number | null>(null);
   // 'line' 模式下用相对增量旋转，避免手机端绝对映射导致的方向跳变
   const lineLastXRef = useRef<number | null>(null);
@@ -283,7 +295,13 @@ export function useAimInteraction({
     }
     if (!canAim) return;
     const mode = pickDragMode(e.clientX, e.clientY);
-    dragRef.current = { mode, downX: e.clientX, downY: e.clientY, dragging: false };
+    dragRef.current = {
+      mode,
+      downX: e.clientX,
+      downY: e.clientY,
+      startAngle: aimRef.current,
+      dragging: false,
+    };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     if (mode === 'ghost') {
       clearAimDial();
@@ -295,7 +313,7 @@ export function useAimInteraction({
     }
     clearAimDial();
     aimAtPointer(e.clientX, e.clientY, false);
-  }, [canAim, matchPhase, previewCuePlacement, pickDragMode, aimAtPointer, clearAimDial]);
+  }, [canAim, matchPhase, previewCuePlacement, pickDragMode, aimAtPointer, clearAimDial, aimRef]);
 
   /** 指针移动 */
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -324,7 +342,7 @@ export function useAimInteraction({
     }
   }, [canAim, matchPhase, previewCuePlacement, aimAtPointer, moveGhostTo, aimRef, applyAim, aimDialVisible, resolveAimDialSolution]);
 
-  /** 指针抬起：摆球手势落实体母球；普通瞄准/幽灵球落位后无条件呼出拨轮。 */
+  /** 指针抬起：摆球落实体母球；粗瞄只有拖动结束且角度真实变化才对外发事实。 */
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (matchPhase === 'placing' && placementPointerRef.current === e.pointerId) {
       commitCuePlacement(e.clientX, e.clientY);
@@ -338,12 +356,21 @@ export function useAimInteraction({
     if (drag && drag.mode !== 'line') {
       showAimDial();
     }
+    const coarseAimAdjusted = Boolean(
+      drag?.dragging &&
+      isMeaningfulGuideAimChange(
+        drag.startAngle,
+        aimRef.current,
+        GUIDE_COARSE_AIM_MIN_RADIANS,
+      ),
+    );
     dragRef.current = null;
     lineLastXRef.current = null;
     if ((e.target as HTMLElement).hasPointerCapture(e.pointerId)) {
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     }
-  }, [matchPhase, commitCuePlacement, showAimDial]);
+    if (coarseAimAdjusted) onCoarseAimAdjusted();
+  }, [matchPhase, commitCuePlacement, showAimDial, aimRef, onCoarseAimAdjusted]);
 
   const handlePointerCancel = useCallback((e: React.PointerEvent) => {
     dragRef.current = null;
@@ -359,14 +386,19 @@ export function useAimInteraction({
     }
   }, [matchPhase, scene3DRef, clearAimDial]);
 
-  const handleAimDialAdjust = useCallback((pixelDelta: number, pressureGain = 1) => {
-    if (!canAim || !aimDialVisible || pixelDelta === 0) return;
+  const handleAimDialAdjust = useCallback((pixelDelta: number, pressureGain = 1): boolean => {
+    if (!canAim || !aimDialVisible || pixelDelta === 0) return false;
     const current = aimRef.current;
     const solution = resolveAimDialSolution(current);
     const next = applyAim(
       current + aimDialAngleDelta(pixelDelta, solution, pressureGain),
     );
     setAimDialSolution(resolveAimDialSolution(next));
+    return isMeaningfulGuideAimChange(
+      current,
+      next,
+      GUIDE_FINE_AIM_MIN_RADIANS,
+    );
   }, [canAim, aimDialVisible, aimRef, resolveAimDialSolution, applyAim]);
 
   return {

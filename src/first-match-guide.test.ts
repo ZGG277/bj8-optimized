@@ -1,6 +1,6 @@
 /*
-[INPUT]: first-match-guide 纯步骤状态机与可控 Storage 替身
-[OUTPUT]: 覆盖首局步骤推进、越级防护、完成持久化与受限存储降级
+[INPUT]: first-match-guide 纯状态机、有效角度判定与可控 Storage 替身
+[OUTPUT]: 覆盖真实动作推进、误触防护、直接出杆收敛、可选发现及持久化
 [POS]: 首次引导产品状态门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -8,10 +8,34 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   FIRST_MATCH_GUIDE_STORAGE_KEY,
   guideStepAfterEvent,
-  nextFirstMatchGuideStep,
+  isMeaningfulGuideAimChange,
   saveFirstMatchGuideCompleted,
   shouldRunFirstMatchGuide,
 } from './first-match-guide';
+import { positionForAnchor } from './components/FirstMatchGuide';
+
+function rect(x: number, y: number, width: number, height: number): DOMRect {
+  return {
+    x,
+    y,
+    left: x,
+    top: y,
+    right: x + width,
+    bottom: y + height,
+    width,
+    height,
+    toJSON: () => ({
+      x,
+      y,
+      left: x,
+      top: y,
+      right: x + width,
+      bottom: y + height,
+      width,
+      height,
+    }),
+  };
+}
 
 function memoryStorage(initial?: Record<string, string>): Storage {
   const values = new Map(Object.entries(initial ?? {}));
@@ -26,7 +50,7 @@ function memoryStorage(initial?: Record<string, string>): Storage {
 }
 
 describe('首局引导持久化', () => {
-  it('未完成时启用，完成后不再打扰', () => {
+  it('未完成时启用，完成或跳过后不再打扰', () => {
     const storage = memoryStorage();
     expect(shouldRunFirstMatchGuide(storage)).toBe(true);
     saveFirstMatchGuideCompleted(storage);
@@ -49,25 +73,99 @@ describe('首局引导持久化', () => {
   });
 });
 
-describe('首局引导步骤', () => {
-  it('按放球、开球瞄准与出杆事实推进', () => {
-    expect(guideStepAfterEvent('break-place', 'cue-placed')).toBe('break-aim');
-    expect(guideStepAfterEvent('break-aim', 'aim-used')).toBe('break-power');
-    expect(guideStepAfterEvent('break-power', 'shot-committed')).toBe('player-aim');
+describe('真实动作判定', () => {
+  it('点击、误触和极小抖动不算粗瞄，真实角度拖动才算', () => {
+    expect(isMeaningfulGuideAimChange(0.4, 0.4, 0.003)).toBe(false);
+    expect(isMeaningfulGuideAimChange(0.4, 0.401, 0.003)).toBe(false);
+    expect(isMeaningfulGuideAimChange(0.4, 0.43, 0.003)).toBe(true);
   });
 
-  it('玩家回合按瞄准、视角、击球点与出杆依次推进', () => {
-    expect(guideStepAfterEvent('player-aim', 'aim-used')).toBe('view');
-    expect(guideStepAfterEvent('view', 'view-used')).toBe('spin');
-    expect(guideStepAfterEvent('spin', 'spin-used')).toBe('power');
-    expect(guideStepAfterEvent('power', 'shot-committed')).toBe('layout');
-    expect(nextFirstMatchGuideStep('layout')).toBeNull();
+  it('跨越 -pi/pi 时仍按最短角度判断', () => {
+    expect(isMeaningfulGuideAimChange(Math.PI - 0.01, -Math.PI + 0.02, 0.003)).toBe(true);
+  });
+});
+
+describe('首局微提示状态机', () => {
+  it('开球只按放球、粗瞄、拨轮与成功出杆事实推进', () => {
+    expect(guideStepAfterEvent('break-place', 'cue-placed')).toBe('break-coarse');
+    expect(guideStepAfterEvent('break-coarse', 'coarse-aim-adjusted')).toBe('break-fine');
+    expect(guideStepAfterEvent('break-fine', 'fine-aim-adjusted')).toBe('break-power');
+    expect(guideStepAfterEvent('break-power', 'shot-committed')).toBe('player-view');
   });
 
-  it('无关操作不能越过当前步骤，开球直接出杆仍可收敛', () => {
-    expect(guideStepAfterEvent('break-place', 'view-used')).toBe('break-place');
-    expect(guideStepAfterEvent('view', 'spin-used')).toBe('view');
-    expect(guideStepAfterEvent('break-aim', 'shot-committed')).toBe('player-aim');
-    expect(guideStepAfterEvent('break-place', 'shot-committed')).toBe('player-aim');
+  it('误触或与当前提示无关的操作不推进', () => {
+    expect(guideStepAfterEvent('break-place', 'coarse-aim-adjusted')).toBe('break-place');
+    expect(guideStepAfterEvent('break-coarse', 'view-adjusted')).toBe('break-coarse');
+    expect(guideStepAfterEvent('break-fine', 'spin-adjusted')).toBe('break-fine');
+  });
+
+  it('先拨轮也是有效瞄准，可从粗瞄提示直接进入蓄力', () => {
+    expect(guideStepAfterEvent('break-coarse', 'fine-aim-adjusted')).toBe('break-power');
+  });
+
+  it('视角、杆法、布局为可选发现，直接出杆从任何玩家提示完成', () => {
+    expect(guideStepAfterEvent('player-view', 'view-adjusted')).toBe('player-spin');
+    expect(guideStepAfterEvent('player-view', 'spin-adjusted')).toBe('player-layout');
+    expect(guideStepAfterEvent('player-spin', 'spin-adjusted')).toBe('player-layout');
+    expect(guideStepAfterEvent('player-layout', 'layout-adjusted')).toBeNull();
+    expect(guideStepAfterEvent('player-view', 'shot-committed')).toBeNull();
+    expect(guideStepAfterEvent('player-spin', 'shot-committed')).toBeNull();
+    expect(guideStepAfterEvent('player-layout', 'shot-committed')).toBeNull();
+  });
+
+  it('快速直接出杆从任一开球提示安全收敛到非阻塞发现', () => {
+    expect(guideStepAfterEvent('break-place', 'shot-committed')).toBe('player-view');
+    expect(guideStepAfterEvent('break-coarse', 'shot-committed')).toBe('player-view');
+    expect(guideStepAfterEvent('break-fine', 'shot-committed')).toBe('player-view');
+  });
+
+  it('390×844 移动端桌面锚定提示避让主题按钮，不与左下角控件重叠', () => {
+    const anchor = rect(0, 0, 390, 844);
+    const hint = rect(0, 0, 84, 44);
+    const themeButton = rect(6, 800, 38, 38);
+    const position = positionForAnchor(anchor, hint, true, {
+      mobile: true,
+      viewportWidth: 390,
+      viewportHeight: 844,
+      avoidRects: [themeButton],
+    });
+
+    expect(position.left).toBe(12);
+    expect(position.top).toBe(718);
+    expect(position.top + hint.height).toBeLessThanOrEqual(themeButton.top);
+    expect(position.top).toBeGreaterThanOrEqual(8);
+    expect(position.top + hint.height).toBeLessThanOrEqual(844 - 8);
+  });
+
+  it('1280×720 桌面锚定提示避让主题按钮，不与左下角控件重叠', () => {
+    const anchor = rect(0, 0, 1280, 720);
+    const hint = rect(0, 0, 84, 44);
+    const themeButton = rect(8, 670, 42, 42);
+    const position = positionForAnchor(anchor, hint, true, {
+      mobile: false,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      avoidRects: [themeButton],
+    });
+
+    expect(position.left).toBe(12);
+    expect(position.top + hint.height + 8).toBeLessThanOrEqual(themeButton.top);
+    expect(position.top).toBeGreaterThanOrEqual(themeButton.top - hint.height - 8 - 1);
+  });
+
+  it('全屏容器不应干扰桌面锚点微提示定位，仍以有效控件避让', () => {
+    const anchor = rect(0, 0, 1280, 720);
+    const hint = rect(0, 0, 84, 44);
+    const fullScreenContainer = rect(0, 0, 1280, 720);
+    const themeButton = rect(8, 670, 42, 42);
+    const position = positionForAnchor(anchor, hint, true, {
+      mobile: false,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      avoidRects: [fullScreenContainer, themeButton],
+    });
+
+    expect(position.top + hint.height + 8).toBeLessThanOrEqual(themeButton.top);
+    expect(position.top).toBe(618);
   });
 });
