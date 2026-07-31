@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供六袋立体袋腔与角袋无缝皮口、纵横屏全台适配相机、独立观战/全局环绕、全局段无遮挡桌面、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[OUTPUT]: 对外提供含浅驼皮圈、白色菱形网袋和收尖绿呢角衬的真实六袋结构，以及纵横屏全台适配相机、独立观战/全局环绕、全局段无遮挡桌面、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -525,37 +525,37 @@ export class Scene3D {
       this.tableGroup.add(mesh);
     }
 
-    // ---- 袋腔：U 形皮革袋唇 + 收口斜壁 + 下沉暗底 ----
+    // ---- 袋腔：浅驼皮圈 + 白色菱形网袋 + 深处暗底 ----
     // 物理仍完全消费 PocketGeometry；这里仅把同一开口做成立体结构，
     // 避免库边断开后只剩一块平面暗色，看起来像台帮缺了一截。
+    // 真实中式球台的袋口由浅色皮圈和白网主导，黑暗只应退到网袋后方。
     const pocketLipMat = new THREE.MeshPhysicalMaterial({
       map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.0014,
-      color: 0x2b1c14,
-      roughness: 0.72,
-      clearcoat: 0.12,
-      clearcoatRoughness: 0.72,
+      bumpScale: 0.0006,
+      color: 0xd5c5a4,
+      roughness: 0.86,
+      clearcoat: 0.02,
+      clearcoatRoughness: 0.92,
       side: THREE.DoubleSide,
     });
     // 实体乔氏袋口的外护口是机器压制牛皮 + 硬质骨架，视觉上应是薄而挺的平面，
     // 不是软包或圆绳。浅驼色用于从同色木框上读出材质边界。
     const pocketTopTrimMat = new THREE.MeshPhysicalMaterial({
-      map: leatherTex,
       bumpMap: leatherTex,
       bumpScale: 0.0007,
-      color: 0x9d7653,
-      roughness: 0.62,
-      clearcoat: 0.1,
-      clearcoatRoughness: 0.68,
+      color: 0x86623f,
+      roughness: 0.9,
+      clearcoat: 0,
+      clearcoatRoughness: 1,
       side: THREE.DoubleSide,
     });
     const pocketWallMat = new THREE.MeshStandardMaterial({
       map: leatherTex,
       bumpMap: leatherTex,
       bumpScale: 0.0018,
-      color: 0x21150f,
-      roughness: 0.92,
+      color: 0x5c4936,
+      roughness: 0.96,
       side: THREE.DoubleSide,
     });
     const pocketBottomMat = new THREE.MeshStandardMaterial({
@@ -579,12 +579,19 @@ export class Scene3D {
       map: mouthTexture,
       color: 0xffffff,
       transparent: true,
+      opacity: 0.28,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
+    const pocketNetMat = new THREE.LineBasicMaterial({
+      color: 0xeee6d3,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+    });
     for (const pocket of POCKETS) {
       const halfWidth = pocket.mouthHalfWidth;
-      const depthRadius = pocket.shelfDepth + (pocket.kind === 'corner' ? 0.032 : 0.028);
+      const depthRadius = pocket.shelfDepth + (pocket.kind === 'corner' ? 0.016 : 0.014);
       const centerDepth = depthRadius + 0.002;
       const topHalfWidth = halfWidth * 1.1;
       const bottomHalfWidth = topHalfWidth * 0.66;
@@ -610,7 +617,7 @@ export class Scene3D {
           bottomCenterDepth + Math.sin(angle) * bottomDepthRadius,
           Math.cos(angle) * bottomHalfWidth,
         );
-        wallPositions.push(top.x, -0.006, top.z, lower.x, -0.029, lower.z);
+        wallPositions.push(top.x, -0.006, top.z, lower.x, -0.072, lower.z);
         bottomPoints.push(lower);
         mouthPoints.push(
           pocketLocalToWorld(
@@ -652,7 +659,7 @@ export class Scene3D {
         pocketBottomMat,
       );
       bottom.rotation.x = -Math.PI / 2;
-      bottom.position.y = -0.0285;
+      bottom.position.y = -0.0715;
       bottom.name = `pocket-bottom-${pocket.index}`;
       bottom.receiveShadow = true;
       this.tableGroup.add(bottom);
@@ -675,8 +682,77 @@ export class Scene3D {
       mouth.renderOrder = 2;
       this.tableGroup.add(mouth);
 
+      // 照片中的白色绳网从皮圈下沿开始，向下收成更窄的袋兜。
+      // 两组反向斜线跨越相邻高度层，形成真正的菱形网格，而不是贴图或平行竖线。
+      const netRows = 6;
+      const netStrands = 18;
+      const netPositions: number[] = [];
+      const netPoint = (row: number, strand: number) => {
+        const rowT = row / (netRows - 1);
+        const angle = (strand / netStrands) * Math.PI * 2;
+        const rowCenterDepth = THREE.MathUtils.lerp(
+          centerDepth,
+          bottomCenterDepth,
+          rowT,
+        );
+        const rowDepthRadius = THREE.MathUtils.lerp(
+          depthRadius * 0.91,
+          bottomDepthRadius * 0.72,
+          rowT,
+        );
+        const rowHalfWidth = THREE.MathUtils.lerp(
+          topHalfWidth * 0.88,
+          bottomHalfWidth * 0.78,
+          rowT,
+        );
+        const point = pocketLocalToWorld(
+          pocket,
+          rowCenterDepth + Math.sin(angle) * rowDepthRadius,
+          Math.cos(angle) * rowHalfWidth,
+        );
+        return new THREE.Vector3(
+          point.x,
+          THREE.MathUtils.lerp(-0.004, -0.069, rowT),
+          point.z,
+        );
+      };
+      const appendNetSegment = (a: THREE.Vector3, b: THREE.Vector3) => {
+        netPositions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      };
+      for (let strand = 0; strand < netStrands; strand += 1) {
+        appendNetSegment(
+          netPoint(0, strand),
+          netPoint(0, (strand + 1) % netStrands),
+        );
+      }
+      for (let row = 0; row < netRows - 1; row += 1) {
+        for (let strand = 0; strand < netStrands; strand += 1) {
+          appendNetSegment(
+            netPoint(row, strand),
+            netPoint(row + 1, (strand + 1) % netStrands),
+          );
+          appendNetSegment(
+            netPoint(row, strand),
+            netPoint(row + 1, (strand - 1 + netStrands) % netStrands),
+          );
+        }
+      }
+      const netGeometry = new THREE.BufferGeometry();
+      netGeometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(netPositions, 3),
+      );
+      const net = new THREE.LineSegments(netGeometry, pocketNetMat);
+      net.name = `pocket-net-${pocket.index}`;
+      net.userData.materialRole = 'white-diamond-net';
+      net.userData.rowCount = netRows;
+      net.userData.strandCount = netStrands;
+      net.userData.diamondSegmentCount = (netRows - 1) * netStrands * 2;
+      net.renderOrder = 3;
+      this.tableGroup.add(net);
+
       // 只包住袋口外半圈，不做悬浮的完整圆环；中间沿袋腔向外回弯，
-      // 使俯视和低机位都能读出“袋唇”而不是“缺口”。
+      // 现在只模拟真实皮圈内沿的一道浅色缝边；黑暗退到网袋与袋底之后。
       const trimSourceLocalPoints: Array<[number, number]> = [
         [-mouthInset * 0.16, -halfWidth * 0.98],
         [pocket.shelfDepth * 0.58, -halfWidth * 1.06],
@@ -686,8 +762,8 @@ export class Scene3D {
         [pocket.shelfDepth * 0.58, halfWidth * 1.06],
         [-mouthInset * 0.16, halfWidth * 0.98],
       ];
-      // 四个角袋的黑色软袋唇显式穿过两侧 jaw 入口，并继续向台内藏入约 8mm。
-      // 旧曲线直接从 jaw 附近起步，Tube 端帽与圆弧库边在斜视角会露出一小段断缝。
+      // 四个角袋的浅色缝边显式穿过两侧 jaw 入口，并继续向台内藏入约 8mm。
+      // 曲线若直接从 jaw 附近起步，Tube 端帽与圆弧库边在斜视角会露出一小段断缝。
       // 增加“隐藏端点 → 精确 jaw 锚点”后，端帽被库边覆盖，曲线切向仍连续。
       const cornerJoinExtension = mouthInset * 0.55;
       const lipLocalPoints: Array<[number, number]> = pocket.kind === 'corner'
@@ -727,9 +803,9 @@ export class Scene3D {
         'centripetal',
       );
       const trimPoints = trimCurve.getPoints(48);
-      const trimWidth = pocket.kind === 'corner' ? 0.021 : 0.016;
-      const trimTopY = RAIL_H + 0.004;
-      const trimBottomY = trimTopY - 0.0016;
+      const trimWidth = pocket.kind === 'corner' ? 0.019 : 0.015;
+      const trimTopY = RAIL_H + 0.007;
+      const trimBottomY = trimTopY - 0.006;
       const trimPositions: number[] = [];
       const trimIndices: number[] = [];
       for (let index = 0; index < trimPoints.length; index += 1) {
@@ -755,9 +831,16 @@ export class Scene3D {
         const blendedNormalLength = Math.hypot(normalX, normalZ) || 1;
         normalX /= blendedNormalLength;
         normalZ /= blendedNormalLength;
-        // 端部曲线已与木帮平行，保留完整宽度做直截面衔接，避免归零收尖形成小三角。
-        const leftX = point.x + normalX * trimWidth;
-        const leftZ = point.z + normalZ * trimWidth;
+        // 实体皮圈接近库边时会自然收窄；保留 35% 宽度避免归零尖角，
+        // 同时消除旧版全宽直截面在低机位形成的两块方形小舌。
+        const widthScale = THREE.MathUtils.lerp(
+          0.35,
+          1,
+          THREE.MathUtils.smoothstep(edgeDistance, 0, 0.2),
+        );
+        const capWidth = trimWidth * widthScale;
+        const leftX = point.x + normalX * capWidth;
+        const leftZ = point.z + normalZ * capWidth;
         const rightX = point.x;
         const rightZ = point.z;
         trimPositions.push(
@@ -795,6 +878,9 @@ export class Scene3D {
       trimGeometry.computeVertexNormals();
       const topTrim = new THREE.Mesh(trimGeometry, pocketTopTrimMat);
       topTrim.name = `pocket-top-trim-${pocket.index}`;
+      topTrim.userData.materialRole = 'tan-leather-cap';
+      topTrim.userData.widthMm = trimWidth * 1000;
+      topTrim.userData.heightMm = (trimTopY - trimBottomY) * 1000;
       topTrim.userData.seamlessEndCount = 2;
       topTrim.castShadow = true;
       topTrim.receiveShadow = true;
@@ -804,13 +890,15 @@ export class Scene3D {
         new THREE.TubeGeometry(
           lipCurve,
           44,
-          pocket.kind === 'corner' ? 0.0042 : 0.0038,
+          pocket.kind === 'corner' ? 0.0018 : 0.0016,
           8,
           false,
         ),
         pocketLipMat,
       );
       lip.name = `pocket-lip-${pocket.index}`;
+      lip.userData.materialRole = 'stitched-welt';
+      lip.userData.radiusMm = pocket.kind === 'corner' ? 1.8 : 1.6;
       lip.userData.jawAnchorCount = pocket.kind === 'corner' ? 2 : 0;
       lip.userData.joinExtensionMm = pocket.kind === 'corner'
         ? cornerJoinExtension * 1000
