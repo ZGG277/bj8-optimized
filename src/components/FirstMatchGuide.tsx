@@ -65,9 +65,35 @@ type AnchorPosition = {
 const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 8;
 const MOBILE_BOTTOM_RESERVE = 82;
+const FULLSCREEN_AVOID_THRESHOLD = 0.82;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
+}
+
+function isEffectiveAvoidRect(
+  rect: GuideAvoidRect,
+  viewportWidth: number,
+  viewportHeight: number,
+): boolean {
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const coversMostViewport =
+    rect.width >= viewportWidth * FULLSCREEN_AVOID_THRESHOLD &&
+    rect.height >= viewportHeight * FULLSCREEN_AVOID_THRESHOLD;
+  return !coversMostViewport;
+}
+
+function normalizeAvoidRect(
+  rect: DOMRect,
+): GuideAvoidRect {
+  return {
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    bottom: rect.bottom,
+    width: rect.width,
+    height: rect.height,
+  };
 }
 
 export function positionForAnchor(
@@ -88,27 +114,40 @@ export function positionForAnchor(
   );
   const maxTop = safeBottom - hint.height;
 
-  const overlaps = (x: number, y: number) =>
-    avoidRects.some(({ left, right, top, bottom }) =>
-      x < right &&
-      x + hint.width > left &&
-      y < bottom &&
-      y + hint.height > top,
-    );
-
   if (tableAnchor) {
+    const effectiveAvoidRects = avoidRects.filter(rect =>
+      isEffectiveAvoidRect(rect, viewportWidth, viewportHeight),
+    );
     const left = clamp(anchor.left + 12, VIEWPORT_MARGIN, maxLeft);
     const baseTop = clamp(anchor.bottom - hint.height - 12, VIEWPORT_MARGIN, maxTop);
-    const avoidedTop = Math.min(
+    const overlapsTable = (y: number) =>
+      effectiveAvoidRects.some(({ left: avoidLeft, right, top, bottom }) =>
+        left < right &&
+        left + hint.width > avoidLeft &&
+        y < bottom &&
+        y + hint.height > top,
+      );
+
+    if (!overlapsTable(baseTop)) {
+      return { left, top: baseTop, side: 'table' };
+    }
+
+    const candidateTops = [
       baseTop,
-      ...avoidRects.map(rect => rect.top - hint.height - ANCHOR_GAP),
-    );
-    const avoidSafeTop = Number.isFinite(avoidedTop) ? avoidedTop : baseTop;
-    const top = clamp(
-      overlaps(left, avoidSafeTop) ? avoidSafeTop : baseTop,
-      VIEWPORT_MARGIN,
-      maxTop,
-    );
+      ...effectiveAvoidRects.flatMap(rect => [
+        rect.top - hint.height - ANCHOR_GAP,
+        rect.bottom + ANCHOR_GAP,
+      ]),
+    ]
+      .map(top => clamp(top, VIEWPORT_MARGIN, maxTop))
+      .filter(top => Number.isFinite(top));
+    const uniqueTops = Array.from(new Set(candidateTops));
+    const sortedTops = uniqueTops.sort((a, b) => {
+      const distanceA = Math.abs(a - baseTop);
+      const distanceB = Math.abs(b - baseTop);
+      return distanceA - distanceB;
+    });
+    const top = sortedTops.find(top => !overlapsTable(top)) ?? baseTop;
     return { left, top, side: 'table' };
   }
 
@@ -204,12 +243,12 @@ export function FirstMatchGuide({
         return;
       }
       const avoidRects = [
-        document.querySelector<HTMLElement>('.theme-palette-button'),
-        document.querySelector<HTMLElement>('.control-deck'),
+        ...Array.from(document.querySelectorAll<HTMLElement>('.theme-palette-button, [data-control-slot]')),
       ]
-        .filter(Boolean)
-        .map(el => el!.getBoundingClientRect())
-        .filter(rect => rect.width > 0 && rect.height > 0);
+        .filter(el => window.getComputedStyle(el).display !== 'none')
+        .filter(el => window.getComputedStyle(el).visibility !== 'hidden')
+        .filter(el => getComputedStyle(el).opacity !== '0')
+        .map(el => normalizeAvoidRect(el.getBoundingClientRect()));
       const next = positionForAnchor(
         anchor.getBoundingClientRect(),
         hint.getBoundingClientRect(),

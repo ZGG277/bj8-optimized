@@ -136,4 +136,36 @@ describe('首局微提示状态机', () => {
     expect(position.top).toBeGreaterThanOrEqual(8);
     expect(position.top + hint.height).toBeLessThanOrEqual(844 - 8);
   });
+
+  it('1280×720 桌面锚定提示避让主题按钮，不与左下角控件重叠', () => {
+    const anchor = rect(0, 0, 1280, 720);
+    const hint = rect(0, 0, 84, 44);
+    const themeButton = rect(8, 670, 42, 42);
+    const position = positionForAnchor(anchor, hint, true, {
+      mobile: false,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      avoidRects: [themeButton],
+    });
+
+    expect(position.left).toBe(12);
+    expect(position.top + hint.height + 8).toBeLessThanOrEqual(themeButton.top);
+    expect(position.top).toBeGreaterThanOrEqual(themeButton.top - hint.height - 8 - 1);
+  });
+
+  it('全屏容器不应干扰桌面锚点微提示定位，仍以有效控件避让', () => {
+    const anchor = rect(0, 0, 1280, 720);
+    const hint = rect(0, 0, 84, 44);
+    const fullScreenContainer = rect(0, 0, 1280, 720);
+    const themeButton = rect(8, 670, 42, 42);
+    const position = positionForAnchor(anchor, hint, true, {
+      mobile: false,
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      avoidRects: [fullScreenContainer, themeButton],
+    });
+
+    expect(position.top + hint.height + 8).toBeLessThanOrEqual(themeButton.top);
+    expect(position.top).toBe(618);
+  });
 });
