@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 __bj8 调试句柄
-[OUTPUT]: 390×844 竖屏双方水平、辅助线默认/持久化、触屏防抖长按拖放、同边换位、沿边落点与轴向断言
+[OUTPUT]: 390×844 竖屏双方水平、辅助线、触屏拖放、压感拨轮增益/视觉/回退、沿边落点与轴向断言
 [POS]: v1.4 手机真实 Pointer 与统一控件布局的浏览器出口验收门禁（保留旧脚本名供现有命令调用）
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -18,6 +18,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const browser = await puppeteer.connect({ browserURL: BROWSER_URL });
 const page = await browser.newPage();
+const cdp = await page.createCDPSession();
 await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
 const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
@@ -118,6 +119,42 @@ async function quickMove(selector, deltaX, deltaY) {
   await wait(24);
   await page.mouse.up();
   await wait(160);
+}
+
+async function pressureMove(selector, force, deltaX = 36) {
+  const point = await center(selector);
+  const touch = (x, pressure) => ({
+    x,
+    y: point.y,
+    id: 7,
+    radiusX: 6,
+    radiusY: 6,
+    force: pressure,
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [touch(point.x, force)],
+  });
+  for (let step = 1; step <= 4; step += 1) {
+    await wait(24);
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [touch(point.x + deltaX * step / 4, force)],
+    });
+  }
+  await wait(40);
+  const feedback = await page.$eval(selector, element => ({
+    active: element.getAttribute('data-pressure-active'),
+    tightness: Number(
+      getComputedStyle(element).getPropertyValue('--aim-dial-tightness'),
+    ),
+  }));
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await wait(160);
+  return feedback;
 }
 
 async function startAndPlace() {
@@ -301,6 +338,54 @@ await quickMove('[data-control-slot="aimDial"] .aim-dial', 34, 0);
 const dialEndAim = await page.evaluate(() => window.__bj8.aim.current);
 ok('快速横拨仍改变唯一世界杆向',
   Math.abs(dialEndAim - dialStartAim) > 0.001, `${dialStartAim} → ${dialEndAim}`);
+
+const pressureBaseline = await page.evaluate(() => window.__bj8.aim.current);
+const resetAim = angle => page.evaluate(value => {
+  window.__bj8.aim.current = value;
+  window.__bj8.scene.current.setAim(value);
+}, angle);
+
+await resetAim(pressureBaseline);
+const lowPressureFeedback = await pressureMove(
+  '[data-control-slot="aimDial"] .aim-dial',
+  0.18,
+);
+const lowPressureAim = await page.evaluate(() => window.__bj8.aim.current);
+await resetAim(pressureBaseline);
+const highPressureFeedback = await pressureMove(
+  '[data-control-slot="aimDial"] .aim-dial',
+  0.82,
+);
+const highPressureAim = await page.evaluate(() => window.__bj8.aim.current);
+await resetAim(pressureBaseline);
+const fallbackPressureFeedback = await pressureMove(
+  '[data-control-slot="aimDial"] .aim-dial',
+  0.5,
+);
+const fallbackPressureAim = await page.evaluate(() => window.__bj8.aim.current);
+const lowPressureDelta = Math.abs(lowPressureAim - pressureBaseline);
+const highPressureDelta = Math.abs(highPressureAim - pressureBaseline);
+const fallbackPressureDelta = Math.abs(fallbackPressureAim - pressureBaseline);
+
+ok('同位移低压/高压都产生可见紧度反馈且高压更强',
+  lowPressureFeedback.active === 'true' &&
+    highPressureFeedback.active === 'true' &&
+    highPressureFeedback.tightness > lowPressureFeedback.tightness + 0.4,
+  JSON.stringify({ lowPressureFeedback, highPressureFeedback }));
+ok('同样 36px 位移下高压传动更紧、瞄准变化更精细',
+  lowPressureDelta > 0.001 &&
+    highPressureDelta > 0 &&
+    highPressureDelta < lowPressureDelta * 0.6,
+  JSON.stringify({ lowPressureDelta, highPressureDelta }));
+ok('固定 0.5 普通触摸回退原速度且不误显示压感',
+  fallbackPressureFeedback.active === 'false' &&
+    fallbackPressureDelta > 0.001 &&
+    Math.abs(fallbackPressureDelta - lowPressureDelta) / lowPressureDelta < 0.12,
+  JSON.stringify({
+    fallbackPressureFeedback,
+    fallbackPressureDelta,
+    lowPressureDelta,
+  }));
 
 const semanticBefore = await page.evaluate(() => ({
   aim: window.__bj8.aim.current,

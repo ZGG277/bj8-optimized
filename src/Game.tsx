@@ -412,16 +412,19 @@ export default function Game() {
     if (event.pointerType === 'touch') releaseTouchAimCameraLater();
   }, [releaseTouchAimCameraLater, spectatorActive]);
 
-  const handleStableAimDialAdjust = useCallback((pixelDelta: number) => {
+  const handleStableAimDialAdjust = useCallback((
+    pixelDelta: number,
+    pressureGain = 1,
+  ) => {
     const coarsePointer = typeof window !== 'undefined' &&
       window.matchMedia?.('(pointer: coarse)').matches;
     if (coarsePointer && canAim && !isGlobalCameraView(viewLevel)) {
       lockTouchAimCamera();
-      handleAimDialAdjust(pixelDelta);
+      handleAimDialAdjust(pixelDelta, pressureGain);
       releaseTouchAimCameraLater();
       return;
     }
-    handleAimDialAdjust(pixelDelta);
+    handleAimDialAdjust(pixelDelta, pressureGain);
   }, [
     canAim,
     handleAimDialAdjust,

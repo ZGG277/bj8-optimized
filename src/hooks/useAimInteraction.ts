@@ -359,11 +359,13 @@ export function useAimInteraction({
     }
   }, [matchPhase, scene3DRef, clearAimDial]);
 
-  const handleAimDialAdjust = useCallback((pixelDelta: number) => {
+  const handleAimDialAdjust = useCallback((pixelDelta: number, pressureGain = 1) => {
     if (!canAim || !aimDialVisible || pixelDelta === 0) return;
     const current = aimRef.current;
     const solution = resolveAimDialSolution(current);
-    const next = applyAim(current + aimDialAngleDelta(pixelDelta, solution));
+    const next = applyAim(
+      current + aimDialAngleDelta(pixelDelta, solution, pressureGain),
+    );
     setAimDialSolution(resolveAimDialSolution(next));
   }, [canAim, aimDialVisible, aimRef, resolveAimDialSolution, applyAim]);
 

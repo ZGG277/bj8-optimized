@@ -47,7 +47,8 @@ export type PocketAimWindow = {
   halfWidth: number;
 };
 
-const CORNER_MOUTH_WIDTH = 0.088;
+/** 四个角袋由 88mm 小幅放宽到 90mm；中袋维持原规格。 */
+const CORNER_MOUTH_WIDTH = 0.09;
 const SIDE_MOUTH_WIDTH = 0.092;
 const CORNER_JAW_RADIUS = 0.102;
 const SIDE_JAW_RADIUS = 0.064;

@@ -284,7 +284,7 @@ describe('落袋检测测试', () => {
   it('六袋采用统一参数化口宽、圆弧角衬与台阶深度', () => {
     expect(TABLE.ballRadius * 2).toBeCloseTo(0.05715, 6);
     expect(POCKETS).toHaveLength(6);
-    expect(POCKETS[0].mouthWidth).toBeCloseTo(0.088, 6);
+    expect(POCKETS[0].mouthWidth).toBeCloseTo(0.09, 6);
     expect(POCKETS[2].mouthWidth).toBeCloseTo(0.092, 6);
     expect(POCKETS[0].jawRadius).toBeCloseTo(0.102, 6);
     expect(POCKETS[2].jawRadius).toBeCloseTo(0.064, 6);

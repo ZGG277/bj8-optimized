@@ -63,9 +63,35 @@ describe('PocketGeometry 参数与六袋对称', () => {
       [TABLE.width / 2, TABLE.length / 2],
     ]);
     expect(POCKETS[0].mouthWidth).toBe(POCKETS[1].mouthWidth);
+    expect(POCKETS.filter(pocket => pocket.kind === 'corner')
+      .every(pocket => pocket.mouthWidth === 0.09)).toBe(true);
+    expect(POCKETS.filter(pocket => pocket.kind === 'side')
+      .every(pocket => pocket.mouthWidth === 0.092)).toBe(true);
     expect(POCKETS[0].jawRadius).toBe(POCKETS[5].jawRadius);
     expect(POCKETS[2].shelfDepth).toBe(POCKETS[3].shelfDepth);
     expect(POCKETS.every(pocket => pocket.jawSegments.length === 24)).toBe(true);
+  });
+
+  it('角袋新增 1mm 单侧净窗口容错，而中袋边界保持不变', () => {
+    const historicalCornerHalfWidth =
+      0.088 / 2 - TABLE.ballRadius - 0.00075;
+    const historicalSideHalfWidth =
+      0.092 / 2 - TABLE.ballRadius - 0.00075;
+    const newlyAcceptedLateral = historicalCornerHalfWidth + 0.0005;
+
+    for (const pocket of POCKETS.filter(item => item.kind === 'corner')) {
+      expect(getPocketAimWindow(pocket).halfWidth)
+        .toBeCloseTo(historicalCornerHalfWidth + 0.001, 8);
+      const world = sendBallToPocket(pocket, 1.6, newlyAcceptedLateral);
+      expect(getCueBall(world)?.active, `corner=${pocket.index}`).toBe(false);
+      expect(world.events.some(event =>
+        event.type === 'pocket' && event.pocket === pocket.index)).toBe(true);
+    }
+
+    for (const pocket of POCKETS.filter(item => item.kind === 'side')) {
+      expect(getPocketAimWindow(pocket).halfWidth)
+        .toBeCloseTo(historicalSideHalfWidth, 8);
+    }
   });
 
   it('安全窗口由口宽和球半径推导，左右边界严格对称', () => {

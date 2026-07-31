@@ -13,6 +13,7 @@ import { ViewToolbar } from './ViewToolbar';
 import type { PrecisionAimSolution } from '../aim/aim-solution';
 import type { CueSpin } from '../physics';
 import type { PositionPlanStatus } from '../hooks/usePositionPlan';
+import { aimDialPressureProfile } from '../input/aim-dial';
 import {
   CONTROL_LAYOUT_LONG_PRESS_MS,
   CONTROL_LAYOUT_MOVE_THRESHOLD,
@@ -75,6 +76,8 @@ type DockableControlSlotProps = {
     id: DockItemId,
     deltaX: number,
     deltaY: number,
+    pointerType: string,
+    pressure: number,
   ) => boolean;
 };
 
@@ -205,6 +208,8 @@ function DockableControlSlot({
             id,
             event.clientX - activation.x,
             event.clientY - activation.y,
+            event.pointerType,
+            event.pressure,
           );
           if (!handled) {
             activation.originalTarget?.dispatchEvent(new PointerEvent('pointermove', {
@@ -264,7 +269,7 @@ interface ControlDeckProps {
   onSpinChange: (spin: CueSpin) => void;
   onToggleGuidance: () => void;
   onToggleAimAssist: () => void;
-  onAimDialAdjust: (pixelDelta: number) => void;
+  onAimDialAdjust: (pixelDelta: number, pressureGain?: number) => void;
   onBeginCharge: (coordinate: number, availableTravel: number) => void;
   onUpdateCharge: (coordinate: number) => void;
   onReleaseCharge: () => void;
@@ -805,13 +810,16 @@ export function ControlDeck({
     id: DockItemId,
     deltaX: number,
     deltaY: number,
+    pointerType: string,
+    pressure: number,
   ) => {
     if (id !== 'aimDial') return false;
+    const pressureProfile = aimDialPressureProfile(pointerType, pressure);
     onAimDialAdjust(controlAxisDelta(
       layoutRef.current.aimDial,
       deltaX,
       deltaY,
-    ));
+    ), pressureProfile.gain);
     return true;
   }, [onAimDialAdjust]);
 
