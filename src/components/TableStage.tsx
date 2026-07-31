@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖连续 viewLevel / match / 观战与手动相机状态及 pointer 事件处理器
-[OUTPUT]: 渲染 3D 球桌、手动相机状态、轻量观战提示、纯视觉全台回正与结束遮罩
+[INPUT]: 依赖连续 viewLevel / match / 观战、首局引导与手动相机状态及 pointer 事件处理器
+[OUTPUT]: 渲染 3D 球桌、手动相机状态、首局语境观战提示、纯视觉全台回正与结束遮罩
 [POS]: HUD 组件层；瞄准拨轮已并入统一可停靠控制层，相机/对局状态由上层持有
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -11,6 +11,7 @@ interface TableStageProps {
   viewLevel: number;
   spectatorActive: boolean;
   manualCameraActive: boolean;
+  firstMatchGuideActive: boolean;
   match: MatchState;
   containerRef: React.Ref<HTMLDivElement>;
   onPointerDown: (e: React.PointerEvent) => void;
@@ -25,6 +26,7 @@ export function TableStage({
   viewLevel,
   spectatorActive,
   manualCameraActive,
+  firstMatchGuideActive,
   match,
   containerRef,
   onPointerDown,
@@ -46,10 +48,16 @@ export function TableStage({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
       >
-        {match.phase === 'opponent' && (
+        {spectatorActive && (
           <div className="turn-mask">
             <span className="thinking-dot" />
-            <strong>顾燃计算中 · 左右滑动看全台</strong>
+            <strong>
+              {firstMatchGuideActive
+                ? '顾燃正在击球 · 左右滑动可看全台'
+                : match.phase === 'opponent'
+                  ? '顾燃计算中 · 左右滑动看全台'
+                  : '顾燃击球中 · 左右滑动看全台'}
+            </strong>
           </div>
         )}
 
