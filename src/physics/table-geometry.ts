@@ -57,7 +57,7 @@ export const POCKET_MOUTH_WIDTH_PRESETS = {
 } as const;
 
 /** 当前使用版本：想测哪个版本改这里即可。 */
-export const ACTIVE_POCKET_MOUTH_PRESET: PocketMouthWidthPreset = 'roomy';
+export const ACTIVE_POCKET_MOUTH_PRESET: PocketMouthWidthPreset = 'wide';
 
 const {
   corner: CORNER_MOUTH_WIDTH,
