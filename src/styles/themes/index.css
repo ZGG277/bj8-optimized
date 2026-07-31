@@ -1,12 +1,45 @@
 /*
 [INPUT]: base/layout/controls 三层样式之后加载；ThemeSwitcher 组件
-[OUTPUT]: 汇总青瓷、决赛之夜、霓虹球房三套主题，并提供调色盘折叠入口样式
-[POS]: 视觉主题层入口；主题规则以 :root[data-theme] 隔离，不改变游戏交互几何
+[OUTPUT]: 汇总三套主题、调色盘入口，以及控件静置半透明/按住实色/无卡片外框的共享视觉策略
+[POS]: 视觉主题层入口；主题规则以 :root[data-theme] 隔离，只改变表达而不改变游戏交互几何
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 @import './celadon.css';
 @import './noir.css';
 @import './neon.css';
+
+/*
+ * 球桌上的操控件统一采用“静置退后、按住浮现”的视觉层级。
+ * 透明度只作用于内容层，不改变 48px+ 触控几何；按压、键盘焦点和布局拖动时恢复实色。
+ */
+:root[data-theme] .control-deck .control-slot-body {
+  opacity: 0.56;
+  transition:
+    opacity 180ms ease,
+    filter 180ms ease;
+  filter: saturate(0.82);
+}
+
+:root[data-theme] .control-deck .control-slot:active .control-slot-body,
+:root[data-theme] .control-deck .control-slot.is-dragging .control-slot-body,
+:root[data-theme] .control-deck .control-slot:has(:focus-visible) .control-slot-body {
+  opacity: 1;
+  filter: saturate(1);
+  transition-duration: 0ms;
+}
+
+/* 去掉独立卡片式外框，保留主题自身的色块、刻度和状态色。 */
+:root[data-theme] .control-deck :is(
+  .view-switcher,
+  .plan-button,
+  .spin-preview,
+  .shoot-zone,
+  .shoot-pad,
+  .aim-dial
+) {
+  border: 0;
+  box-shadow: none;
+}
 
 .theme-switcher {
   position: fixed;

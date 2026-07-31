@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 调色盘折叠入口、三主题白名单、URL/本地持久化及桌面/竖屏边界断言
+[OUTPUT]: 调色盘折叠入口、三主题白名单、URL/本地持久化、控件静置透明/按住实色及桌面/竖屏边界断言
 [POS]: 视觉主题集成的浏览器回归门禁，不修改游戏数据与服务端状态
 [PROTOCOL]: 变更时更新此头部，然后检查 README.md
 */
@@ -127,6 +127,56 @@ const afterStart = await page.evaluate(() => ({
 ok('进入对局后主题与入口继续保留',
   afterStart.theme === 'celadon' && afterStart.switcherVisible && afterStart.gameVisible,
   JSON.stringify(afterStart));
+
+const restingControls = await page.evaluate(() => {
+  const selectors = [
+    ['view', '[data-control-slot="view"] .control-slot-body', '.view-switcher'],
+    ['bulb', '[data-control-slot="bulb"] .control-slot-body', '.plan-button'],
+    ['spin', '[data-control-slot="spin"] .control-slot-body', '.spin-preview'],
+    ['power', '[data-control-slot="power"] .control-slot-body', '.shoot-zone'],
+  ];
+  return selectors.map(([id, bodySelector, shellSelector]) => {
+    const body = document.querySelector(bodySelector);
+    const shell = document.querySelector(shellSelector);
+    const bodyStyle = body ? getComputedStyle(body) : null;
+    const shellStyle = shell ? getComputedStyle(shell) : null;
+    return {
+      id,
+      opacity: Number(bodyStyle?.opacity ?? -1),
+      borders: shellStyle
+        ? [
+            shellStyle.borderTopWidth,
+            shellStyle.borderRightWidth,
+            shellStyle.borderBottomWidth,
+            shellStyle.borderLeftWidth,
+          ]
+        : [],
+    };
+  });
+});
+ok(
+  '四个主控静置时透明度一致且取消硬外框',
+  restingControls.length === 4 &&
+    restingControls.every(control =>
+      control.opacity >= 0.55 && control.opacity <= 0.57 &&
+      control.borders.length === 4 &&
+      control.borders.every(width => width === '0px')),
+  JSON.stringify(restingControls),
+);
+
+const pressedPoint = await page.$eval('[data-control-slot="view"]', element => {
+  const rect = element.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+});
+await page.mouse.move(pressedPoint.x, pressedPoint.y);
+await page.mouse.down();
+await new Promise(resolve => setTimeout(resolve, 90));
+const pressedOpacity = await page.$eval(
+  '[data-control-slot="view"] .control-slot-body',
+  element => Number(getComputedStyle(element).opacity),
+);
+await page.mouse.up();
+ok('主控按住时恢复实色', pressedOpacity >= 0.98, String(pressedOpacity));
 
 const visualProfiles = [
   { name: 'desktop', viewport: { width: 1280, height: 800 } },
