@@ -1,22 +1,23 @@
 /*
 [INPUT]: 依赖 vitest 与 opponent/model 纯函数
-[OUTPUT]: 覆盖三杆批量、难度归一、辅助降权、冷启动收缩、顾燃袋口内执行误差、动态模式映射、适量规划预算与 v1/v2 持久化
+[OUTPUT]: 覆盖整局一次评估、难度归一、辅助降权、冷启动收缩、顾燃安全窗执行误差、战术预算与 v1/v2/v3 持久化
 [POS]: 自适应对手领域层回归测试
 [PROTOCOL]: 模型字段或阈值变化时同步更新本文件与 model.ts 头部
 */
 import { describe, expect, it } from 'vitest';
 import {
   LEGACY_PLAYER_SKILL_STORAGE_KEY,
+  PREVIOUS_PLAYER_SKILL_STORAGE_KEY,
   OPPONENT_AIM_WINDOW_FRACTION,
   PLAYER_SKILL_STORAGE_KEY,
   applyShotObservation,
+  applyMatchObservations,
   confidenceAdjustedLevel,
   createOpponentProfile,
   createPlayerSkillProfile,
   levelToSigma,
   loadPlayerSkillProfile,
   opponentTierFor,
-  queueShotObservation,
   retargetOpponentProfile,
   sampleOpponentAimOffset,
   savePlayerSkillProfile,
@@ -102,7 +103,7 @@ describe('player skill model', () => {
     expect(levelToSigma(80)).toBeLessThan(levelToSigma(40));
   });
 
-  it('keeps the visible level stable for two shots and commits on the third', () => {
+  it('keeps the visible profile stable during play and commits every shot once at match end', () => {
     const observation = {
       tolerance: 0.003,
       pocketed: true,
@@ -110,46 +111,42 @@ describe('player skill model', () => {
       position: 'success' as const,
       assisted: false,
     };
-    const first = queueShotObservation(createPlayerSkillProfile(), observation);
-    const second = queueShotObservation(first.profile, observation);
-    const third = queueShotObservation(second.profile, observation);
-    expect(first.batchCompleted).toBe(false);
-    expect(second.batchCompleted).toBe(false);
-    expect(first.profile.level).toBe(50);
-    expect(second.profile.level).toBe(50);
-    expect(second.profile.pendingObservations).toHaveLength(2);
-    expect(third.batchCompleted).toBe(true);
-    expect(third.profile.pendingObservations).toHaveLength(0);
-    expect(third.profile.totalPlayerShots).toBe(3);
-    expect(third.profile.level).toBeGreaterThan(50);
-    expect(third.profile.lastBatchDelta).toBeCloseTo(1.2);
+    const profile = createPlayerSkillProfile();
+    const observations = [observation, observation, observation, observation];
+    expect(profile.level).toBe(50);
+    expect(profile.totalPlayerShots).toBe(0);
+    const settled = applyMatchObservations(profile, observations);
+    expect(settled.totalPlayerShots).toBe(4);
+    expect(settled.matchesEvaluated).toBe(1);
+    expect(settled.level).toBeGreaterThan(50);
+    expect(settled.lastMatchDelta).toBeCloseTo(1.6);
   });
 
   it('counts a defensive shot in the batch without changing execution evidence', () => {
     const base = createPlayerSkillProfile();
-    const queued = queueShotObservation(base, {
+    const settled = applyMatchObservations(base, [{
       tolerance: null,
       pocketed: false,
       foul: false,
       position: 'unknown',
       assisted: false,
-    });
-    expect(queued.profile.totalPlayerShots).toBe(1);
-    expect(queued.profile.qualifiedShots).toBe(0);
-    expect(queued.profile.executionLevel).toBe(50);
+    }]);
+    expect(settled.totalPlayerShots).toBe(1);
+    expect(settled.qualifiedShots).toBe(0);
+    expect(settled.executionLevel).toBe(50);
   });
 
   it('uses no-intent shots only for cadence and discipline', () => {
-    let profile = createPlayerSkillProfile();
-    for (let i = 0; i < 3; i += 1) {
-      profile = queueShotObservation(profile, {
+    const profile = applyMatchObservations(
+      createPlayerSkillProfile(),
+      Array.from({ length: 3 }, (_, i) => ({
         tolerance: null,
         pocketed: false,
         foul: i === 2,
-        position: 'unknown',
+        position: 'unknown' as const,
         assisted: false,
-      }).profile;
-    }
+      })),
+    );
     expect(profile.totalPlayerShots).toBe(3);
     expect(profile.qualifiedShots).toBe(0);
     expect(profile.executionLevel).toBe(50);
@@ -181,10 +178,8 @@ describe('player skill model', () => {
       level: 0,
       executionLevel: 0,
     };
-    for (let i = 0; i < 3; i += 1) {
-      high = queueShotObservation(high, success).profile;
-      low = queueShotObservation(low, miss).profile;
-    }
+    high = applyMatchObservations(high, [success, success, success]);
+    low = applyMatchObservations(low, [miss, miss, miss]);
     expect(high.level).toBeLessThanOrEqual(100);
     expect(high.executionLevel).toBeLessThanOrEqual(100);
     expect(low.level).toBeGreaterThanOrEqual(0);
@@ -211,11 +206,13 @@ describe('opponent profile', () => {
     const challenge = createOpponentProfile(player, 'challenge');
     expect(practice.tierLevel).toBe(67);
     expect(practice.targetLevel).toBe(67);
-    expect(practice.planner.maxDepth).toBe(1);
-    expect(practice.planner.simBudget).toBe(240);
+    expect(practice.tactical.candidateLimit).toBe(3);
+    expect(practice.tactical.simulationLimit).toBe(12);
     expect(challenge.tierLevel).toBe(74);
-    expect(challenge.planner.maxDepth).toBe(2);
-    expect(challenge.planner.simBudget).toBe(640);
+    expect(challenge.tactical.candidateLimit).toBe(6);
+    expect(challenge.tactical.simulationLimit).toBe(24);
+    expect(challenge.tactical.followUpWeight).toBeGreaterThan(practice.tactical.followUpWeight);
+    expect(challenge.tactical.alternativeChance).toBe(0);
     expect(challenge.aimSigma).toBeLessThan(practice.aimSigma);
   });
 
@@ -231,8 +228,8 @@ describe('opponent profile', () => {
     expect(next.effectiveLevel - initial.effectiveLevel).toBe(3);
     expect(next.aimSigma).toBeLessThan(initial.aimSigma);
     expect(next.powerJitter).toBeLessThan(initial.powerJitter);
-    expect(next.choiceTemperature).toBeLessThan(initial.choiceTemperature);
-    expect(next.planner.simBudget).toBe(initial.planner.simBudget);
+    expect(next.powerJitter).toBeLessThan(initial.powerJitter);
+    expect(next.tactical.simulationLimit).toBe(initial.tactical.simulationLimit);
   });
 
   it('caps both mode targets at 100', () => {
@@ -262,19 +259,19 @@ describe('opponent profile', () => {
 });
 
 describe('profile persistence', () => {
-  it('round-trips a pending batch and recovers from broken JSON', () => {
+  it('round-trips a completed-match profile and recovers from broken JSON', () => {
     const data = new Map<string, string>();
     const storage = {
       getItem: (key: string) => data.get(key) ?? null,
       setItem: (key: string, value: string) => { data.set(key, value); },
     };
-    const profile = queueShotObservation(createPlayerSkillProfile(), {
+    const profile = applyMatchObservations(createPlayerSkillProfile(), [{
       tolerance: 0.01,
       pocketed: true,
       foul: false,
       position: 'success',
       assisted: false,
-    }).profile;
+    }]);
     savePlayerSkillProfile(profile, storage);
     expect(loadPlayerSkillProfile(storage)).toEqual(profile);
 
@@ -301,10 +298,34 @@ describe('profile persistence', () => {
     const migrated = loadPlayerSkillProfile({
       getItem: (key: string) => data.get(key) ?? null,
     });
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(3);
     expect(migrated.level).toBe(68);
     expect(migrated.executionLevel).toBe(66);
-    expect(migrated.pendingObservations).toEqual([]);
     expect(migrated.totalPlayerShots).toBe(0);
+  });
+
+  it('migrates v2 pending shots once instead of restoring a three-shot queue', () => {
+    const data = new Map<string, string>();
+    const previous = {
+      ...createPlayerSkillProfile(),
+      version: 2,
+      totalPlayerShots: 2,
+      pendingObservations: [{
+        tolerance: 0.003,
+        pocketed: true,
+        foul: false,
+        position: 'success',
+        assisted: false,
+      }],
+      lastBatchDelta: 0,
+    };
+    data.set(PREVIOUS_PLAYER_SKILL_STORAGE_KEY, JSON.stringify(previous));
+    const migrated = loadPlayerSkillProfile({
+      getItem: key => data.get(key) ?? null,
+    });
+    expect(migrated.version).toBe(3);
+    expect(migrated.totalPlayerShots).toBe(2);
+    expect(migrated.matchesEvaluated).toBe(1);
+    expect(migrated.level).toBeGreaterThan(50);
   });
 });

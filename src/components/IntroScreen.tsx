@@ -32,7 +32,7 @@ export function IntroScreen({ playerSkill, onStart }: IntroScreenProps) {
       <div className="intro-card">
         <span className="intro-kicker">中式八球 · 物理模拟</span>
         <h1>瓜瓜台球</h1>
-        <p>选择这一局你想要的对手关系。每三杆更新一次评估，顾燃随后渐进匹配。</p>
+        <p>选择这一局你想要的对手关系。双方水平局内锁定，每局结束后统一更新。</p>
         <div className="skill-summary" aria-label="当前能力评估">
           <span>当前水平</span>
           <strong>{levelLabel(playerSkill.level)} · {Math.round(playerSkill.level)}</strong>

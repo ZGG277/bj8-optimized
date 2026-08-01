@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、三杆批量能力与渐进 AI、按需节能走位预算、独立观战/手动环绕、触屏瞄准锁镜、360° 粗瞄/手动切档精瞄拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、整局结束能力评估、移动端运动快照降频、按需走位预算、独立观战/手动环绕与瞄准 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -21,6 +21,7 @@ import { legalNumbers } from './match/match-machine';
 import { useShotInput } from './input/use-shot-input';
 import { MIN_POWER, type ShotIntent } from './input/shot-input';
 import { usePhysicsLoop } from './simulation/use-physics-loop';
+import { renderBudgetFor } from './render-policy';
 import { useGameState } from './hooks/useGameState';
 import { useAimInteraction } from './hooks/useAimInteraction';
 import { useOpponentAI } from './hooks/useOpponentAI';
@@ -81,7 +82,7 @@ export default function Game() {
     match, matchRef, setMatch,
     viewLevel, setViewLevel,
     playerSkill, gameMode, opponentProfile,
-    recordPlayerShot,
+    recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
 
@@ -107,6 +108,16 @@ export default function Game() {
   cameraAzimuthRef.current = cameraAzimuth;
   const spectatorActive =
     match.actor === 'opponent' && (match.phase === 'opponent' || match.phase === 'rolling');
+  const physicsPresentationIntervalMs = useMemo(() => {
+    if (typeof window === 'undefined') return 0;
+    const budget = renderBudgetFor({
+      width: window.innerWidth,
+      height: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      coarsePointer: window.matchMedia?.('(pointer: coarse)').matches ?? false,
+    });
+    return budget.mobile ? 1000 / budget.movingPresentationFps : 0;
+  }, []);
 
   // 禁用移动端长按唤出复制/全选/分享菜单，避免干扰击球与蓄力
   useEffect(() => {
@@ -655,7 +666,10 @@ export default function Game() {
         assisted: skillCapture.assisted,
       });
     }
-  }, [recordPlayerShot, settleShotRaw, setViewLevel]);
+    if (settlement?.resolution.next.phase === 'finished') {
+      completeMatchAssessment();
+    }
+  }, [completeMatchAssessment, recordPlayerShot, settleShotRaw, setViewLevel]);
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
@@ -666,6 +680,7 @@ export default function Game() {
       setWorldView(cloneWorld(worldRef.current));
     }, [worldRef, playPhysicsEvents, setWorldView]),
     onSettled: settleShot,
+    presentationIntervalMs: physicsPresentationIntervalMs,
   });
 
   // ── 对手 AI 回合 ──

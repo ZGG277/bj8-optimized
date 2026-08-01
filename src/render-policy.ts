@@ -1,6 +1,6 @@
 /*
 [INPUT]: 视口 CSS 尺寸、设备像素比与粗指针能力
-[OUTPUT]: 对外输出 WebGL 像素比、阴影贴图尺寸与 GPU 功耗偏好
+[OUTPUT]: 对外输出 WebGL 像素比、阴影贴图尺寸、GPU 功耗偏好与运动快照帧率
 [POS]: 3D 渲染预算纯策略层；不依赖 Three.js、React 或浏览器全局，可单测
 [PROTOCOL]: 阈值或预算变化时，同步更新本注释、render-policy.test.ts 与 src/CLAUDE.md
 */
@@ -10,6 +10,7 @@ export type RenderBudget = {
   pixelRatio: number;
   shadowMapSize: 1024 | 2048;
   powerPreference: WebGLPowerPreference;
+  movingPresentationFps: 30 | 60;
 };
 
 export type RenderEnvironment = {
@@ -40,6 +41,6 @@ export function renderBudgetFor(environment: RenderEnvironment): RenderBudget {
     pixelRatio: Math.min(dpr, mobile ? MOBILE_PIXEL_RATIO_CAP : DESKTOP_PIXEL_RATIO_CAP),
     shadowMapSize: mobile ? 1024 : 2048,
     powerPreference: mobile ? 'low-power' : 'high-performance',
+    movingPresentationFps: mobile ? 30 : 60,
   };
 }
-
