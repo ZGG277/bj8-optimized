@@ -70,6 +70,8 @@ const MAX_OPPONENT_LEVEL = 100;
 const MAX_LEVEL_UP_PER_SHOT = 0.4;
 const MAX_LEVEL_DOWN_PER_SHOT = 0.2;
 const MAX_OPPONENT_STEP = 3;
+const POSITION_WEIGHT = 0.28;
+const PRECISION_WEIGHT = 1 - POSITION_WEIGHT;
 export const OPPONENT_AIM_WINDOW_FRACTION = 0.82;
 
 function clamp(value: number, min: number, max: number): number {
@@ -204,10 +206,10 @@ export function applyMatchObservations(
     qualifiedShots += evidenceWeight;
   }
 
-  // Beta(2,2) 先验让两个次要维度在冷启动时保持中性，不会凭一杆主导总等级。
+  // 技术分只由准度和走位组成；Beta(2,2) 先验避免一杆走位主导冷启动结果。
   const positionScore = ((positionSuccesses + 2) / (positionAttempts + 4)) * 100;
-  const disciplineScore = (1 - (fouls + 2) / (foulAttempts + 4)) * 100;
-  const compositeTarget = executionLevel * 0.8 + positionScore * 0.12 + disciplineScore * 0.08;
+  const compositeTarget =
+    executionLevel * PRECISION_WEIGHT + positionScore * POSITION_WEIGHT;
   const compositeDelta = clamp(
     compositeTarget - profile.level,
     -MAX_LEVEL_DOWN_PER_SHOT * batch.length,

@@ -136,22 +136,25 @@ describe('player skill model', () => {
     expect(settled.executionLevel).toBe(50);
   });
 
-  it('uses no-intent shots only for cadence and discipline', () => {
-    const profile = applyMatchObservations(
-      createPlayerSkillProfile(),
-      Array.from({ length: 3 }, (_, i) => ({
+  it('records foul facts without adding a third scoring dimension', () => {
+    const observations = Array.from({ length: 3 }, (_, i) => ({
         tolerance: null,
         pocketed: false,
         foul: i === 2,
         position: 'unknown' as const,
         assisted: false,
-      })),
+      }));
+    const clean = applyMatchObservations(
+      createPlayerSkillProfile(),
+      observations.map(observation => ({ ...observation, foul: false })),
     );
-    expect(profile.totalPlayerShots).toBe(3);
-    expect(profile.qualifiedShots).toBe(0);
-    expect(profile.executionLevel).toBe(50);
-    expect(profile.foulAttempts).toBe(3);
-    expect(profile.fouls).toBe(1);
+    const fouled = applyMatchObservations(createPlayerSkillProfile(), observations);
+    expect(fouled.totalPlayerShots).toBe(3);
+    expect(fouled.qualifiedShots).toBe(0);
+    expect(fouled.executionLevel).toBe(50);
+    expect(fouled.foulAttempts).toBe(3);
+    expect(fouled.fouls).toBe(1);
+    expect(fouled.level).toBeCloseTo(clean.level, 10);
   });
 
   it('never crosses the 0–100 score boundaries', () => {

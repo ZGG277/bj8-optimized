@@ -12,7 +12,7 @@
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
 
-`opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；出杆在整局结束时一次评估，明确进攻意图才更新执行精度；生成 +3/+10 目标与独立限预算战术 Worker，挑战档优先真实进球、避免洗袋并保留下一杆。
+`opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；出杆在整局结束时一次评估，技术分只由准度 72% 与走位 28% 组成；生成 +3/+10 目标与独立限预算战术 Worker，挑战档优先真实进球、避免洗袋并保留下一杆。
 
 `layout/`: 五控件布局纯领域层；维护 desktop/portrait/landscape 三套自由或右/底停靠位置，负责 8px 钳制、48px 吸附、沿边落点、碰撞避让、容量与 v2→v3 迁移。
 
@@ -58,7 +58,7 @@
   - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出、轻点显式切换固定精瞄档的无边界拨轮
   - `useOpponentAI`：消费局前锁定档案，调度限预算战术 Worker、选杆扰动与袋口容错内的执行误差
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
-  - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在灯泡显式点亮后经可抢占 planner/async 搜索
+  - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在灯泡显式点亮后经可抢占 Worker 执行 320 次、两层、2.5 秒截止搜索
   - `useDraggableOverlay`：规划/复盘共用的 Pointer 拖拽位移与视口边界约束
 
 `utils/`: 纯工具函数层，不依赖 React 或 DOM：

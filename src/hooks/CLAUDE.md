@@ -22,9 +22,9 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `useAudioManager.ts`: 音效协调层，管理 BilliardsAudio 初始化和物理事件音效播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents。
 
-`usePositionPlan.ts`: 走位规划集成层——状态机 idle→computing→ready→showing（failed 兜底）；仅在灯泡显式点亮且进入玩家静止瞄准态时经 planner/async 后台预算，熄灭、出杆或对手回合取消陈旧结果，showing 期间不重算；暴露 status/plans/error/open/close。
+`usePositionPlan.ts`: 走位规划集成层——状态机 idle→computing→ready→showing（failed 兜底）；仅在灯泡显式点亮且进入玩家静止瞄准态时经可抢占 Worker 执行 320 次、两层、2.5 秒截止搜索，熄灭、出杆或对手回合取消陈旧结果，showing 期间不重算；暴露 status/plans/error/open/close。
 
-`usePositionPlan.test.ts`: 世界指纹必须包含玩家分组，并锁定灯泡熄灭/非玩家瞄准态不计算。
+`usePositionPlan.test.ts`: 世界指纹必须包含玩家分组，并锁定灯泡熄灭/非玩家瞄准态不计算以及规划预算/墙钟上限。
 
 `useDraggableOverlay.ts`: 规划/复盘浮层共用 Pointer 拖拽 Hook；用独立手柄捕获指针，位移钳制在当前视口 8px 安全边界内。
 

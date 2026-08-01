@@ -1,17 +1,24 @@
 /*
 [INPUT]: 依赖用户显式点亮提示、physics 世界快照、match 对局状态、planner/async 异步走位搜索
-[OUTPUT]: 对外提供 { status, plans, error, open, close }：只在提示开启时预算玩家走位方案
-[POS]: 规划集成层——状态机 idle→computing→ready→showing（failed 兜底），不承担渲染
+[OUTPUT]: 对外提供 { status, plans, error, open, close }：只在提示开启时限时预算玩家走位方案
+[POS]: 规划集成层——状态机 idle→computing→ready→showing（failed 兜底），控制预算与截止时间但不承担渲染
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cloneWorld, type BilliardsWorld } from '../physics';
 import { legalNumbers } from '../match/match-machine';
 import type { MatchState } from '../match/types';
-import { cancelPendingPlan, planPositionAsync } from '../planner/async';
-import type { PositionPlan } from '../planner/search';
+import { cancelPendingPlan, planPositionWithinDeadline } from '../planner/async';
+import type { PlannerOptions, PositionPlan } from '../planner/search';
 
 export type PositionPlanStatus = 'idle' | 'computing' | 'ready' | 'showing' | 'failed';
+
+export const PLAYER_PLAN_DEADLINE_MS = 2500;
+export const PLAYER_PLAN_OPTIONS = {
+  samples: 6,
+  maxDepth: 2,
+  simBudget: 320,
+} satisfies PlannerOptions;
 
 interface UsePositionPlanProps {
   worldView: BilliardsWorld;
@@ -42,7 +49,7 @@ export function shouldComputePositionPlan(
 
 /**
  * 后台预算触发规则：
- * - 用户点亮提示且处于玩家瞄准回合、世界指纹变化 → planPositionAsync
+ * - 用户点亮提示且处于玩家瞄准回合、世界指纹变化 → 限预算、限时 Worker
  * - 灯泡熄灭时不创建 Worker、不做 8000 次后台仿真，避免手机无意耗电
  * - 玩家连续进攻（出杆结算后回到 aiming）→ 指纹变化，自然重新预算
  * - 玩家出杆/对手回合/滚动中 → cancelPendingPlan 丢弃陈旧结果，回到 idle
@@ -85,7 +92,12 @@ export function usePositionPlan({ worldView, match, enabled }: UsePositionPlanPr
 
     setError(undefined);
     setStatus('computing');
-    planPositionAsync(cloneWorld(worldView), legal)
+    planPositionWithinDeadline(
+      cloneWorld(worldView),
+      legal,
+      PLAYER_PLAN_OPTIONS,
+      PLAYER_PLAN_DEADLINE_MS,
+    )
       .then((result) => {
         if (lastFingerprintRef.current !== fingerprint) return; // 世界已变，结果过期
         if (result.length === 0) {

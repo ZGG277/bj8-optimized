@@ -1,13 +1,18 @@
 /*
 [INPUT]: 依赖 usePositionPlan 导出的 planFingerprint、physics 世界构造
-[OUTPUT]: 回归预算指纹分组语义，以及灯泡熄灭/非玩家瞄准态绝不启动走位计算
+[OUTPUT]: 回归预算指纹分组语义、按需触发门控与玩家走位预算/墙钟上限
 [POS]: hooks 层纯函数测试，不挂载 React
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { describe, it, expect } from 'vitest';
 import { createInitialWorld } from '../physics';
 import type { MatchState } from '../match/types';
-import { planFingerprint, shouldComputePositionPlan } from './usePositionPlan';
+import {
+  PLAYER_PLAN_DEADLINE_MS,
+  PLAYER_PLAN_OPTIONS,
+  planFingerprint,
+  shouldComputePositionPlan,
+} from './usePositionPlan';
 
 describe('planFingerprint 分组语义', () => {
   it('同一球局、不同分组 → 指纹必须不同（分组竞态回归）', () => {
@@ -52,5 +57,12 @@ describe('走位计算节能门控', () => {
       actor: 'opponent',
     })).toBe(false);
     expect(shouldComputePositionPlan(true, { ...world, moving: true }, aiming)).toBe(false);
+  });
+
+  it('使用两层小预算并在 2.5 秒内终止', () => {
+    expect(PLAYER_PLAN_OPTIONS.samples).toBeLessThanOrEqual(8);
+    expect(PLAYER_PLAN_OPTIONS.maxDepth).toBeLessThanOrEqual(2);
+    expect(PLAYER_PLAN_OPTIONS.simBudget).toBeLessThanOrEqual(320);
+    expect(PLAYER_PLAN_DEADLINE_MS).toBeLessThanOrEqual(2500);
   });
 });
