@@ -6,7 +6,7 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 ## 成员清单
 
-`useGameState.ts`: 状态管理收敛层，集中管理 worldView/match/viewLevel、跨刷新三杆玩家能力与局内渐进对手档案；批次完成后才更新可见水平并把顾燃最多重定向 3 分。
+`useGameState.ts`: 状态管理收敛层，集中管理 worldView/match/viewLevel 与双方档案；局内只在 ref 收集玩家出杆事实，胜负确定后一次消费、更新可见水平并持久化，未完成对局重开时丢弃临时样本。
 
 `useAimAssist.ts`: 预测辅助线偏好 Hook；首次/损坏存储默认关闭，安全读写 `guagua-billiards:aim-assist:v1`，不控制幽灵球和合法目标环。
 
@@ -18,7 +18,7 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `useAimInteraction.ts`: 交互协调层，封装跟手虚母球、Pointer 落位、点哪打哪、抓影子球与 360° 粗瞄；屏幕反算显式消费当前视觉相机方位，因此顾燃交棒后的自由高位镜头不会与幽灵球点击错位；母球或幽灵球落位后立即呼出无限拨轮，用户轻点才切换固定精瞄档，不探测袋口；只在拖动结束且世界角真实变化时上报粗瞄事实，拨轮调整返回实际粗/精档事实。
 
-`useOpponentAI.ts`: AI 调度层，副作用 Hook——match.phase === 'opponent' 时消费最新有效档案；500ms 自然停顿后最多等待后台规划 2s，超时取消并回退轻量选杆；规划杆的执行误差由 opponent 模型连续压在当前母球杆向安全窗口内，避免高斯长尾明显歪瞄。
+`useOpponentAI.ts`: AI 调度层，match.phase === 'opponent' 时消费本局锁定档案；500ms 自然停顿后调用专用战术 Worker，陪练/挑战分别以 750/1200ms 截止，超时回退轻量选杆；已验证杆的执行误差按模式压在当前杆向安全窗内。
 
 `useAudioManager.ts`: 音效协调层，管理 BilliardsAudio 初始化和物理事件音效播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents。
 

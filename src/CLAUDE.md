@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按真实操作推进首局提示；走位 Worker 只在用户点亮灯泡后启动，结果就绪自动展开，熄灭/出杆立即取消；手动相机路由到独立视觉方位，触屏瞄准期间短暂冻结低位相机；规则在 `match/`、输入在 `input/`、AI 在 `hooks/useOpponentAI`、走位在 `hooks/usePositionPlan`、物理时钟在 `simulation/`，DEV 调试句柄只用于浏览器门禁。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按真实操作推进首局提示；走位 Worker 只在用户点亮灯泡后启动；手机运动中保持 240Hz 物理但仅以 30Hz 发布 React/WebGL 快照；规则在 `match/`、输入在 `input/`、AI 在 `hooks/useOpponentAI`、走位在 `hooks/usePositionPlan`、物理时钟在 `simulation/`，DEV 调试句柄只用于浏览器门禁。
 
 `first-match-guide.ts`: 首局引导纯产品状态机；只有零出杆记录且无完成标记的新用户启用，以放球、拖动结束角度变化、拨轮有效角度变化和成功出杆约束核心节奏，视角/杆法/布局是可跳过的非阻塞发现，容错读写 `guagua-billiards:first-match-guide:v1`，不依赖 React/DOM 或规则实现。
 
@@ -12,7 +12,7 @@
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
 
-`opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；所有真实出杆组成跨局三杆批次，明确进攻意图才更新执行精度；生成 +3/+10 目标并每批最多 3 分渐进重定向顾燃，不依赖 React/DOM。
+`opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；出杆在整局结束时一次评估，明确进攻意图才更新执行精度；生成 +3/+10 目标与独立限预算战术 Worker，挑战档优先真实进球、避免洗袋并保留下一杆。
 
 `layout/`: 五控件布局纯领域层；维护 desktop/portrait/landscape 三套自由或右/底停靠位置，负责 8px 钳制、48px 吸附、沿边落点、碰撞避让、容量与 v2→v3 迁移。
 
@@ -53,10 +53,10 @@
 `audio.ts`: 基于 Web Audio 的无外部资源击球、碰撞、碰库与落袋合成音效。
 
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
-  - `useGameState`：集中管理对局状态、跨刷新三杆玩家画像与局内渐进对手档案；新局重置 shot 结算守卫
+  - `useGameState`：集中管理对局状态、局内锁定双方档案与整局一次评估；新局重置 shot 结算守卫
   - `useAimAssist`：默认关闭且容错持久化的预测辅助线偏好
   - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出、轻点显式切换固定精瞄档的无边界拨轮
-  - `useOpponentAI`：每次调度消费最新有效对手档案，控制搜索预算、选杆扰动与袋口容错内的执行误差
+  - `useOpponentAI`：消费局前锁定档案，调度限预算战术 Worker、选杆扰动与袋口容错内的执行误差
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
   - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在灯泡显式点亮后经可抢占 planner/async 搜索
   - `useDraggableOverlay`：规划/复盘共用的 Pointer 拖拽位移与视口边界约束

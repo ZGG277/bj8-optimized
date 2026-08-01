@@ -19,6 +19,7 @@ describe('renderBudgetFor', () => {
       pixelRatio: 1.25,
       shadowMapSize: 1024,
       powerPreference: 'low-power',
+      movingPresentationFps: 30,
     });
   });
 
@@ -44,6 +45,7 @@ describe('renderBudgetFor', () => {
       pixelRatio: 2,
       shadowMapSize: 2048,
       powerPreference: 'high-performance',
+      movingPresentationFps: 60,
     });
   });
 });

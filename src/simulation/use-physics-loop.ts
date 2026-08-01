@@ -1,12 +1,13 @@
 /*
-[INPUT]: React 生命周期、激活标记、世界 ref 与 onFrame/onSettled 回调
-[OUTPUT]: 对外提供 usePhysicsLoop:rAF 驱动 fixed-step-runner,可见性变化重置时钟,停止时恰好一次 onSettled
+[INPUT]: React 生命周期、激活标记、世界 ref、展示帧间隔与 onFrame/onSettled 回调
+[OUTPUT]: 对外提供 usePhysicsLoop:rAF 驱动 240Hz fixed-step-runner，可降频发布快照，停止时强制最终帧并恰好结算一次
 [POS]: 模拟时钟的 React 装配层,只做事件桥接;步进策略归 fixed-step-runner,物理归 physics
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { PHYSICS_DT, stepWorld, type BilliardsWorld } from '../physics';
 import { createFixedStepRunner } from './fixed-step-runner';
+import { createPresentationCadence } from './presentation-cadence';
 
 type Options = {
   /** 仅 true 时运行循环(通常 match.phase === 'rolling') */
@@ -16,9 +17,17 @@ type Options = {
   onFrame: () => void;
   /** 世界停止时调用,每段运动恰好一次 */
   onSettled: () => void;
+  /** 0 表示每个有效 rAF 都发布；手机传 1000/30 降低 React/WebGL 快照功耗。 */
+  presentationIntervalMs?: number;
 };
 
-export function usePhysicsLoop({ active, worldRef, onFrame, onSettled }: Options) {
+export function usePhysicsLoop({
+  active,
+  worldRef,
+  onFrame,
+  onSettled,
+  presentationIntervalMs = 0,
+}: Options) {
   const onFrameRef = useRef(onFrame);
   const onSettledRef = useRef(onSettled);
   useEffect(() => { onFrameRef.current = onFrame; });
@@ -37,11 +46,14 @@ export function usePhysicsLoop({ active, worldRef, onFrame, onSettled }: Options
       step: (dt) => stepWorld(worldRef.current, dt),
       moving: () => worldRef.current.moving,
     });
+    const cadence = createPresentationCadence(presentationIntervalMs);
 
     let raf = 0;
     const tick = (now: number) => {
       const result = runner.frame(now);
-      if (result.steps > 0 || result.settled) onFrameRef.current();
+      if ((result.steps > 0 && cadence.shouldPublish(now)) || result.settled) {
+        onFrameRef.current();
+      }
       if (result.settled) {
         onSettledRef.current();
         return;
@@ -58,5 +70,5 @@ export function usePhysicsLoop({ active, worldRef, onFrame, onSettled }: Options
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [active, worldRef]);
+  }, [active, worldRef, presentationIntervalMs]);
 }

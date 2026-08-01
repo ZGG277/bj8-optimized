@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
-[OUTPUT]: 对外提供对局状态（worldView / match / viewLevel）、三杆批量玩家能力画像、
-          渐进对手档案与 resetGame / settleShot / recordPlayerShot 等编排动作
+[OUTPUT]: 对外提供对局状态（worldView / match / viewLevel）、整局结束才提交的双方能力档案、
+          resetGame / settleShot / recordPlayerShot / completeMatchAssessment 等编排动作
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -21,9 +21,8 @@ import { factsFromWorld } from '../match/shot-facts';
 import type { MatchMessageKey, MatchMessageParams, MatchState } from '../match/types';
 import {
   createOpponentProfile,
+  applyMatchObservations,
   loadPlayerSkillProfile,
-  queueShotObservation,
-  retargetOpponentProfile,
   savePlayerSkillProfile,
   type GameMode,
   type ShotSkillObservation,
@@ -54,7 +53,7 @@ export function useGameState() {
   // ── 视图状态 ──
   const [viewLevel, setViewLevel] = useState(FIRST_PERSON_VIEW);
 
-  // ── 玩家能力与对手档案（玩家画像跨局；对手档案按三杆批次渐进重定向）──
+  // ── 玩家能力与对手档案（整局中锁定，结束后一次性更新）──
   const [playerSkill, setPlayerSkill] = useState(() =>
     loadPlayerSkillProfile(browserStorage()),
   );
@@ -65,6 +64,7 @@ export function useGameState() {
   const [opponentProfile, setOpponentProfile] = useState(() =>
     createOpponentProfile(playerSkill, 'practice'),
   );
+  const matchObservationsRef = useRef<ShotSkillObservation[]>([]);
 
   // ── 派生 ──
   const canAim = match.phase === 'aiming' && match.actor === 'player' && !worldView.moving;
@@ -82,6 +82,7 @@ export function useGameState() {
     const fresh = createInitialWorld(Math.random);
     worldRef.current = fresh;
     settlementGuardRef.current.reset();
+    matchObservationsRef.current = [];
     setWorldView(cloneWorld(fresh));
     setMatch(m => beginMatch(m));
     setGameMode(nextMode);
@@ -91,17 +92,22 @@ export function useGameState() {
     setAim(0);
   }, [gameMode]);
 
-  /** 所有玩家出杆进入跨局三杆队列；批次完成后才更新可见水平并渐进重定向 AI。 */
+  /** 局内只收集事实；不改可见分数、不持久化、不改本局 AI。 */
   const recordPlayerShot = useCallback((observation: ShotSkillObservation) => {
-    const result = queueShotObservation(playerSkillRef.current, observation);
-    playerSkillRef.current = result.profile;
-    setPlayerSkill(result.profile);
-    savePlayerSkillProfile(result.profile, browserStorage());
-    if (result.batchCompleted) {
-      setOpponentProfile(current =>
-        retargetOpponentProfile(current, result.profile, gameModeRef.current));
-    }
-    return result;
+    matchObservationsRef.current.push(observation);
+  }, []);
+
+  /** 胜负已定后一次消费本局样本，双方新档案只影响结算页/下一局。 */
+  const completeMatchAssessment = useCallback(() => {
+    const observations = matchObservationsRef.current;
+    matchObservationsRef.current = [];
+    if (observations.length === 0) return playerSkillRef.current;
+    const next = applyMatchObservations(playerSkillRef.current, observations);
+    playerSkillRef.current = next;
+    setPlayerSkill(next);
+    savePlayerSkillProfile(next, browserStorage());
+    setOpponentProfile(createOpponentProfile(next, gameModeRef.current));
+    return next;
   }, []);
 
   /** 物理停止：事实推导 → 纯规则结算 → 原子提交 → 执行显式 effects
@@ -140,6 +146,7 @@ export function useGameState() {
     setMessage,
     resetGame,
     recordPlayerShot,
+    completeMatchAssessment,
     settleShotRaw,
   };
 }

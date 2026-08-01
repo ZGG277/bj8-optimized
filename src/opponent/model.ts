@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
-[OUTPUT]: 玩家三杆批量能力画像、袋口容错内的顾燃执行误差、适量搜索预算的陪练/挑战动态对手档案、等级/置信度展示与安全持久化
-[POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；局内档案按三杆批次限速重定向
+[OUTPUT]: 玩家整局能力画像、袋口容错内的顾燃执行误差、限预算战术选杆档案、等级/置信度展示与安全持久化
+[POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；对局中档案锁定，只在整局结束时统一评估
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
 import { erfProb, gaussian } from '../planner/evaluate';
@@ -20,7 +20,7 @@ export type ShotSkillObservation = {
 };
 
 export type PlayerSkillProfile = {
-  version: 2;
+  version: 3;
   level: number;
   executionLevel: number;
   executionSigma: number;
@@ -31,12 +31,11 @@ export type PlayerSkillProfile = {
   positionSuccesses: number;
   foulAttempts: number;
   fouls: number;
-  /** 所有真实玩家出杆；用于稳定的三杆更新节奏。 */
+  /** 已完成对局中的所有真实玩家出杆。 */
   totalPlayerShots: number;
-  /** 跨局、跨刷新保留，始终只有 0–2 条。 */
-  pendingObservations: ShotSkillObservation[];
-  /** 最近一次三杆批次带来的可见分数变化。 */
-  lastBatchDelta: number;
+  matchesEvaluated: number;
+  /** 最近一局结束时带来的可见分数变化。 */
+  lastMatchDelta: number;
 };
 
 export type OpponentProfile = {
@@ -45,21 +44,23 @@ export type OpponentProfile = {
   tierLevel: number;
   /** 最新玩家画像对应的目标实力。 */
   targetLevel: number;
-  /** 下一回合实际采用的能力，局内每批最多移动 3 分。 */
+  /** 本局锁定的实际能力。 */
   effectiveLevel: number;
   label: string;
   aimSigma: number;
   powerJitter: number;
-  choiceTemperature: number;
-  planner: {
-    sigma: number;
-    samples: number;
-    maxDepth: 1 | 2;
-    simBudget: number;
+  aimWindowFraction: number;
+  tactical: {
+    candidateLimit: number;
+    simulationLimit: number;
+    followUpWeight: number;
+    alternativeChance: number;
+    deadlineMs: number;
   };
 };
 
-export const PLAYER_SKILL_STORAGE_KEY = 'guagua-billiards:player-skill:v2';
+export const PLAYER_SKILL_STORAGE_KEY = 'guagua-billiards:player-skill:v3';
+export const PREVIOUS_PLAYER_SKILL_STORAGE_KEY = 'guagua-billiards:player-skill:v2';
 export const LEGACY_PLAYER_SKILL_STORAGE_KEY = 'guagua-billiards:player-skill:v1';
 
 const MIN_SIGMA = 0.0025;
@@ -68,7 +69,6 @@ const MIN_OPPONENT_LEVEL = 0;
 const MAX_OPPONENT_LEVEL = 100;
 const MAX_LEVEL_UP_PER_SHOT = 0.4;
 const MAX_LEVEL_DOWN_PER_SHOT = 0.2;
-const SHOTS_PER_BATCH = 3;
 const MAX_OPPONENT_STEP = 3;
 export const OPPONENT_AIM_WINDOW_FRACTION = 0.82;
 
@@ -95,11 +95,12 @@ export function sampleOpponentAimOffset(
   sigma: number,
   tolerance: number,
   rng: () => number = Math.random,
+  windowFraction = OPPONENT_AIM_WINDOW_FRACTION,
 ): number {
   if (!Number.isFinite(sigma) || sigma <= 0) return 0;
   const raw = gaussian(rng) * sigma;
   if (!Number.isFinite(tolerance) || tolerance <= 0) return raw;
-  const limit = tolerance * OPPONENT_AIM_WINDOW_FRACTION;
+  const limit = tolerance * clamp(windowFraction, 0.1, 1);
   return Math.tanh(raw / limit) * limit;
 }
 
@@ -113,7 +114,7 @@ export function levelLabel(level: number): string {
 
 export function createPlayerSkillProfile(): PlayerSkillProfile {
   return {
-    version: 2,
+    version: 3,
     level: 50,
     executionLevel: 50,
     executionSigma: levelToSigma(50),
@@ -125,8 +126,8 @@ export function createPlayerSkillProfile(): PlayerSkillProfile {
     foulAttempts: 0,
     fouls: 0,
     totalPlayerShots: 0,
-    pendingObservations: [],
-    lastBatchDelta: 0,
+    matchesEvaluated: 0,
+    lastMatchDelta: 0,
   };
 }
 
@@ -156,13 +157,14 @@ function normalizedObservation(observation: ShotSkillObservation): ShotSkillObse
 
 /**
  * 把一批样本一次性折算为可见分数。执行维度仍逐杆消费“实际-预期”证据，
- * 最终综合分只提交一次，因此三杆之间不会在 UI 上抖动。
+ * 最终综合分只提交一次，因此整局进行中不会在 UI 上抖动。
  */
-export function applyShotBatch(
+export function applyMatchObservations(
   profile: PlayerSkillProfile,
   observations: ShotSkillObservation[],
 ): PlayerSkillProfile {
-  const batch = observations.slice(0, SHOTS_PER_BATCH);
+  const batch = observations.map(normalizedObservation);
+  if (batch.length === 0) return profile;
   let executionLevel = profile.executionLevel;
   const buckets: [number, number, number] = [...profile.difficultyBuckets];
   let qualifiedShots = profile.qualifiedShots;
@@ -219,7 +221,7 @@ export function applyShotBatch(
 
   return {
     ...profile,
-    version: 2,
+    version: 3,
     level,
     executionLevel,
     executionSigma: levelToSigma(executionLevel),
@@ -230,50 +232,18 @@ export function applyShotBatch(
     positionSuccesses,
     foulAttempts,
     fouls,
-    lastBatchDelta: level - profile.level,
+    totalPlayerShots: profile.totalPlayerShots + batch.length,
+    matchesEvaluated: profile.matchesEvaluated + 1,
+    lastMatchDelta: level - profile.level,
   };
 }
 
-/** 兼容纯模型调用：立即应用单杆，但不参与生产环境的三杆队列。 */
+/** 兼容纯模型/单杆校准调用；生产对局使用 applyMatchObservations。 */
 export function applyShotObservation(
   profile: PlayerSkillProfile,
   observation: ShotSkillObservation,
 ): PlayerSkillProfile {
-  return applyShotBatch(profile, [observation]);
-}
-
-export type QueuedShotResult = {
-  profile: PlayerSkillProfile;
-  batchCompleted: boolean;
-};
-
-/** 每三次真实出杆才提交能力变化；未满三杆只持久化队列。 */
-export function queueShotObservation(
-  profile: PlayerSkillProfile,
-  observation: ShotSkillObservation,
-): QueuedShotResult {
-  const pending = [...profile.pendingObservations, normalizedObservation(observation)];
-  const totalPlayerShots = profile.totalPlayerShots + 1;
-  if (pending.length < SHOTS_PER_BATCH) {
-    return {
-      batchCompleted: false,
-      profile: {
-        ...profile,
-        totalPlayerShots,
-        pendingObservations: pending,
-        lastBatchDelta: 0,
-      },
-    };
-  }
-  const evaluated = applyShotBatch(profile, pending.slice(0, SHOTS_PER_BATCH));
-  return {
-    batchCompleted: true,
-    profile: {
-      ...evaluated,
-      totalPlayerShots,
-      pendingObservations: [],
-    },
-  };
+  return applyMatchObservations(profile, [observation]);
 }
 
 /** 低置信度时向中性 50 收缩，避免冷启动误判直接生成碾压型对手。 */
@@ -308,19 +278,17 @@ function profileForLevel(
     effectiveLevel: safeEffective,
     label: levelLabel(safeTarget),
     aimSigma,
-    powerJitter: 0.11 - levelT * 0.08,
-    choiceTemperature:
+    powerJitter:
       mode === 'practice'
-        ? 0.42 - levelT * 0.24
-        : 0.2 - levelT * 0.14,
-    planner: {
-      sigma: aimSigma,
-      samples:
-        mode === 'practice'
-          ? 8 + Math.round(levelT * 8)
-          : 12 + Math.round(levelT * 12),
-      maxDepth: mode === 'practice' ? 1 : 2,
-      simBudget: mode === 'practice' ? 240 : 640,
+        ? 0.1 - levelT * 0.065
+        : 0.035 - levelT * 0.02,
+    aimWindowFraction: mode === 'practice' ? 0.82 : 0.55,
+    tactical: {
+      candidateLimit: mode === 'practice' ? 3 : 6,
+      simulationLimit: mode === 'practice' ? 12 : 24,
+      followUpWeight: mode === 'practice' ? 0.35 : 0.9,
+      alternativeChance: mode === 'practice' ? 0.22 : 0,
+      deadlineMs: mode === 'practice' ? 750 : 1200,
     },
   };
 }
@@ -333,7 +301,7 @@ export function createOpponentProfile(
   return profileForLevel(mode, targetLevel, targetLevel);
 }
 
-/** 玩家批次更新后重定向；下一次 AI 调度读取的新档案最多移动 3 分。 */
+/** 兼容外部渐进重定向；生产对局局内不调用。 */
 export function retargetOpponentProfile(
   current: OpponentProfile,
   player: PlayerSkillProfile,
@@ -350,8 +318,12 @@ type StorageWriter = Pick<Storage, 'setItem'>;
 
 function parseProfile(value: unknown): PlayerSkillProfile | null {
   if (!value || typeof value !== 'object') return null;
-  const raw = value as Partial<Omit<PlayerSkillProfile, 'version'>> & { version?: number };
-  if ((raw.version !== 1 && raw.version !== 2) || !Array.isArray(raw.difficultyBuckets)) return null;
+  const raw = value as Partial<Omit<PlayerSkillProfile, 'version'>> & {
+    version?: number;
+    pendingObservations?: unknown[];
+    lastBatchDelta?: number;
+  };
+  if ((raw.version !== 1 && raw.version !== 2 && raw.version !== 3) || !Array.isArray(raw.difficultyBuckets)) return null;
   const fallback = createPlayerSkillProfile();
   const difficultyBuckets: [number, number, number] = [
     Math.max(0, finite(raw.difficultyBuckets[0], 0)),
@@ -361,11 +333,11 @@ function parseProfile(value: unknown): PlayerSkillProfile | null {
   const executionLevel = clamp(finite(raw.executionLevel, fallback.executionLevel), 0, 100);
   const pendingObservations =
     raw.version === 2 && Array.isArray(raw.pendingObservations)
-      ? raw.pendingObservations.slice(0, SHOTS_PER_BATCH - 1).map(item =>
+      ? raw.pendingObservations.slice(0, 2).map(item =>
           normalizedObservation(item as ShotSkillObservation))
       : [];
-  return {
-    version: 2,
+  const parsed: PlayerSkillProfile = {
+    version: 3,
     level: clamp(finite(raw.level, fallback.level), 0, 100),
     executionLevel,
     executionSigma: levelToSigma(executionLevel),
@@ -376,10 +348,13 @@ function parseProfile(value: unknown): PlayerSkillProfile | null {
     positionSuccesses: Math.max(0, finite(raw.positionSuccesses, 0)),
     foulAttempts: Math.max(0, finite(raw.foulAttempts, 0)),
     fouls: Math.max(0, finite(raw.fouls, 0)),
-    totalPlayerShots: Math.max(0, finite(raw.totalPlayerShots, 0)),
-    pendingObservations,
-    lastBatchDelta: finite(raw.lastBatchDelta, 0),
+    totalPlayerShots: Math.max(0, finite(raw.totalPlayerShots, 0) - pendingObservations.length),
+    matchesEvaluated: Math.max(0, finite(raw.matchesEvaluated, 0)),
+    lastMatchDelta: finite(raw.lastMatchDelta, finite(raw.lastBatchDelta, 0)),
   };
+  return pendingObservations.length > 0
+    ? applyMatchObservations(parsed, pendingObservations)
+    : parsed;
 }
 
 export function loadPlayerSkillProfile(storage?: StorageReader | null): PlayerSkillProfile {
@@ -387,6 +362,8 @@ export function loadPlayerSkillProfile(storage?: StorageReader | null): PlayerSk
   try {
     const saved = storage.getItem(PLAYER_SKILL_STORAGE_KEY);
     if (saved) return parseProfile(JSON.parse(saved)) ?? createPlayerSkillProfile();
+    const previous = storage.getItem(PREVIOUS_PLAYER_SKILL_STORAGE_KEY);
+    if (previous) return parseProfile(JSON.parse(previous)) ?? createPlayerSkillProfile();
     const legacy = storage.getItem(LEGACY_PLAYER_SKILL_STORAGE_KEY);
     return legacy ? parseProfile(JSON.parse(legacy)) ?? createPlayerSkillProfile() : createPlayerSkillProfile();
   } catch {
