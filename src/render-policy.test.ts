@@ -16,10 +16,10 @@ describe('renderBudgetFor', () => {
       coarsePointer: true,
     })).toEqual({
       mobile: true,
-      pixelRatio: 1.25,
+      pixelRatio: 1.5,
       shadowMapSize: 1024,
       powerPreference: 'low-power',
-      movingPresentationFps: 30,
+      movingPresentationFps: 60,
     });
   });
 
@@ -31,7 +31,7 @@ describe('renderBudgetFor', () => {
       coarsePointer: true,
     });
     expect(budget.mobile).toBe(true);
-    expect(budget.pixelRatio).toBe(1.25);
+    expect(budget.pixelRatio).toBe(1.5);
   });
 
   it('桌面保留 2× 清晰度与 2048 阴影', () => {

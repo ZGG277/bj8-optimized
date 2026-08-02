@@ -17,7 +17,7 @@ type Options = {
   onFrame: () => void;
   /** 世界停止时调用,每段运动恰好一次 */
   onSettled: () => void;
-  /** 0 表示每个有效 rAF 都发布；手机传 1000/30 降低 React/WebGL 快照功耗。 */
+  /** 0 表示每个有效 rAF 都发布；手机传 1000/60 保持滚动视觉连续。 */
   presentationIntervalMs?: number;
 };
 

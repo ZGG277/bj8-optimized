@@ -21,7 +21,7 @@ export type RenderEnvironment = {
 };
 
 const MOBILE_SHORT_EDGE = 600;
-const MOBILE_PIXEL_RATIO_CAP = 1.25;
+const MOBILE_PIXEL_RATIO_CAP = 1.5;
 const DESKTOP_PIXEL_RATIO_CAP = 2;
 
 /**
@@ -41,6 +41,6 @@ export function renderBudgetFor(environment: RenderEnvironment): RenderBudget {
     pixelRatio: Math.min(dpr, mobile ? MOBILE_PIXEL_RATIO_CAP : DESKTOP_PIXEL_RATIO_CAP),
     shadowMapSize: mobile ? 1024 : 2048,
     powerPreference: mobile ? 'low-power' : 'high-performance',
-    movingPresentationFps: mobile ? 30 : 60,
+    movingPresentationFps: 60,
   };
 }
