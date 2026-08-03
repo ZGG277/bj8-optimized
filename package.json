@@ -1,7 +1,8 @@
 {
   "name": "bj8-optimized",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "private": true,
+  "packageManager": "npm@11.9.0",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build && node scripts/inline-build.mjs",
@@ -12,6 +13,8 @@
     "test:interaction": "node scripts/verify-interaction.mjs",
     "test:mobile": "node scripts/verify-mobile-portrait-v12.mjs",
     "test:spectator-camera": "node scripts/verify-spectator-camera.mjs",
+    "test:render-thermal": "node scripts/verify-render-thermal.mjs",
+    "test:control-intent": "node scripts/verify-control-intent.mjs",
     "test:pockets-visual": "node scripts/verify-pockets.mjs",
     "check": "npm run typecheck && npm run test:unit && npm run build"
   },

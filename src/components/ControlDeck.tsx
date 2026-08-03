@@ -1,11 +1,12 @@
 /*
-[INPUT]: 五个游戏控件状态、手动相机、显式精瞄档、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
-[OUTPUT]: 纯视觉五控件层；转发粗精切档并支持合成层逐帧自由拖动、右/底吸附、跨边转向、长按布局、真实布局变化事实与 v3 持久化
-[POS]: HUD 控件编排层；组合 ViewToolbar / AimDial / SpinControl / ShootControl，不持有游戏规则
+[INPUT]: 五个游戏控件状态、观战视角锁、手动相机、默认左右微调/显式拨轮档、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
+[OUTPUT]: 纯视觉五控件层；灯泡展开三项独立辅助，默认显示球杆左右微调，显式开启后原位切换拨轮；并保留逐帧自由拖动、右/底吸附与 v3 持久化
+[POS]: HUD 控件编排层；组合 ViewToolbar / AimControls·AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { AimControls } from './AimControls';
 import { AimDial } from './AimDial';
 import { SpinControl } from './SpinControl';
 import { ShootControl } from './ShootControl';
@@ -37,6 +38,25 @@ import {
 } from '../layout/control-layout';
 
 type Axis = 'horizontal' | 'vertical';
+
+export const CONTENT_GESTURE_LAYOUT_CANCEL_PX = 3;
+
+export function controlActivationIntent(
+  id: DockItemId,
+  distance: number,
+  deadlineReached: boolean,
+  layoutMoveThreshold: number,
+): 'pending' | 'quick-gesture' | 'layout' {
+  // 瞄准和蓄力一旦出现明确位移，本次手势就属于控件内容；
+  // 即使此时刚好跨过长按时限，也不能再升级为布局拖位。
+  if ((id === 'aimDial' || id === 'power') &&
+    distance > CONTENT_GESTURE_LAYOUT_CANCEL_PX) {
+    return 'quick-gesture';
+  }
+  if (deadlineReached) return 'layout';
+  if (distance > layoutMoveThreshold) return 'quick-gesture';
+  return 'pending';
+}
 
 type LayoutDrag = {
   id: DockItemId;
@@ -131,6 +151,9 @@ function DockableControlSlot({
       style={style}
       onPointerDownCapture={(event) => {
         if (dragging) return;
+        // 左右微调按钮的静止长按属于连续瞄准，不得被控件布局长按抢走。
+        if (event.target instanceof Element &&
+          event.target.closest('[data-control-content-hold="aim-button"]')) return;
         clearActivation();
         const target = event.currentTarget;
         const pointerId = event.pointerId;
@@ -175,7 +198,17 @@ function DockableControlSlot({
       onPointerMoveCapture={(event) => {
         const activation = activationRef.current;
         if (!activation || activation.pointerId !== event.pointerId) return;
-        if (window.performance.now() >= activation.deadline) {
+        const distance = Math.hypot(
+          event.clientX - activation.x,
+          event.clientY - activation.y,
+        );
+        const intent = controlActivationIntent(
+          id,
+          distance,
+          window.performance.now() >= activation.deadline,
+          activation.moveThreshold,
+        );
+        if (intent === 'layout') {
           window.clearTimeout(activation.timer);
           activationRef.current = null;
           suppressClickRef.current = true;
@@ -199,8 +232,7 @@ function DockableControlSlot({
           event.stopPropagation();
           return;
         }
-        if (Math.hypot(event.clientX - activation.x, event.clientY - activation.y) >
-          activation.moveThreshold) {
+        if (intent === 'quick-gesture') {
           clearActivation();
           event.stopPropagation();
           const handled = onQuickGesture(
@@ -254,6 +286,7 @@ function DockableControlSlot({
 interface ControlDeckProps {
   viewLevel: number;
   manualCameraActive: boolean;
+  viewLocked: boolean;
   canAim: boolean;
   spin: CueSpin;
   charging: boolean;
@@ -263,6 +296,7 @@ interface ControlDeckProps {
   guidanceEnabled: boolean;
   hasReview: boolean;
   aimAssistEnabled: boolean;
+  aimDialEnabled: boolean;
   aimDialVisible: boolean;
   aimDialPrecisionActive: boolean;
   onViewLevel: (level: number) => void;
@@ -271,6 +305,8 @@ interface ControlDeckProps {
   onLayoutAdjusted: () => void;
   onToggleGuidance: () => void;
   onToggleAimAssist: () => void;
+  onToggleAimDial: () => void;
+  onAimButtonAdjust: (angleDelta: number) => void;
   onAimDialAdjust: (pixelDelta: number, pressureGain?: number) => void;
   onToggleAimDialPrecision: () => void;
   onBeginCharge: (coordinate: number, availableTravel: number) => void;
@@ -304,6 +340,7 @@ function axisFor(id: DockItemId, placement: Placement): Axis {
 export function ControlDeck({
   viewLevel,
   manualCameraActive,
+  viewLocked,
   canAim,
   spin,
   charging,
@@ -313,6 +350,7 @@ export function ControlDeck({
   guidanceEnabled,
   hasReview,
   aimAssistEnabled,
+  aimDialEnabled,
   aimDialVisible,
   aimDialPrecisionActive,
   onViewLevel,
@@ -321,6 +359,8 @@ export function ControlDeck({
   onLayoutAdjusted,
   onToggleGuidance,
   onToggleAimAssist,
+  onToggleAimDial,
+  onAimButtonAdjust,
   onAimDialAdjust,
   onToggleAimDialPrecision,
   onBeginCharge,
@@ -709,6 +749,7 @@ export function ControlDeck({
       <ViewToolbar
         viewLevel={viewLevel}
         manualCameraActive={manualCameraActive}
+        disabled={viewLocked}
         orientation={axisFor('view', layout.view)}
         onViewLevel={onViewLevel}
         onToggleManualCamera={onToggleManualCamera}
@@ -718,7 +759,7 @@ export function ControlDeck({
       <div className={`assist-control ${assistMenuOpen ? 'menu-open' : ''}`}>
         <button
           type="button"
-          className={`plan-button ${guidanceStateClass} ${aimAssistEnabled ? 'has-aim-assist' : ''}`}
+          className={`plan-button ${guidanceStateClass} ${aimAssistEnabled || aimDialEnabled ? 'has-aim-assist' : ''}`}
           aria-label="打开辅助功能"
           aria-expanded={assistMenuOpen}
           onClick={() => setAssistMenuOpen(open => !open)}
@@ -752,6 +793,19 @@ export function ControlDeck({
             >
               <span className="route-icon" aria-hidden="true"><i /><i /><i /></span>
             </button>
+            <button
+              type="button"
+              className={`assist-option dial-option ${aimDialEnabled ? 'active' : ''}`}
+              role="switch"
+              aria-label="拨轮瞄准"
+              aria-checked={aimDialEnabled}
+              onClick={() => {
+                onToggleAimDial();
+                setAssistMenuOpen(false);
+              }}
+            >
+              <span className="dial-icon" aria-hidden="true"><i /></span>
+            </button>
           </div>
         )}
       </div>
@@ -773,17 +827,22 @@ export function ControlDeck({
         onTap={onTapShot}
       />
     ),
-    aimDial: aimDialVisible ? (
-      <AimDial
-        visible
-        precisionActive={aimDialPrecisionActive}
-        orientation={axisFor('aimDial', layout.aimDial)}
-        onAdjust={onAimDialAdjust}
-        onTogglePrecision={onToggleAimDialPrecision}
-      />
+    aimDial: canAim ? (
+      aimDialEnabled && aimDialVisible ? (
+        <AimDial
+          visible
+          precisionActive={aimDialPrecisionActive}
+          orientation={axisFor('aimDial', layout.aimDial)}
+          onAdjust={onAimDialAdjust}
+          onTogglePrecision={onToggleAimDialPrecision}
+        />
+      ) : (
+        <AimControls disabled={false} onAdjust={onAimButtonAdjust} />
+      )
     ) : null,
   }), [
     aimAssistEnabled,
+    aimDialEnabled,
     aimDialPrecisionActive,
     aimDialVisible,
     assistMenuOpen,
@@ -796,7 +855,10 @@ export function ControlDeck({
     hasReview,
     layout,
     manualCameraActive,
+    viewLocked,
     onAimDialAdjust,
+    onAimButtonAdjust,
+    onToggleAimDial,
     onToggleAimDialPrecision,
     onBeginCharge,
     onCancelCharge,
@@ -833,7 +895,7 @@ export function ControlDeck({
     pointerType: string,
     pressure: number,
   ) => {
-    if (id !== 'aimDial') return false;
+    if (id !== 'aimDial' || !aimDialEnabled) return false;
     const pressureProfile = aimDialPressureProfile(pointerType, pressure);
     onAimDialAdjust(controlAxisDelta(
       layoutRef.current.aimDial,
@@ -841,7 +903,7 @@ export function ControlDeck({
       deltaY,
     ), pressureProfile.gain);
     return true;
-  }, [onAimDialAdjust]);
+  }, [aimDialEnabled, onAimDialAdjust]);
 
   const renderSlot = (id: DockItemId) => (
     <DockableControlSlot
@@ -849,6 +911,7 @@ export function ControlDeck({
       id={id}
       placement={layout[id]}
       dragging={draggingId === id}
+      className={id === 'aimDial' && !aimDialEnabled ? 'is-aim-buttons' : ''}
       onLayoutStart={startLayoutDrag}
       onQuickGesture={transferQuickGesture}
     >

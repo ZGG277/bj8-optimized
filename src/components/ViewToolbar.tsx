@@ -1,6 +1,6 @@
 /*
-[INPUT]: 当前归一化视角高度、手动相机状态、停靠方向与调整回调
-[OUTPUT]: 对外提供无文字手动相机入口，以及可横竖转向且可停任意高度的视角推杆
+[INPUT]: 当前归一化视角高度、观战锁定、手动相机状态、停靠方向与调整回调
+[OUTPUT]: 对外提供可在顾燃回合整体禁用的无文字手动相机入口，以及可横竖转向且可停任意高度的视角推杆
 [POS]: 控制组件层，只转发 0..1 连续视角事实，不持有对局或相机状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -20,6 +20,7 @@ import {
 type Props = {
   viewLevel: number;
   manualCameraActive: boolean;
+  disabled: boolean;
   orientation: 'horizontal' | 'vertical';
   onViewLevel: (level: number) => void;
   onToggleManualCamera: () => void;
@@ -32,6 +33,7 @@ const TRACK_INSET_PX = 12;
 export function ViewToolbar({
   viewLevel,
   manualCameraActive,
+  disabled,
   orientation,
   onViewLevel,
   onToggleManualCamera,
@@ -62,6 +64,7 @@ export function ViewToolbar({
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    if (disabled) return;
     pointerIdRef.current = event.pointerId;
     pointerStartRef.current = { x: event.clientX, y: event.clientY, moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -71,6 +74,7 @@ export function ViewToolbar({
     if (pointerIdRef.current !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
+    if (disabled) return;
     const start = pointerStartRef.current;
     if (start && !start.moved) {
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 4) return;
@@ -83,7 +87,7 @@ export function ViewToolbar({
     if (pointerIdRef.current !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
-    if (!pointerStartRef.current?.moved) updateFromPointer(event);
+    if (!disabled && !pointerStartRef.current?.moved) updateFromPointer(event);
     pointerIdRef.current = null;
     pointerStartRef.current = null;
     setDragLevel(null);
@@ -93,6 +97,7 @@ export function ViewToolbar({
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
     let next: number | null = null;
     if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
       next = levelRef.current + 0.05;
@@ -117,7 +122,8 @@ export function ViewToolbar({
 
   return (
     <div
-      className={`view-switcher is-${orientation}`}
+      className={`view-switcher is-${orientation} ${disabled ? 'disabled' : ''}`}
+      aria-disabled={disabled}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="view-mode-cluster">
@@ -126,6 +132,7 @@ export function ViewToolbar({
           className={`view-mode-button view-mode-overhead ${level >= 0.995 ? 'active' : ''}`}
           aria-pressed={level >= 0.995}
           aria-label="切换俯视视角"
+          disabled={disabled}
           onClick={() => onViewLevel(OVERHEAD_VIEW)}
         >
           <span className="view-icon view-icon-overhead" aria-hidden="true"><i /></span>
@@ -135,6 +142,7 @@ export function ViewToolbar({
           className={`view-mode-button manual-camera-button ${manualCameraActive ? 'active' : ''}`}
           aria-pressed={manualCameraActive}
           aria-label={manualCameraActive ? '退出手动视角' : '开启手动视角'}
+          disabled={disabled}
           onClick={onToggleManualCamera}
         >
           <span className="manual-camera-icon" aria-hidden="true"><i /></span>
@@ -143,7 +151,8 @@ export function ViewToolbar({
       <div
         className="view-slider-track"
         role="slider"
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
         aria-label="视角推杆"
         aria-orientation={orientation}
         aria-valuemin={0}
@@ -167,6 +176,7 @@ export function ViewToolbar({
         className={`view-mode-button view-mode-first ${level <= 0.005 ? 'active' : ''}`}
         aria-pressed={level <= 0.005}
         aria-label="切换第一人称视角"
+        disabled={disabled}
         onClick={() => onViewLevel(FIRST_PERSON_VIEW)}
       >
         <span className="view-icon view-icon-eye" aria-hidden="true"><i /></span>

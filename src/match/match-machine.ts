@@ -72,9 +72,9 @@ export function createInitialMatchState(): MatchState {
   };
 }
 
-/** 从介绍页进入开球：先让玩家在开球区放置白球 */
+/** 从介绍页进入开球：白球已在标准位，直接进入瞄准状态 */
 export function beginMatch(state: MatchState): MatchState {
-  return { ...createInitialMatchState(), phase: 'placing', messageKey: 'placing-break', messageParams: state.messageParams };
+  return { ...createInitialMatchState(), phase: 'aiming', messageKey: 'break-ready', messageParams: state.messageParams };
 }
 
 /**

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖浏览器 Web Audio API 与物理事件传入的速度/类型
-[OUTPUT]: 对外提供 BilliardsAudio，合成出杆、球碰、碰库与落袋音效
+[OUTPUT]: 对外提供 BilliardsAudio，合成出杆、球碰、碰库、落袋与克制胜局彩炮音效
 [POS]: 表现层音频适配器；无外部音频资源，不参与物理和规则判定
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
@@ -55,13 +55,18 @@ export class BilliardsAudio {
   }
 
   /** 碰撞咔哒声，intensity 0-1 */
-  click(intensity: number) {
+  ballCollision(intensity: number) {
     // 节流：同一帧多个碰撞只播一次
     const now = performance.now();
     if (now - this.lastPlay < 25) return;
     this.lastPlay = now;
     const v = Math.min(1, Math.max(0.05, intensity));
     this.noiseBurst(0.03 + v * 0.05, 2200 + v * 1800, 0.12 + v * 0.5);
+  }
+
+  /** 兼容旧的首碰调用名。 */
+  click(intensity: number) {
+    this.ballCollision(intensity);
   }
 
   /** 库边闷响 */
@@ -83,5 +88,13 @@ export class BilliardsAudio {
   strike(power: number) {
     const v = Math.min(1, Math.max(0.1, power / 100));
     this.noiseBurst(0.04 + v * 0.04, 1600 + v * 1200, 0.2 + v * 0.45);
+  }
+
+  /** 胜局彩炮：两声轻爆点加一层短促闪光，不铺满声场。 */
+  victory() {
+    if (!this.ensure()) return;
+    this.noiseBurst(0.1, 180, 0.34, 'lowpass');
+    setTimeout(() => this.noiseBurst(0.08, 230, 0.27, 'lowpass'), 145);
+    setTimeout(() => this.noiseBurst(0.14, 4200, 0.1, 'highpass'), 185);
   }
 }

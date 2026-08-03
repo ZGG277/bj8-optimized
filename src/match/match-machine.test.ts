@@ -213,10 +213,10 @@ describe('8 号球胜负', () => {
 });
 
 describe('状态机属性', () => {
-  it('重开：回到初始开放开球局（先放置白球）', () => {
+  it('重开：白球在标准位自动就位并直接进入瞄准状态', () => {
     const m = beginMatch(createInitialMatchState());
-    expect(m.phase).toBe('placing');
-    expect(m.messageKey).toBe('placing-break');
+    expect(m.phase).toBe('aiming');
+    expect(m.messageKey).toBe('break-ready');
     expect(m.actor).toBe('player');
     expect(m.breaking).toBe(true);
     expect(m.playerGroup).toBeNull();

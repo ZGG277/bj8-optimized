@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供含台内圆弧凹口、浅驼皮圈、白色菱形网袋和收尖绿呢角衬的真实六袋结构，以及移动端节能预算、静止按需渲染、纵横屏全台适配相机、独立观战/全局环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[OUTPUT]: 对外提供带前探鼻尖/下沿内凹的真实库边与六袋结构、静止按需渲染、最终帧率上限、GPU 负载监控/三档自适应温控、纵横屏全台适配相机、观战锁定与玩家手动环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -15,6 +15,7 @@ import {
   pocketLocalToWorld,
   predictBallCollisionDirections,
   type BilliardsWorld,
+  type CushionSegment,
   type Point2,
   type PocketGeometry,
 } from './physics';
@@ -34,7 +35,18 @@ import {
   makeBallTexture,
   makeCueBallTexture,
 } from './textures';
-import { renderBudgetFor } from './render-policy';
+import {
+  adaptiveRenderQualityFor,
+  renderBudgetFor,
+  type AdaptiveRenderQuality,
+  type RenderBudget,
+  type RenderQualityTier,
+} from './render-policy';
+import {
+  THERMAL_IDLE_RECOVERY_MS,
+  createThermalGovernor,
+  type ThermalSnapshot,
+} from './thermal-governor';
 
 const R = TABLE.ballRadius;
 const W = TABLE.width;
@@ -43,9 +55,74 @@ const RAIL_H = 0.045;
 const RAIL_W = 0.07;
 const CUSHION_H = 0.038;
 const CUSHION_W = 0.048;
+const CUSHION_BASE_RECESS = 0.019;
+const CUSHION_NOSE_HEIGHT = R * 1.24;
 const POCKET_POS: [number, number][] = POCKETS.map(
   pocket => [pocket.x, pocket.z],
 );
+
+/**
+ * 真实胶边剖面：鼻尖位于球心上方并探向台内，鼻尖下方逐级退向木帮，
+ * 让连接台呢的位置形成内凹阴影；端点仍严格落在共享物理碰撞线上。
+ */
+const CUSHION_PROFILE: ReadonlyArray<readonly [outwardOffset: number, y: number]> = [
+  [CUSHION_W, 0.001],
+  [CUSHION_W, CUSHION_H],
+  [0.0075, CUSHION_H],
+  [0.0008, CUSHION_NOSE_HEIGHT + 0.0012],
+  [0, CUSHION_NOSE_HEIGHT],
+  [0.0015, CUSHION_NOSE_HEIGHT - 0.003],
+  [0.0045, 0.021],
+  [0.0115, 0.009],
+  [CUSHION_BASE_RECESS, 0.001],
+];
+
+function makeCushionGeometry(segment: CushionSegment) {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const appendProfileVertex = (point: Point2, outwardOffset: number, y: number) => {
+    positions.push(
+      point.x - segment.inward.x * outwardOffset,
+      y,
+      point.z - segment.inward.z * outwardOffset,
+    );
+  };
+
+  // 侧面共享剖面顶点，使法线在鼻尖与内凹曲面之间连续过渡。
+  for (const [outwardOffset, y] of CUSHION_PROFILE) {
+    appendProfileVertex(segment.a, outwardOffset, y);
+    appendProfileVertex(segment.b, outwardOffset, y);
+  }
+  for (let index = 0; index < CUSHION_PROFILE.length; index += 1) {
+    const next = (index + 1) % CUSHION_PROFILE.length;
+    const a = index * 2;
+    const b = a + 1;
+    const nextA = next * 2;
+    const nextB = nextA + 1;
+    indices.push(a, nextA, nextB, a, nextB, b);
+  }
+
+  // 端盖使用独立顶点，避免短角衬的端面法线污染绒面剖面的高光。
+  const capAStart = positions.length / 3;
+  for (const [outwardOffset, y] of CUSHION_PROFILE) {
+    appendProfileVertex(segment.a, outwardOffset, y);
+  }
+  const capBStart = positions.length / 3;
+  for (const [outwardOffset, y] of CUSHION_PROFILE) {
+    appendProfileVertex(segment.b, outwardOffset, y);
+  }
+  for (let index = 1; index < CUSHION_PROFILE.length - 1; index += 1) {
+    indices.push(capAStart, capAStart + index + 1, capAStart + index);
+    indices.push(capBStart, capBStart + index, capBStart + index + 1);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
 
 /** 整链规划的分杆配色（台呢绿底可读：暖橙/青/紫），轨迹/高亮环/序号标记同色 */
 const PLAN_STEP_COLORS = [0xffa03c, 0x35d6d6, 0xb478ff];
@@ -79,6 +156,15 @@ type DropAnim = {
   to: THREE.Vector3;
 };
 
+type GpuTimerExtension = {
+  TIME_ELAPSED_EXT: number;
+  GPU_DISJOINT_EXT: number;
+};
+
+type Scene3DOptions = {
+  onThermalQualityChange?: (quality: AdaptiveRenderQuality, snapshot: ThermalSnapshot) => void;
+};
+
 export class Scene3D {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -97,7 +183,7 @@ export class Scene3D {
   private virtualCam: THREE.PerspectiveCamera;
 
   private aimAngle = 0;
-  /** 纯视觉方位；玩家回合可跟随 aimAngle，观战回合由用户独立环绕。 */
+  /** 纯视觉方位；玩家回合可跟随 aimAngle 或手动环绕，观战回合由上层锁定俯视方向。 */
   private cameraAzimuth = 0;
   /** 0=第一人称，1=俯视；中间值可停留。 */
   private viewLevel = 0;
@@ -145,7 +231,17 @@ export class Scene3D {
   private animationId = 0;
   private running = false;
   private renderFrameCount = 0;
-  private shadowMapSize: 1024 | 2048;
+  private shadowMapSize: 512 | 1024 | 1536;
+  private keyLight: THREE.DirectionalLight | null = null;
+  private renderBudget: RenderBudget;
+  private adaptiveQuality: AdaptiveRenderQuality;
+  private thermalGovernor: ReturnType<typeof createThermalGovernor>;
+  private onThermalQualityChange?: Scene3DOptions['onThermalQualityChange'];
+  private gpuTimerExtension: GpuTimerExtension | null = null;
+  private pendingGpuQueries: WebGLQuery[] = [];
+  private lastRenderedAt: number | null = null;
+  private renderSlotMs: number | null = null;
+  private thermalIdleTimer: number | null = null;
 
   // ---- 走位规划渲染 ----
   /** 规划图层：瞄准线/轨迹/走位区域/序号标记，showPlanChain(null) 整体清空 */
@@ -166,7 +262,7 @@ export class Scene3D {
     snapped: boolean;                // 当前杆起点球位是否已摆放
   } | null = null;
 
-  constructor(element: HTMLElement) {
+  constructor(element: HTMLElement, options: Scene3DOptions = {}) {
     this.element = element;
 
     const renderBudget = renderBudgetFor({
@@ -175,6 +271,10 @@ export class Scene3D {
       devicePixelRatio: window.devicePixelRatio,
       coarsePointer: window.matchMedia?.('(pointer: coarse)').matches ?? false,
     });
+    this.renderBudget = renderBudget;
+    this.adaptiveQuality = adaptiveRenderQualityFor(renderBudget, 'balanced');
+    this.thermalGovernor = createThermalGovernor(this.adaptiveQuality.movingPresentationFps);
+    this.onThermalQualityChange = options.onThermalQualityChange;
     this.shadowMapSize = renderBudget.shadowMapSize;
 
     this.scene = new THREE.Scene();
@@ -197,6 +297,11 @@ export class Scene3D {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     element.appendChild(this.renderer.domElement);
+
+    const gl = this.renderer.getContext();
+    if (gl instanceof WebGL2RenderingContext) {
+      this.gpuTimerExtension = gl.getExtension('EXT_disjoint_timer_query_webgl2') as GpuTimerExtension | null;
+    }
 
     // 环境反射：程序化房间，给球体真实高光
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -231,6 +336,7 @@ export class Scene3D {
 
     // 主光：略偏一侧，产生长影子
     const key = new THREE.DirectionalLight(0xfff2dd, 2.6);
+    this.keyLight = key;
     key.position.set(0.6, 2.6, 0.4);
     key.castShadow = true;
     key.shadow.mapSize.set(this.shadowMapSize, this.shadowMapSize);
@@ -324,16 +430,17 @@ export class Scene3D {
     const clothMat = new THREE.MeshPhysicalMaterial({
       map: clothMaps.map,
       normalMap: clothMaps.normalMap,
-      normalScale: new THREE.Vector2(0.5, 0.5),
+      normalScale: new THREE.Vector2(0.16, 0.26),
       roughnessMap: clothMaps.roughnessMap,
-      roughness: 1.0,
+      roughness: 0.94,
       metalness: 0.0,
-      sheen: 0.35,
-      sheenRoughness: 0.65,
-      sheenColor: new THREE.Color(0x6fae8e),
-      envMapIntensity: 0.15,
+      sheen: 0.28,
+      sheenRoughness: 0.88,
+      sheenColor: new THREE.Color(0x5f967c),
+      envMapIntensity: 0.1,
     });
     const cloth = new THREE.Mesh(clothGeo, clothMat);
+    cloth.name = 'table-cloth';
     cloth.receiveShadow = true;
     this.tableGroup.add(cloth);
 
@@ -506,7 +613,7 @@ export class Scene3D {
     woodFrame.receiveShadow = true;
     this.tableGroup.add(woodFrame);
 
-    // ---- 共享库边：直线段与离散圆弧段使用同一种连续包呢实体 ----
+    // ---- 共享库边：直线段与离散圆弧段使用同一种前探鼻尖、下沿内凹的包呢实体 ----
     const cushionMat = new THREE.MeshPhysicalMaterial({
       color: 0x0f6a4a,
       roughness: 0.85,
@@ -516,26 +623,12 @@ export class Scene3D {
       side: THREE.DoubleSide,
     });
     for (const segment of CUSHION_SEGMENTS) {
-      const outerA = {
-        x: segment.a.x - segment.inward.x * CUSHION_W,
-        z: segment.a.z - segment.inward.z * CUSHION_W,
-      };
-      const outerB = {
-        x: segment.b.x - segment.inward.x * CUSHION_W,
-        z: segment.b.z - segment.inward.z * CUSHION_W,
-      };
-      const shape = new THREE.Shape();
-      shape.moveTo(segment.a.x, -segment.a.z);
-      shape.lineTo(segment.b.x, -segment.b.z);
-      shape.lineTo(outerB.x, -outerB.z);
-      shape.lineTo(outerA.x, -outerA.z);
-      shape.closePath();
-      const geometry = new THREE.ExtrudeGeometry(shape, {
-        depth: CUSHION_H,
-        bevelEnabled: false,
-      });
-      geometry.rotateX(-Math.PI / 2);
-      const mesh = new THREE.Mesh(geometry, cushionMat);
+      const mesh = new THREE.Mesh(makeCushionGeometry(segment), cushionMat);
+      mesh.name = `cushion-${segment.id}`;
+      mesh.userData.profileRole = 'molded-undercut';
+      mesh.userData.profilePointCount = CUSHION_PROFILE.length;
+      mesh.userData.noseHeightMm = CUSHION_NOSE_HEIGHT * 1000;
+      mesh.userData.noseOverhangMm = CUSHION_BASE_RECESS * 1000;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.tableGroup.add(mesh);
@@ -2003,16 +2096,137 @@ export class Scene3D {
   private requestRender(refreshShadows = false) {
     if (refreshShadows) this.renderer.shadowMap.needsUpdate = true;
     if (!this.running || this.animationId !== 0) return;
-    this.animationId = requestAnimationFrame(() => {
+    this.animationId = requestAnimationFrame((nowMs) => {
       this.animationId = 0;
       if (!this.running) return;
+      const intervalMs = 1000 / this.adaptiveQuality.movingPresentationFps;
+      if (this.renderSlotMs !== null && nowMs - this.renderSlotMs < intervalMs - 0.5) {
+        this.requestRender();
+        return;
+      }
+      this.renderSlotMs = nowMs;
       this.render();
       if (this.hasFrameWork()) this.requestRender(this.strikeAnim !== null || this.dropAnims.size > 0 || this.planPlayAnim !== null);
     });
   }
 
+  private pollGpuTimer(): number | null {
+    const extension = this.gpuTimerExtension;
+    if (!extension || this.pendingGpuQueries.length === 0) return null;
+    const gl = this.renderer.getContext();
+    if (!(gl instanceof WebGL2RenderingContext)) return null;
+
+    const query = this.pendingGpuQueries[0];
+    const available = Boolean(gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE));
+    if (!available) return null;
+    this.pendingGpuQueries.shift();
+    const disjoint = Boolean(gl.getParameter(extension.GPU_DISJOINT_EXT));
+    const elapsedNs = Number(gl.getQueryParameter(query, gl.QUERY_RESULT));
+    gl.deleteQuery(query);
+    return !disjoint && Number.isFinite(elapsedNs) ? elapsedNs / 1_000_000 : null;
+  }
+
+  private beginGpuTimer(): WebGLQuery | null {
+    const extension = this.gpuTimerExtension;
+    if (!extension || this.pendingGpuQueries.length >= 2 || this.renderFrameCount % 8 !== 0) return null;
+    const gl = this.renderer.getContext();
+    if (!(gl instanceof WebGL2RenderingContext)) return null;
+    const query = gl.createQuery();
+    if (!query) return null;
+    try {
+      gl.beginQuery(extension.TIME_ELAPSED_EXT, query);
+      return query;
+    } catch {
+      gl.deleteQuery(query);
+      this.gpuTimerExtension = null;
+      return null;
+    }
+  }
+
+  private finishGpuTimer(query: WebGLQuery | null) {
+    if (!query || !this.gpuTimerExtension) return;
+    const gl = this.renderer.getContext();
+    if (!(gl instanceof WebGL2RenderingContext)) return;
+    try {
+      gl.endQuery(this.gpuTimerExtension.TIME_ELAPSED_EXT);
+      this.pendingGpuQueries.push(query);
+    } catch {
+      gl.deleteQuery(query);
+      this.gpuTimerExtension = null;
+    }
+  }
+
+  private applyThermalTier(tier: RenderQualityTier) {
+    const quality = adaptiveRenderQualityFor(this.renderBudget, tier);
+    if (quality.tier === this.adaptiveQuality.tier) return;
+    this.adaptiveQuality = quality;
+    this.shadowMapSize = quality.shadowMapSize;
+    this.renderer.setPixelRatio(quality.pixelRatio);
+    this.renderer.setSize(this.element.clientWidth, this.element.clientHeight);
+    if (this.keyLight) {
+      this.keyLight.shadow.map?.dispose();
+      this.keyLight.shadow.map = null;
+      this.keyLight.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
+    }
+    this.thermalGovernor.setTargetFps(quality.movingPresentationFps);
+    this.renderSlotMs = null;
+    document.documentElement.dataset.renderQuality = quality.tier;
+    this.onThermalQualityChange?.(quality, this.thermalGovernor.snapshot());
+    this.requestRender(true);
+  }
+
+  private observeThermalLoad(
+    nowMs: number,
+    renderMs: number,
+    frameIntervalMs: number | null,
+    source: 'gpu-timer' | 'cpu-fallback',
+  ) {
+    const tier = this.thermalGovernor.sample({ nowMs, renderMs, frameIntervalMs, source });
+    if (tier) this.applyThermalTier(tier);
+  }
+
+  private clearThermalIdleRecovery() {
+    if (this.thermalIdleTimer === null) return;
+    window.clearTimeout(this.thermalIdleTimer);
+    this.thermalIdleTimer = null;
+  }
+
+  private scheduleThermalIdleRecovery() {
+    if (
+      !this.running ||
+      this.adaptiveQuality.tier === 'balanced' ||
+      this.thermalIdleTimer !== null
+    ) {
+      return;
+    }
+    this.thermalIdleTimer = window.setTimeout(() => {
+      this.thermalIdleTimer = null;
+      if (!this.running || this.lastWorld?.moving || this.hasFrameWork()) return;
+      const tier = this.thermalGovernor.recoverAfterIdle(performance.now());
+      if (tier) this.applyThermalTier(tier);
+      this.scheduleThermalIdleRecovery();
+    }, THERMAL_IDLE_RECOVERY_MS);
+  }
+
   /** 渲染一帧：推进落袋/球杆/规划动画；是否续帧由 requestRender 决定。 */
   render() {
+    const renderStartedAt = performance.now();
+    const frameIntervalMs = this.lastRenderedAt === null
+      ? null
+      : renderStartedAt - this.lastRenderedAt;
+    this.lastRenderedAt = renderStartedAt;
+    const continuousWork = Boolean(this.lastWorld?.moving || this.hasFrameWork());
+    if (continuousWork) this.clearThermalIdleRecovery();
+    const gpuFrameMs = continuousWork ? this.pollGpuTimer() : null;
+    if (gpuFrameMs !== null) {
+      this.observeThermalLoad(
+        renderStartedAt,
+        gpuFrameMs,
+        frameIntervalMs !== null && frameIntervalMs < 250 ? frameIntervalMs : null,
+        'gpu-timer',
+      );
+    }
+    const gpuQuery = continuousWork ? this.beginGpuTimer() : null;
     const dt = Math.min(0.05, this.clock.getDelta());
 
     // 相机平滑收敛:随 rAF 每帧向目标位姿推进,脱离 React 渲染节奏——
@@ -2075,18 +2289,33 @@ export class Scene3D {
     this.updatePlanPlay(dt);
 
     this.renderer.render(this.scene, this.camera);
+    this.finishGpuTimer(gpuQuery);
+    if (continuousWork && !this.gpuTimerExtension) {
+      const renderFinishedAt = performance.now();
+      this.observeThermalLoad(
+        renderFinishedAt,
+        renderFinishedAt - renderStartedAt,
+        frameIntervalMs !== null && frameIntervalMs < 250 ? frameIntervalMs : null,
+        'cpu-fallback',
+      );
+    }
     this.renderFrameCount += 1;
+    if (!this.lastWorld?.moving && !this.hasFrameWork()) {
+      this.scheduleThermalIdleRecovery();
+    }
   }
 
   start() {
     if (this.running) return;
     this.running = true;
+    this.renderSlotMs = null;
     this.clock.start();
     this.requestRender(true);
   }
 
   stop() {
     this.running = false;
+    this.clearThermalIdleRecovery();
     if (this.animationId) cancelAnimationFrame(this.animationId);
     this.animationId = 0;
   }
@@ -2094,6 +2323,15 @@ export class Scene3D {
   /** 浏览器性能验收读取累计真实渲染帧数；不参与业务状态。 */
   renderedFrames(): number {
     return this.renderFrameCount;
+  }
+
+  /** 调试/验收只读快照：不暴露系统温度，只报告 WebGL 负载代理指标。 */
+  thermalSnapshot(): ThermalSnapshot & { pixelRatio: number; shadowMapSize: number } {
+    return {
+      ...this.thermalGovernor.snapshot(),
+      pixelRatio: this.adaptiveQuality.pixelRatio,
+      shadowMapSize: this.adaptiveQuality.shadowMapSize,
+    };
   }
 
   screenToTable(clientX: number, clientY: number): { x: number; z: number } | null {
@@ -2189,6 +2427,12 @@ export class Scene3D {
   dispose() {
     this.stop();
     window.removeEventListener('resize', this.handleResize);
+    const gl = this.renderer.getContext();
+    if (gl instanceof WebGL2RenderingContext) {
+      for (const query of this.pendingGpuQueries) gl.deleteQuery(query);
+    }
+    this.pendingGpuQueries = [];
+    delete document.documentElement.dataset.renderQuality;
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.element) {
       this.element.removeChild(this.renderer.domElement);

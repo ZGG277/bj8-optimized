@@ -194,11 +194,7 @@
 }
 
 .viewport.spectator {
-  cursor: grab;
-}
-
-.viewport.spectator:active {
-  cursor: grabbing;
+  cursor: default;
 }
 
 /* 自由球放置模式:十字光标明示"点哪放哪" */
@@ -372,51 +368,6 @@
   text-overflow: ellipsis;
 }
 
-.camera-recenter {
-  position: absolute;
-  z-index: 5;
-  top: 10px;
-  right: 72px;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  color: var(--text-primary);
-  background: var(--surface-2);
-  box-shadow: var(--shadow-overlay);
-  backdrop-filter: var(--blur-surface);
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.camera-recenter-icon {
-  position: relative;
-  display: block;
-  width: 20px;
-  height: 15px;
-  margin: auto;
-  border: 1.5px solid currentColor;
-  border-radius: 4px;
-  opacity: 0.88;
-}
-
-.camera-recenter-icon i {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 8px currentColor;
-  transform: translate(-50%, -50%);
-}
-
-.camera-recenter:active {
-  transform: scale(0.96);
-}
-
 .viewport.camera-manual {
   cursor: grab;
 }
@@ -506,7 +457,8 @@
   background:
     radial-gradient(circle at 50% 48%, rgba(53, 112, 83, 0.16), transparent 52%),
     rgba(3, 7, 5, 0.84);
-  backdrop-filter: var(--blur-overlay);
+  /* 首屏覆盖全画布，不做全屏实时模糊，避免一打开就拉高 GPU 合成成本。 */
+  backdrop-filter: none;
 }
 
 .intro-card {

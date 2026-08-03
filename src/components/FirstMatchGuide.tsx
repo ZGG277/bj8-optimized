@@ -32,7 +32,7 @@ export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
     selector: '.viewport',
   },
   'break-fine': {
-    text: '轻点拨轮·再拨精瞄',
+    text: '用球杆左右键微调',
     selector: '[data-control-slot="aimDial"]',
     fallbackSelector: '.viewport',
   },

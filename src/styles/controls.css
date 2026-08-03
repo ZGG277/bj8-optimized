@@ -1086,6 +1086,73 @@
   height: 58px;
 }
 
+.control-slot-aimDial.is-aim-buttons .control-slot-body {
+  width: 184px;
+  height: 62px;
+}
+
+.aim-controls {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 56px 40px 56px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  /* 参考拨轮的半透明表面，保留轮廓但不遮死下方球路。 */
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.aim-controls button {
+  width: 56px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-control);
+  color: var(--text-primary);
+  font-size: 18px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.aim-controls button:active {
+  border-color: rgba(121, 215, 177, 0.68);
+  color: var(--green-bright);
+  background: rgba(64, 143, 110, 0.22);
+  transform: scale(0.96);
+}
+
+.aim-controls button:disabled {
+  opacity: 0.3;
+}
+
+.aim-controls-cue {
+  position: relative;
+  width: 40px;
+  height: 48px;
+}
+
+.aim-controls-cue::before {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 3px;
+  height: 38px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(#d8aa5b, rgba(216, 170, 91, 0.2));
+  content: '';
+}
+
 .control-slot-bulb .control-slot-body,
 .control-slot-spin .control-slot-body {
   width: 54px;
@@ -1259,7 +1326,7 @@
   box-shadow: -5px 0 rgba(234, 255, 245, 0.3), 5px 0 rgba(234, 255, 245, 0.3);
 }
 
-/* 灯泡面板：入口只发光，两个功能只用轨迹/路线图形表达。 */
+/* 灯泡面板：入口只发光，三个功能用轨迹/路线/拨轮图形表达。 */
 .assist-control {
   position: relative;
   width: 54px;
@@ -1423,6 +1490,33 @@
 
 .route-icon i:nth-child(2) {
   align-self: flex-start;
+}
+
+.dial-icon {
+  position: relative;
+  width: 26px;
+  height: 18px;
+  display: block;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 4px,
+    currentColor 4px 5px
+  );
+  opacity: 0.92;
+}
+
+.dial-icon::after {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
 }
 
 /* 击球点只保留母球及撞击点。 */
@@ -1705,10 +1799,6 @@
     pointer-events: none;
   }
 
-  .aim-controls {
-    display: none;
-  }
-
   .control-deck > * {
     pointer-events: auto;
   }
@@ -1977,7 +2067,7 @@
 
   /* 横屏：方向微调不再钉在左下，与击球点盘一起收入右下控件组 */
   .aim-controls {
-    background: var(--surface-1);
+    background: color-mix(in srgb, var(--surface-1) 66%, transparent);
     border-radius: var(--radius-sm);
     padding: 4px;
   }

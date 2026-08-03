@@ -1,9 +1,42 @@
 /*
 [INPUT]: 禁用/蓄力态、横竖停靠方向、预览力度与 begin/update/release/cancel/tap 回调
-[OUTPUT]: 对外提供无文字的球杆回缩/能量填充出杆控件，保留 meter 与键盘语义
+[OUTPUT]: 对外提供无文字的球杆回缩/能量填充出杆控件，移出有效走廊松手取消，保留 meter 与键盘语义
 [POS]: 控制组件层,只负责手势出口与语义;力度事实由 input 层计算,物理击球由 Game 提交
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
+
+import { useRef } from 'react';
+
+export const CHARGE_ESCAPE_PADDING_PX = 24;
+
+type ChargeGesture = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  rect: { left: number; right: number; top: number; bottom: number };
+  cancelled: boolean;
+};
+
+/**
+ * 出杆方向上不设上限（允许拉到屏幕边缘满力）；横向离开或向反方向退出
+ * 带 24px 手指容错的走廊则视为明确取消意图。
+ */
+export function isChargePointerInCommitCorridor(
+  gesture: Pick<ChargeGesture, 'startX' | 'startY' | 'rect'>,
+  orientation: 'horizontal' | 'vertical',
+  clientX: number,
+  clientY: number,
+): boolean {
+  const { rect, startX, startY } = gesture;
+  if (orientation === 'vertical') {
+    return clientX >= rect.left - CHARGE_ESCAPE_PADDING_PX
+      && clientX <= rect.right + CHARGE_ESCAPE_PADDING_PX
+      && clientY >= startY - CHARGE_ESCAPE_PADDING_PX;
+  }
+  return clientY >= rect.top - CHARGE_ESCAPE_PADDING_PX
+    && clientY <= rect.bottom + CHARGE_ESCAPE_PADDING_PX
+    && clientX >= startX - CHARGE_ESCAPE_PADDING_PX;
+}
 
 type Props = {
   disabled: boolean;
@@ -31,6 +64,7 @@ export function ShootControl({
   onCancel,
   onTap,
 }: Props) {
+  const gestureRef = useRef<ChargeGesture | null>(null);
   const rounded = Math.round(power);
   const coordinate = (event: React.PointerEvent) =>
     orientation === 'vertical' ? event.clientY : event.clientX;
@@ -48,6 +82,18 @@ export function ShootControl({
           if (disabled) return;
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
           const rect = e.currentTarget.getBoundingClientRect();
+          gestureRef.current = {
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            rect: {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+            },
+            cancelled: false,
+          };
           const start = coordinate(e);
           const remaining = orientation === 'vertical'
             ? rect.bottom - e.clientY
@@ -56,13 +102,41 @@ export function ShootControl({
         }}
         onPointerMove={(e) => {
           e.preventDefault();
-          if (!disabled) onUpdate(coordinate(e));
+          const gesture = gestureRef.current;
+          if (disabled || !gesture || gesture.pointerId !== e.pointerId || gesture.cancelled) return;
+          if (!isChargePointerInCommitCorridor(gesture, orientation, e.clientX, e.clientY)) {
+            gesture.cancelled = true;
+            onCancel();
+            return;
+          }
+          onUpdate(coordinate(e));
         }}
         onPointerUp={(e) => {
           e.preventDefault();
-          if (!disabled) onRelease();
+          const gesture = gestureRef.current;
+          gestureRef.current = null;
+          if (!gesture || gesture.pointerId !== e.pointerId) return;
+          const escaped = gesture.cancelled || !isChargePointerInCommitCorridor(
+            gesture,
+            orientation,
+            e.clientX,
+            e.clientY,
+          );
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          }
+          if (disabled || escaped) {
+            if (!gesture.cancelled) onCancel();
+            return;
+          }
+          onRelease();
         }}
-        onPointerCancel={() => onCancel()}
+        onPointerCancel={(e) => {
+          const gesture = gestureRef.current;
+          if (gesture?.pointerId !== e.pointerId) return;
+          gestureRef.current = null;
+          onCancel();
+        }}
         onKeyDown={(e) => {
           if (disabled) return;
           if (e.key === 'Enter') {

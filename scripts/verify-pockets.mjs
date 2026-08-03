@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 DEV __bj8 场景句柄
-[OUTPUT]: 六袋台内圆弧凹口/浅驼皮圈/白色菱形网袋/细缝边结构、角袋跨接连续性、四机位视觉回归及页面错误门禁
+[OUTPUT]: 前探鼻尖/下沿内凹库边、六袋台内圆弧凹口/浅驼皮圈/白色菱形网袋/细缝边结构、角袋跨接连续性、四机位视觉回归及页面错误门禁
 [POS]: PocketGeometry 物理/视觉一体化的浏览器出口验收；只改调试页内世界，不写游戏数据
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md 与 README.md
 */
@@ -72,6 +72,11 @@ const pocketAnatomy = await page.evaluate(() => {
     pocketCutouts: 0,
     roundedOuterCorners: 0,
     roundedCornerPockets: 0,
+    cushions: 0,
+    undercutCushions: 0,
+    minCushionProfilePoints: Number.POSITIVE_INFINITY,
+    minNoseOverhangMm: Number.POSITIVE_INFINITY,
+    minNoseHeightMm: Number.POSITIVE_INFINITY,
     pocketWraps: 0,
     mouths: 0,
     inwardArcMouths: 0,
@@ -98,6 +103,22 @@ const pocketAnatomy = await page.evaluate(() => {
     bottoms: 0,
   };
   root?.traverse(object => {
+    if (object.name.startsWith('cushion-')) {
+      counts.cushions += 1;
+      counts.undercutCushions += Number(object.userData.profileRole === 'molded-undercut');
+      counts.minCushionProfilePoints = Math.min(
+        counts.minCushionProfilePoints,
+        Number(object.userData.profilePointCount ?? 0),
+      );
+      counts.minNoseOverhangMm = Math.min(
+        counts.minNoseOverhangMm,
+        Number(object.userData.noseOverhangMm ?? 0),
+      );
+      counts.minNoseHeightMm = Math.min(
+        counts.minNoseHeightMm,
+        Number(object.userData.noseHeightMm ?? 0),
+      );
+    }
     if (object.name === 'table-wood-frame') {
       counts.outerWoodFrames += 1;
       counts.pocketCutouts += Number(object.userData.pocketCutoutCount ?? 0);
@@ -173,11 +194,16 @@ const pocketAnatomy = await page.evaluate(() => {
   return counts;
 });
 ok(
-  '一体木框内沿切出六袋、四个角袋圆润收肩且外轮廓只有四个圆角',
+  '一体木框内沿切出六袋，150 段库边均为前探鼻尖与下沿内凹剖面',
   pocketAnatomy.outerWoodFrames === 1 &&
     pocketAnatomy.pocketCutouts === 6 &&
     pocketAnatomy.roundedOuterCorners === 4 &&
     pocketAnatomy.roundedCornerPockets === 4 &&
+    pocketAnatomy.cushions === 150 &&
+    pocketAnatomy.undercutCushions === 150 &&
+    pocketAnatomy.minCushionProfilePoints >= 9 &&
+    pocketAnatomy.minNoseOverhangMm >= 18.99 &&
+    pocketAnatomy.minNoseHeightMm >= 35 &&
     pocketAnatomy.pocketWraps === 0 &&
     pocketAnatomy.mouths === 6 &&
     pocketAnatomy.inwardArcMouths === 6 &&

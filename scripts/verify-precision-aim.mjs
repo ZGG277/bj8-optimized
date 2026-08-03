@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core、__bj8 调试句柄与 Scene3D 台面↔屏幕映射
-[OUTPUT]: 开球虚母球跟手/落实、拨轮无条件呼出、近袋不自动变档、显式轻点精瞄与页面稳定性断言
-[POS]: “摆球后显示无限拨轮 + 用户显式切换固定精瞄档”的浏览器出口门禁
+[OUTPUT]: 开球白球标准位/实体拖放/非法区域阻挡、横竖屏默认左右键、单步/低速长按、灯泡三入口、按需拨轮、显式轻点精瞄与页面稳定性断言
+[POS]: “本地 main 视觉基线 + 左右键默认瞄准 + 灯泡显式开启拨轮”的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
@@ -39,38 +39,174 @@ async function clickText(text) {
 }
 
 await clickText('开始对局');
-await page.waitForFunction(() => window.__bj8?.match?.current?.phase === 'placing');
+await page.waitForFunction(() => window.__bj8?.match?.current?.phase === 'aiming');
 await wait(500);
 
-const beforePlacement = await page.evaluate(() => window.__bj8.scene.current.cuePlacementVisualState());
+const beforePlacement = await page.evaluate(() => ({
+  ...window.__bj8.scene.current.cuePlacementVisualState(),
+  cue: (() => {
+    const cue = window.__bj8.world.current.balls.find((ball) => ball.number === 0);
+    return { x: cue.x, z: cue.z };
+  })(),
+  phase: window.__bj8.match.current.phase,
+  buttons: Boolean(document.querySelector('.aim-controls')),
+  dial: Boolean(document.querySelector('.aim-dial')),
+}));
 ok(
-  '摆球: 开球区未操作前不显示实体母球和预览球',
-  !beforePlacement.realVisible && !beforePlacement.ghostVisible,
+  '开球: 白球自动在开球线中点实体就位且直接可瞄准',
+  beforePlacement.phase === 'aiming' &&
+    beforePlacement.realVisible &&
+    !beforePlacement.ghostVisible &&
+    Math.abs(beforePlacement.cue.x) < 0.000001 &&
+    Math.abs(beforePlacement.cue.z - 0.635) < 0.000001 &&
+    beforePlacement.buttons &&
+    !beforePlacement.dial,
   JSON.stringify(beforePlacement),
 );
 
+const cueStart = await page.evaluate(() => window.__bj8.scene.current.tableToScreen(0, 0.635));
 const kitchen = await page.evaluate(() => window.__bj8.scene.current.tableToScreen(0.12, 0.82));
+await page.mouse.move(cueStart.x, cueStart.y);
+await page.mouse.down();
 await page.mouse.move(kitchen.x, kitchen.y, { steps: 8 });
-await wait(120);
-const hovering = await page.evaluate(() => window.__bj8.scene.current.cuePlacementVisualState());
-ok(
-  '摆球: 指针在合法开球区移动时只有虚母球跟手',
-  !hovering.realVisible && hovering.ghostVisible,
-  JSON.stringify(hovering),
-);
-
-await page.mouse.click(kitchen.x, kitchen.y);
-await page.waitForFunction(() => window.__bj8.match.current.phase === 'aiming');
+await page.mouse.up();
 await wait(220);
 const placed = await page.evaluate(() => ({
   ...window.__bj8.scene.current.cuePlacementVisualState(),
-  dial: Boolean(document.querySelector('.aim-dial')),
-  dialMode: document.querySelector('.aim-dial')?.className ?? '',
+  cue: (() => {
+    const cue = window.__bj8.world.current.balls.find((ball) => ball.number === 0);
+    return { x: cue.x, z: cue.z };
+  })(),
+  phase: window.__bj8.match.current.phase,
 }));
 ok(
-  '摆球: 点击落实体母球并立即呼出拨轮',
-  placed.realVisible && !placed.ghostVisible && placed.dial,
+  '开球: 按住实体白球可拖到开球区合法位置',
+  placed.phase === 'aiming' && placed.realVisible && !placed.ghostVisible &&
+    Math.hypot(placed.cue.x - 0.12, placed.cue.z - 0.82) < 0.02,
   JSON.stringify(placed),
+);
+
+const illegal = await page.evaluate(() => ({
+  from: window.__bj8.scene.current.tableToScreen(0.12, 0.82),
+  to: window.__bj8.scene.current.tableToScreen(0.12, 0.5),
+}));
+await page.mouse.move(illegal.from.x, illegal.from.y);
+await page.mouse.down();
+await page.mouse.move(illegal.to.x, illegal.to.y, { steps: 8 });
+await page.mouse.up();
+await wait(180);
+const blocked = await page.evaluate(() => {
+  const cue = window.__bj8.world.current.balls.find((ball) => ball.number === 0);
+  return { x: cue.x, z: cue.z, messageKey: window.__bj8.match.current.messageKey };
+});
+ok(
+  '开球: 拖过开球线时保留最后合法位并提示越界',
+  Math.abs(blocked.x - 0.12) < 0.02 &&
+    blocked.z >= 0.635 && blocked.z < 0.82 &&
+    blocked.messageKey === 'place-outside-kitchen',
+  JSON.stringify(blocked),
+);
+
+const beforeButton = await page.evaluate(() => window.__bj8.aim.current);
+await page.click('.aim-controls button:first-child');
+await wait(100);
+const afterButton = await page.evaluate(() => window.__bj8.aim.current);
+const clickDelta = Math.atan2(
+  Math.sin(afterButton - beforeButton),
+  Math.cos(afterButton - beforeButton),
+);
+ok(
+  '默认瞄准: 单击左键只走一次固定精瞄步长',
+  Math.abs(clickDelta + 0.004) < 0.000001,
+  `${beforeButton} → ${afterButton} (Δ=${clickDelta})`,
+);
+
+const rightButton = await page.$eval('.aim-controls button:last-child', (element) => {
+  const rect = element.getBoundingClientRect();
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+});
+const beforeHold = await page.evaluate(() => window.__bj8.aim.current);
+await page.mouse.move(rightButton.x, rightButton.y);
+await page.mouse.down();
+await wait(500);
+const holdDidNotDragLayout = await page.evaluate(() =>
+  !document.querySelector('.control-slot-aimDial.is-dragging') &&
+  !document.querySelector('.control-deck.is-layout-dragging'));
+await wait(350);
+await page.mouse.up();
+await wait(100);
+const afterHold = await page.evaluate(() => window.__bj8.aim.current);
+const holdDelta = Math.atan2(
+  Math.sin(afterHold - beforeHold),
+  Math.cos(afterHold - beforeHold),
+);
+ok(
+  '默认瞄准: 长按右键不会触发控件拖位',
+  holdDidNotDragLayout,
+);
+ok(
+  '默认瞄准: 长按右键连续移动且速度受限',
+  holdDelta >= 0.016 && holdDelta <= 0.032,
+  `${beforeHold} → ${afterHold} (Δ=${holdDelta})`,
+);
+
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 3 });
+await wait(300);
+const portraitButtons = await page.evaluate(() => {
+  const controls = document.querySelector('.aim-controls');
+  const rect = controls?.getBoundingClientRect();
+  return {
+    exists: Boolean(controls),
+    display: controls ? getComputedStyle(controls).display : '',
+    rect: rect ? {
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    } : null,
+  };
+});
+ok(
+  '竖屏默认瞄准: 左右键可见且完整位于视口内',
+  portraitButtons.exists &&
+    portraitButtons.display !== 'none' &&
+    portraitButtons.rect &&
+    portraitButtons.rect.left >= 0 &&
+    portraitButtons.rect.top >= 0 &&
+    portraitButtons.rect.right <= 390 &&
+    portraitButtons.rect.bottom <= 844,
+  JSON.stringify(portraitButtons),
+);
+await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
+await wait(300);
+
+await page.click('.plan-button');
+await wait(100);
+const assistMenu = await page.evaluate(() => ({
+  options: document.querySelectorAll('.assist-menu .assist-option').length,
+  aim: Boolean(document.querySelector('.assist-menu .aim-option')),
+  plan: Boolean(document.querySelector('.assist-menu .guidance-option')),
+  dial: Boolean(document.querySelector('.assist-menu .dial-option')),
+}));
+ok(
+  '灯泡: 展开瞄准线、走位复盘、拨轮瞄准三个独立入口',
+  assistMenu.options === 3 && assistMenu.aim && assistMenu.plan && assistMenu.dial,
+  JSON.stringify(assistMenu),
+);
+
+await page.click('.assist-menu .dial-option');
+await wait(140);
+const dialEnabled = await page.evaluate(() => ({
+  buttons: Boolean(document.querySelector('.aim-controls')),
+  dial: Boolean(document.querySelector('.aim-dial')),
+  menuOpen: Boolean(document.querySelector('.assist-menu')),
+}));
+ok(
+  '灯泡: 主动打开拨轮后原位取代默认左右键并收起菜单',
+  dialEnabled.dial && !dialEnabled.buttons && !dialEnabled.menuOpen,
+  JSON.stringify(dialEnabled),
 );
 
 await clickText('俯视');

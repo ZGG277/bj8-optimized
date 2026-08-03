@@ -63,6 +63,13 @@
   --hud-safe-top: 0px;
 }
 
+/* 温控降档时停用毛玻璃后处理，避免 WebGL 画布每次更新都触发额外 GPU 合成。 */
+:root[data-render-quality='warm'],
+:root[data-render-quality='hot'] {
+  --blur-surface: none;
+  --blur-overlay: none;
+}
+
 html, body {
   height: 100%;
   overflow: hidden;

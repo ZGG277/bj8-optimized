@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 audio 合成音效与 physics PhysicsEvent 类型
-[OUTPUT]: 对外提供 audioRef / playStrike / playPhysicsEvents / resetEvents
+[OUTPUT]: 对外提供 audioRef / playStrike / playPhysicsEvents / playVictory / resetEvents
 [POS]: 音效协调层，只消费物理事件与出杆动作；不关心对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -20,7 +20,7 @@ export function useAudioManager() {
   const playPhysicsEvents = useCallback((events: PhysicsEvent[]) => {
     for (let i = playedEventsRef.current; i < events.length; i++) {
       const ev = events[i];
-      if (ev.type === 'first-contact') audioRef.current?.click(Math.min(1, ev.speed / 5));
+      if (ev.type === 'ball-collision') audioRef.current?.ballCollision(Math.min(1, ev.speed / 5));
       else if (ev.type === 'cushion') audioRef.current?.cushion(Math.min(1, ev.speed / 5));
       else if (ev.type === 'pocket') audioRef.current?.pocket();
     }
@@ -32,10 +32,14 @@ export function useAudioManager() {
     audioRef.current?.strike(power);
   }, []);
 
+  const playVictory = useCallback(() => {
+    audioRef.current?.victory();
+  }, []);
+
   /** 新一杆开始时重置事件计数器 */
   const resetEvents = useCallback(() => {
     playedEventsRef.current = 0;
   }, []);
 
-  return { audioRef, playPhysicsEvents, playStrike, resetEvents };
+  return { audioRef, playPhysicsEvents, playStrike, playVictory, resetEvents };
 }

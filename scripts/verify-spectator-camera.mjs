@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 对手观战全台、显式手动相机、控件避让、交棒保留、触屏瞄准锁镜、全局点选冻结球台及手动回第一人称断言
-[POS]: 竖屏观战相机的浏览器出口验收门禁
+[OUTPUT]: 顾燃回合竖屏纵台/横屏横台固定俯视、玩家非俯视杆向跟随、手动相机与触屏锁镜断言
+[POS]: 横竖屏观战锁定与玩家相机跟随的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
@@ -54,28 +54,15 @@ const opponentUi = await page.evaluate(() => ({
   hint: document.querySelector('.turn-mask')?.textContent ?? '',
   hintPointerEvents: getComputedStyle(document.querySelector('.turn-mask')).pointerEvents,
   recenter: Boolean(document.querySelector('.camera-recenter')),
+  viewDisabled: document.querySelector('.view-switcher')?.getAttribute('aria-disabled'),
 }));
 ok(
-  '对手思考提示不再遮挡球桌触控',
-  opponentUi.hint.includes('左右滑动') &&
+  '顾燃回合提示固定俯视且禁用视角控件',
+  opponentUi.hint.includes('固定俯视全台') &&
     opponentUi.hintPointerEvents === 'none' &&
-    opponentUi.recenter,
+    !opponentUi.recenter &&
+    opponentUi.viewDisabled === 'true',
   JSON.stringify(opponentUi),
-);
-const controlSeparation = await page.evaluate(() => {
-  const recenter = document.querySelector('.camera-recenter')?.getBoundingClientRect();
-  const rightRail = document.querySelector('.dock-rail-right')?.getBoundingClientRect();
-  if (!recenter || !rightRail) return null;
-  return {
-    gap: rightRail.left - recenter.right,
-    recenter: { left: recenter.left, right: recenter.right },
-    rightRail: { left: rightRail.left, right: rightRail.right },
-  };
-});
-ok(
-  '纯视觉回正按钮不覆盖右侧控制轨',
-  Boolean(controlSeparation && controlSeparation.gap >= 4),
-  JSON.stringify(controlSeparation),
 );
 
 await wait(80);
@@ -92,6 +79,10 @@ const readCamera = () => page.evaluate(() => {
     [-0.76, 1.4],
     [0.76, 1.4],
   ].map(([x, z]) => scene.tableToScreenAt(x, z, viewAzimuth, level));
+  const longAxis = [
+    scene.tableToScreenAt(0, -1.2, viewAzimuth, level),
+    scene.tableToScreenAt(0, 1.2, viewAzimuth, level),
+  ];
   return {
     aim: window.__bj8.aim.current,
     azimuth,
@@ -105,19 +96,27 @@ const readCamera = () => page.evaluate(() => {
       bottom: viewport.bottom,
     },
     corners,
+    longAxis,
   };
 });
 
-const beforeOrbit = await readCamera();
-const allCornersVisible = beforeOrbit.corners.every(point =>
-  point.x >= beforeOrbit.viewport.left + 4 &&
-  point.x <= beforeOrbit.viewport.right - 4 &&
-  point.y >= beforeOrbit.viewport.top + 4 &&
-  point.y <= beforeOrbit.viewport.bottom - 4);
+const portraitLocked = await readCamera();
+const portraitAxis = {
+  dx: Math.abs(portraitLocked.longAxis[1].x - portraitLocked.longAxis[0].x),
+  dy: Math.abs(portraitLocked.longAxis[1].y - portraitLocked.longAxis[0].y),
+};
+const allCornersVisible = portraitLocked.corners.every(point =>
+  point.x >= portraitLocked.viewport.left + 4 &&
+  point.x <= portraitLocked.viewport.right - 4 &&
+  point.y >= portraitLocked.viewport.top + 4 &&
+  point.y <= portraitLocked.viewport.bottom - 4);
 ok(
-  '竖屏对手回合自动抬升并完整显示木帮外缘',
-  beforeOrbit.level >= 0.819 && allCornersVisible,
-  JSON.stringify(beforeOrbit),
+  '手机竖屏顾燃回合固定为纵向完整俯视',
+  portraitLocked.level >= 0.999 &&
+    Math.abs(portraitLocked.viewAzimuth) < 1e-6 &&
+    portraitAxis.dy > portraitAxis.dx * 2 &&
+    allCornersVisible,
+  JSON.stringify({ portraitLocked, portraitAxis }),
 );
 
 const viewport = await page.$eval('.viewport', element => {
@@ -132,37 +131,52 @@ await page.touchscreen.touchStart(viewport.x, viewport.y);
 await page.touchscreen.touchMove(viewport.dragX, viewport.y);
 await page.touchscreen.touchEnd();
 await wait(120);
-const afterOrbit = await readCamera();
+const afterLockedDrag = await readCamera();
 ok(
-  '对手回合横向滑动只转相机、不改变瞄准角',
-  Math.abs(afterOrbit.azimuth - beforeOrbit.azimuth) > 0.15 &&
-    afterOrbit.aim === beforeOrbit.aim,
-  JSON.stringify({ before: beforeOrbit, after: afterOrbit }),
+  '顾燃回合横向滑动不再旋转球台',
+  Math.abs(afterLockedDrag.azimuth - portraitLocked.azimuth) < 1e-6 &&
+    afterLockedDrag.aim === portraitLocked.aim,
+  JSON.stringify({ before: portraitLocked, after: afterLockedDrag }),
 );
 
-const recenter = await page.$eval('.camera-recenter', element => {
-  const rect = element.getBoundingClientRect();
-  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+const desktopPage = await browser.newPage();
+desktopPage.on('pageerror', error => errors.push(String(error)));
+await desktopPage.setViewport({ width: 1280, height: 800 });
+await desktopPage.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+await desktopPage.waitForFunction(() => window.__bj8?.scene?.current, { timeout: 10000 });
+await desktopPage.evaluate(() => window.__bj8.setMatch({
+  phase: 'opponent',
+  actor: 'opponent',
+  breaking: false,
+  winner: null,
+}));
+await wait(180);
+const landscapeLocked = await desktopPage.evaluate(() => {
+  const scene = window.__bj8.scene.current;
+  const viewAzimuth = window.__bj8.cameraViewAzimuth.current;
+  const level = Number(document.querySelector('.viewport').getAttribute('data-view-level'));
+  return {
+    level,
+    viewAzimuth,
+    longAxis: [
+      scene.tableToScreenAt(0, -1.2, viewAzimuth, level),
+      scene.tableToScreenAt(0, 1.2, viewAzimuth, level),
+    ],
+  };
 });
-await page.touchscreen.tap(recenter.x, recenter.y);
-await wait(120);
-const afterRecenter = await readCamera();
+const landscapeAxis = {
+  dx: Math.abs(landscapeLocked.longAxis[1].x - landscapeLocked.longAxis[0].x),
+  dy: Math.abs(landscapeLocked.longAxis[1].y - landscapeLocked.longAxis[0].y),
+};
 ok(
-  '纯视觉回正按钮恢复竖向球台与完整构图',
-  Math.abs(afterRecenter.azimuth) < 1e-6 &&
-    afterRecenter.corners.every(point =>
-      point.x >= afterRecenter.viewport.left + 4 &&
-      point.x <= afterRecenter.viewport.right - 4 &&
-      point.y >= afterRecenter.viewport.top + 4 &&
-      point.y <= afterRecenter.viewport.bottom - 4),
-  JSON.stringify(afterRecenter),
+  '电脑横屏顾燃回合固定为横向俯视',
+  landscapeLocked.level >= 0.999 &&
+    Math.abs(landscapeLocked.viewAzimuth - Math.PI / 2) < 1e-6 &&
+    landscapeAxis.dx > landscapeAxis.dy * 2,
+  JSON.stringify({ landscapeLocked, landscapeAxis }),
 );
+await desktopPage.close();
 
-// 回正后再转到非零方位，用它作为顾燃交棒时应保留的真实画面。
-await page.touchscreen.touchStart(viewport.x, viewport.y);
-await page.touchscreen.touchMove(viewport.dragX, viewport.y);
-await page.touchscreen.touchEnd();
-await wait(120);
 const beforeHandoff = await readCamera();
 
 await page.evaluate(() => window.__bj8.setMatch({
@@ -174,11 +188,16 @@ await page.evaluate(() => window.__bj8.setMatch({
 await wait(180);
 const handedOff = await readCamera();
 handedOff.recenter = Boolean(await page.$('.camera-recenter'));
+handedOff.viewDisabled = await page.$eval(
+  '.view-switcher',
+  element => element.getAttribute('aria-disabled'),
+);
 ok(
-  '顾燃交棒后保持当前观战高度与方位',
+  '顾燃交棒后保留俯视构图并恢复玩家视角控件',
   Math.abs(handedOff.level - beforeHandoff.level) < 0.001 &&
     Math.abs(handedOff.viewAzimuth - beforeHandoff.viewAzimuth) < 1e-6 &&
-    !handedOff.recenter,
+    !handedOff.recenter &&
+    handedOff.viewDisabled === 'false',
   JSON.stringify({ playerLevel, beforeHandoff, handedOff }),
 );
 
@@ -337,16 +356,18 @@ await page.touchscreen.tap(ghostTarget.screen.x, ghostTarget.screen.y);
 await wait(180);
 const ghostSelected = await page.evaluate(() => ({
   aim: window.__bj8.aim.current,
+  viewAzimuth: window.__bj8.cameraViewAzimuth.current,
   ghost: window.__bj8.scene.current.aimGhostPos(),
 }));
 ok(
-  '保留观战视角时可准确选择幽灵球位置',
+  '玩家选择非俯视视角后，瞄准会同步带动视角并准确选择幽灵球',
   ghostSelected.ghost &&
     Math.hypot(
       ghostSelected.ghost.x - ghostTarget.target.x,
       ghostSelected.ghost.z - ghostTarget.target.z,
     ) < 0.035 &&
-    Math.abs(ghostSelected.aim - ghostTarget.aim) > 0.05,
+    Math.abs(ghostSelected.aim - ghostTarget.aim) > 0.05 &&
+    Math.abs(ghostSelected.viewAzimuth - ghostSelected.aim) < 1e-6,
   JSON.stringify({ ghostTarget, ghostSelected }),
 );
 

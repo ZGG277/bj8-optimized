@@ -5,10 +5,10 @@
 [PROTOCOL]: 预算阈值变化时同步更新本文件与 render-policy.ts 头部
 */
 import { describe, expect, it } from 'vitest';
-import { renderBudgetFor } from './render-policy';
+import { adaptiveRenderQualityFor, renderBudgetFor } from './render-policy';
 
 describe('renderBudgetFor', () => {
-  it('390×844 高 DPR 手机限制实际像素与阴影预算', () => {
+  it('390×844 高 DPR 手机以 2× 清晰度配合 45Hz 控制功耗', () => {
     expect(renderBudgetFor({
       width: 390,
       height: 844,
@@ -16,10 +16,10 @@ describe('renderBudgetFor', () => {
       coarsePointer: true,
     })).toEqual({
       mobile: true,
-      pixelRatio: 1.5,
+      pixelRatio: 2,
       shadowMapSize: 1024,
       powerPreference: 'low-power',
-      movingPresentationFps: 60,
+      movingPresentationFps: 45,
     });
   });
 
@@ -31,10 +31,10 @@ describe('renderBudgetFor', () => {
       coarsePointer: true,
     });
     expect(budget.mobile).toBe(true);
-    expect(budget.pixelRatio).toBe(1.5);
+    expect(budget.pixelRatio).toBe(2);
   });
 
-  it('桌面保留 2× 清晰度与 2048 阴影', () => {
+  it('桌面用 1.75× 与 1536 阴影、低功耗、30/20Hz 档', () => {
     expect(renderBudgetFor({
       width: 1280,
       height: 800,
@@ -42,10 +42,60 @@ describe('renderBudgetFor', () => {
       coarsePointer: false,
     })).toMatchObject({
       mobile: false,
+      pixelRatio: 1.75,
+      shadowMapSize: 1536,
+      powerPreference: 'low-power',
+      movingPresentationFps: 30,
+    });
+  });
+
+  it('高压时逐级降低像素、阴影、帧率与毛玻璃合成', () => {
+    const budget = renderBudgetFor({
+      width: 1440,
+      height: 900,
+      devicePixelRatio: 2,
+      coarsePointer: false,
+    });
+
+    expect(adaptiveRenderQualityFor(budget, 'balanced')).toMatchObject({
+      pixelRatio: 1.75,
+      shadowMapSize: 1536,
+      movingPresentationFps: 30,
+      backdropBlur: true,
+    });
+    expect(adaptiveRenderQualityFor(budget, 'warm')).toMatchObject({
+      pixelRatio: 1.25,
+      shadowMapSize: 1024,
+      movingPresentationFps: 24,
+      backdropBlur: false,
+    });
+    expect(adaptiveRenderQualityFor(budget, 'hot')).toMatchObject({
+      pixelRatio: 1,
+      shadowMapSize: 512,
+      movingPresentationFps: 20,
+      backdropBlur: false,
+    });
+  });
+
+  it('手机温控优先降展示频率，极端高压也保留 1.25× 可读清晰度', () => {
+    const budget = renderBudgetFor({
+      width: 390,
+      height: 844,
+      devicePixelRatio: 3,
+      coarsePointer: true,
+    });
+
+    expect(adaptiveRenderQualityFor(budget, 'balanced')).toMatchObject({
       pixelRatio: 2,
-      shadowMapSize: 2048,
-      powerPreference: 'high-performance',
-      movingPresentationFps: 60,
+      movingPresentationFps: 45,
+    });
+    expect(adaptiveRenderQualityFor(budget, 'warm')).toMatchObject({
+      pixelRatio: 1.5,
+      movingPresentationFps: 30,
+    });
+    expect(adaptiveRenderQualityFor(budget, 'hot')).toMatchObject({
+      pixelRatio: 1.25,
+      movingPresentationFps: 24,
     });
   });
 });

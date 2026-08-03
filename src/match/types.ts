@@ -33,6 +33,7 @@ export type MatchMessageKey =
   | 'ai-safe'
   | 'placing-freeball'
   | 'placing-break'
+  | 'break-ready'
   | 'placed'
   | 'place-occupied'
   | 'place-near-pocket'

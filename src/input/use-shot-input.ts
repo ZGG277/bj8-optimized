@@ -1,6 +1,6 @@
 /*
 [INPUT]: React 生命周期、canShoot 门禁、onCommit 回调与 pointer/keyboard 原始事件
-[OUTPUT]: 对外提供 useShotInput 协调器：世界角 aim、spin/previewPower/charging 状态与 begin/update/cancel/release/commit 动作
+[OUTPUT]: 对外提供 useShotInput 协调器：世界角 aim、spin/previewPower/charging 状态与 begin/update/cancel/release/commit 动作；取消蓄力时同步清零预览
 [POS]: 输入协调层,只做会话管理与事件归一;力度与击球点的事实计算委托 shot-input 纯函数
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -138,6 +138,7 @@ export function useShotInput({ canShoot, onCommit, worldRef, breaking }: Options
     stopPreview();
     sessionRef.current = null;
     setCharging(false);
+    setPreviewPower(0);
   }, [stopPreview]);
 
   const commitShot = useCallback((intent: ShotIntent) => {

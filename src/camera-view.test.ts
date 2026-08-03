@@ -1,6 +1,6 @@
 /*
-[INPUT]: camera-view 连续视角、独立方位角与竖屏全台适配纯几何
-[OUTPUT]: 锁定端点、任意高度、手动视角路由、全局视角阈值、环绕独立性及竖屏六袋安全边界回归
+[INPUT]: camera-view 连续视角、观战锁定、横竖屏俯视方向与全台适配纯几何
+[OUTPUT]: 锁定端点、任意高度、玩家杆向跟随、观战横竖台及六袋安全边界回归
 [POS]: 连续视角相机回归测试
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -9,16 +9,19 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import {
   CAMERA_FOV_DEGREES,
   FIRST_PERSON_VIEW,
+  FULL_TABLE_AZIMUTH,
   GLOBAL_CAMERA_VIEW_LEVEL,
+  LANDSCAPE_TABLE_AZIMUTH,
   OVERHEAD_VIEW,
-  SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
   cameraAzimuthAtView,
   cameraInteractionMode,
   cameraPoseAt,
   clampViewLevel,
   isGlobalCameraView,
+  isOverheadCameraView,
   normalizeCameraAzimuth,
+  opponentOverheadAzimuth,
   viewLevelLabel,
 } from './camera-view';
 
@@ -39,10 +42,16 @@ describe('continuous camera view', () => {
     expect(isGlobalCameraView(OVERHEAD_VIEW)).toBe(true);
   });
 
-  it('手动视角把球桌手势路由给相机，退出后恢复瞄准路由', () => {
+  it('顾燃回合锁定球桌，玩家手动视角才把手势路由给相机', () => {
     expect(cameraInteractionMode(false, true)).toBe('orbit');
-    expect(cameraInteractionMode(true, false)).toBe('orbit');
+    expect(cameraInteractionMode(true, false)).toBe('locked');
+    expect(cameraInteractionMode(true, true)).toBe('locked');
     expect(cameraInteractionMode(false, false)).toBe('aim');
+  });
+
+  it('顾燃俯视方向按视口固定为竖台或横台', () => {
+    expect(opponentOverheadAzimuth(390, 844)).toBe(FULL_TABLE_AZIMUTH);
+    expect(opponentOverheadAzimuth(1280, 800)).toBe(LANDSCAPE_TABLE_AZIMUTH);
   });
 
   it('高度随推杆位置单调抬升且中间值不会吸附端点', () => {
@@ -70,7 +79,7 @@ describe('continuous camera view', () => {
     expect(east.position.z).toBeCloseTo(0, 10);
   });
 
-  it('观战或手动环绕只换算视觉方位角，不需要也不会返回瞄准事实', () => {
+  it('玩家手动环绕只换算视觉方位角，不需要也不会返回瞄准事实', () => {
     const aimAngle = 0.37;
     const cameraBefore = -0.8;
     const cameraAfter = cameraAzimuthAfterDrag(cameraBefore, 120);
@@ -79,17 +88,21 @@ describe('continuous camera view', () => {
     expect(normalizeCameraAzimuth(cameraAfter + Math.PI * 2)).toBeCloseTo(cameraAfter, 10);
   });
 
-  it('观战或主动全局模式保持视觉方位，拉回第一人称时沿最短圆弧回接杆向', () => {
+  it('玩家俯视端保持视觉方位，任意非俯视视角立即跟随瞄准角', () => {
     const cameraAzimuth = Math.PI - 0.1;
     const aimAngle = -Math.PI + 0.1;
-    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.82, true))
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 1, true))
       .toBeCloseTo(cameraAzimuth, 10);
-    const middle = cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.25, true);
-    expect(Math.abs(normalizeCameraAzimuth(middle - aimAngle))).toBeLessThan(0.2);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.994, true))
+      .toBeCloseTo(aimAngle, 10);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.82, true))
+      .toBeCloseTo(aimAngle, 10);
     expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0, true))
       .toBeCloseTo(aimAngle, 10);
     expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 1, false))
       .toBeCloseTo(aimAngle, 10);
+    expect(isOverheadCameraView(0.994)).toBe(false);
+    expect(isOverheadCameraView(0.995)).toBe(true);
   });
 
   it.each([0, Math.PI / 2])(
@@ -101,7 +114,7 @@ describe('continuous camera view', () => {
         0.55,
         cameraAzimuth,
         0,
-        SPECTATOR_VIEW_LEVEL,
+        OVERHEAD_VIEW,
         aspect,
       );
       const camera = new PerspectiveCamera(CAMERA_FOV_DEGREES, aspect, 0.01, 60);

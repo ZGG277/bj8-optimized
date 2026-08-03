@@ -10,8 +10,8 @@
 
 `fixed-step-runner.test.ts`: 帧率无关性（10/30/60 FPS 总步数一致）、backlog 保留（2 FPS 不丢时间）、resetClock 不补算、settled 恰好一次的单元测试。
 
-`presentation-cadence.ts` / `presentation-cadence.test.ts`: 展示快照纯节流器及高刷新输入→60Hz 发布回归；只控制 clone/React/WebGL 发布次数，不介入物理计时。
+`presentation-cadence.ts` / `presentation-cadence.test.ts`: 展示快照纯节流器及高刷新输入降频回归；温控可在运行中更新最小间隔，只控制 clone/React/WebGL 发布次数，不介入物理计时。
 
-`use-physics-loop.ts`: React 装配层，rAF 仍驱动 240Hz runner，手机以 60Hz 发布运动快照；停止帧强制发布，visibilitychange 重置时钟，回调经 ref 桥接。
+`use-physics-loop.ts`: React 装配层，rAF 仍驱动 240Hz runner，通过 ref 热更新展示帧间隔，温控切档不重启 runner；停止帧强制发布，visibilitychange 重置时钟，回调经 ref 桥接。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

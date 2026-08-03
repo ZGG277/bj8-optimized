@@ -1,6 +1,6 @@
 /*
 [INPUT]: React 生命周期、激活标记、世界 ref、展示帧间隔与 onFrame/onSettled 回调
-[OUTPUT]: 对外提供 usePhysicsLoop:rAF 驱动 240Hz fixed-step-runner，可降频发布快照，停止时强制最终帧并恰好结算一次
+[OUTPUT]: 对外提供 usePhysicsLoop:rAF 驱动 240Hz fixed-step-runner，可无重启热更新快照帧率，停止时强制最终帧并恰好结算一次
 [POS]: 模拟时钟的 React 装配层,只做事件桥接;步进策略归 fixed-step-runner,物理归 physics
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -17,7 +17,7 @@ type Options = {
   onFrame: () => void;
   /** 世界停止时调用,每段运动恰好一次 */
   onSettled: () => void;
-  /** 0 表示每个有效 rAF 都发布；手机传 1000/60 保持滚动视觉连续。 */
+  /** 0 表示每个有效 rAF 都发布；运行中可由温控档位热更新。 */
   presentationIntervalMs?: number;
 };
 
@@ -30,8 +30,10 @@ export function usePhysicsLoop({
 }: Options) {
   const onFrameRef = useRef(onFrame);
   const onSettledRef = useRef(onSettled);
+  const presentationIntervalRef = useRef(presentationIntervalMs);
   useEffect(() => { onFrameRef.current = onFrame; });
   useEffect(() => { onSettledRef.current = onSettled; });
+  useEffect(() => { presentationIntervalRef.current = presentationIntervalMs; }, [presentationIntervalMs]);
 
   useEffect(() => {
     if (!active) return;
@@ -50,6 +52,7 @@ export function usePhysicsLoop({
 
     let raf = 0;
     const tick = (now: number) => {
+      cadence.setIntervalMs(presentationIntervalRef.current);
       const result = runner.frame(now);
       if ((result.steps > 0 && cadence.shouldPublish(now)) || result.settled) {
         onFrameRef.current();
@@ -70,5 +73,5 @@ export function usePhysicsLoop({
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [active, worldRef, presentationIntervalMs]);
+  }, [active, worldRef]);
 }

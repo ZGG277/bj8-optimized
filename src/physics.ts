@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖常量表与纯数学；禁止依赖 React、DOM、规则状态或渲染层
-[OUTPUT]: 对外输出 240 Hz 确定性世界：步进、统一袋口内弧捕获几何、首碰/碰库/落袋事件、合法目标推导与击球接口
+[OUTPUT]: 对外输出 240 Hz 确定性世界：步进、统一袋口内弧捕获几何、球碰/首碰/碰库/落袋事件、标准开球位与击球接口
 [POS]: 物理内核层，规则与 UI 的事实来源；所有时间积分必须以 PHYSICS_DT 固定步长进行
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -103,6 +103,7 @@ export type BallState = {
 export type CueSpin = { x: number; y: number };
 
 export type PhysicsEvent =
+  | { type: "ball-collision"; first: number; second: number; time: number; speed: number }
   | { type: "first-contact"; ball: number; time: number; speed: number }
   | { type: "cushion"; ball: number; time: number; speed: number }
   | {
@@ -149,8 +150,6 @@ function makeBall(number: number, x: number, z: number): BallState {
 // 摆球位置扰动：模拟真实球框无法 100% 贴紧以及台面微小不平。
 // 数值控制在球径的 ~1.5% 以内，既不影响人眼识别，也足以打破对称开球。
 const RACK_POSITION_JITTER = 0.00045;
-const CUE_KITCHEN_JITTER_X = 0.18;
-const CUE_KITCHEN_JITTER_Z = 0.12;
 
 /**
  * 对球堆做轻量重叠消除。小球随机偏移后偶发重叠，沿球心连线推开。
@@ -191,12 +190,8 @@ function settleRack(balls: BallState[], iterations = 8) {
  * 几何完全对称仍会导致同力度开球结果过于相似。
  */
 export function createInitialWorld(rng?: () => number): BilliardsWorld {
-  // 白球初始在开球区内随机位置；玩家进入对局后仍可在开球区重新放置
-  const cueX = rng ? (rng() - 0.5) * 2 * CUE_KITCHEN_JITTER_X : 0;
-  const cueZ = rng
-    ? TABLE.length * 0.25 + rng() * Math.min(CUE_KITCHEN_JITTER_Z, TABLE.length * 0.25 - R)
-    : TABLE.length * 0.25;
-  const balls: BallState[] = [makeBall(0, cueX, cueZ)];
+  // 白球始终放在开球线中点标准位；随机性只用于球堆，避免重开后母球“自己跑位”。
+  const balls: BallState[] = [makeBall(0, 0, TABLE.length * 0.25)];
 
   const rackOrder = rng
     ? shuffledRackOrder(rng)
@@ -782,6 +777,17 @@ function resolveForkTriple(world: BilliardsWorld, fork: ForkContact, dt: number)
     }
   }
 
+  for (let i = 0; i < targets.length; i += 1) {
+    if (betas[i] <= 0) continue;
+    world.events.push({
+      type: "ball-collision",
+      first: striker.number,
+      second: targets[i].number,
+      time: world.time,
+      speed: Math.abs(normals[i].rvn),
+    });
+  }
+
   if (world.firstContact === null) {
     const cueInvolved = striker.number === 0 || targets.some((t) => t.number === 0);
     if (cueInvolved) {
@@ -911,6 +917,14 @@ function resolveBallPair(world: BilliardsWorld, first: BallState, second: BallSt
     second.x += second.vx * advanceSecond;
     second.z += second.vz * advanceSecond;
   }
+
+  world.events.push({
+    type: "ball-collision",
+    first: first.number,
+    second: second.number,
+    time: world.time,
+    speed: Math.abs(relativeNormal),
+  });
 
   if (world.firstContact === null) {
     const object = first.number === 0 ? second : second.number === 0 ? first : null;

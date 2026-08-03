@@ -23,4 +23,12 @@ describe('presentation cadence', () => {
     cadence.reset();
     expect(cadence.shouldPublish(20)).toBe(true);
   });
+
+  it('运行中可降频而不重启物理时钟', () => {
+    const cadence = createPresentationCadence(1000 / 60);
+    expect(cadence.shouldPublish(0)).toBe(true);
+    cadence.setIntervalMs(1000 / 20);
+    expect(cadence.shouldPublish(20)).toBe(false);
+    expect(cadence.shouldPublish(50)).toBe(true);
+  });
 });

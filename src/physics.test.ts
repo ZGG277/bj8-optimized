@@ -43,6 +43,13 @@ describe('出杆机制测试', () => {
     expect(world.moving).toBe(false);
   });
 
+  it('随机摆球也不改变白球的标准开球位', () => {
+    const randomWorld = createInitialWorld(() => 0.99);
+    const cue = getCueBall(randomWorld)!;
+    expect(cue.x).toBe(0);
+    expect(cue.z).toBe(TABLE.length * 0.25);
+  });
+
   it('可以正常击打白球', () => {
     const result = strikeCueBall(world, 0.5, 50);
     expect(result).toBe(true);
@@ -236,6 +243,12 @@ describe('碰撞物理测试', () => {
     }
     // 1号球应被打向 -z 方向至少 0.6m（碰库前）
     expect(z0 - minZ).toBeGreaterThan(0.6);
+    expect(world.events.some((event) => (
+      event.type === 'ball-collision' &&
+      [event.first, event.second].includes(0) &&
+      [event.first, event.second].includes(1) &&
+      event.speed > 0
+    ))).toBe(true);
   });
 
   it('纯 z 方向逆序三球链在同一步内继续传播（碰撞迭代不得只观察 x）', () => {

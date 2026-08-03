@@ -1,14 +1,14 @@
 /*
 [INPUT]: 母球位置、独立相机方位角、力度预览、归一化视角高度与视口宽高比
-[OUTPUT]: 对外提供连续视角钳制、交互路由、全局视角判定、竖屏全台适配、自由相机回接、环绕手势换算与相机位姿
+[OUTPUT]: 对外提供连续视角钳制、观战锁定路由、横竖屏固定俯视方向、玩家非俯视杆向跟随、全台适配与相机位姿
 [POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 
 export const FIRST_PERSON_VIEW = 0;
 export const OVERHEAD_VIEW = 1;
-export const SPECTATOR_VIEW_LEVEL = 0.82;
 export const FULL_TABLE_AZIMUTH = 0;
+export const LANDSCAPE_TABLE_AZIMUTH = Math.PI / 2;
 export const CAMERA_FOV_DEGREES = 46;
 
 const FP_CAM_DIST = 0.72;
@@ -23,8 +23,8 @@ const TABLE_OUTER_HALF_WIDTH = 0.76;
 const TABLE_OUTER_HALF_LENGTH = 1.4;
 const TABLE_FIT_MARGIN = 1.23;
 const ORBIT_RADIANS_PER_PIXEL = 0.008;
-const CAMERA_REATTACH_START = 0.08;
 export const GLOBAL_CAMERA_VIEW_LEVEL = 0.42;
+export const OVERHEAD_LOCK_VIEW_LEVEL = 0.995;
 
 export type CameraPoint = {
   x: number;
@@ -37,7 +37,7 @@ export type CameraPose = {
   lookAt: CameraPoint;
 };
 
-export type CameraInteractionMode = 'aim' | 'orbit';
+export type CameraInteractionMode = 'aim' | 'orbit' | 'locked';
 
 export function clampViewLevel(level: number): number {
   if (!Number.isFinite(level)) return FIRST_PERSON_VIEW;
@@ -49,17 +49,30 @@ export function normalizeCameraAzimuth(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
-/** 到达全局高度后，点台面只改变瞄准事实，不再带动整张球台转向。 */
+/** 全局高度用于切换全台构图、吊灯和触控反馈；方位是否锁定另由俯视端点判定。 */
 export function isGlobalCameraView(level: number): boolean {
   return clampViewLevel(level) >= GLOBAL_CAMERA_VIEW_LEVEL;
 }
 
-/** 观战或显式手动视角只消费相机手势；普通玩家状态才把球桌手势交给瞄准。 */
+export function isOverheadCameraView(level: number): boolean {
+  return clampViewLevel(level) >= OVERHEAD_LOCK_VIEW_LEVEL;
+}
+
+/** 竖屏让球台长边沿屏幕纵轴，横屏转 90° 让球台横放。 */
+export function opponentOverheadAzimuth(width: number, height: number): number {
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
+    return LANDSCAPE_TABLE_AZIMUTH;
+  }
+  return width < height ? FULL_TABLE_AZIMUTH : LANDSCAPE_TABLE_AZIMUTH;
+}
+
+/** 顾燃回合锁定球桌；只有玩家显式开启手动视角时，球桌手势才用于环绕。 */
 export function cameraInteractionMode(
   spectatorActive: boolean,
   manualCameraActive: boolean,
 ): CameraInteractionMode {
-  return spectatorActive || manualCameraActive ? 'orbit' : 'aim';
+  if (spectatorActive) return 'locked';
+  return manualCameraActive ? 'orbit' : 'aim';
 }
 
 /** 横向拖动只产生视觉方位角，不消费也不返回球杆瞄准角。 */
@@ -69,9 +82,8 @@ export function cameraAzimuthAfterDrag(current: number, pixelDelta: number): num
 }
 
 /**
- * 观战或玩家主动进入全局高度后，高位保持进入时的视觉方位；
- * 用户向第一人称拉动时，沿最短圆弧平滑回到杆向。
- * detached=false 时保持既有玩家相机语义：所有高度都跟随瞄准角。
+ * 玩家只有停在俯视端点时保持独立方位；一旦选择非俯视视角，
+ * 相机立即重新消费当前瞄准角。触摸瞄准期间的短暂锁镜由上层处理。
  */
 export function cameraAzimuthAtView(
   cameraAzimuth: number,
@@ -80,19 +92,8 @@ export function cameraAzimuthAtView(
   detached: boolean,
 ): number {
   const aim = normalizeCameraAzimuth(aimAngle);
-  if (!detached) return aim;
-  const level = clampViewLevel(viewLevel);
-  const raw = Math.min(
-    1,
-    Math.max(
-      0,
-      (level - CAMERA_REATTACH_START) /
-        (GLOBAL_CAMERA_VIEW_LEVEL - CAMERA_REATTACH_START),
-    ),
-  );
-  const transition = raw * raw * (3 - 2 * raw);
-  const shortestDelta = normalizeCameraAzimuth(cameraAzimuth - aim);
-  return normalizeCameraAzimuth(aim + shortestDelta * transition);
+  if (!detached || !isOverheadCameraView(viewLevel)) return aim;
+  return normalizeCameraAzimuth(cameraAzimuth);
 }
 
 /** 端点保留产品名称；中间高度直接给出可感知的百分比。 */

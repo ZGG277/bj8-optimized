@@ -32,6 +32,7 @@ export function renderMatchMessage(m: MatchState): string {
     case 'ai-safe': return '顾燃选择安全球';
     case 'placing-freeball': return '你的自由球，点击台面放置白球';
     case 'placing-break': return '开球：点击开球区放置白球';
+    case 'break-ready': return '白球已在标准位，按住白球可调整';
     case 'placed': return '白球已放置，你的回合';
     case 'place-occupied': return '位置被占用，请选择其他位置';
     case 'place-near-pocket': return '不能放在袋口附近';

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖浏览器 Canvas API 与 Three.js CanvasTexture
-[OUTPUT]: 对外提供台呢、木纹、皮革、球体与母球的程序化贴图工厂
+[OUTPUT]: 对外提供确定性多尺度台呢、木纹、皮革、球体与母球的程序化贴图工厂
 [POS]: 渲染资源层；只生成纹理，不持有场景或对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
@@ -9,7 +9,25 @@
  */
 import * as THREE from 'three';
 
-/** 带方向性的台呢绒布贴图（颜色 + 高度噪声） */
+const clampByte = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
+
+/** 确定性二维噪声；避免每次加载时台呢的明暗和质感随机变化。 */
+function clothNoise(x: number, y: number, seed: number) {
+  let hash = Math.imul(x ^ seed, 374761393) + Math.imul(y ^ (seed >>> 1), 668265263);
+  hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
+  return ((hash ^ (hash >>> 16)) >>> 0) / 4294967295;
+}
+
+function configureClothTexture(texture: THREE.CanvasTexture, colorSpace: THREE.ColorSpace) {
+  texture.colorSpace = colorSpace;
+  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  texture.anisotropy = 8;
+}
+
+/** 带方向性的台呢绒布贴图（均匀底色 + 细密经纬/倒毛 + 连续微法线）。 */
 export function makeClothMaps(widthPx = 1024, heightPx = 2048): {
   map: THREE.CanvasTexture;
   normalMap: THREE.CanvasTexture;
@@ -19,89 +37,58 @@ export function makeClothMaps(widthPx = 1024, heightPx = 2048): {
   canvas.width = widthPx;
   canvas.height = heightPx;
   const ctx = canvas.getContext('2d')!;
+  const colorImage = ctx.createImageData(widthPx, heightPx);
 
-  const height = new Float32Array(widthPx * heightPx);
-  const rough = new Float32Array(widthPx * heightPx);
-
-  // 底色：比赛绿，沿长边有轻微倒顺毛渐变（一头亮一头暗）
-  const base = ctx.createLinearGradient(0, 0, 0, heightPx);
-  base.addColorStop(0, '#095236');
-  base.addColorStop(0.5, '#0c6442');
-  base.addColorStop(1, '#084e33');
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, widthPx, heightPx);
-
-  // 绒纤维：大量短笔触，方向偏向纵向（倒毛方向）
-  const strokes = 26000;
-  for (let i = 0; i < strokes; i++) {
-    const x = Math.random() * widthPx;
-    const y = Math.random() * heightPx;
-    const len = 1 + Math.random() * 3.2;
-    const angle = Math.PI / 2 + (Math.random() - 0.5) * 1.1; // 偏向纵向
-    const bright = Math.random();
-    ctx.strokeStyle = bright > 0.5
-      ? `rgba(255,255,240,${0.02 + Math.random() * 0.05})`
-      : `rgba(0,30,18,${0.03 + Math.random() * 0.06})`;
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
-    ctx.stroke();
-
-    const px = Math.floor(x);
-    const py = Math.floor(y);
-    if (px >= 0 && px < widthPx && py >= 0 && py < heightPx) {
-      const idx = py * widthPx + px;
-      height[idx] += (bright - 0.5) * 0.4;
-      rough[idx] += (Math.random() - 0.5) * 0.2;
+  // 比赛绿保持近似均匀；只有 1~3 色阶的细纤维差异，不再制造可见的大块斑驳。
+  for (let y = 0; y < heightPx; y++) {
+    for (let x = 0; x < widthPx; x++) {
+      const weave = Math.sin(y * 1.07 + x * 0.075) * 0.62
+        + Math.sin(x * 1.73 - y * 0.035) * 0.28;
+      const nap = Math.sin(y * 0.041 + Math.sin(x * 0.009) * 0.55) * 0.24;
+      const grain = (clothNoise(x, y, 0x73a21) - 0.5) * 1.4;
+      const tone = weave + nap + grain;
+      const idx = (y * widthPx + x) * 4;
+      colorImage.data[idx] = clampByte(10 + tone * 0.55);
+      colorImage.data[idx + 1] = clampByte(91 + tone * 1.05);
+      colorImage.data[idx + 2] = clampByte(60 + tone * 0.7);
+      colorImage.data[idx + 3] = 255;
     }
   }
-
-  // 大块织物纹理（低频）
-  for (let i = 0; i < 900; i++) {
-    const x = Math.random() * widthPx;
-    const y = Math.random() * heightPx;
-    const r = 8 + Math.random() * 30;
-    ctx.fillStyle = `rgba(${Math.random() > 0.5 ? '255,255,235' : '0,25,15'},${0.008 + Math.random() * 0.014})`;
-    ctx.beginPath();
-    ctx.ellipse(x, y, r, r * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.putImageData(colorImage, 0, 0);
 
   const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
+  configureClothTexture(map, THREE.SRGBColorSpace);
 
-  // 由高度场生成法线贴图（降采样到 512x1024 保证生成速度）
+  // 连续的细密经纬法线；不再用单像素尖峰，近景不会出现砂砾状噪点。
   const nw = 512, nh = 1024;
   const nCanvas = document.createElement('canvas');
   nCanvas.width = nw;
   nCanvas.height = nh;
   const nCtx = nCanvas.getContext('2d')!;
   const nImg = nCtx.createImageData(nw, nh);
-  const sx = widthPx / nw;
-  const sy = heightPx / nh;
-
-  const hAt = (ix: number, iy: number) => {
-    const fx = Math.min(widthPx - 1, Math.max(0, Math.floor(ix * sx)));
-    const fy = Math.min(heightPx - 1, Math.max(0, Math.floor(iy * sy)));
-    return height[fy * widthPx + fx];
-  };
   for (let y = 0; y < nh; y++) {
     for (let x = 0; x < nw; x++) {
-      const dx = hAt(x + 1, y) - hAt(x - 1, y);
-      const dy = hAt(x, y + 1) - hAt(x, y - 1);
+      const primaryPhase = y * 1.11 + x * 0.17;
+      const secondaryPhase = y * 2.41 - x * 0.08;
+      const crossPhase = x * 1.79 + y * 0.04;
+      const dx = Math.cos(primaryPhase) * 0.0408
+        - Math.cos(secondaryPhase) * 0.008
+        + Math.cos(crossPhase) * 0.1432;
+      const dy = Math.cos(primaryPhase) * 0.2664
+        + Math.cos(secondaryPhase) * 0.241
+        + Math.cos(crossPhase) * 0.0032;
       const idx = (y * nw + x) * 4;
-      nImg.data[idx] = 128 - dx * 220;
-      nImg.data[idx + 1] = 128 - dy * 220;
+      nImg.data[idx] = clampByte(128 - dx * 18);
+      nImg.data[idx + 1] = clampByte(128 - dy * 18);
       nImg.data[idx + 2] = 255;
       nImg.data[idx + 3] = 255;
     }
   }
   nCtx.putImageData(nImg, 0, 0);
   const normalMap = new THREE.CanvasTexture(nCanvas);
+  configureClothTexture(normalMap, THREE.NoColorSpace);
 
-  // 粗糙度贴图：绒面整体高粗糙，局部抖动
+  // 绒面整体高粗糙，仅保留轻微而连续的倒毛变化。
   const rCanvas = document.createElement('canvas');
   rCanvas.width = nw;
   rCanvas.height = nh;
@@ -110,13 +97,17 @@ export function makeClothMaps(widthPx = 1024, heightPx = 2048): {
   for (let y = 0; y < nh; y++) {
     for (let x = 0; x < nw; x++) {
       const idx = (y * nw + x) * 4;
-      const v = 235 + rough[Math.min(heightPx - 1, Math.floor(y * sy)) * widthPx + Math.min(widthPx - 1, Math.floor(x * sx))] * 60;
-      rImg.data[idx] = rImg.data[idx + 1] = rImg.data[idx + 2] = Math.max(180, Math.min(255, v));
+      const nap = Math.sin(y * 0.043 + Math.sin(x * 0.011) * 0.6) * 2.2;
+      const weave = Math.sin(y * 1.11 + x * 0.17) * 1.1;
+      const grain = (clothNoise(x, y, 0x19c87) - 0.5) * 1.4;
+      const value = clampByte(238 + nap + weave + grain);
+      rImg.data[idx] = rImg.data[idx + 1] = rImg.data[idx + 2] = value;
       rImg.data[idx + 3] = 255;
     }
   }
   rCtx.putImageData(rImg, 0, 0);
   const roughnessMap = new THREE.CanvasTexture(rCanvas);
+  configureClothTexture(roughnessMap, THREE.NoColorSpace);
 
   return { map, normalMap, roughnessMap };
 }
