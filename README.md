@@ -89,8 +89,8 @@ npx vite --port 5199 --strictPort &
 
 ```bash
 npm run build
-lark-cli apps +html-publish --app-id app_17b18dh5axj --path ./dist --as user
-lark-cli apps +release-get --app-id app_17b18dh5axj --release-id <release_id>   # 轮询至 finished
+lark-cli apps +html-publish --app-id app_17b18dh5axj --path ./dist/index.html --as user
+# 命令成功返回的 data.url 即本次 HTML 发布态地址；release-get 仅用于全栈应用。
 ```
 
 ## 目录结构
