@@ -16,7 +16,7 @@ v1.4 采用纯视觉五控件 HUD：视角、灯泡、击球点、蓄力和拨�
 
 视觉语言 v1.3 以“静谧球房”的信息架构、54px 控制轨和手势几何为共同底座，提供三套可即时切换的表达：默认「青瓷」、正式竞技「决赛之夜」、年轻夜场「霓虹球房」。左下角小调色盘展开主题选项，URL `?theme=celadon|noir|neon` 与 `[` / `]` 键也可切换，选择会保存在本机；主题只改视觉，不改游戏逻辑与触控几何。
 
-线上版（飞书妙搭托管）：https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj
+线上版（飞书妙搭托管）：https://lg22l37ytz.feishuapp.com/app/app_17atze3ahyj
 
 ## 快速开始
 
@@ -89,7 +89,7 @@ npx vite --port 5199 --strictPort &
 
 ```bash
 npm run build
-lark-cli apps +html-publish --app-id app_17b18dh5axj --path ./dist/index.html --as user
+lark-cli apps +html-publish --app-id app_17atze3ahyj --path ./dist/index.html --as user
 # 命令成功返回的 data.url 即本次 HTML 发布态地址；release-get 仅用于全栈应用。
 ```
 
