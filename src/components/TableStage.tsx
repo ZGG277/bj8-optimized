@@ -1,16 +1,19 @@
 /*
-[INPUT]: 依赖连续 viewLevel / match / 观战、首局引导与手动相机状态及 pointer 事件处理器
-[OUTPUT]: 渲染 3D 球桌、手动相机状态、首局语境观战提示、纯视觉全台回正与结束遮罩
+[INPUT]: 依赖连续 viewLevel / match、显式相机模式/阶段/交互、首局引导及 pointer 事件处理器
+[OUTPUT]: 渲染 3D 球桌、相机语义状态、首局语境观战提示、全台常驻回正与结束遮罩
 [POS]: HUD 组件层；瞄准拨轮已并入统一可停靠控制层，相机/对局状态由上层持有
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import React from 'react';
 import type { MatchState } from '../match/types';
+import type { CameraMode, CameraPhase } from '../camera-state';
 
 interface TableStageProps {
   viewLevel: number;
   spectatorActive: boolean;
-  manualCameraActive: boolean;
+  cameraMode: CameraMode;
+  cameraPhase: CameraPhase['kind'];
+  cameraInteraction: 'aim' | 'orbit';
   firstMatchGuideActive: boolean;
   match: MatchState;
   containerRef: React.Ref<HTMLDivElement>;
@@ -25,7 +28,9 @@ interface TableStageProps {
 export function TableStage({
   viewLevel,
   spectatorActive,
-  manualCameraActive,
+  cameraMode,
+  cameraPhase,
+  cameraInteraction,
   firstMatchGuideActive,
   match,
   containerRef,
@@ -40,9 +45,11 @@ export function TableStage({
     <section className="table-stage">
       <div
         ref={containerRef}
-        className={`viewport ${viewLevel >= 0.995 ? 'overhead' : 'orbit'} ${spectatorActive ? 'spectator' : ''} ${manualCameraActive ? 'camera-manual' : ''} ${match.phase === 'placing' ? 'placing' : ''}`}
+        className={`viewport ${viewLevel >= 0.995 ? 'overhead' : 'orbit'} ${spectatorActive ? 'spectator' : ''} ${cameraInteraction === 'orbit' ? 'camera-manual' : ''} ${match.phase === 'placing' ? 'placing' : ''}`}
         data-view-level={viewLevel.toFixed(3)}
-        data-camera-mode={manualCameraActive ? 'manual' : 'aim'}
+        data-camera-mode={cameraMode}
+        data-camera-phase={cameraPhase}
+        data-camera-interaction={cameraInteraction}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -61,7 +68,7 @@ export function TableStage({
           </div>
         )}
 
-        {spectatorActive && (
+        {cameraMode !== 'shot' && (
           <button
             type="button"
             className="camera-recenter"

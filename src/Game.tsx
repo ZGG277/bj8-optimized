@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、整局结束能力评估、移动端运动快照降频、按需走位预算、独立观战/手动环绕与瞄准 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、整局结束能力评估、移动端运动快照降频、按需走位预算与已查看方案快照、幽灵球落位自动第一人称、击球后全局观察与显式 shot/tactical/spectator 视角
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -28,6 +28,8 @@ import { useOpponentAI } from './hooks/useOpponentAI';
 import { useAudioManager } from './hooks/useAudioManager';
 import { usePositionPlan } from './hooks/usePositionPlan';
 import { useAimAssist } from './hooks/useAimAssist';
+import { useCameraController } from './hooks/useCameraController';
+import { useSceneBridge } from './hooks/useSceneBridge';
 import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
 import { ControlDeck } from './components/ControlDeck';
@@ -35,19 +37,17 @@ import { PlanOverlay } from './components/PlanOverlay';
 import { ReviewOverlay } from './components/ReviewOverlay';
 import { IntroScreen } from './components/IntroScreen';
 import { FirstMatchGuide } from './components/FirstMatchGuide';
-import { Scene3D } from './Scene3D';
+import type { Scene3D } from './Scene3D';
 import type { PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
 import {
-  FULL_TABLE_AZIMUTH,
   OVERHEAD_VIEW,
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
-  cameraAzimuthAtView,
-  cameraInteractionMode,
-  isGlobalCameraView,
+  fullTableAzimuthForViewport,
 } from './camera-view';
+import { cameraInteractionFor } from './camera-state';
 import type { GameMode, PositionOutcome } from './opponent/model';
 import {
   guideStepAfterEvent,
@@ -64,8 +64,6 @@ type SkillShotCapture = {
   assisted: boolean;
 };
 
-const TOUCH_AIM_CAMERA_RELEASE_MS = 650;
-
 function browserStorage(): Storage | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -80,7 +78,6 @@ export default function Game() {
   const {
     worldRef, worldView, setWorldView,
     match, matchRef, setMatch,
-    viewLevel, setViewLevel,
     playerSkill, gameMode, opponentProfile,
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
@@ -97,17 +94,33 @@ export default function Game() {
   // ── 3D 场景 ──
   const containerRef = useRef<HTMLDivElement>(null);
   const scene3DRef = useRef<Scene3D | null>(null);
-  const [cameraAzimuth, setCameraAzimuth] = useState(FULL_TABLE_AZIMUTH);
-  const [cameraDetached, setCameraDetached] = useState(false);
-  const [touchAimCameraLocked, setTouchAimCameraLocked] = useState(false);
-  const [manualCameraActive, setManualCameraActive] = useState(false);
-  const [manualCameraPinned, setManualCameraPinned] = useState(false);
-  const touchAimCameraTimerRef = useRef<number | null>(null);
-  const manualAimTransitionPointerRef = useRef<number | null>(null);
-  const cameraAzimuthRef = useRef(cameraAzimuth);
-  cameraAzimuthRef.current = cameraAzimuth;
+  const camera = useCameraController();
+  const { viewLevel, setCameraAzimuth } = camera;
+  const cancelAimInteractionRef = useRef<() => void>(() => {});
+  const aimCameraPointerRef = useRef<number | null>(null);
+  const cameraGesturePointerRef = useRef<number | null>(null);
+  const orbitPointerRef = useRef<{
+    id: number; lastX: number; target: HTMLElement;
+  } | null>(null);
+  const cameraAzimuthRef = useRef(camera.cameraAzimuth);
+  const endCameraInteraction = useCallback(() => {
+    cancelAimInteractionRef.current();
+    camera.releaseAimCameraNow();
+    aimCameraPointerRef.current = null;
+    cameraGesturePointerRef.current = null;
+    const orbit = orbitPointerRef.current;
+    if (orbit?.target.hasPointerCapture(orbit.id)) orbit.target.releasePointerCapture(orbit.id);
+    orbitPointerRef.current = null;
+    scene3DRef.current?.endCameraGesture();
+  }, [camera]);
   const spectatorActive =
     match.actor === 'opponent' && (match.phase === 'opponent' || match.phase === 'rolling');
+  const canonicalTableAzimuth = useCallback(() => {
+    const element = containerRef.current;
+    const width = element?.clientWidth ?? (typeof window === 'undefined' ? 1280 : window.innerWidth);
+    const height = element?.clientHeight ?? (typeof window === 'undefined' ? 800 : window.innerHeight);
+    return fullTableAzimuthForViewport(width, height);
+  }, []);
   const physicsPresentationIntervalMs = useMemo(() => {
     if (typeof window === 'undefined') return 0;
     const budget = renderBudgetFor({
@@ -135,12 +148,10 @@ export default function Game() {
     enabled: guidanceAllowed && guidanceEnabled,
   });
   const planOpen = positionPlan.status === 'showing';
-  // 规划视图打开期间禁用瞄准输入（最小侵入：只压低 canAim，不动交互层内部）
-  const canAim = canAimBase && !planOpen;
   // positionPlan 对象每渲染换新身份；出杆捕获只需读 plans，用 ref 镜像避免 handleCommit 重建
   const positionPlanRef = useRef(positionPlan);
   positionPlanRef.current = positionPlan;
-  const planConsultedRef = useRef(false);
+  const planConsultedRef = useRef<PositionPlan['steps'][number] | null>(null);
 
   // ── 击球复盘（上一杆「计划 vs 实际」）──
   // 出杆瞬间在 handleCommit 的 doShot 里捕获快照；对手杆走 useOpponentAI 不经此路，天然只记玩家杆
@@ -148,7 +159,9 @@ export default function Game() {
   const skillShotCaptureRef = useRef<SkillShotCapture | null>(null);
   const [shotReview, setShotReview] = useState<ShotReview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
-  // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
+  // 临时全台视图拥有完整相机快照；展开时不允许出杆丢失恢复点。
+  const canAim = canAimBase && !planOpen && !reviewOpen;
+  // “走位与击球复盘”是独立开关；默认关闭，规划与复盘都只缓存、不主动弹出。
   const aimAssist = useAimAssist();
   const [firstMatchGuideStep, setFirstMatchGuideStep] =
     useState<FirstMatchGuideStep | null>(() =>
@@ -199,21 +212,22 @@ export default function Game() {
     match.phase,
   ]);
 
-  // 打开前的视角，关闭时恢复
-  const prevViewLevelRef = useRef(viewLevel);
+  // 规划/复盘向相机控制器申请临时全台视图；关闭时原子恢复完整快照。
   const handleOpenPlan = useCallback(() => {
     if (!guidanceAllowed) return;
-    planConsultedRef.current = true;
-    prevViewLevelRef.current = viewLevel;
+    endCameraInteraction();
+    planConsultedRef.current = positionPlan.plans[0]?.steps[0] ?? null;
+    camera.beginTemporary('plan', OVERHEAD_VIEW, canonicalTableAzimuth());
     positionPlan.open();
-  }, [guidanceAllowed, viewLevel, positionPlan]);
+  }, [camera, canonicalTableAzimuth, endCameraInteraction, guidanceAllowed, positionPlan]);
   const handleClosePlan = useCallback(() => {
+    endCameraInteraction();
     positionPlan.close();
-    setViewLevel(prevViewLevelRef.current);
+    camera.restoreTemporary('plan');
     setGuidanceEnabled(false);
-  }, [positionPlan, setViewLevel]);
+  }, [camera, endCameraInteraction, positionPlan]);
 
-  // 灯泡点亮后才启动 Worker；结果到达时自动展开，不要求用户重复点击。
+  // 用户显式开启走位/复盘后才启动 Worker；结果到达时自动展开，不要求重复点击。
   useEffect(() => {
     if (
       guidanceEnabled &&
@@ -226,23 +240,23 @@ export default function Game() {
   }, [guidanceEnabled, shotReview, positionPlan.status, planOpen, handleOpenPlan]);
 
   // ── 复盘开合：▶ 对比切俯视 + 场景叠加；✕/💡 收起回 chip ──
-  const prevReviewViewLevelRef = useRef(viewLevel);
   const handleOpenReview = useCallback(() => {
     if (!shotReview) return;
+    endCameraInteraction();
     setGuidanceEnabled(true);
-    prevReviewViewLevelRef.current = viewLevel;
+    camera.beginTemporary('review', OVERHEAD_VIEW, canonicalTableAzimuth());
     setReviewOpen(true);
-    setViewLevel(OVERHEAD_VIEW);
     scene3DRef.current?.showReviewOverlay(shotReview);
-  }, [shotReview, viewLevel, setViewLevel]);
+  }, [camera, canonicalTableAzimuth, endCameraInteraction, shotReview]);
   const handleCloseReview = useCallback(() => {
+    endCameraInteraction();
     setReviewOpen(false);
     scene3DRef.current?.showReviewOverlay(null);
-    setViewLevel(prevReviewViewLevelRef.current);
+    camera.restoreTemporary('review');
     setGuidanceEnabled(false);
-  }, [setViewLevel]);
+  }, [camera, endCameraInteraction]);
 
-  // 💡 是规划与复盘的总开关：默认熄灭；复盘优先，规划仅在用户主动点亮时打开。
+  // 走位/复盘开关默认关闭；复盘优先，规划仅在用户主动开启时打开。
   const handleTogglePlan = useCallback(() => {
     if (!guidanceAllowed) return;
     if (guidanceEnabled) {
@@ -270,13 +284,9 @@ export default function Game() {
     if (!shotReview && reviewOpen) {
       setReviewOpen(false);
       scene3DRef.current?.showReviewOverlay(null);
+      camera.restoreTemporary('review');
     }
-  }, [shotReview, reviewOpen]);
-
-  // 打开规划视图自动切俯视（轨迹/走位区域在俯视下可读性最好）
-  useEffect(() => {
-    if (planOpen && viewLevel !== OVERHEAD_VIEW) setViewLevel(OVERHEAD_VIEW);
-  }, [planOpen, viewLevel, setViewLevel]);
+  }, [camera, shotReview, reviewOpen]);
 
   const handleShowPlanStep = useCallback((plan: PositionPlan | null, stepIndex: number) => {
     scene3DRef.current?.showPlanStep(plan, stepIndex);
@@ -292,22 +302,25 @@ export default function Game() {
   const resetSpinRef = useRef<() => void>(() => {});
   const spectatorWasActiveRef = useRef(false);
 
-  // 对手接管后切到竖屏友好的全台观战位；交棒后保留该高度与朝向。
+  // 对手接管进入 spectator；交棒后显式落到 tactical，保留观战高度与朝向供规划。
   useEffect(() => {
     const wasActive = spectatorWasActiveRef.current;
     if (spectatorActive && !wasActive) {
-      const element = containerRef.current;
-      const portrait = Boolean(element && element.clientWidth < element.clientHeight);
-      setCameraAzimuth(portrait ? FULL_TABLE_AZIMUTH : aimRef.current);
-      setCameraDetached(true);
-      setViewLevel(Math.max(viewLevel, SPECTATOR_VIEW_LEVEL));
+      endCameraInteraction();
+      camera.enterSpectator(
+        Math.max(viewLevel, SPECTATOR_VIEW_LEVEL),
+        canonicalTableAzimuth(),
+      );
+    } else if (!spectatorActive && wasActive) {
+      endCameraInteraction();
+      camera.exitSpectator();
     }
     spectatorWasActiveRef.current = spectatorActive;
-  }, [spectatorActive, setViewLevel, viewLevel]);
+  }, [camera, canonicalTableAzimuth, endCameraInteraction, spectatorActive, viewLevel]);
 
   // ── 出杆提交：输入层只给 ShotIntent，这里负责球杆动画与物理击球 ──
   const handleCommit = useCallback((intent: ShotIntent) => {
-    setTouchAimCameraLocked(false);
+    endCameraInteraction();
     const angle = aimRef.current;
     const cueBall = getCueBall(worldRef.current);
     if (!cueBall) return;
@@ -320,6 +333,7 @@ export default function Game() {
     scene3DRef.current?.showReviewOverlay(null);
 
     const doShot = () => {
+      const consultedPlan = planConsultedRef.current;
       const currentMatch = matchRef.current;
       const legal = legalNumbers(worldRef.current, 'player', currentMatch.playerGroup);
       const declaredIntent = currentMatch.breaking
@@ -329,22 +343,33 @@ export default function Game() {
         target: declaredIntent?.target ?? null,
         pocket: declaredIntent?.pocket ?? null,
         tolerance: declaredIntent?.halfWidth ?? null,
-        assisted: planConsultedRef.current,
+        assisted: consultedPlan !== null,
       };
-      planConsultedRef.current = false;
+      planConsultedRef.current = null;
       // 击球前快照（复盘捕获点）：strikeCueBall 会改写 worldRef，必须先克隆
       shotCaptureRef.current = {
         worldBefore: cloneWorld(worldRef.current),
         angle,
         power: intent.power,
         spin: intent.spin,
-        planned: positionPlanRef.current.plans[0]?.steps[0] ?? null,
+        planned: consultedPlan ?? positionPlanRef.current.plans[0]?.steps[0] ?? null,
       };
       if (!strikeCueBall(worldRef.current, angle, intent.power, intent.spin)) {
         shotCaptureRef.current = null;
         skillShotCaptureRef.current = null;
         return;
       }
+      const cameraAtContact = camera.getRenderState({
+        aim: angle,
+        liveCue: { cueX: cueBall.x, cueZ: cueBall.z },
+        previewPower: intent.power,
+      });
+      camera.strikeContact({
+        anchor: { cueX: cueBall.x, cueZ: cueBall.z },
+        level: cameraAtContact.viewLevel,
+        azimuth: cameraAtContact.cameraAzimuth,
+        previewPower: intent.power,
+      });
       advanceFirstMatchGuide('shot-committed');
       // 每杆只在物理确认击球成功后复位中杆，避免动画取消时误清用户设置。
       resetSpinRef.current();
@@ -360,7 +385,7 @@ export default function Game() {
     } else {
       doShot();
     }
-  }, [advanceFirstMatchGuide, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch]);
+  }, [advanceFirstMatchGuide, camera, endCameraInteraction, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch]);
 
   // ── 出杆输入协调器 ──
   const {
@@ -377,84 +402,31 @@ export default function Game() {
     commitShot,
   } = useShotInput({ canShoot: canAim, onCommit: handleCommit, worldRef, breaking: match.breaking });
   resetSpinRef.current = () => setSpin({ x: 0, y: 0 });
-  const cameraViewAzimuth =
-    touchAimCameraLocked || manualCameraActive || manualCameraPinned
-      ? cameraAzimuth
-      : cameraAzimuthAtView(
-          cameraAzimuth,
-          aim,
-          viewLevel,
-          cameraDetached,
-        );
+  aimRef.current = aim;
+  const liveCue = getCueBall(worldView);
+  const cameraRender = camera.getRenderState({
+    aim,
+    liveCue: { cueX: liveCue?.x ?? 0, cueZ: liveCue?.z ?? 0 },
+    previewPower,
+  });
+  const cameraViewAzimuth = cameraRender.cameraAzimuth;
   const cameraViewAzimuthRef = useRef(cameraViewAzimuth);
   cameraViewAzimuthRef.current = cameraViewAzimuth;
+  cameraAzimuthRef.current = cameraViewAzimuth;
 
-  const clearTouchAimCameraTimer = useCallback(() => {
-    if (touchAimCameraTimerRef.current === null) return;
-    window.clearTimeout(touchAimCameraTimerRef.current);
-    touchAimCameraTimerRef.current = null;
-  }, []);
+  const handleEnterShotCamera = useCallback(
+    () => { endCameraInteraction(); camera.enterShot(aimRef.current); }, [camera, endCameraInteraction]);
+  const handleAimEstablishedCamera = useCallback(
+    () => camera.establishAim(aimRef.current), [camera]);
 
-  const lockTouchAimCamera = useCallback(() => {
-    if (isGlobalCameraView(viewLevel)) return;
-    clearTouchAimCameraTimer();
-    setCameraAzimuth(cameraViewAzimuthRef.current);
-    setTouchAimCameraLocked(true);
-  }, [clearTouchAimCameraTimer, viewLevel]);
+  const handleEnterTacticalCamera = useCallback(() => {
+    endCameraInteraction();
+    camera.enterTactical({ level: OVERHEAD_VIEW, azimuth: canonicalTableAzimuth() });
+  }, [camera, canonicalTableAzimuth, endCameraInteraction]);
 
-  const releaseTouchAimCameraLater = useCallback(() => {
-    clearTouchAimCameraTimer();
-    touchAimCameraTimerRef.current = window.setTimeout(() => {
-      touchAimCameraTimerRef.current = null;
-      setTouchAimCameraLocked(false);
-    }, TOUCH_AIM_CAMERA_RELEASE_MS);
-  }, [clearTouchAimCameraTimer]);
-
-  const handleToggleManualCamera = useCallback(() => {
-    clearTouchAimCameraTimer();
-    manualAimTransitionPointerRef.current = null;
-    setTouchAimCameraLocked(false);
-    if (manualCameraActive) {
-      setManualCameraActive(false);
-      setManualCameraPinned(true);
-      return;
-    }
-    setCameraAzimuth(cameraViewAzimuthRef.current);
-    setCameraDetached(true);
-    setManualCameraPinned(false);
-    setManualCameraActive(true);
-  }, [clearTouchAimCameraTimer, manualCameraActive]);
-
-  useEffect(
-    () => () => clearTouchAimCameraTimer(),
-    [clearTouchAimCameraTimer],
-  );
-
-  // 回合交给顾燃时立即退出短暂的触屏锁镜，观战相机不等待计时器。
-  useEffect(() => {
-    if (!spectatorActive) return;
-    clearTouchAimCameraTimer();
-    setTouchAimCameraLocked(false);
-  }, [clearTouchAimCameraTimer, spectatorActive]);
-
-  // 玩家主动升到全局高度时冻结进入瞬间的方位；点台面此后只调整瞄准/幽灵球。
-  useEffect(() => {
-    if (
-      !spectatorActive &&
-      !cameraDetached &&
-      isGlobalCameraView(viewLevel)
-    ) {
-      setCameraAzimuth(cameraViewAzimuthRef.current);
-      setCameraDetached(true);
-    }
-  }, [cameraDetached, spectatorActive, viewLevel]);
-
-  // 观战或主动进入全局视角后，只有确实拉到底才恢复“镜头跟杆向”。
-  useEffect(() => {
-    if (!spectatorActive && cameraDetached && viewLevel <= 0.005) {
-      setCameraDetached(false);
-    }
-  }, [cameraDetached, spectatorActive, viewLevel]);
+  const handleToggleCameraOrbit = useCallback(() => {
+    endCameraInteraction(); camera.toggleOrbit();
+  }, [camera, endCameraInteraction]);
 
   // ── 瞄准交互（在 useShotInput 之后，以获取 setAim）──
   const {
@@ -462,6 +434,7 @@ export default function Game() {
     handlePointerMove,
     handlePointerUp,
     handlePointerCancel,
+    cancelActiveInteraction,
     handleAimDialAdjust,
     toggleAimDialPrecision,
     aimDialVisible,
@@ -469,10 +442,8 @@ export default function Game() {
   } = useAimInteraction({
     scene3DRef,
     worldRef,
-    viewLevel,
     setAim,
     aimRef,
-    cameraAzimuthRef: cameraViewAzimuthRef,
     aimGhostDistRef,
     canAim,
     matchPhase: match.phase,
@@ -480,44 +451,47 @@ export default function Game() {
     setMatch,
     setMessage,
     setWorldView,
-    setViewLevel,
+    onCuePlaced: handleAimEstablishedCamera,
+    onAimEstablished: handleAimEstablishedCamera,
     onCoarseAimAdjusted: () => {
       advanceFirstMatchGuide('coarse-aim-adjusted');
     },
   });
+  cancelAimInteractionRef.current = cancelActiveInteraction;
 
-  const stageInteractionMode = cameraInteractionMode(
-    spectatorActive,
-    manualCameraActive,
+  const stageInteractionMode = cameraInteractionFor(
+    camera.state,
+    match.phase === 'placing',
   );
-  const orbitPointerRef = useRef<{ id: number; lastX: number } | null>(null);
   const handleStagePointerDown = useCallback((event: ReactPointerEvent) => {
     if (stageInteractionMode === 'orbit') {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
+      const activeOrbit = orbitPointerRef.current;
+      if (activeOrbit && activeOrbit.id !== event.pointerId) return;
       event.preventDefault();
-      orbitPointerRef.current = { id: event.pointerId, lastX: event.clientX };
+      orbitPointerRef.current = {
+        id: event.pointerId,
+        lastX: event.clientX,
+        target: event.currentTarget as HTMLElement,
+      };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
-    if (manualCameraPinned && canAim) {
-      clearTouchAimCameraTimer();
-      setCameraAzimuth(cameraViewAzimuthRef.current);
-      setManualCameraPinned(false);
-      if (!isGlobalCameraView(viewLevel)) {
-        setTouchAimCameraLocked(true);
-        manualAimTransitionPointerRef.current = event.pointerId;
-      }
+    if (cameraGesturePointerRef.current !== null && cameraGesturePointerRef.current !== event.pointerId) return;
+    if (canAim || match.phase === 'placing') {
+      scene3DRef.current?.beginCameraGesture();
+      cameraGesturePointerRef.current = event.pointerId;
     }
-    if (event.pointerType === 'touch' && canAim) lockTouchAimCamera();
+    if (canAim && camera.lockAimCamera(cameraViewAzimuthRef.current)) {
+      aimCameraPointerRef.current = event.pointerId;
+    }
     handlePointerDown(event);
   }, [
+    camera,
     canAim,
-    clearTouchAimCameraTimer,
     handlePointerDown,
-    lockTouchAimCamera,
-    manualCameraPinned,
+    match.phase,
     stageInteractionMode,
-    viewLevel,
   ]);
 
   const handleStagePointerMove = useCallback((event: ReactPointerEvent) => {
@@ -546,13 +520,16 @@ export default function Game() {
       return;
     }
     aimHandler(event);
-    const manualTransition =
-      manualAimTransitionPointerRef.current === event.pointerId;
-    if (manualTransition) manualAimTransitionPointerRef.current = null;
-    if (event.pointerType === 'touch' || manualTransition) {
-      releaseTouchAimCameraLater();
+    if (cameraGesturePointerRef.current === event.pointerId) {
+      cameraGesturePointerRef.current = null;
+      scene3DRef.current?.endCameraGesture();
     }
-  }, [releaseTouchAimCameraLater, stageInteractionMode]);
+    const ownsAimCameraLock = aimCameraPointerRef.current === event.pointerId;
+    if (ownsAimCameraLock) {
+      aimCameraPointerRef.current = null;
+      camera.releaseAimCameraLater(event.pointerType);
+    }
+  }, [camera, stageInteractionMode]);
 
   const handleStableAimDialAdjust = useCallback((
     pixelDelta: number,
@@ -560,43 +537,34 @@ export default function Game() {
   ) => {
     const coarsePointer = typeof window !== 'undefined' &&
       window.matchMedia?.('(pointer: coarse)').matches;
-    const resumePinnedCamera = manualCameraPinned && canAim;
-    if (resumePinnedCamera) {
-      clearTouchAimCameraTimer();
-      setCameraAzimuth(cameraViewAzimuthRef.current);
-      setManualCameraPinned(false);
-      if (!isGlobalCameraView(viewLevel)) setTouchAimCameraLocked(true);
-    }
-    if ((coarsePointer || resumePinnedCamera) && canAim) {
-      if (!isGlobalCameraView(viewLevel)) lockTouchAimCamera();
+    if (canAim && camera.mode === 'shot') {
+      camera.lockAimCamera(cameraViewAzimuthRef.current);
       const adjustedMode = handleAimDialAdjust(pixelDelta, pressureGain);
       if (adjustedMode === 'fine') advanceFirstMatchGuide('fine-aim-adjusted');
-      releaseTouchAimCameraLater();
+      camera.releaseAimCameraLater(coarsePointer ? 'touch' : 'mouse');
       return;
     }
     const adjustedMode = handleAimDialAdjust(pixelDelta, pressureGain);
     if (adjustedMode === 'fine') advanceFirstMatchGuide('fine-aim-adjusted');
   }, [
     advanceFirstMatchGuide,
+    camera,
     canAim,
-    clearTouchAimCameraTimer,
     handleAimDialAdjust,
-    lockTouchAimCamera,
-    manualCameraPinned,
-    releaseTouchAimCameraLater,
-    viewLevel,
   ]);
 
   const handleCameraRecenter = useCallback(() => {
-    setCameraAzimuth(FULL_TABLE_AZIMUTH);
-    setViewLevel(current => Math.max(current, SPECTATOR_VIEW_LEVEL));
-  }, [setViewLevel]);
+    camera.recenter(
+      Math.max(viewLevel, SPECTATOR_VIEW_LEVEL),
+      canonicalTableAzimuth(),
+    );
+  }, [camera, canonicalTableAzimuth, viewLevel]);
 
   const handleGuideViewLevel = useCallback((level: number) => {
     const adjusted = Math.abs(level - viewLevel) > 0.0005;
-    setViewLevel(level);
+    camera.setViewLevel(level);
     if (canAim && adjusted) advanceFirstMatchGuide('view-adjusted');
-  }, [advanceFirstMatchGuide, canAim, setViewLevel, viewLevel]);
+  }, [advanceFirstMatchGuide, camera, canAim, viewLevel]);
 
   const handleGuideSpinChange = useCallback((nextSpin: typeof spin) => {
     const adjusted =
@@ -612,33 +580,45 @@ export default function Game() {
 
   // ── 重置游戏 ──
   const handleResetGame = useCallback((nextMode: GameMode) => {
+    endCameraInteraction();
     resetGame(setAim, nextMode);
     setSpin({ x: 0, y: 0 });
     setGuidanceEnabled(false);
-    setCameraAzimuth(FULL_TABLE_AZIMUTH);
-    setCameraDetached(false);
-    clearTouchAimCameraTimer();
-    setTouchAimCameraLocked(false);
-    setManualCameraActive(false);
-    setManualCameraPinned(false);
-    manualAimTransitionPointerRef.current = null;
-    planConsultedRef.current = false;
+    camera.reset({
+      mode: 'tactical',
+      level: OVERHEAD_VIEW,
+      azimuth: canonicalTableAzimuth(),
+    });
+    planConsultedRef.current = null;
     skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
-  }, [clearTouchAimCameraTimer, resetGame, setAim, setSpin, aimGhostDistRef]);
+    scene3DRef.current?.setAimGhostDist(null);
+  }, [camera, canonicalTableAzimuth, endCameraInteraction, resetGame, setAim, setSpin, aimGhostDistRef]);
   const handleReplay = useCallback(() => {
     handleResetGame(gameMode);
   }, [gameMode, handleResetGame]);
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
-    const settlement = settleShotRaw(setViewLevel);
+    const settlement = settleShotRaw();
+    if (settlement) {
+      camera.settleShot();
+      const needsPlacement = settlement.resolution.effects.some(
+        effect => effect.type === 'request-player-placement',
+      );
+      if (needsPlacement) {
+        camera.enterTactical({
+          level: OVERHEAD_VIEW,
+          azimuth: canonicalTableAzimuth(),
+        });
+      }
+    }
     // 复盘生成：有捕获（玩家杆）→ 判定；无捕获（对手杆）→ 清掉旧复盘
     const capture = shotCaptureRef.current;
     shotCaptureRef.current = null;
     const review = capture ? buildShotReview(capture) : null;
     setShotReview(review);
-    // 只记录复盘，不主动打开；用户需要再次点亮 💡。
+    // 只记录复盘，不主动打开；用户需要再次开启“走位与击球复盘”。
     setGuidanceEnabled(false);
 
     const skillCapture = skillShotCaptureRef.current;
@@ -669,7 +649,7 @@ export default function Game() {
     if (settlement?.resolution.next.phase === 'finished') {
       completeMatchAssessment();
     }
-  }, [completeMatchAssessment, recordPlayerShot, settleShotRaw, setViewLevel]);
+  }, [camera, canonicalTableAzimuth, completeMatchAssessment, recordPlayerShot, settleShotRaw]);
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
@@ -698,75 +678,27 @@ export default function Game() {
     onShot: resetEvents,
   });
 
-  // ── 初始化 3D 场景 ──
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const scene = new Scene3D(el);
-    scene3DRef.current = scene;
-    scene.start();
-
-    // 开发模式暴露调试句柄
-    if (import.meta.env.DEV) {
-      (window as unknown as { __bj8: unknown }).__bj8 = {
-        world: worldRef,
-        scene: scene3DRef,
-        aim: aimRef,
-        match: matchRef,
-        cameraAzimuth: cameraAzimuthRef,
-        cameraViewAzimuth: cameraViewAzimuthRef,
-        // 专项门禁读取纯几何解，验证真实指针落点是否跨过精瞄边界。
-        precisionAt: (angle: number, multiplier?: number) => findPrecisionAim(
-          worldRef.current,
-          angle,
-          legalNumbers(worldRef.current, 'player', matchRef.current.playerGroup),
-          multiplier,
-        ),
-        // 摆球调试后手动同步快照到 React 世界视图（正常对局中由物理循环/结算自动同步）
-        sync: () => setWorldView(cloneWorld(worldRef.current)),
-        // 浏览器专项门禁用于固定 actor/phase；只在 DEV 暴露，真实瞄准与出杆仍走指针事件
-        setMatch: (patch: Partial<typeof match>) => setMatch(current => ({ ...current, ...patch })),
-      };
-    }
-
-    return () => {
-      scene.dispose();
-      scene3DRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── 同步世界状态到 3D 场景 ──
-  useEffect(() => {
-    const scene = scene3DRef.current;
-    if (!scene) return;
-
-    aimRef.current = aim;
-    scene.setViewLevel(viewLevel);
-    scene.setAim(aim);
-    scene.setCameraAzimuth(cameraViewAzimuth);
-    scene.setAimAssistVisible(aimAssist.enabled);
-    scene.setSpin(spin);
-    scene.setAimGhostDist(aimGhostDistRef.current);
-    // 合法目标高亮：只在玩家回合显示
-    scene.setLegalTargets(legalTargets);
-    scene.sync(worldView);
-
-    const cue = getCueBall(worldView);
-    scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
-  }, [
+  useSceneBridge({
+    containerRef,
+    scene3DRef,
+    worldRef,
     worldView,
-    viewLevel,
+    setWorldView,
+    matchRef,
+    setMatch,
+    matchPhase: match.phase,
     aim,
-    cameraViewAzimuth,
-    aimAssist.enabled,
-    previewPower,
-    match,
+    aimRef,
     spin,
+    previewPower,
     aimGhostDistRef,
+    aimAssistVisible: aimAssist.enabled,
     legalTargets,
-  ]);
+    cameraRender,
+    cameraStateRef: camera.stateRef,
+    cameraAzimuthRef,
+    cameraViewAzimuthRef,
+  });
 
   // ── 渲染 ──
   return (
@@ -778,9 +710,11 @@ export default function Game() {
         opponentProfile={opponentProfile}
       />
       <TableStage
-        viewLevel={viewLevel}
+        viewLevel={cameraRender.viewLevel}
         spectatorActive={spectatorActive}
-        manualCameraActive={manualCameraActive}
+        cameraMode={camera.mode}
+        cameraPhase={camera.phase}
+        cameraInteraction={stageInteractionMode}
         firstMatchGuideActive={Boolean(firstMatchGuideStep)}
         match={match}
         containerRef={containerRef}
@@ -793,7 +727,8 @@ export default function Game() {
       />
       <ControlDeck
         viewLevel={viewLevel}
-        manualCameraActive={manualCameraActive}
+        cameraMode={camera.mode}
+        cameraOrbitActive={camera.orbitActive}
         canAim={canAim}
         spin={spin}
         charging={charging}
@@ -806,7 +741,9 @@ export default function Game() {
         aimDialVisible={aimDialVisible}
         aimDialPrecisionActive={aimDialPrecisionActive}
         onViewLevel={handleGuideViewLevel}
-        onToggleManualCamera={handleToggleManualCamera}
+        onEnterTacticalCamera={handleEnterTacticalCamera}
+        onEnterShotCamera={handleEnterShotCamera}
+        onToggleCameraOrbit={handleToggleCameraOrbit}
         onSpinChange={handleGuideSpinChange}
         onLayoutAdjusted={handleGuideLayoutAdjusted}
         onToggleGuidance={handleTogglePlan}

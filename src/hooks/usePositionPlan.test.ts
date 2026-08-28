@@ -45,11 +45,11 @@ describe('走位计算节能门控', () => {
     messageParams: {},
   };
 
-  it('灯泡熄灭时即使轮到玩家也不计算', () => {
+  it('走位与击球复盘关闭时即使轮到玩家也不计算', () => {
     expect(shouldComputePositionPlan(false, world, aiming)).toBe(false);
   });
 
-  it('仅点亮且处于静止玩家瞄准态时计算', () => {
+  it('仅开启走位与击球复盘且处于静止玩家瞄准态时计算', () => {
     expect(shouldComputePositionPlan(true, world, aiming)).toBe(true);
     expect(shouldComputePositionPlan(true, world, {
       ...aiming,

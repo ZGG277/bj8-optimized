@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；零出杆新用户按真实操作推进首局提示；走位 Worker 只在用户点亮灯泡后启动；手机运动中保持 240Hz 物理并以 60Hz 发布 React/WebGL 快照；规则在 `match/`、输入在 `input/`、AI 在 `hooks/useOpponentAI`、走位在 `hooks/usePositionPlan`、物理时钟在 `simulation/`，DEV 调试句柄只用于浏览器门禁。
+`Game.tsx`: 对局编排器，统一以世界角提交杆向，将母球放置、点台落位或幽灵球落位的自动第一人称与击球后全局观察事件交给 `useCameraController`；抓瞄准线粗调不触发转场。React↔Three.js 同步交给 `useSceneBridge`；走位 Worker 只在用户显式开启“走位与击球复盘”后启动，并保留用户已查看的当前杆快照供下一杆复盘；手机运动中保持 240Hz 物理并以 60Hz 发布快照。
 
 `first-match-guide.ts`: 首局引导纯产品状态机；只有零出杆记录且无完成标记的新用户启用，以放球、拖动结束角度变化、拨轮有效角度变化和成功出杆约束核心节奏，视角/杆法/布局是可跳过的非阻塞发现，容错读写 `guagua-billiards:first-match-guide:v1`，不依赖 React/DOM 或规则实现。
 
@@ -16,21 +16,25 @@
 
 `layout/`: 五控件布局纯领域层；维护 desktop/portrait/landscape 三套自由或右/底停靠位置，负责 8px 钳制、48px 吸附、沿边落点、碰撞避让、容量与 v2→v3 迁移。
 
-`input/`: 出杆与拨轮输入层，纯换算（行程归一、按住满力、击球点单位圆、用户显式粗/精双档、可靠 Pointer 压力→拨轮紧度）+ React 协调器；rAF 只做预览，最终力度由松开时刻真实事实决定。
+`input/`: 出杆、拨轮与幽灵球输入层，纯换算（行程归一、按住满力、击球点单位圆、默认精瞄且可显式切换的双档、近母球安全圆/迟滞/快速跨心检测、可靠 Pointer 压力→拨轮紧度）+ 严格单指针 React 协调器；rAF 只做预览，最终力度由松开时刻真实事实决定。
 
 `aim/`: 纯袋口瞄准几何层——世界角首碰检测、统一物理袋口、2R 走廊遮挡、含 throw 的袋口左右角尖反解；供规划、调试与可选辅助消费，不参与玩家拨轮的粗/精切档。
 
-`components/`: HUD 控制组件（双方动态水平、首局控件邻近提示、灯泡图形面板、无文字视角/击球点/蓄力/横竖拨轮、五控件自由拖放与双边停靠、规划/复盘浮层、主题切换器、球桌视口与开始界面），只转发事件，不持有对局规则。
+`components/`: HUD 控制组件（双方动态水平、首局控件邻近提示、跟随可移动灯泡的新用户功能提示/双开关面板、无文字视角/击球点/蓄力/横竖拨轮、五控件自由拖放与双边停靠、规划/复盘浮层、主题切换器、球桌视口与开始界面），只转发事件，不持有对局规则。
 
 `styles/`: 样式体系 base → layout → controls → themes；主题入口统一让控件静置 56% 内容透明、按住/聚焦/拖动恢复实色并去掉卡片式外框，不改触控几何；横屏尺寸令牌统一重定义，控件层级高于球桌、低于遮罩。
 
 `simulation/`: 固定步调度器与 React 物理循环桥；蓄水池累积帧时长、单帧步数封顶、backlog 保留不丢弃，标签页恢复时重置时钟不补算，静止迁移恰好结算一次。
 
-`camera-view.ts`: 连续视角纯几何，统一钳制 `viewLevel`、瞄准/手动环绕交互路由、全局视角阈值、端点/中间高度文案、独立视觉方位角与环绕手势换算；高位按视口宽高比适配全台，观战交棒或玩家主动进入全局高度后冻结球台视觉方位，并在用户拉向第一人称时沿最短圆弧回接杆向。
+`camera-state.ts`: 不依赖 React/DOM/Three.js 的 shot/tactical/spectator 纯状态机；每模式独立记忆高度/方位，母球放置、点台或幽灵球有效落位后以世界杆向进入第一人称，临时规划/复盘原子恢复完整快照，出杆冻结母球锚点 300ms 后迁移到结果全景。
 
-`camera-view.test.ts`: 连续高度不吸附、相机高度单调、手动相机交互路由、全局视角阈值、视觉方位独立、自由相机回接、各高度 180° 环绕与 390×844 竖屏全台安全边界回归。
+`camera-state.test.ts`: 模式往返记忆、有效落位第一人称→击球保持→全局观察、临时快照 owner、观战交棒/复盘重叠、瞄准锁镜、击球锚点、交互路由与 reset 回归。
 
-`Scene3D.ts`: Three.js 场景适配器；移动端消费 `render-policy` 的 1.5×/1024/low-power 预算，阴影仅动态刷新，球桌静止且相机/动画收敛后停止 rAF；消费统一 PocketGeometry 生成台内凹口、皮圈、网袋与暗底，球杆瞄准角和纯视觉相机方位分离；另负责预测辅助、摆球、合法目标环、球杆、走位/复盘与按需相机平滑。
+`camera-view.ts`: 连续相机纯几何，统一钳制 `viewLevel`、端点文案、全台横竖屏标准方位、环绕手势换算与唯一位姿公式；模式迁移与跟杆语义已收敛到 `camera-state.ts`。
+
+`camera-view.test.ts`: 连续高度不吸附、相机高度单调、全局视角阈值、横竖屏全台标准方位、视觉方位独立、各高度 180° 环绕与 390×844 竖屏全台安全边界回归。
+
+`Scene3D.ts`: Three.js 场景适配器；台呢使用整桌连续 UV、六袋暗口使用各袋局部 UV；对外分离 `sync` 世界、`updateCue` 瞄准和 `syncCamera` 相机通道，活相机手势期冻结实际位姿，纯镜头运动不标记阴影失效，DEV 统计可验证通道/阴影成本；卸载时取消出杆兜底并去重释放场景几何/材质/纹理/环境，移动端消费 `render-policy` 预算，静止收敛后停止 rAF。
 
 `render-policy.ts`: 不依赖 Three.js 的纯渲染预算；以粗指针或视口短边识别手机，输出像素比、阴影贴图和 GPU 功耗偏好。
 
@@ -54,17 +58,19 @@
 
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
   - `useGameState`：集中管理对局状态、局内锁定双方档案与整局一次评估；新局重置 shot 结算守卫
-  - `useAimAssist`：默认关闭且容错持久化的预测辅助线偏好
-  - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出、轻点显式切换固定精瞄档的无边界拨轮
+  - `useCameraController`：用 reducer 调度显式相机事件、完整临时快照、输入分类延时解锁与 300ms 击球保持计时器
+  - `useSceneBridge`：建立/销毁 Scene3D，分发 world/aim/visibility/camera 四条去耦通道并暴露 DEV 验收句柄
+  - `useAimAssist`：默认开启、保留显式关闭且容错持久化的预测辅助线偏好
+  - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、活相机坐标系的抓影子球、360° 粗瞄与默认精瞄的无边界拨轮；单指针所有权、模式/回合迁移共用原子取消口，防止副指针干扰或旧会话跨状态复活
   - `useOpponentAI`：消费局前锁定档案，调度限预算战术 Worker、选杆扰动与袋口容错内的执行误差
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents
-  - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在灯泡显式点亮后经可抢占 Worker 执行 320 次、两层、2.5 秒截止搜索
+  - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在“走位与击球复盘”显式开启后经可抢占 Worker 执行 320 次、两层、2.5 秒截止搜索
   - `useDraggableOverlay`：规划/复盘共用的 Pointer 拖拽位移与视口边界约束
 
 `utils/`: 纯工具函数层，不依赖 React 或 DOM：
   - `renderMatchMessage`：将规则层消息键+参数映射为中文文案，纯函数可测试
 
-`textures.ts`: 为台呢、木纹、皮革与球体生成 CanvasTexture，供 Scene3D 初始化使用。
+`textures.ts`: 程序化 CanvasTexture 工厂；以固定种子生成纵向梳毛台呢色差/法线/粗糙度、中性皮革与袋腔暗口，让刷新后绒布和袋口视觉回归可复现；仍为 Scene3D 提供木纹与球体贴图。
 
 `main.tsx`: React 应用挂载入口，首帧前应用青瓷/决赛之夜/霓虹球房主题，启用 StrictMode 并按 base → layout → controls → themes 顺序加载样式。
 

@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供含台内圆弧凹口、浅驼皮圈、白色菱形网袋和收尖绿呢角衬的真实六袋结构，以及移动端节能预算、静止按需渲染、纵横屏全台适配相机、独立观战/全局环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 确定性台呢/袋口贴图与 Three.js
+[OUTPUT]: 对外提供正确归一贴图的真实六袋场景、分离的 world/cue/camera 同步、活相机手势冻结、完整资源释放、按需阴影/渲染统计、纵横屏全台视角、瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -13,6 +13,7 @@ import {
   POCKETS,
   TABLE,
   pocketLocalToWorld,
+  worldToPocketLocal,
   predictBallCollisionDirections,
   type BilliardsWorld,
   type Point2,
@@ -31,6 +32,7 @@ import {
   makeClothMaps,
   makeWoodTexture,
   makeLeatherTexture,
+  makePocketMouthTexture,
   makeBallTexture,
   makeCueBallTexture,
 } from './textures';
@@ -46,6 +48,25 @@ const CUSHION_W = 0.048;
 const POCKET_POS: [number, number][] = POCKETS.map(
   pocket => [pocket.x, pocket.z],
 );
+
+/** ShapeGeometry 默认把形状坐标直接当 UV；这里在旋转前显式映射世界台面坐标。 */
+function remapShapeGeometryUv(
+  geometry: THREE.ShapeGeometry,
+  mapPoint: (point: Point2) => [u: number, v: number],
+  uvSpace: string,
+): void {
+  const position = geometry.getAttribute('position');
+  const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
+  for (let index = 0; index < position.count; index += 1) {
+    const [u, v] = mapPoint({
+      x: position.getX(index),
+      z: -position.getY(index),
+    });
+    uv.setXY(index, u, v);
+  }
+  uv.needsUpdate = true;
+  geometry.userData.uvSpace = uvSpace;
+}
 
 /** 整链规划的分杆配色（台呢绿底可读：暖橙/青/紫），轨迹/高亮环/序号标记同色 */
 const PLAN_STEP_COLORS = [0xffa03c, 0x35d6d6, 0xb478ff];
@@ -111,6 +132,8 @@ export class Scene3D {
   private targetCameraPos = new THREE.Vector3();
   private targetLookAt = new THREE.Vector3();
   private smoothLookAt = new THREE.Vector3();
+  /** 指针手势期间冻结实际可见相机；状态仍可更新，松手后再追向最新目标。 */
+  private cameraGestureActive = false;
   private cuePull = 0;
   private clock = new THREE.Clock();
   private lastSyncTime = 0;
@@ -141,11 +164,19 @@ export class Scene3D {
     fired: boolean;
     onContact?: () => void;
   } | null = null;
+  /** 后台 rAF 被节流时的触球墙钟兜底；卸载或正常触球都必须取消。 */
+  private strikeFallbackTimer: number | null = null;
 
   private animationId = 0;
   private running = false;
   private renderFrameCount = 0;
+  private worldSyncCount = 0;
+  private aimSyncCount = 0;
+  private cameraSyncCount = 0;
+  private shadowInvalidationCount = 0;
+  private shadowFrameCount = 0;
   private shadowMapSize: 1024 | 2048;
+  private environmentTarget: THREE.WebGLRenderTarget | null = null;
 
   // ---- 走位规划渲染 ----
   /** 规划图层：瞄准线/轨迹/走位区域/序号标记，showPlanChain(null) 整体清空 */
@@ -200,8 +231,11 @@ export class Scene3D {
 
     // 环境反射：程序化房间，给球体真实高光
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const roomEnvironment = new RoomEnvironment();
+    this.environmentTarget = pmrem.fromScene(roomEnvironment, 0.04);
+    this.scene.environment = this.environmentTarget.texture;
     this.scene.environmentIntensity = 0.55;
+    roomEnvironment.dispose();
     pmrem.dispose();
 
     RectAreaLightUniformsLib.init();
@@ -320,20 +354,43 @@ export class Scene3D {
     }
     clothShape.closePath();
     const clothGeo = new THREE.ShapeGeometry(clothShape, 24);
+    const clothBounds = clothBoundary.reduce(
+      (bounds, point) => ({
+        minX: Math.min(bounds.minX, point.x),
+        maxX: Math.max(bounds.maxX, point.x),
+        minZ: Math.min(bounds.minZ, point.z),
+        maxZ: Math.max(bounds.maxZ, point.z),
+      }),
+      { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity },
+    );
+    const clothSpanX = clothBounds.maxX - clothBounds.minX;
+    const clothSpanZ = clothBounds.maxZ - clothBounds.minZ;
+    remapShapeGeometryUv(
+      clothGeo,
+      point => [
+        (point.x - clothBounds.minX) / clothSpanX,
+        (point.z - clothBounds.minZ) / clothSpanZ,
+      ],
+      'table-world-bounds-0-1',
+    );
     clothGeo.rotateX(-Math.PI / 2);
     const clothMat = new THREE.MeshPhysicalMaterial({
       map: clothMaps.map,
       normalMap: clothMaps.normalMap,
-      normalScale: new THREE.Vector2(0.5, 0.5),
+      // 纵向法线略强于横向，与真实台呢梳毛方向一致，不靠放大凹凸假装“织物”。
+      normalScale: new THREE.Vector2(0.22, 0.38),
       roughnessMap: clothMaps.roughnessMap,
-      roughness: 1.0,
+      roughness: 0.96,
       metalness: 0.0,
-      sheen: 0.35,
-      sheenRoughness: 0.65,
-      sheenColor: new THREE.Color(0x6fae8e),
-      envMapIntensity: 0.15,
+      sheen: 0.58,
+      sheenRoughness: 0.78,
+      sheenColor: new THREE.Color(0x78b99a),
+      envMapIntensity: 0.12,
     });
     const cloth = new THREE.Mesh(clothGeo, clothMat);
+    cloth.name = 'table-cloth';
+    cloth.userData.surfaceRole = 'directional-worsted-cloth';
+    cloth.userData.textureSeed = '42a11ce/8f31d07';
     cloth.receiveShadow = true;
     this.tableGroup.add(cloth);
 
@@ -548,30 +605,33 @@ export class Scene3D {
     const pocketLipMat = new THREE.MeshPhysicalMaterial({
       map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.0006,
+      bumpScale: 0.00045,
       color: 0xd5c5a4,
-      roughness: 0.86,
-      clearcoat: 0.02,
-      clearcoatRoughness: 0.92,
+      roughness: 0.74,
+      clearcoat: 0.055,
+      clearcoatRoughness: 0.82,
+      envMapIntensity: 0.2,
       side: THREE.DoubleSide,
     });
     // 实体乔氏袋口的外护口是机器压制牛皮 + 硬质骨架，视觉上应是薄而挺的平面，
     // 不是软包或圆绳。浅驼色用于从同色木框上读出材质边界。
     const pocketTopTrimMat = new THREE.MeshPhysicalMaterial({
+      map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.0007,
+      bumpScale: 0.00055,
       color: 0x86623f,
-      roughness: 0.9,
-      clearcoat: 0,
-      clearcoatRoughness: 1,
+      roughness: 0.8,
+      clearcoat: 0.035,
+      clearcoatRoughness: 0.88,
+      envMapIntensity: 0.16,
       side: THREE.DoubleSide,
     });
     const pocketWallMat = new THREE.MeshStandardMaterial({
       map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.0018,
+      bumpScale: 0.00135,
       color: 0x5c4936,
-      roughness: 0.96,
+      roughness: 0.93,
       side: THREE.DoubleSide,
     });
     const pocketBottomMat = new THREE.MeshStandardMaterial({
@@ -579,30 +639,19 @@ export class Scene3D {
       roughness: 0.98,
       side: THREE.DoubleSide,
     });
-    const mouthCanvas = document.createElement('canvas');
-    mouthCanvas.width = mouthCanvas.height = 128;
-    const mouthContext = mouthCanvas.getContext('2d')!;
-    const mouthGradient = mouthContext.createRadialGradient(64, 62, 5, 64, 64, 62);
-    mouthGradient.addColorStop(0, 'rgba(2, 2, 1, 0.98)');
-    mouthGradient.addColorStop(0.58, 'rgba(7, 5, 3, 0.94)');
-    mouthGradient.addColorStop(0.82, 'rgba(24, 15, 10, 0.72)');
-    mouthGradient.addColorStop(1, 'rgba(38, 24, 17, 0.12)');
-    mouthContext.fillStyle = mouthGradient;
-    mouthContext.fillRect(0, 0, 128, 128);
-    const mouthTexture = new THREE.CanvasTexture(mouthCanvas);
-    mouthTexture.colorSpace = THREE.SRGBColorSpace;
+    const mouthTexture = makePocketMouthTexture();
     const pocketMouthMat = new THREE.MeshBasicMaterial({
       map: mouthTexture,
       color: 0xffffff,
       transparent: true,
-      opacity: 0.28,
+      opacity: 0.38,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
     const pocketNetMat = new THREE.LineBasicMaterial({
       color: 0xeee6d3,
       transparent: true,
-      opacity: 0.92,
+      opacity: 0.82,
       depthWrite: false,
     });
     for (const pocket of POCKETS) {
@@ -689,8 +738,29 @@ export class Scene3D {
         mouthShape.lineTo(point.x, -point.z);
       }
       mouthShape.closePath();
+      const mouthGeometry = new THREE.ShapeGeometry(mouthShape);
+      const mouthHalfWidth = topHalfWidth * 0.94;
+      remapShapeGeometryUv(
+        mouthGeometry,
+        point => {
+          const local = worldToPocketLocal(pocket, point);
+          return [
+            THREE.MathUtils.clamp(
+              0.5 + local.lateral / (mouthHalfWidth * 2),
+              0,
+              1,
+            ),
+            THREE.MathUtils.clamp(
+              0.5 + (local.depth - mouthCenterDepth) / (depthRadius * 2),
+              0,
+              1,
+            ),
+          ];
+        },
+        'pocket-local-bounds-0-1',
+      );
       const mouth = new THREE.Mesh(
-        new THREE.ShapeGeometry(mouthShape),
+        mouthGeometry,
         pocketMouthMat,
       );
       mouth.rotation.x = -Math.PI / 2;
@@ -1151,7 +1221,9 @@ export class Scene3D {
 
   /** 设置瞄准幽灵球靶点距离（白球心起算）；null = 自动取首触点距离 */
   setAimGhostDist(d: number | null) {
+    if (d === this.aimGhostDist) return;
     this.aimGhostDist = d;
+    this.updateAimGuide();
     this.requestRender();
   }
 
@@ -1189,12 +1261,19 @@ export class Scene3D {
   }
 
   setSpin(spin: { x: number; y: number }) {
+    if (this.spin.x === spin.x && this.spin.y === spin.y) return;
     this.spin = spin;
-    this.requestRender(true);
+    this.requestRender();
   }
 
   setLegalTargets(numbers: number[]) {
-    this.legalTargets = new Set(numbers);
+    const next = new Set(numbers);
+    if (
+      next.size === this.legalTargets.size &&
+      [...next].every(number => this.legalTargets.has(number))
+    ) return;
+    this.legalTargets = next;
+    this.updateLegalTargetRings();
     this.requestRender();
   }
 
@@ -1651,6 +1730,10 @@ export class Scene3D {
     // 加速时长随拉杆距离变化：轻杆快、重杆行程长一点
     const dist = from.distanceTo(contact);
     const dur1 = Math.min(0.22, Math.max(0.08, dist * 0.55));
+    if (this.strikeFallbackTimer !== null) {
+      window.clearTimeout(this.strikeFallbackTimer);
+      this.strikeFallbackTimer = null;
+    }
     const anim: NonNullable<Scene3D['strikeAnim']> = {
       t: 0,
       dur1,
@@ -1666,7 +1749,8 @@ export class Scene3D {
     this.requestRender(true);
     // 兜底：rAF 被浏览器节流（后台标签页）时，按墙钟时间到点直接触球，
     // 保证"松手必出杆"，动画只是表现层
-    setTimeout(() => {
+    this.strikeFallbackTimer = window.setTimeout(() => {
+      this.strikeFallbackTimer = null;
       if (this.strikeAnim === anim && !anim.fired) {
         this.cueGroup.position.copy(anim.contact);
         this.cueGroup.visible = false;
@@ -1679,23 +1763,82 @@ export class Scene3D {
   }
 
   setViewLevel(level: number) {
-    this.viewLevel = clampViewLevel(level);
+    const next = clampViewLevel(level);
+    if (next === this.viewLevel) return;
+    this.viewLevel = next;
     // 进入全局段就直接展示无遮挡桌面；相机继续抬升时不会穿过吊灯模型。
     if (this.lampGroup) this.lampGroup.visible = !isGlobalCameraView(this.viewLevel);
+    this.updateCameraTarget();
     this.requestRender();
   }
 
   setAim(angle: number) {
+    if (angle === this.aimAngle) return;
     this.aimAngle = angle;
-    this.requestRender(true);
+    this.updateAimGuide();
+    this.requestRender();
   }
 
   setCameraAzimuth(angle: number) {
-    this.cameraAzimuth = normalizeCameraAzimuth(angle);
+    const next = normalizeCameraAzimuth(angle);
+    if (next === this.cameraAzimuth) return;
+    this.cameraAzimuth = next;
+    this.updateCameraTarget();
+    this.requestRender();
+  }
+
+  /**
+   * 原子更新相机通道。纯相机变化不触碰世界、球杆或阴影；冻结手势期间只记住
+   * 最新事实，松手后才更新目标位姿。
+   */
+  syncCamera(
+    level: number,
+    azimuth: number,
+    cueX: number,
+    cueZ: number,
+    previewPower: number,
+  ) {
+    const nextLevel = clampViewLevel(level);
+    const nextAzimuth = normalizeCameraAzimuth(azimuth);
+    const nextPower = Math.max(0, previewPower);
+    if (
+      nextLevel === this.viewLevel &&
+      nextAzimuth === this.cameraAzimuth &&
+      cueX === this.lastCueX &&
+      cueZ === this.lastCueZ &&
+      nextPower === this.lastPreviewPower
+    ) return;
+
+    this.viewLevel = nextLevel;
+    this.cameraAzimuth = nextAzimuth;
+    this.lastCueX = cueX;
+    this.lastCueZ = cueZ;
+    this.lastPreviewPower = nextPower;
+    if (this.lampGroup) this.lampGroup.visible = !isGlobalCameraView(this.viewLevel);
+    this.updateCameraTarget();
+    this.cameraSyncCount += 1;
+    this.requestRender();
+  }
+
+  /** 指针落下时冻结活相机，而不是冻结尚未到达的目标位姿。 */
+  beginCameraGesture() {
+    if (this.cameraGestureActive) return;
+    this.cameraGestureActive = true;
+    this.targetCameraPos.copy(this.camera.position);
+    this.targetLookAt.copy(this.smoothLookAt);
+    this.requestRender();
+  }
+
+  /** 指针结束后以最新相机事实重新计算目标，平滑追上但不改变刚完成的世界输入。 */
+  endCameraGesture() {
+    if (!this.cameraGestureActive) return;
+    this.cameraGestureActive = false;
+    this.updateCameraTarget();
     this.requestRender();
   }
 
   private updateCameraTarget() {
+    if (this.cameraGestureActive) return;
     const cameraPose = cameraPoseAt(
       this.lastCueX,
       this.lastCueZ,
@@ -1713,12 +1856,14 @@ export class Scene3D {
   }
 
   setAimAssistVisible(visible: boolean) {
+    if (visible === this.aimAssistVisible) return;
     this.aimAssistVisible = visible;
     this.updateAimGuide();
     this.requestRender();
   }
 
   sync(world: BilliardsWorld) {
+    this.worldSyncCount += 1;
     this.lastWorld = world;
     const now = performance.now();
     this.syncDt = this.lastSyncTime ? Math.min(0.05, (now - this.lastSyncTime) / 1000) : 1 / 60;
@@ -1786,20 +1931,27 @@ export class Scene3D {
       }
     }
 
-    // 合法目标高亮环跟随球位
-    for (const ball of world.balls) {
-      const ring = this.targetRings[ball.number];
-      if (!ring) continue;
-      ring.visible = ball.active && this.legalTargets.has(ball.number) && this.phase === 'aiming' && !world.moving && !this.planActive;
-      if (ring.visible) ring.position.set(ball.x, 0.0025, ball.z);
-    }
+    this.updateLegalTargetRings();
 
     // 规划选中第 2/3 杆时，真实 world 仍是当前球局；同步完成后重新覆盖
     // 虚拟起始球位，直到 showPlanStep(null/越界) 或 clearPlan 恢复真实局面。
     if (this.planStepPreviewWorld) this.snapBallsTo(this.planStepPreviewWorld);
 
     this.updateAimGuide();
-    this.requestRender(world.moving || this.dropAnims.size > 0);
+    // world 快照意味着球位/显隐事实可能变化；静态重置同样需要一帧正确球影。
+    this.requestRender(true);
+  }
+
+  /** 合法目标环由 world、phase、targets 三种事实共同决定，任一通道变化都可独立刷新。 */
+  private updateLegalTargetRings() {
+    const world = this.lastWorld;
+    if (!world) return;
+    for (const ball of world.balls) {
+      const ring = this.targetRings[ball.number];
+      if (!ring) continue;
+      ring.visible = ball.active && this.legalTargets.has(ball.number) && this.phase === 'aiming' && !world.moving && !this.planActive;
+      if (ring.visible) ring.position.set(ball.x, 0.0025, ball.z);
+    }
   }
 
   /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球+靶点影子球 */
@@ -1943,22 +2095,16 @@ export class Scene3D {
     }
   }
 
-  update(cueX: number, cueZ: number, power: number, phase: string) {
+  /** 球杆/瞄准展示通道；不更新相机锚点，避免纯镜头操作重放 cue 与阴影工作。 */
+  updateCue(cueX: number, cueZ: number, power: number, phase: string) {
+    this.aimSyncCount += 1;
     this.phase = phase;
-    this.lastCueX = cueX;
-    this.lastCueZ = cueZ;
-    this.lastPreviewPower = power;
     const cue = this.ballMeshes[0];
     const cueActive = Boolean(this.lastWorld?.balls[0]?.active);
     // 摆球阶段物理世界仍保留母球作为候选状态，但画面只显示跟手的半透明预览；
     // 点击落实后下一次 sync 会恢复实体母球，避免一虚一实同时出现。
     if (cue && phase === 'placing') cue.visible = false;
     const angle = this.aimAngle;
-
-    // ---- 相机：视觉方位与球杆瞄准解耦；高度按当前视口比例确保高位全台可见。 ----
-    this.updateCameraTarget();
-    // 相机只设目标位姿;平滑收敛在 render() 每帧执行。
-    // 若在此处随 React 渲染推进,松手后 React 不再渲染,相机会冻结在半途。
 
     // ---- 球杆：蓄力拉杆 ----
     if (this.strikeAnim) {
@@ -1986,10 +2132,15 @@ export class Scene3D {
       }
     }
 
-    // sync() 先于本方法被调用，updateAimGuide 依赖的 phase 在此刻才更新——
-    // 用最新 phase 重算一次瞄准辅助，避免开局幽灵球要等下一次交互才显示
+    this.updateLegalTargetRings();
     this.updateAimGuide();
     this.requestRender(true);
+  }
+
+  /** 兼容既有脚本：业务层应分别调用 updateCue() 与 syncCamera()。 */
+  update(cueX: number, cueZ: number, power: number, phase: string) {
+    this.updateCue(cueX, cueZ, power, phase);
+    this.syncCamera(this.viewLevel, this.cameraAzimuth, cueX, cueZ, power);
   }
 
   /** 相机或显式动画仍未收敛时才需要下一帧；静止球桌不维持空转 rAF。 */
@@ -2001,7 +2152,10 @@ export class Scene3D {
   }
 
   private requestRender(refreshShadows = false) {
-    if (refreshShadows) this.renderer.shadowMap.needsUpdate = true;
+    if (refreshShadows) {
+      this.shadowInvalidationCount += 1;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     if (!this.running || this.animationId !== 0) return;
     this.animationId = requestAnimationFrame(() => {
       this.animationId = 0;
@@ -2035,6 +2189,10 @@ export class Scene3D {
           this.cueGroup.position.copy(a.contact);
           a.fired = true;
           a.t = 0;
+          if (this.strikeFallbackTimer !== null) {
+            window.clearTimeout(this.strikeFallbackTimer);
+            this.strikeFallbackTimer = null;
+          }
           a.onContact?.();
         } else {
           const ease = a.t * a.t * a.t; // 加速前冲
@@ -2074,6 +2232,7 @@ export class Scene3D {
 
     this.updatePlanPlay(dt);
 
+    if (this.renderer.shadowMap.needsUpdate) this.shadowFrameCount += 1;
     this.renderer.render(this.scene, this.camera);
     this.renderFrameCount += 1;
   }
@@ -2094,6 +2253,18 @@ export class Scene3D {
   /** 浏览器性能验收读取累计真实渲染帧数；不参与业务状态。 */
   renderedFrames(): number {
     return this.renderFrameCount;
+  }
+
+  /** 浏览器性能门禁读取复制后的通道/阴影统计，不暴露内部可写计数。 */
+  debugRenderStats() {
+    return {
+      renderedFrames: this.renderFrameCount,
+      worldSyncs: this.worldSyncCount,
+      aimSyncs: this.aimSyncCount,
+      cameraSyncs: this.cameraSyncCount,
+      shadowInvalidations: this.shadowInvalidationCount,
+      shadowFrames: this.shadowFrameCount,
+    };
   }
 
   screenToTable(clientX: number, clientY: number): { x: number; z: number } | null {
@@ -2188,7 +2359,36 @@ export class Scene3D {
 
   dispose() {
     this.stop();
+    if (this.strikeFallbackTimer !== null) {
+      window.clearTimeout(this.strikeFallbackTimer);
+      this.strikeFallbackTimer = null;
+    }
+    this.strikeAnim = null;
     window.removeEventListener('resize', this.handleResize);
+
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    const textures = new Set<THREE.Texture>();
+    this.scene.traverse(object => {
+      const renderable = object as THREE.Mesh;
+      if (renderable.geometry?.isBufferGeometry) geometries.add(renderable.geometry);
+      const objectMaterials = renderable.material;
+      if (Array.isArray(objectMaterials)) objectMaterials.forEach(material => materials.add(material));
+      else if (objectMaterials?.isMaterial) materials.add(objectMaterials);
+    });
+    for (const material of materials) {
+      for (const value of Object.values(material)) {
+        if ((value as THREE.Texture | undefined)?.isTexture) {
+          textures.add(value as THREE.Texture);
+        }
+      }
+    }
+    textures.forEach(texture => texture.dispose());
+    materials.forEach(material => material.dispose());
+    geometries.forEach(geometry => geometry.dispose());
+    this.scene.environment = null;
+    this.environmentTarget?.dispose();
+    this.environmentTarget = null;
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.element) {
       this.element.removeChild(this.renderer.domElement);

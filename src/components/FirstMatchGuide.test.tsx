@@ -1,8 +1,8 @@
 /*
 [INPUT]: FirstMatchGuide 服务端静态渲染结果
-[OUTPUT]: 断言一行提示只保留弱化跳过入口、精瞄需显式切档且不回归手动下一步/完成控件
+[OUTPUT]: 断言一行提示只保留弱化跳过入口、默认精瞄拨轮文案且不回归手动下一步/完成控件
 [POS]: 首局微提示结构门禁，不依赖浏览器布局
-[PROTOCOL]: 变更时更新此头部，然后检查 components/CLAUDE.md
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -25,7 +25,7 @@ describe('FirstMatchGuide 微提示结构', () => {
     expect(markup).not.toContain('guide-next');
   });
 
-  it('精瞄提示要求用户先显式轻点拨轮再微调', () => {
+  it('精瞄提示直接引导轻拨，不要求先切档', () => {
     const markup = renderToStaticMarkup(
       <FirstMatchGuide
         step="break-fine"
@@ -34,6 +34,8 @@ describe('FirstMatchGuide 微提示结构', () => {
       />,
     );
 
-    expect(markup).toContain('轻点拨轮·再拨精瞄');
+    expect(markup).toContain('轻拨拨轮·精细瞄准');
+    expect(markup).not.toContain('先切档');
+    expect(markup).not.toContain('轻点拨轮');
   });
 });

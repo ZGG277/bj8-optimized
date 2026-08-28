@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 对手观战全台、显式手动相机、控件避让、交棒保留、触屏瞄准锁镜、全局点选冻结球台及手动回第一人称断言
-[POS]: 竖屏观战相机的浏览器出口验收门禁
+[OUTPUT]: 390×844 shot/tactical/spectator 视角生命周期、有效落位自动第一人称、自由环绕、控件避让、交棒保留、活相机锁镜与纯镜头通道耗能断言
+[POS]: 竖屏显式相机状态机的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
@@ -30,17 +30,11 @@ const start = await page.evaluate(() => {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 });
 if (start) await page.touchscreen.tap(start.x, start.y);
-await wait(300);
-
-// 用真实键盘把玩家视角停在 35%，确认对手接管时会抬升到全台观战位。
-await page.focus('.view-slider-track');
-await page.keyboard.press('Home');
-for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowUp');
-await wait(120);
-const playerLevel = await page.$eval(
-  '.viewport',
-  element => Number(element.getAttribute('data-view-level')),
+await page.waitForFunction(
+  () => window.__bj8?.match?.current?.phase === 'placing',
+  { timeout: 2500 },
 );
+await wait(120);
 
 // opponent 显示轻量提示；所有视觉读取都用目标相机，不等待 rAF 收敛。
 await page.evaluate(() => window.__bj8.setMatch({
@@ -174,12 +168,17 @@ await page.evaluate(() => window.__bj8.setMatch({
 await wait(180);
 const handedOff = await readCamera();
 handedOff.recenter = Boolean(await page.$('.camera-recenter'));
+handedOff.mode = await page.$eval(
+  '.viewport',
+  element => element.getAttribute('data-camera-mode'),
+);
 ok(
-  '顾燃交棒后保持当前观战高度与方位',
+  '顾燃交棒后落到全台模式并保持当前构图',
   Math.abs(handedOff.level - beforeHandoff.level) < 0.001 &&
     Math.abs(handedOff.viewAzimuth - beforeHandoff.viewAzimuth) < 1e-6 &&
-    !handedOff.recenter,
-  JSON.stringify({ playerLevel, beforeHandoff, handedOff }),
+    handedOff.mode === 'tactical' &&
+    handedOff.recenter,
+  JSON.stringify({ beforeHandoff, handedOff }),
 );
 
 const manualCameraUi = await page.evaluate(() => {
@@ -202,13 +201,13 @@ const manualCameraUi = await page.evaluate(() => {
   };
 });
 ok(
-  '手动视角入口是视角控件内的紧凑纯图形按钮',
+  '自由环绕入口是视角控件内的紧凑纯图形按钮',
   Boolean(
     manualCameraUi &&
     manualCameraUi.width >= 20 &&
     manualCameraUi.height >= 20 &&
     manualCameraUi.text === '' &&
-    manualCameraUi.label === '开启手动视角' &&
+    manualCameraUi.label === '开启自由环绕' &&
     manualCameraUi.pressed === 'false' &&
     manualCameraUi.insideViewControl
   ),
@@ -236,7 +235,8 @@ await page.evaluate(() => {
   world.moving = false;
   window.__bj8.sync();
 });
-await wait(120);
+// 调试造局会让原有 15 球播放落袋动画；耗能基线必须等动画完全结束。
+await wait(1200);
 const manualBefore = await page.evaluate(() => ({
   aim: window.__bj8.aim.current,
   azimuth: window.__bj8.cameraAzimuth.current,
@@ -245,6 +245,7 @@ const manualBefore = await page.evaluate(() => ({
   ghost: window.__bj8.scene.current.aimGhostPos(),
   pressed: document.querySelector('.manual-camera-button')?.getAttribute('aria-pressed'),
   mode: document.querySelector('.viewport')?.getAttribute('data-camera-mode'),
+  stats: window.__bj8.scene.current.debugRenderStats(),
 }));
 await page.touchscreen.touchStart(viewport.x, viewport.y);
 await page.touchscreen.touchMove(viewport.dragX, viewport.y);
@@ -265,12 +266,15 @@ manualAdjusted.mode = await page.$eval(
   '.viewport',
   element => element.getAttribute('data-camera-mode'),
 );
+manualAdjusted.stats = await page.evaluate(
+  () => window.__bj8.scene.current.debugRenderStats(),
+);
 ok(
-  '手动视角可独立调整方位和高度，不改变瞄准角或幽灵球',
+  '全台环绕可独立调整方位和高度，不改变瞄准角或幽灵球',
   manualBefore.pressed === 'true' &&
-    manualBefore.mode === 'manual' &&
+    manualBefore.mode === 'tactical' &&
     manualAdjusted.pressed === 'true' &&
-    manualAdjusted.mode === 'manual' &&
+    manualAdjusted.mode === 'tactical' &&
     Math.abs(manualAdjusted.azimuth - manualBefore.azimuth) > 0.15 &&
     manualAdjusted.level < manualBefore.level - 0.09 &&
     Math.abs(manualAdjusted.aim - manualBefore.aim) < 1e-10 &&
@@ -281,6 +285,14 @@ ok(
       manualAdjusted.ghost.z - manualBefore.ghost.z,
     ) < 1e-8,
   JSON.stringify({ manualBefore, manualAdjusted }),
+);
+ok(
+  '纯相机环绕与高度变化不重放世界、瞄准或阴影通道',
+  manualAdjusted.stats.cameraSyncs > manualBefore.stats.cameraSyncs &&
+    manualAdjusted.stats.worldSyncs === manualBefore.stats.worldSyncs &&
+    manualAdjusted.stats.aimSyncs === manualBefore.stats.aimSyncs &&
+    manualAdjusted.stats.shadowInvalidations === manualBefore.stats.shadowInvalidations,
+  JSON.stringify({ before: manualBefore.stats, after: manualAdjusted.stats }),
 );
 
 await page.touchscreen.tap(manualCameraUi.x, manualCameraUi.y);
@@ -295,9 +307,9 @@ manualExited.mode = await page.$eval(
   element => element.getAttribute('data-camera-mode'),
 );
 ok(
-  '退出手动视角后保留所选画面，等待下一次瞄准操作',
+  '退出自由环绕后保留全台构图，恢复点选瞄准',
   manualExited.pressed === 'false' &&
-    manualExited.mode === 'aim' &&
+    manualExited.mode === 'tactical' &&
     Math.abs(manualExited.level - manualAdjusted.level) < 0.001 &&
     Math.abs(manualExited.viewAzimuth - manualAdjusted.viewAzimuth) < 1e-6 &&
     Math.abs(manualExited.aim - manualAdjusted.aim) < 1e-10,
@@ -334,13 +346,16 @@ const ghostTarget = await page.evaluate(() => {
   return { target, screen, aim: window.__bj8.aim.current };
 });
 await page.touchscreen.tap(ghostTarget.screen.x, ghostTarget.screen.y);
-await wait(180);
+await wait(850);
 const ghostSelected = await page.evaluate(() => ({
   aim: window.__bj8.aim.current,
+  level: Number(document.querySelector('.viewport')?.getAttribute('data-view-level')),
+  mode: document.querySelector('.viewport')?.getAttribute('data-camera-mode'),
+  viewAzimuth: window.__bj8.cameraViewAzimuth.current,
   ghost: window.__bj8.scene.current.aimGhostPos(),
 }));
 ok(
-  '保留观战视角时可准确选择幽灵球位置',
+  '全台视角仍可准确选择幽灵球位置',
   ghostSelected.ghost &&
     Math.hypot(
       ghostSelected.ghost.x - ghostTarget.target.x,
@@ -350,25 +365,16 @@ ok(
   JSON.stringify({ ghostTarget, ghostSelected }),
 );
 
-// 用户主动把视角杆拉到底，第一人称才重新跟随当前杆向。
-const viewTrack = await page.$eval('.view-slider-track', element => {
-  const rect = element.getBoundingClientRect();
-  const level = Number(document.querySelector('.viewport').getAttribute('data-view-level'));
-  const travel = Math.max(1, rect.height - 24);
-  return {
-    x: rect.left + rect.width / 2,
-    fromY: rect.bottom - 12 - level * travel,
-    toY: rect.bottom - 8,
-  };
-});
-await page.touchscreen.touchStart(viewTrack.x, viewTrack.fromY);
-await page.touchscreen.touchMove(viewTrack.x, viewTrack.toY);
-await page.touchscreen.touchEnd();
-await wait(180);
+// 幽灵球完成有效落位后自动建立瞄准态：零高度第一人称并跟随最新杆向。
 const firstPerson = await readCamera();
+firstPerson.mode = await page.$eval(
+  '.viewport',
+  element => element.getAttribute('data-camera-mode'),
+);
 ok(
-  '用户拉回第一人称后相机重新跟随当前瞄准角',
-  firstPerson.level <= 0.005 &&
+  '幽灵球有效落位后自动进入零高度击球视角并跟随杆向',
+  firstPerson.mode === 'shot' &&
+    Math.abs(firstPerson.level) < 0.001 &&
     Math.abs(firstPerson.viewAzimuth - firstPerson.aim) < 1e-6,
   JSON.stringify(firstPerson),
 );
@@ -406,7 +412,7 @@ ok(
   JSON.stringify({ firstPerson, touchAimTarget, touchAimLocked, touchAimFollowed }),
 );
 
-// 玩家自己升回全局视角：冻结进入瞬间的球台方位，点台面只更新瞄准与幽灵球。
+// 玩家显式进入全台视角；点台面完成有效瞄准后应自动回到零高度第一人称。
 await page.focus('.view-slider-track');
 await page.keyboard.press('End');
 await wait(180);
@@ -423,21 +429,23 @@ const playerGlobalTarget = await page.evaluate(() => {
   return { target, screen };
 });
 await page.touchscreen.tap(playerGlobalTarget.screen.x, playerGlobalTarget.screen.y);
-await wait(180);
+await wait(850);
 const playerGlobalAfter = await page.evaluate(() => ({
   aim: window.__bj8.aim.current,
   azimuth: window.__bj8.cameraAzimuth.current,
   viewAzimuth: window.__bj8.cameraViewAzimuth.current,
+  level: Number(document.querySelector('.viewport')?.getAttribute('data-view-level')),
+  mode: document.querySelector('.viewport')?.getAttribute('data-camera-mode'),
   ghost: window.__bj8.scene.current.aimGhostPos(),
 }));
 ok(
-  '玩家拉到全局模式直接显示无遮挡桌面，点球桌只调整瞄准、不转动整张球台',
+  '玩家进入全台模式时无遮挡，点球桌完成瞄准后自动回到第一人称',
   Math.abs(playerGlobalBefore.level - 1) < 0.001 &&
-    firstPerson.lampVisible === true &&
     playerGlobalBefore.lampVisible === false &&
     Math.abs(playerGlobalAfter.aim - playerGlobalBefore.aim) > 0.05 &&
-    Math.abs(playerGlobalAfter.azimuth - playerGlobalBefore.azimuth) < 1e-6 &&
-    Math.abs(playerGlobalAfter.viewAzimuth - playerGlobalBefore.viewAzimuth) < 1e-6 &&
+    playerGlobalAfter.mode === 'shot' &&
+    Math.abs(playerGlobalAfter.level) < 0.001 &&
+    Math.abs(playerGlobalAfter.viewAzimuth - playerGlobalAfter.aim) < 1e-6 &&
     playerGlobalAfter.ghost &&
     Math.hypot(
       playerGlobalAfter.ghost.x - playerGlobalTarget.target.x,

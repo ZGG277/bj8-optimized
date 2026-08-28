@@ -243,9 +243,8 @@ ok('五个控件都在视口安全范围且不遮挡比分牌',
 ok('操作面无可见文字和力度数字',
   initial.controlText === '' && initial.powerNumbers === 0,
   JSON.stringify({ text: initial.controlText, numbers: initial.powerNumbers }));
-ok('首次进入预测辅助线关闭但幽灵球仍可见',
-  initial.storedAim === null && !initial.aimVisible && !initial.objVisible &&
-    !initial.tanVisible && initial.ghostVisible,
+ok('首次进入预测辅助线默认开启且幽灵球可见',
+  initial.storedAim === null && initial.aimVisible && initial.ghostVisible,
   JSON.stringify(initial));
 
 const rightOrderBefore = await page.evaluate(() => {
@@ -308,20 +307,20 @@ const menuOpen = await page.evaluate(() => ({
   guidanceDisabled: document.querySelector('.guidance-option')?.disabled,
 }));
 ok('灯泡向球桌内侧展开两个独立图形开关',
-  menuOpen.expanded === 'true' && menuOpen.aimSwitch === 'false',
+  menuOpen.expanded === 'true' && menuOpen.aimSwitch === 'true',
   JSON.stringify(menuOpen));
 await page.click('.aim-option');
 await wait(120);
-const enabled = await page.evaluate(() => ({
+const disabled = await page.evaluate(() => ({
   stored: localStorage.getItem('guagua-billiards:aim-assist:v1'),
   checked: document.querySelector('.aim-option')?.getAttribute('aria-checked'),
   aimVisible: window.__bj8.scene.current.aimLine.visible,
   ghostVisible: window.__bj8.scene.current.aimGhost.visible,
 }));
-ok('灯泡可独立打开预测线且不影响幽灵球',
-  enabled.stored === 'true' && enabled.checked === 'true' &&
-    enabled.aimVisible && enabled.ghostVisible,
-  JSON.stringify(enabled));
+ok('灯泡可独立关闭预测线且不影响幽灵球',
+  disabled.stored === 'false' && disabled.checked === 'false' &&
+    !disabled.aimVisible && disabled.ghostVisible,
+  JSON.stringify(disabled));
 
 await page.reload({ waitUntil: 'networkidle0' });
 await wait(350);
@@ -329,8 +328,8 @@ const persisted = await page.evaluate(() => ({
   stored: localStorage.getItem('guagua-billiards:aim-assist:v1'),
   bulbClass: document.querySelector('.plan-button')?.className ?? '',
 }));
-ok('辅助线选择刷新后保持', persisted.stored === 'true' &&
-  persisted.bulbClass.includes('has-aim-assist'), JSON.stringify(persisted));
+ok('辅助线关闭选择刷新后保持', persisted.stored === 'false' &&
+  !persisted.bulbClass.includes('has-aim-assist'), JSON.stringify(persisted));
 await startAndPlace();
 
 const dialStartAim = await page.evaluate(() => window.__bj8.aim.current);

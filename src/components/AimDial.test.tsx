@@ -1,8 +1,8 @@
 /*
 [INPUT]: AimDial 服务端静态渲染结果与用户显式粗/精档状态
-[OUTPUT]: 断言默认不自动精瞄、显式精瞄状态与键鼠/触控无障碍语义
+[OUTPUT]: 断言外部粗/精双档状态与键鼠/触控无障碍语义
 [POS]: 方向拨轮结构门禁，不依赖浏览器 Pointer 实现或袋口几何
-[PROTOCOL]: 变更时更新此头部，然后检查 components/CLAUDE.md
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -20,8 +20,8 @@ function render(precisionActive: boolean): string {
   );
 }
 
-describe('AimDial 手动精瞄结构', () => {
-  it('默认保持粗档，并明确提示轻点后才启用精瞄', () => {
+describe('AimDial 双档结构', () => {
+  it('外部传入粗档时提示轻点启用精瞄', () => {
     const markup = render(false);
     expect(markup).toContain('aim-dial coarse');
     expect(markup).toContain('data-precision-active="false"');
@@ -30,7 +30,7 @@ describe('AimDial 手动精瞄结构', () => {
     expect(markup).not.toContain('接近');
   });
 
-  it('只在外部显式状态开启后展示精瞄档', () => {
+  it('外部传入精瞄档时展示精瞄状态', () => {
     const markup = render(true);
     expect(markup).toContain('aim-dial fine');
     expect(markup).toContain('data-precision-active="true"');

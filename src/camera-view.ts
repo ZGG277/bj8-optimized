@@ -1,6 +1,6 @@
 /*
 [INPUT]: 母球位置、独立相机方位角、力度预览、归一化视角高度与视口宽高比
-[OUTPUT]: 对外提供连续视角钳制、交互路由、全局视角判定、竖屏全台适配、自由相机回接、环绕手势换算与相机位姿
+[OUTPUT]: 对外提供连续视角钳制、横竖屏全台标准方位、全局视角判定、自由相机回接、环绕手势换算与相机位姿
 [POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -23,7 +23,6 @@ const TABLE_OUTER_HALF_WIDTH = 0.76;
 const TABLE_OUTER_HALF_LENGTH = 1.4;
 const TABLE_FIT_MARGIN = 1.23;
 const ORBIT_RADIANS_PER_PIXEL = 0.008;
-const CAMERA_REATTACH_START = 0.08;
 export const GLOBAL_CAMERA_VIEW_LEVEL = 0.42;
 
 export type CameraPoint = {
@@ -36,8 +35,6 @@ export type CameraPose = {
   position: CameraPoint;
   lookAt: CameraPoint;
 };
-
-export type CameraInteractionMode = 'aim' | 'orbit';
 
 export function clampViewLevel(level: number): number {
   if (!Number.isFinite(level)) return FIRST_PERSON_VIEW;
@@ -54,45 +51,17 @@ export function isGlobalCameraView(level: number): boolean {
   return clampViewLevel(level) >= GLOBAL_CAMERA_VIEW_LEVEL;
 }
 
-/** 观战或显式手动视角只消费相机手势；普通玩家状态才把球桌手势交给瞄准。 */
-export function cameraInteractionMode(
-  spectatorActive: boolean,
-  manualCameraActive: boolean,
-): CameraInteractionMode {
-  return spectatorActive || manualCameraActive ? 'orbit' : 'aim';
+/** 全台回正让球台长边沿视口长边展开，避免竖屏/横屏浪费主要画布。 */
+export function fullTableAzimuthForViewport(width: number, height: number): number {
+  const safeWidth = Number.isFinite(width) ? Math.max(1, width) : 1;
+  const safeHeight = Number.isFinite(height) ? Math.max(1, height) : 1;
+  return safeWidth >= safeHeight ? Math.PI / 2 : FULL_TABLE_AZIMUTH;
 }
 
 /** 横向拖动只产生视觉方位角，不消费也不返回球杆瞄准角。 */
 export function cameraAzimuthAfterDrag(current: number, pixelDelta: number): number {
   if (!Number.isFinite(pixelDelta)) return normalizeCameraAzimuth(current);
   return normalizeCameraAzimuth(current - pixelDelta * ORBIT_RADIANS_PER_PIXEL);
-}
-
-/**
- * 观战或玩家主动进入全局高度后，高位保持进入时的视觉方位；
- * 用户向第一人称拉动时，沿最短圆弧平滑回到杆向。
- * detached=false 时保持既有玩家相机语义：所有高度都跟随瞄准角。
- */
-export function cameraAzimuthAtView(
-  cameraAzimuth: number,
-  aimAngle: number,
-  viewLevel: number,
-  detached: boolean,
-): number {
-  const aim = normalizeCameraAzimuth(aimAngle);
-  if (!detached) return aim;
-  const level = clampViewLevel(viewLevel);
-  const raw = Math.min(
-    1,
-    Math.max(
-      0,
-      (level - CAMERA_REATTACH_START) /
-        (GLOBAL_CAMERA_VIEW_LEVEL - CAMERA_REATTACH_START),
-    ),
-  );
-  const transition = raw * raw * (3 - 2 * raw);
-  const shortestDelta = normalizeCameraAzimuth(cameraAzimuth - aim);
-  return normalizeCameraAzimuth(aim + shortestDelta * transition);
 }
 
 /** 端点保留产品名称；中间高度直接给出可感知的百分比。 */

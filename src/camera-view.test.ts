@@ -1,6 +1,6 @@
 /*
-[INPUT]: camera-view 连续视角、独立方位角与竖屏全台适配纯几何
-[OUTPUT]: 锁定端点、任意高度、手动视角路由、全局视角阈值、环绕独立性及竖屏六袋安全边界回归
+[INPUT]: camera-view 连续视角、独立方位角与横竖屏全台适配纯几何
+[OUTPUT]: 锁定端点、任意高度、全台标准方位、全局视角阈值、环绕独立性及竖屏六袋安全边界回归
 [POS]: 连续视角相机回归测试
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -13,8 +13,7 @@ import {
   OVERHEAD_VIEW,
   SPECTATOR_VIEW_LEVEL,
   cameraAzimuthAfterDrag,
-  cameraAzimuthAtView,
-  cameraInteractionMode,
+  fullTableAzimuthForViewport,
   cameraPoseAt,
   clampViewLevel,
   isGlobalCameraView,
@@ -39,10 +38,10 @@ describe('continuous camera view', () => {
     expect(isGlobalCameraView(OVERHEAD_VIEW)).toBe(true);
   });
 
-  it('手动视角把球桌手势路由给相机，退出后恢复瞄准路由', () => {
-    expect(cameraInteractionMode(false, true)).toBe('orbit');
-    expect(cameraInteractionMode(true, false)).toBe('orbit');
-    expect(cameraInteractionMode(false, false)).toBe('aim');
+  it('全台回正让球台长边沿当前视口长边展开', () => {
+    expect(fullTableAzimuthForViewport(390, 844)).toBe(0);
+    expect(fullTableAzimuthForViewport(844, 390)).toBeCloseTo(Math.PI / 2);
+    expect(fullTableAzimuthForViewport(Number.NaN, Number.NaN)).toBeCloseTo(Math.PI / 2);
   });
 
   it('高度随推杆位置单调抬升且中间值不会吸附端点', () => {
@@ -77,19 +76,6 @@ describe('continuous camera view', () => {
     expect(cameraAfter).not.toBe(cameraBefore);
     expect(aimAngle).toBe(0.37);
     expect(normalizeCameraAzimuth(cameraAfter + Math.PI * 2)).toBeCloseTo(cameraAfter, 10);
-  });
-
-  it('观战或主动全局模式保持视觉方位，拉回第一人称时沿最短圆弧回接杆向', () => {
-    const cameraAzimuth = Math.PI - 0.1;
-    const aimAngle = -Math.PI + 0.1;
-    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.82, true))
-      .toBeCloseTo(cameraAzimuth, 10);
-    const middle = cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.25, true);
-    expect(Math.abs(normalizeCameraAzimuth(middle - aimAngle))).toBeLessThan(0.2);
-    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0, true))
-      .toBeCloseTo(aimAngle, 10);
-    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 1, false))
-      .toBeCloseTo(aimAngle, 10);
   });
 
   it.each([0, Math.PI / 2])(

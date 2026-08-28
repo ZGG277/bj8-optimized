@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口与 puppeteer-core
-[OUTPUT]: 桌面/竖屏/横屏的真实指针、键盘、瞄准、视角、蓄力与放置断言
+[OUTPUT]: 桌面/竖屏/横屏的真实指针、键盘、瞄准、近母球幽灵球稳定性、视角、蓄力、放置与跨输入原子取消断言
 [POS]: 核心输入交互的浏览器出口门禁，DOM 只读不代替执行
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
@@ -55,12 +55,16 @@ async function realClickAria(page, ariaLabel) {
 }
 
 async function placeCueBallInKitchen(page) {
-  const candidates = await page.evaluate(() => {
-    const r = document.querySelector('.viewport').getBoundingClientRect();
-    // 俯视下开球区在屏幕下方（head string 之后，z >= L/4），取几个候选点
-    return [0.72, 0.78, 0.84, 0.90].map(fy => ({ x: r.x + r.width / 2, y: r.y + r.height * fy }));
-  });
-  for (const pt of candidates) {
+  // 全台视角会根据横竖屏旋转球台；用当前活相机把真实开球区坐标投到屏幕，
+  // 不再假设开球区永远在屏幕下方。
+  const kitchenTargets = [
+    { x: 0, z: 0.98 },
+    { x: -0.18, z: 0.98 },
+    { x: 0.18, z: 0.98 },
+  ];
+  for (const target of kitchenTargets) {
+    const pt = await page.evaluate(({ x, z }) =>
+      window.__bj8.scene.current.tableToScreen(x, z), target);
     await page.mouse.click(pt.x, pt.y);
     await new Promise(r => setTimeout(r, 350));
     const phase = await page.evaluate(() => window.__bj8?.match?.current?.phase);
@@ -166,7 +170,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     const turn = await turnText(page);
     if (turn === '你的回合') return true;
     if (turn === '放置白球') {
-      await realClickAria(page, '切换俯视视角');
+      await realClickAria(page, '进入全台观察');
       await new Promise(r => setTimeout(r, 400));
       const candidates = await page.evaluate(() => {
         const r = document.querySelector('.viewport').getBoundingClientRect();
@@ -203,16 +207,16 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
 
   // 纯视觉端点按钮仍保留 aria；真实点击后状态翻转，且不改变瞄准角。
   const aimBeforeSwitch = await page.evaluate(() => window.__bj8.aim.current);
-  await realClickAria(page, '切换俯视视角');
+  await realClickAria(page, '进入全台观察');
   await new Promise(r => setTimeout(r, 400));
   const pressed = await page.evaluate(() => ({
-    first: document.querySelector('[aria-label="切换第一人称视角"]')?.getAttribute('aria-pressed'),
-    overhead: document.querySelector('[aria-label="切换俯视视角"]')?.getAttribute('aria-pressed'),
+    shot: document.querySelector('[aria-label="进入击球视角"]')?.getAttribute('aria-pressed'),
+    tactical: document.querySelector('[aria-label="进入全台观察"]')?.getAttribute('aria-pressed'),
   }));
-  ok('桌面: 切视角 aria-pressed 翻转', pressed.first === 'false' && pressed.overhead === 'true', JSON.stringify(pressed));
+  ok('桌面: 切视角 aria-pressed 翻转', pressed.shot === 'false' && pressed.tactical === 'true', JSON.stringify(pressed));
   const aimAfterSwitch = await page.evaluate(() => window.__bj8.aim.current);
   ok('桌面: 切视角不改变瞄准角', aimBeforeSwitch === aimAfterSwitch, `before=${aimBeforeSwitch} after=${aimAfterSwitch}`);
-  await realClickAria(page, '切换第一人称视角');
+  await realClickAria(page, '进入击球视角');
   await new Promise(r => setTimeout(r, 400));
 
   // 鼠标拖拽出杆
@@ -242,6 +246,44 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   await new Promise(r => setTimeout(r, 250));
   ok('桌面: 空格1350ms力度81±2', Math.abs(holdPower - 81) <= 2, `power=${holdPower}`);
   ok('桌面: 空格出杆后回到你的回合', await stagePlayerAim(page));
+
+  // 交叉输入：按住台面不松手时用键盘出杆，旧 pointerup 不得在 rolling 里复活瞄准拨轮。
+  const heldAimPoint = await page.evaluate(() => {
+    const r = document.querySelector('.viewport').getBoundingClientRect();
+    return { x: r.x + r.width * 0.62, y: r.y + r.height * 0.48 };
+  });
+  await page.mouse.move(heldAimPoint.x, heldAimPoint.y);
+  await page.mouse.down();
+  await page.keyboard.down('Space');
+  await new Promise(r => setTimeout(r, 120));
+  await page.keyboard.up('Space');
+  await new Promise(r => setTimeout(r, 700));
+  const heldShotBeforeUp = await page.evaluate(() => ({
+    phase: window.__bj8.match.current.phase,
+    cameraPhase: window.__bj8.cameraState.current.phase.kind,
+    dial: Boolean(document.querySelector('.aim-dial')),
+  }));
+  await page.mouse.up();
+  await new Promise(r => setTimeout(r, 100));
+  const heldShotAfterUp = await page.evaluate(() => {
+    const dial = document.querySelector('.aim-dial');
+    return {
+      phase: window.__bj8.match.current.phase,
+      cameraPhase: window.__bj8.cameraState.current.phase.kind,
+      dial: Boolean(dial),
+      dialParent: dial?.parentElement?.className ?? null,
+      shootDisabled: document.querySelector('.shoot-pad')?.getAttribute('aria-disabled'),
+    };
+  });
+  ok('桌面: 键盘出杆原子取消未松手的台面手势',
+    heldShotBeforeUp.phase === 'rolling' && !heldShotBeforeUp.dial,
+    JSON.stringify(heldShotBeforeUp));
+  ok('桌面: 迟到 pointerup 不复活拨轮且镜头进入结果全景',
+    heldShotAfterUp.phase === 'rolling' &&
+      heldShotAfterUp.cameraPhase === 'outcome-overview' &&
+      !heldShotAfterUp.dial,
+    JSON.stringify(heldShotAfterUp));
+  ok('桌面: 交叉输入后再次回到你的回合', await stagePlayerAim(page));
 
   // 紧凑击球点先展开，再把大母球拖到顶部 → 高杆
   const spinPreview = await page.evaluate(() => {
@@ -316,7 +358,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   // 自由球放置：直接固定规则阶段，隔离随机开球与 AI 时序，只验证真实触摸输入出口。
   await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 30000 }).catch(() => {});
   {
-    await realClickAria(page, '切换俯视视角');
+    await realClickAria(page, '进入全台观察');
     await page.evaluate(() => {
       const world = window.__bj8.world.current;
       const cue = world.balls[0];
@@ -414,7 +456,7 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
 
   // 纯视觉视角端点不被比分栏遮挡，命中自身或其图形子节点。
   const viewBtn = await page.evaluate(() => {
-    const btn = document.querySelector('[aria-label="切换俯视视角"]');
+    const btn = document.querySelector('[aria-label="进入全台观察"]');
     if (!btn) return null;
     const r = btn.getBoundingClientRect();
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
@@ -437,9 +479,9 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     await new Promise(r => setTimeout(r, 300));
     const aimAfter = await page.evaluate(() => window.__bj8.aim.current);
     ok('横屏: 点击视角端点不改变瞄准角', aimBefore === aimAfter, `before=${aimBefore} after=${aimAfter}`);
-    const pressed = await page.evaluate(() => document.querySelector('[aria-label="切换俯视视角"]')?.getAttribute('aria-pressed'));
+    const pressed = await page.evaluate(() => document.querySelector('[aria-label="进入全台观察"]')?.getAttribute('aria-pressed'));
     ok('横屏: 视角端点状态变化(aria-pressed)', pressed === 'true', `aria-pressed=${pressed}`);
-    await realClickAria(page, '切换第一人称视角');
+    await realClickAria(page, '进入击球视角');
     await new Promise(r => setTimeout(r, 300));
   }
 
@@ -478,29 +520,77 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   const ringCount = await page.evaluate(() => window.__bj8?.scene?.current?.legalTargetCount?.() ?? -1);
   ok('瞄准: 开球前合法目标=14', ringCount === 14, `legalTargetCount=${ringCount}`);
 
-  // 点台面右侧 vs 左侧,瞄准角应变号(点哪打哪)
+  // 全台模式下分别点母球前方右/左世界点；每次有效落位都会自动回 shot，
+  // 所以下一个样本必须重新进入 tactical 并用该模式的目标相机投影。
   const vp = await page.evaluate(() => {
     const r = document.querySelector('.viewport').getBoundingClientRect();
     return { x: r.x, y: r.y, w: r.width, h: r.height };
   });
-  const tapAim = async (fx, fy) => {
-    await page.mouse.move(vp.x + vp.w * fx, vp.y + vp.h * fy);
+  const enterGlobalAndProjectAim = async (lateral) => {
+    await realClickAria(page, '进入全台观察');
+    await new Promise(r => setTimeout(r, 300));
+    const sample = await page.evaluate(offset => {
+      const debug = window.__bj8;
+      const cue = debug.world.current.balls[0];
+      const target = { x: cue.x + offset, z: cue.z - 0.4 };
+      const level = Number(document.querySelector('.viewport')?.dataset.viewLevel);
+      return {
+        screen: debug.scene.current.tableToScreenAt(
+          target.x,
+          target.z,
+          debug.cameraViewAzimuth.current,
+          level,
+        ),
+        camera: {
+          mode: debug.cameraState.current.mode,
+          level,
+        },
+      };
+    }, lateral);
+    return sample;
+  };
+  const tapProjectedAim = async (sample) => {
+    await page.mouse.move(sample.screen.x, sample.screen.y);
     await page.mouse.down();
     await new Promise(r => setTimeout(r, 120));
     await page.mouse.up();
     await new Promise(r => setTimeout(r, 120));
     return page.evaluate(() => window.__bj8.aim.current);
   };
-  const aimRight = await tapAim(0.85, 0.45);
-  const aimLeft = await tapAim(0.15, 0.45);
+  const rightSample = await enterGlobalAndProjectAim(0.32);
+  const cameraBeforeAim = rightSample.camera;
+  const aimRight = await tapProjectedAim(rightSample);
+  const cameraAfterAim = await page.evaluate(() => ({
+    mode: window.__bj8.cameraState.current.mode,
+    level: Number(document.querySelector('.viewport')?.dataset.viewLevel),
+  }));
+  ok('瞄准: 全局落位幽灵球后自动进入第一人称',
+    cameraBeforeAim.mode === 'tactical' &&
+      cameraAfterAim.mode === 'shot' &&
+      cameraAfterAim.level < 0.01,
+    JSON.stringify({ before: cameraBeforeAim, after: cameraAfterAim }));
+  const leftSample = await enterGlobalAndProjectAim(-0.32);
+  const aimLeft = await tapProjectedAim(leftSample);
   ok('瞄准: 点左右两侧瞄准角异号(点哪打哪)',
     aimRight !== aimLeft && aimRight * aimLeft < 0,
     `右=${aimRight?.toFixed(3)} 左=${aimLeft?.toFixed(3)}`);
 
-  // 拖拽也应直接映射位置而非增量
-  await page.mouse.move(vp.x + vp.w * 0.8, vp.y + vp.h * 0.4);
+  // 拖拽也应使用按下时的 tactical 坐标系直接映射末端位置，而非累计增量。
+  const dragRight = await enterGlobalAndProjectAim(0.32);
+  const dragLeft = await page.evaluate(() => {
+    const debug = window.__bj8;
+    const cue = debug.world.current.balls[0];
+    const level = Number(document.querySelector('.viewport')?.dataset.viewLevel);
+    return debug.scene.current.tableToScreenAt(
+      cue.x - 0.32,
+      cue.z - 0.4,
+      debug.cameraViewAzimuth.current,
+      level,
+    );
+  });
+  await page.mouse.move(dragRight.screen.x, dragRight.screen.y);
   await page.mouse.down();
-  await page.mouse.move(vp.x + vp.w * 0.2, vp.y + vp.h * 0.4, { steps: 8 });
+  await page.mouse.move(dragLeft.x, dragLeft.y, { steps: 8 });
   const aimDrag = await page.evaluate(() => window.__bj8.aim.current);
   await page.mouse.up();
   ok('瞄准: 拖拽末端位置决定瞄准角', aimDrag * aimRight < 0,
@@ -545,6 +635,120 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
     ok('瞄准: 轻点微抖不带偏瞄准(拖拽死区)',
       expected !== null && Math.abs(expected) < 0.7 && got !== null && Math.abs(got - expected) < 0.01,
       `aim=${got?.toFixed(4)} 真值=${expected?.toFixed(4)}`);
+  }
+
+  // 击球视角抓幽灵球贴近母球：整次手势必须使用按下瞬间的活相机坐标系。
+  // 否则每次 pointermove 都会把新杆向反馈给屏幕反算，在母球附近累加成快速旋转。
+  {
+    await stagePlayerAim(page);
+    await realClickAria(page, '进入击球视角');
+    await page.evaluate(() => {
+      const world = window.__bj8.world.current;
+      for (const ball of world.balls) {
+        ball.active = ball.number === 0;
+        ball.vx = ball.vz = ball.wx = ball.wy = ball.wz = 0;
+      }
+      Object.assign(world.balls[0], { active: true, x: 0, z: 0.55 });
+      world.moving = false;
+      window.__bj8.setMatch({ phase: 'aiming', actor: 'player', breaking: false });
+      window.__bj8.sync();
+    });
+    await new Promise(r => setTimeout(r, 1000));
+
+    // 先用真实点击把幽灵球放到母球前方，再从球体上按下，
+    // 确保本段验证的是 ghost drag，而不是普通点哪打哪。
+    const seedGhostScreen = await page.evaluate(() => {
+      const debug = window.__bj8;
+      const cue = debug.world.current.balls[0];
+      return debug.scene.current.tableToScreen(cue.x + 0.18, cue.z - 0.3);
+    });
+    await page.mouse.click(seedGhostScreen.x, seedGhostScreen.y);
+    await new Promise(r => setTimeout(r, 250));
+
+    const gestureStart = await page.evaluate(() => {
+      const debug = window.__bj8;
+      const scene = debug.scene.current;
+      const cue = debug.world.current.balls[0];
+      const ghost = scene.aimGhostPos();
+      return {
+        ghostScreen: scene.tableToScreen(ghost.x, ghost.z),
+      };
+    });
+
+    await page.mouse.move(gestureStart.ghostScreen.x, gestureStart.ghostScreen.y);
+    await page.mouse.down();
+
+    // pointerdown 会冻结当前活相机；在冻结之后再投影本次手势采样点，
+    // 避免把按下前最后一帧平滑过渡误算成瞄准偏差。
+    const gesture = await page.evaluate(() => {
+      const debug = window.__bj8;
+      const scene = debug.scene.current;
+      const cue = debug.world.current.balls[0];
+      const azimuth = debug.cameraViewAzimuth.current;
+      const radius = 0.07;
+      return {
+        cue: { x: cue.x, z: cue.z },
+        azimuth,
+        cueScreen: scene.tableToScreen(cue.x, cue.z),
+        points: [-0.9, -0.45, 0, 0.45, 0.9].map(angle => {
+          const target = {
+            x: cue.x + Math.sin(angle) * radius,
+            z: cue.z - Math.cos(angle) * radius,
+          };
+          const screen = scene.tableToScreen(target.x, target.z);
+          const hit = scene.screenToTable(screen.x, screen.y);
+          return {
+            screen,
+            expected: Math.atan2(hit.x - cue.x, -(hit.z - cue.z)),
+          };
+        }),
+      };
+    });
+
+    const samples = [];
+    for (const point of gesture.points) {
+      await page.mouse.move(point.screen.x, point.screen.y);
+      await new Promise(r => setTimeout(r, 60));
+      samples.push(await page.evaluate(expected => ({
+        expected,
+        aim: window.__bj8.aim.current,
+        camera: window.__bj8.cameraViewAzimuth.current,
+      }), point.expected));
+    }
+    const beforeDeadZone = samples.at(-1);
+    await page.mouse.move(gesture.cueScreen.x, gesture.cueScreen.y, { steps: 6 });
+    await new Promise(r => setTimeout(r, 60));
+    const inDeadZone = await page.evaluate(cue => {
+      const ghost = window.__bj8.scene.current.aimGhostPos();
+      return {
+        aim: window.__bj8.aim.current,
+        camera: window.__bj8.cameraViewAzimuth.current,
+        configuredDistance: window.__bj8.scene.current.aimGhostDist,
+        distance: Math.hypot(ghost.x - cue.x, ghost.z - cue.z),
+      };
+    }, gesture.cue);
+    await page.mouse.up();
+
+    const angleError = (left, right) => Math.abs(Math.atan2(
+      Math.sin(left - right),
+      Math.cos(left - right),
+    ));
+    const maxAimError = Math.max(...samples.map(sample =>
+      angleError(sample.aim, sample.expected)));
+    const maxCameraDrift = Math.max(...samples.map(sample =>
+      angleError(sample.camera, gesture.azimuth)));
+
+    ok('瞄准: 幽灵球近母球拖拽使用固定坐标系',
+      maxAimError < 0.015,
+      `最大角度误差=${maxAimError.toFixed(5)}rad`);
+    ok('瞄准: 幽灵球拖拽期间相机不反馈旋转',
+      maxCameraDrift < 1e-6,
+      `最大相机漂移=${maxCameraDrift.toFixed(8)}rad`);
+    ok('瞄准: 指针穿入母球时保留杆向并钳在两球直径外',
+      beforeDeadZone &&
+        angleError(inDeadZone.aim, beforeDeadZone.aim) < 1e-6 &&
+        Math.abs(inDeadZone.distance - 0.05715) < 5e-4,
+      `杆向差=${beforeDeadZone ? angleError(inDeadZone.aim, beforeDeadZone.aim).toFixed(8) : 'missing'}rad 距离=${inDeadZone.distance.toFixed(5)}m 配置=${inDeadZone.configuredDistance}`);
   }
 
   // 出杆动画:触球瞬间皮头应贴到白球面上(gap ≈ R+2mm ≈ 0.0306m)

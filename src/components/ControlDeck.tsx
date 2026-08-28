@@ -1,8 +1,8 @@
 /*
-[INPUT]: 五个游戏控件状态、手动相机、显式精瞄档、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
+[INPUT]: 五个游戏控件状态、显式相机模式/环绕、精瞄档、辅助灯泡、视口尺寸与 Pointer 手势
 [OUTPUT]: 纯视觉五控件层；转发粗精切档并支持合成层逐帧自由拖动、右/底吸附、跨边转向、长按布局、真实布局变化事实与 v3 持久化
-[POS]: HUD 控件编排层；组合 ViewToolbar / AimDial / SpinControl / ShootControl，不持有游戏规则
-[PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
+[POS]: HUD 控件编排层；组合 ViewToolbar / BulbAssistControl / AimDial / SpinControl / ShootControl，不持有游戏规则
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
@@ -10,8 +10,10 @@ import { AimDial } from './AimDial';
 import { SpinControl } from './SpinControl';
 import { ShootControl } from './ShootControl';
 import { ViewToolbar } from './ViewToolbar';
+import { BulbAssistControl } from './BulbAssistControl';
 import type { CueSpin } from '../physics';
 import type { PositionPlanStatus } from '../hooks/usePositionPlan';
+import type { CameraMode } from '../camera-state';
 import { aimDialPressureProfile } from '../input/aim-dial';
 import {
   CONTROL_LAYOUT_LONG_PRESS_MS,
@@ -253,7 +255,8 @@ function DockableControlSlot({
 
 interface ControlDeckProps {
   viewLevel: number;
-  manualCameraActive: boolean;
+  cameraMode: CameraMode;
+  cameraOrbitActive: boolean;
   canAim: boolean;
   spin: CueSpin;
   charging: boolean;
@@ -266,7 +269,9 @@ interface ControlDeckProps {
   aimDialVisible: boolean;
   aimDialPrecisionActive: boolean;
   onViewLevel: (level: number) => void;
-  onToggleManualCamera: () => void;
+  onEnterTacticalCamera: () => void;
+  onEnterShotCamera: () => void;
+  onToggleCameraOrbit: () => void;
   onSpinChange: (spin: CueSpin) => void;
   onLayoutAdjusted: () => void;
   onToggleGuidance: () => void;
@@ -303,7 +308,8 @@ function axisFor(id: DockItemId, placement: Placement): Axis {
 
 export function ControlDeck({
   viewLevel,
-  manualCameraActive,
+  cameraMode,
+  cameraOrbitActive,
   canAim,
   spin,
   charging,
@@ -316,7 +322,9 @@ export function ControlDeck({
   aimDialVisible,
   aimDialPrecisionActive,
   onViewLevel,
-  onToggleManualCamera,
+  onEnterTacticalCamera,
+  onEnterShotCamera,
+  onToggleCameraOrbit,
   onSpinChange,
   onLayoutAdjusted,
   onToggleGuidance,
@@ -334,7 +342,6 @@ export function ControlDeck({
     loadControlLayouts(browserStorage()));
   const [draggingId, setDraggingId] = useState<DockItemId | null>(null);
   const [snapPreview, setSnapPreview] = useState<DockEdge | null>(null);
-  const [assistMenuOpen, setAssistMenuOpen] = useState(false);
   const dragRef = useRef<LayoutDrag | null>(null);
 
   const profile = resolveLayoutProfile(viewport.width, viewport.height);
@@ -444,7 +451,6 @@ export function ControlDeck({
     element: HTMLElement,
   ) => {
     onCancelCharge();
-    setAssistMenuOpen(false);
     const currentViewport = viewportRef.current;
     const originFree = clampFreePlacement(
       rect.left + rect.width / 2,
@@ -679,7 +685,6 @@ export function ControlDeck({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setAssistMenuOpen(false);
       const drag = dragRef.current;
       if (drag) {
         if (drag.frame !== null) window.cancelAnimationFrame(drag.frame);
@@ -702,59 +707,31 @@ export function ControlDeck({
   // 已点亮时保持可用，用户可在计算中途再次点击熄灭并取消。
   const guidanceAvailable =
     canAim || guidanceEnabled || planStatus === 'ready' || planStatus === 'showing' || hasReview;
-  const guidanceStateClass = guidanceEnabled ? 'is-open' : 'is-off';
 
   const nodes = useMemo<Record<DockItemId, ReactNode>>(() => ({
     view: (
       <ViewToolbar
         viewLevel={viewLevel}
-        manualCameraActive={manualCameraActive}
+        cameraMode={cameraMode}
+        orbitActive={cameraOrbitActive}
         orientation={axisFor('view', layout.view)}
         onViewLevel={onViewLevel}
-        onToggleManualCamera={onToggleManualCamera}
+        onEnterTactical={onEnterTacticalCamera}
+        onEnterShot={onEnterShotCamera}
+        onToggleOrbit={onToggleCameraOrbit}
       />
     ),
     bulb: (
-      <div className={`assist-control ${assistMenuOpen ? 'menu-open' : ''}`}>
-        <button
-          type="button"
-          className={`plan-button ${guidanceStateClass} ${aimAssistEnabled ? 'has-aim-assist' : ''}`}
-          aria-label="打开辅助功能"
-          aria-expanded={assistMenuOpen}
-          onClick={() => setAssistMenuOpen(open => !open)}
-        >
-          <span className="bulb-icon" aria-hidden="true"><i /></span>
-        </button>
-        {assistMenuOpen && (
-          <div
-            className={`assist-menu assist-menu-${axisFor('bulb', layout.bulb)}`}
-            role="group"
-            aria-label="辅助功能"
-          >
-            <button
-              type="button"
-              className={`assist-option aim-option ${aimAssistEnabled ? 'active' : ''}`}
-              role="switch"
-              aria-label="瞄准辅助线"
-              aria-checked={aimAssistEnabled}
-              onClick={onToggleAimAssist}
-            >
-              <span className="trajectory-icon" aria-hidden="true"><i /></span>
-            </button>
-            <button
-              type="button"
-              className={`assist-option guidance-option ${guidanceEnabled ? 'active' : ''}`}
-              role="switch"
-              aria-label="走位与击球复盘"
-              aria-checked={guidanceEnabled}
-              disabled={!guidanceAvailable}
-              onClick={onToggleGuidance}
-            >
-              <span className="route-icon" aria-hidden="true"><i /><i /><i /></span>
-            </button>
-          </div>
-        )}
-      </div>
+      <BulbAssistControl
+        placement={layout.bulb}
+        axis={axisFor('bulb', layout.bulb)}
+        guidanceAvailable={guidanceAvailable}
+        guidanceEnabled={guidanceEnabled}
+        aimAssistEnabled={aimAssistEnabled}
+        layoutDragging={draggingId !== null}
+        onToggleGuidance={onToggleGuidance}
+        onToggleAimAssist={onToggleAimAssist}
+      />
     ),
     spin: (
       <SpinControl spin={spin} disabled={!canAim} onSpinChange={onSpinChange} />
@@ -773,7 +750,7 @@ export function ControlDeck({
         onTap={onTapShot}
       />
     ),
-    aimDial: aimDialVisible ? (
+    aimDial: aimDialVisible && canAim ? (
       <AimDial
         visible
         precisionActive={aimDialPrecisionActive}
@@ -786,16 +763,16 @@ export function ControlDeck({
     aimAssistEnabled,
     aimDialPrecisionActive,
     aimDialVisible,
-    assistMenuOpen,
     breaking,
     canAim,
     charging,
+    draggingId,
     guidanceAvailable,
     guidanceEnabled,
-    guidanceStateClass,
     hasReview,
     layout,
-    manualCameraActive,
+    cameraMode,
+    cameraOrbitActive,
     onAimDialAdjust,
     onToggleAimDialPrecision,
     onBeginCharge,
@@ -805,7 +782,9 @@ export function ControlDeck({
     onTapShot,
     onToggleAimAssist,
     onToggleGuidance,
-    onToggleManualCamera,
+    onEnterTacticalCamera,
+    onEnterShotCamera,
+    onToggleCameraOrbit,
     onUpdateCharge,
     onViewLevel,
     planStatus,

@@ -1,11 +1,11 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core 与 __bj8 调试句柄
-[OUTPUT]: 灯泡总开关、最高概率单方案分杆展示与手动复盘的真实输入集成断言及截图
+[OUTPUT]: 灯泡辅助菜单、按需 Worker、最高概率单方案分杆展示、关闭后方案快照与手动复盘的真实输入集成断言及截图
 [POS]: planner→React→Scene3D→真实输入的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
- * P1 走位规划集成回归:固定球局 → 默认熄灭 → 💡 点亮 → 最高概率方案分杆展示 → 关闭恢复
- *   → 击球复盘:真实出杆后保持静默 → 再点 💡 → .review-chip → ▶ 对比 → 收起
+ * P1 走位规划集成回归:固定球局 → 走位/复盘默认关闭 → 显式开启 → 最高概率方案分杆展示 → 关闭恢复
+ *   → 击球复盘:真实出杆后保持静默 → 再次开启走位/复盘 → .review-chip → ▶ 对比 → 收起
  * 摆球经 __bj8 调试句柄(同 verify-break-group 模式),按钮点击全部走真实鼠标事件。
  * 前置:
  *   npx vite --port 5199 --strictPort &
@@ -40,6 +40,40 @@ async function realClickButton(page, text) {
   if (!box) return false;
   await page.mouse.click(box.x, box.y);
   return true;
+}
+
+async function realClickAria(page, ariaLabel) {
+  const box = await page.evaluate((label) => {
+    const element = document.querySelector(`[aria-label="${label}"]`);
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }, ariaLabel);
+  if (!box) return false;
+  await page.mouse.click(box.x, box.y);
+  return true;
+}
+
+async function realClickSelector(page, selector) {
+  const box = await page.evaluate((query) => {
+    const element = document.querySelector(query);
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }, selector);
+  if (!box) return false;
+  await page.mouse.click(box.x, box.y);
+  return true;
+}
+
+async function toggleGuidance(page) {
+  const menuOpen = await page.evaluate(() =>
+    document.querySelector('.plan-button')?.getAttribute('aria-expanded') === 'true');
+  if (!menuOpen) {
+    if (!await realClickSelector(page, '.plan-button')) return false;
+    await new Promise(r => setTimeout(r, 120));
+  }
+  return realClickAria(page, '走位与击球复盘');
 }
 
 const page = await browser.newPage();
@@ -101,33 +135,14 @@ const staged = await page.evaluate(() => {
 });
 ok('摆球同步(4 颗 active)', staged === 4, `active=${staged}`);
 
-// 等后台规划完成；按钮始终保持“熄灭”视觉，只以 enabled 表示可主动点亮。
-const buttonFlow = await page.evaluate(() => new Promise((resolve) => {
-  const seen = new Set();
-  const deadline = Date.now() + 20000;
-  const timer = setInterval(() => {
-    const btn = document.querySelector('.plan-button');
-    if (!btn) return;
-    const visible = getComputedStyle(btn).visibility === 'visible';
-    if (visible && btn.disabled) seen.add('computing');
-    if (visible && !btn.disabled) {
-      seen.add('ready');
-      clearInterval(timer);
-      resolve([...seen]);
-    }
-    if (Date.now() > deadline) {
-      clearInterval(timer);
-      resolve([...seen, 'timeout']);
-    }
-  }, 120);
-}));
-ok('💡 默认熄灭且就绪后可主动点亮', buttonFlow.includes('ready') && await page.evaluate(
-  () => document.querySelector('.plan-button')?.getAttribute('aria-pressed') === 'false'
-), `flow=${buttonFlow.join('→')}`);
-
-// 真实点击打开规划提示条
-ok('点击 💡 提示按钮', await realClickButton(page, '提示'));
-await new Promise(r => setTimeout(r, 600));
+// 辅助菜单内走位/复盘默认关闭；用户显式开启后才启动 Worker，结果就绪自动展开。
+ok('走位与击球复盘默认关闭且入口可用',
+  await realClickSelector(page, '.plan-button') && await page.evaluate(() => {
+    const option = document.querySelector('[aria-label="走位与击球复盘"]');
+    return option?.getAttribute('aria-checked') === 'false' && !option.disabled;
+  }));
+ok('开启走位与击球复盘', await realClickAria(page, '走位与击球复盘'));
+await page.waitForFunction(() => Boolean(document.querySelector('.plan-bar')), { timeout: 20000 }).catch(() => {});
 const overlay = await page.evaluate(() => {
   const bar = document.querySelector('.plan-bar');
   const panel = document.querySelector('.plan-panel');
@@ -143,15 +158,15 @@ ok('当前杆概率文案存在', /本杆 \d+%/.test(overlay.prob), overlay.prob
 // 💡 三态 toggle：展开中按钮为 is-open，再点 = 关闭（与 ✕ 等价），再点重开
 ok('引导展开中按钮为 is-open', await page.evaluate(
   () => document.querySelector('.plan-button')?.classList.contains('is-open') ?? false));
-ok('再点 💡 关闭引导', await realClickButton(page, '提示'));
+ok('再点走位开关关闭引导', await toggleGuidance(page));
 await new Promise(r => setTimeout(r, 500));
 const afterToggleClose = await page.evaluate(() => ({
   bar: !!document.querySelector('.plan-bar'),
   off: document.querySelector('.plan-button')?.classList.contains('is-off') ?? false,
 }));
-ok('toggle 关闭后提示条消失且按钮熄灭', !afterToggleClose.bar && afterToggleClose.off, JSON.stringify(afterToggleClose));
-ok('再点 💡 重开引导', await realClickButton(page, '提示'));
-await new Promise(r => setTimeout(r, 600));
+ok('开关关闭后提示条消失且走位状态关闭', !afterToggleClose.bar && afterToggleClose.off, JSON.stringify(afterToggleClose));
+ok('再次开启走位与击球复盘', await toggleGuidance(page));
+await page.waitForFunction(() => Boolean(document.querySelector('.plan-bar')), { timeout: 20000 }).catch(() => {});
 ok('重开后提示条恢复', await page.evaluate(() => !!document.querySelector('.plan-bar')));
 
 // 场景默认只渲染第 1 杆；点击第 2/3 杆标签才切换对应预览。
@@ -188,16 +203,16 @@ ok('规划层不再自动播放整链', !await page.evaluate(
 ));
 await page.screenshot({ path: `${SHOT_DIR}/38-position-plan.png` });
 
-// 关闭:提示条消失、场景规划渲染清除、视角恢复第一人称、瞄准恢复
+// 关闭:提示条消失、场景规划渲染清除、视角恢复击球模式、瞄准恢复
 ok('点击 ✕ 关闭', await realClickButton(page, '✕'));
 await new Promise(r => setTimeout(r, 600));
 const restored = await page.evaluate(() => ({
   bar: !!document.querySelector('.plan-bar'),
   planObjects: window.__bj8.scene.current.planObjectCount(),
-  firstPressed: document.querySelector('[aria-label="切换第一人称视角"]')?.getAttribute('aria-pressed'),
+  shotPressed: document.querySelector('[aria-label="进入击球视角"]')?.getAttribute('aria-pressed'),
 }));
 ok('关闭后提示条消失且场景清除', !restored.bar && restored.planObjects === 0, JSON.stringify(restored));
-ok('关闭后视角恢复第一人称', restored.firstPressed === 'true', `aria-pressed=${restored.firstPressed}`);
+ok('关闭后视角恢复击球模式', restored.shotPressed === 'true', `aria-pressed=${restored.shotPressed}`);
 
 // 瞄准恢复:点台面右侧应改变瞄准角
 const aimRestore = await (async () => {
@@ -240,22 +255,12 @@ const restaged = await page.evaluate(() => {
 });
 ok('复盘摆球同步(4 颗 active)', restaged === 4, `active=${restaged}`);
 
-// 等新局面计划算完（capture 需要 plans[0]，否则不出复盘）
-const relit = await page.evaluate(() => new Promise((resolve) => {
-  const deadline = Date.now() + 20000;
-  const timer = setInterval(() => {
-    const btn = document.querySelector('.plan-button');
-    if (btn && getComputedStyle(btn).visibility === 'visible' && !btn.disabled) {
-      clearInterval(timer);
-      resolve(true);
-    }
-    if (Date.now() > deadline) {
-      clearInterval(timer);
-      resolve(false);
-    }
-  }, 120);
-}));
-ok('新局面 💡 重新就绪', relit);
+// 新局面再次显式开启走位/复盘，等待规划完成后收起全台层执行该杆。
+const relit = await toggleGuidance(page);
+await page.waitForFunction(() => Boolean(document.querySelector('.plan-bar')), { timeout: 20000 }).catch(() => {});
+ok('新局面 💡 重新就绪', relit && await page.evaluate(() => Boolean(document.querySelector('.plan-bar'))));
+ok('收起规划层后执行该杆', await realClickButton(page, '✕'));
+await new Promise(r => setTimeout(r, 300));
 
 // 瞄准不能写 __bj8.aim（ref 会被蓄力预览的 React 同步覆盖回状态值）——
 // 走真实点击：网格扫描 screenToTable 找台面 (0.62, 0)（母球→1 号延长线上）的屏幕点，点击设 aim
@@ -303,9 +308,9 @@ ok('真实拖拽出杆', !!shootBox && shotCommitted);
 await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 15000 }).catch(() => {});
 await new Promise(r => setTimeout(r, 300));
 ok('击球结算后复盘保持隐藏', !await page.$('.review-float'));
-ok('再次点亮 💡 请求复盘', await realClickButton(page, '提示'));
+ok('再次开启走位与击球复盘以请求复盘', await toggleGuidance(page));
 
-// 点亮后生成复盘 chip（buildShotReview 已在结算时缓存）
+// 开启后生成复盘 chip（buildShotReview 已在结算时缓存）
 const chipText = await page.evaluate(() => new Promise((resolve) => {
   const deadline = Date.now() + 15000;
   const timer = setInterval(() => {

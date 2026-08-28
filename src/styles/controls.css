@@ -1,8 +1,8 @@
 /*
 [INPUT]: base.css 的令牌与 layout.css 的壳层几何
-[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、手动相机入口、手动切档方向拨轮、右侧控制轨、击球点、力度出杆、首局上下文提示及规划/复盘浮层样式
+[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、手动相机入口、手动切档方向拨轮、右侧控制轨、击球点、力度出杆、灯泡新用户提示、首局上下文提示及规划/复盘浮层样式
 [POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
-[PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 /* 长行程视角推杆：顶端俯视、底端第一人称，行程与出杆区同高。 */
 .view-switcher {
@@ -1372,6 +1372,108 @@
 
 .assist-option:disabled {
   opacity: 0.26;
+}
+
+/* 灯泡新用户提示通过 portal 脱离控件静置透明度，但仍每帧跟随可移动灯泡。 */
+.bulb-coachmark {
+  position: fixed;
+  z-index: 14;
+  display: inline-flex;
+  width: max-content;
+  max-width: min(236px, calc(100vw - 16px));
+  min-height: 52px;
+  align-items: center;
+  padding-left: 12px;
+  border: 1px solid color-mix(in srgb, var(--warm) 28%, var(--line));
+  border-radius: 14px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
+  pointer-events: none;
+}
+
+.bulb-coachmark::after {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--warm) 28%, var(--line));
+  border-right: 1px solid color-mix(in srgb, var(--warm) 28%, var(--line));
+  background: color-mix(in srgb, var(--surface-2) 94%, transparent);
+  content: '';
+}
+
+.bulb-coachmark.is-left::after {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.bulb-coachmark.is-right::after {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%) rotate(225deg);
+}
+
+.bulb-coachmark.is-above::after {
+  right: 20px;
+  bottom: -5px;
+  transform: rotate(135deg);
+}
+
+.bulb-coachmark.is-below::after {
+  right: 20px;
+  top: -5px;
+  transform: rotate(-45deg);
+}
+
+.bulb-coachmark-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+.bulb-coachmark-copy strong {
+  color: var(--warm);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.bulb-coachmark-copy > span {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.bulb-coachmark-dismiss {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.62;
+  pointer-events: auto;
+}
+
+.bulb-coachmark-dismiss i {
+  display: block;
+  font-size: 15px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.bulb-coachmark-dismiss:focus-visible {
+  outline: 2px solid var(--green-bright);
+  outline-offset: -4px;
 }
 
 .trajectory-icon {

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
-[OUTPUT]: 对外提供对局状态（worldView / match / viewLevel）、整局结束才提交的双方能力档案、
+[OUTPUT]: 对外提供对局状态（worldView / match）、整局结束才提交的双方能力档案、
           resetGame / settleShot / recordPlayerShot / completeMatchAssessment 等编排动作
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -28,7 +28,6 @@ import {
   type ShotSkillObservation,
 } from '../opponent/model';
 import { createShotSettlementGuard } from './shot-settlement-guard';
-import { FIRST_PERSON_VIEW, OVERHEAD_VIEW } from '../camera-view';
 
 function browserStorage(): Storage | null {
   if (typeof window === 'undefined') return null;
@@ -49,9 +48,6 @@ export function useGameState() {
   const [match, setMatch] = useState<MatchState>(() => createInitialMatchState());
   const matchRef = useRef(match);
   useEffect(() => { matchRef.current = match; }, [match]);
-
-  // ── 视图状态 ──
-  const [viewLevel, setViewLevel] = useState(FIRST_PERSON_VIEW);
 
   // ── 玩家能力与对手档案（整局中锁定，结束后一次性更新）──
   const [playerSkill, setPlayerSkill] = useState(() =>
@@ -88,7 +84,6 @@ export function useGameState() {
     setGameMode(nextMode);
     gameModeRef.current = nextMode;
     setOpponentProfile(createOpponentProfile(playerSkillRef.current, nextMode));
-    setViewLevel(OVERHEAD_VIEW);
     setAim(0);
   }, [gameMode]);
 
@@ -112,7 +107,7 @@ export function useGameState() {
 
   /** 物理停止：事实推导 → 纯规则结算 → 原子提交 → 执行显式 effects
    *  相同一杆只结算一次（shotId 守卫，StrictMode 下不重复） */
-  const settleShotRaw = useCallback((setViewLevelFn: (level: number) => void) => {
+  const settleShotRaw = useCallback(() => {
     const world = worldRef.current;
     const facts = factsFromWorld(world);
     if (!settlementGuardRef.current.accept(facts.shotId)) return null;
@@ -121,8 +116,6 @@ export function useGameState() {
     for (const effect of resolution.effects) {
       if (effect.type === 'auto-respot-cue') {
         respotCueBall(world);
-      } else if (effect.type === 'request-player-placement') {
-        setViewLevelFn(OVERHEAD_VIEW);
       }
     }
     setMatch(resolution.next);
@@ -137,8 +130,6 @@ export function useGameState() {
     match,
     matchRef,
     setMatch,
-    viewLevel,
-    setViewLevel,
     playerSkill,
     gameMode,
     opponentProfile,

@@ -1,13 +1,13 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 DEV __bj8 场景句柄
-[OUTPUT]: 六袋台内圆弧凹口/浅驼皮圈/白色菱形网袋/细缝边结构、角袋跨接连续性、四机位视觉回归及页面错误门禁
+[OUTPUT]: 六袋台内圆弧凹口/浅驼皮圈/白色菱形网袋/细缝边结构、台呢全局 UV、六袋局部 UV、角袋跨接连续性、四机位视觉回归及页面错误门禁
 [POS]: PocketGeometry 物理/视觉一体化的浏览器出口验收；只改调试页内世界，不写游戏数据
-[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md 与 README.md
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
 
 const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9333';
-const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:4173/';
+const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:5199/';
 const SHOT_DIR = process.env.SHOT_DIR || 'shots';
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const results = [];
@@ -68,12 +68,18 @@ ok('开发页暴露可复现视觉场景', hasDebug);
 const pocketAnatomy = await page.evaluate(() => {
   const root = window.__bj8?.scene?.current?.scene;
   const counts = {
+    clothSurfaces: 0,
+    normalizedClothUvs: 0,
+    clothUvMaxError: 0,
     outerWoodFrames: 0,
     pocketCutouts: 0,
     roundedOuterCorners: 0,
     roundedCornerPockets: 0,
     pocketWraps: 0,
     mouths: 0,
+    localMouthUvs: 0,
+    maxMouthUvRadiusError: 0,
+    mouthUvFingerprints: [],
     inwardArcMouths: 0,
     minCaptureInsetMm: Number.POSITIVE_INFINITY,
     maxCaptureInsetMm: 0,
@@ -98,6 +104,41 @@ const pocketAnatomy = await page.evaluate(() => {
     bottoms: 0,
   };
   root?.traverse(object => {
+    if (object.name === 'table-cloth') {
+      counts.clothSurfaces += 1;
+      const position = object.geometry?.getAttribute?.('position');
+      const uv = object.geometry?.getAttribute?.('uv');
+      if (position && uv && position.count === uv.count) {
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minZ = Infinity;
+        let maxZ = -Infinity;
+        for (let index = 0; index < position.count; index += 1) {
+          minX = Math.min(minX, position.getX(index));
+          maxX = Math.max(maxX, position.getX(index));
+          minZ = Math.min(minZ, position.getZ(index));
+          maxZ = Math.max(maxZ, position.getZ(index));
+        }
+        const spanX = maxX - minX;
+        const spanZ = maxZ - minZ;
+        let finiteAndInRange = true;
+        for (let index = 0; index < uv.count; index += 1) {
+          const u = uv.getX(index);
+          const v = uv.getY(index);
+          finiteAndInRange &&= Number.isFinite(u) && Number.isFinite(v) &&
+            u >= -1e-6 && u <= 1 + 1e-6 && v >= -1e-6 && v <= 1 + 1e-6;
+          counts.clothUvMaxError = Math.max(
+            counts.clothUvMaxError,
+            Math.abs(u - (position.getX(index) - minX) / spanX),
+            Math.abs(v - (position.getZ(index) - minZ) / spanZ),
+          );
+        }
+        counts.normalizedClothUvs += Number(
+          finiteAndInRange &&
+          object.geometry.userData.uvSpace === 'table-world-bounds-0-1',
+        );
+      }
+    }
     if (object.name === 'table-wood-frame') {
       counts.outerWoodFrames += 1;
       counts.pocketCutouts += Number(object.userData.pocketCutoutCount ?? 0);
@@ -114,6 +155,29 @@ const pocketAnatomy = await page.evaluate(() => {
     ) counts.pocketWraps += 1;
     if (object.name.startsWith('pocket-mouth-')) {
       counts.mouths += 1;
+      const position = object.geometry?.getAttribute?.('position');
+      const uv = object.geometry?.getAttribute?.('uv');
+      if (position && uv && position.count === uv.count) {
+        let finiteAndInRange = true;
+        const fingerprint = [];
+        for (let index = 0; index < uv.count; index += 1) {
+          const u = uv.getX(index);
+          const v = uv.getY(index);
+          finiteAndInRange &&= Number.isFinite(u) && Number.isFinite(v) &&
+            u >= -1e-6 && u <= 1 + 1e-6 && v >= -1e-6 && v <= 1 + 1e-6;
+          counts.maxMouthUvRadiusError = Math.max(
+            counts.maxMouthUvRadiusError,
+            Math.abs((u - 0.5) ** 2 + (v - 0.5) ** 2 - 0.25),
+          );
+          fingerprint.push(`${u.toFixed(4)},${v.toFixed(4)}`);
+        }
+        fingerprint.sort();
+        counts.mouthUvFingerprints.push(fingerprint.join(';'));
+        counts.localMouthUvs += Number(
+          finiteAndInRange &&
+          object.geometry.userData.uvSpace === 'pocket-local-bounds-0-1',
+        );
+      }
       if (object.userData.captureShape === 'inward-arc') {
         counts.inwardArcMouths += 1;
         const insetMm = Number(object.userData.captureInsetMm ?? 0);
@@ -203,6 +267,30 @@ ok(
     pocketAnatomy.wells === 6 &&
     pocketAnatomy.bottoms === 6,
   JSON.stringify(pocketAnatomy),
+);
+
+ok(
+  '台呢使用覆盖整桌的连续 0..1 UV，而不是被世界坐标夹边',
+  pocketAnatomy.clothSurfaces === 1 &&
+    pocketAnatomy.normalizedClothUvs === 1 &&
+    pocketAnatomy.clothUvMaxError < 1e-5,
+  JSON.stringify({
+    clothSurfaces: pocketAnatomy.clothSurfaces,
+    normalizedClothUvs: pocketAnatomy.normalizedClothUvs,
+    clothUvMaxError: pocketAnatomy.clothUvMaxError,
+  }),
+);
+
+ok(
+  '六袋暗口各自使用一致的局部 0..1 UV，径向贴图不受世界位置污染',
+  pocketAnatomy.localMouthUvs === 6 &&
+    pocketAnatomy.maxMouthUvRadiusError < 1e-5 &&
+    new Set(pocketAnatomy.mouthUvFingerprints).size === 1,
+  JSON.stringify({
+    localMouthUvs: pocketAnatomy.localMouthUvs,
+    maxMouthUvRadiusError: pocketAnatomy.maxMouthUvRadiusError,
+    uniqueFingerprints: new Set(pocketAnatomy.mouthUvFingerprints).size,
+  }),
 );
 
 ok('俯视相机可定位', await setPocketCamera({

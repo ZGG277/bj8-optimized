@@ -1,5 +1,5 @@
 /*
-[INPUT]: 依赖用户显式点亮提示、physics 世界快照、match 对局状态、planner/async 异步走位搜索
+[INPUT]: 依赖“走位与击球复盘”显式开关、physics 世界快照、match 对局状态、planner/async 异步走位搜索
 [OUTPUT]: 对外提供 { status, plans, error, open, close }：只在提示开启时限时预算玩家走位方案
 [POS]: 规划集成层——状态机 idle→computing→ready→showing（failed 兜底），控制预算与截止时间但不承担渲染
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -38,7 +38,7 @@ export function planFingerprint(world: BilliardsWorld, playerGroup: MatchState['
   return `${playerGroup ?? 'open'}#${balls}`;
 }
 
-/** 走位搜索的产品门控：只有用户显式点亮且玩家已进入静止瞄准态才允许计算。 */
+/** 走位搜索的产品门控：只有用户显式开启走位/复盘且玩家已进入静止瞄准态才允许计算。 */
 export function shouldComputePositionPlan(
   enabled: boolean,
   world: BilliardsWorld,
@@ -49,8 +49,8 @@ export function shouldComputePositionPlan(
 
 /**
  * 后台预算触发规则：
- * - 用户点亮提示且处于玩家瞄准回合、世界指纹变化 → 限预算、限时 Worker
- * - 灯泡熄灭时不创建 Worker、不做 8000 次后台仿真，避免手机无意耗电
+ * - 走位/复盘开关开启且处于玩家瞄准回合、世界指纹变化 → 限预算、限时 Worker
+ * - 走位/复盘开关关闭时不创建 Worker、不做 8000 次后台仿真，避免手机无意耗电
  * - 玩家连续进攻（出杆结算后回到 aiming）→ 指纹变化，自然重新预算
  * - 玩家出杆/对手回合/滚动中 → cancelPendingPlan 丢弃陈旧结果，回到 idle
  * - showing（规划视图打开）期间不重新触发、不取消——视图里的数据保持自洽

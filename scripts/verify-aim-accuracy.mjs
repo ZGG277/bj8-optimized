@@ -50,11 +50,7 @@ async function realClickButton(text) {
 await realClickButton('开始对局');
 await new Promise(r => setTimeout(r, 800));
 
-// v1.4 辅助线首次默认关闭；专项门禁必须经灯泡图形面板显式打开。
-await realClickButton('打开辅助功能');
-await new Promise(r => setTimeout(r, 80));
-await realClickButton('瞄准辅助线');
-await new Promise(r => setTimeout(r, 120));
+// 辅助线缺省偏好时默认开启；专项门禁不再经灯泡反向关闭。
 
 // 开局先真实完成 placing；各几何用例随后只用 DEV 调试句柄固定 actor/phase 与摆位，
 // 瞄准、蓄力、出杆仍全部走真实鼠标，避免前一用例洗袋触发 AI 干扰下一用例。

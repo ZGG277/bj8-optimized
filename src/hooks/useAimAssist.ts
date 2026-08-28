@@ -1,8 +1,8 @@
 /*
 [INPUT]: 浏览器 localStorage 与用户开关动作
-[OUTPUT]: 持久化的瞄准预测线可见状态；首次或损坏数据默认关闭
+[OUTPUT]: 持久化的瞄准预测线可见状态；首次或损坏数据默认开启，显式关闭偏好仍被保留
 [POS]: HUD 偏好 Hook；不控制幽灵球、合法目标或走位规划
-[PROTOCOL]: 存储键或默认值变化时同步更新本文件测试与 hooks/CLAUDE.md
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useState } from 'react';
 
@@ -12,11 +12,13 @@ type StorageReader = Pick<Storage, 'getItem'>;
 type StorageWriter = Pick<Storage, 'setItem'>;
 
 export function loadAimAssistPreference(storage?: StorageReader | null): boolean {
-  if (!storage) return false;
+  if (!storage) return true;
   try {
-    return storage.getItem(AIM_ASSIST_STORAGE_KEY) === 'true';
+    const saved = storage.getItem(AIM_ASSIST_STORAGE_KEY);
+    if (saved === 'false') return false;
+    return true;
   } catch {
-    return false;
+    return true;
   }
 }
 

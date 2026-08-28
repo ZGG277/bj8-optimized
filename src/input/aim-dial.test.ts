@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 vitest 与 aim-dial 纯输入换算
-[OUTPUT]: 用户显式粗/精双档、固定精瞄传动、压感增益/视觉与回退断言
+[OUTPUT]: 上层粗/精双档、固定精瞄传动、压感增益/视觉与回退断言
 [POS]: 无限拨轮输入层可失败测试网，不挂载 React/DOM
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -16,12 +16,12 @@ import {
 } from './aim-dial';
 
 describe('无限瞄准拨轮', () => {
-  it('默认粗档保持可持续 360° 旋转', () => {
+  it('上层传入粗档时保持可持续 360° 旋转', () => {
     expect(aimDialMode(false)).toBe('coarse');
     expect(aimDialRadiansPerPixel(false)).toBeCloseTo(AIM_DIAL_COARSE_RAD_PER_PX, 8);
   });
 
-  it('只有用户显式切档才进入固定精瞄传动', () => {
+  it('上层传入精瞄档时固定使用八分之一传动', () => {
     expect(aimDialMode(true)).toBe('fine');
     expect(aimDialRadiansPerPixel(true)).toBeCloseTo(AIM_DIAL_FINE_RAD_PER_PX, 8);
     expect(aimDialRadiansPerPixel(false) / aimDialRadiansPerPixel(true)).toBeCloseTo(8, 8);
