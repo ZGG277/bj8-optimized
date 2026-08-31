@@ -6,8 +6,8 @@
 */
 import puppeteer from 'puppeteer-core';
 
-const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9334';
-const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:5200/';
+const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9333';
+const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:5199/';
 const SHOT_DIR = process.env.SHOT_DIR || 'shots';
 const results = [];
 const ok = (name, pass, detail = '') => {

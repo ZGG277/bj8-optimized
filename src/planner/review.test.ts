@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 vitest、../physics 世界构造、./search 的 planPosition、./review 的 buildShotReview
-[OUTPUT]: 对外提供击球复盘层单元测试（无导出）：perfect / 可进球的力度偏小 / 力度偏大 / 瞄偏（pot-miss）四场景判定与文案
+[OUTPUT]: 对外提供计划对比、自主意图复盘、犯规优先与开球建议的单元回归
 [POS]: 复盘层的可失败断言网；场景用种子化 planPosition 的真实首步，力度偏小用例只抬高计划参考力以隔离诊断分支
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -63,6 +63,13 @@ function makeCapture(
     power: overrides.power ?? step.candidate.power,
     spin: step.candidate.spin,
     planned: step,
+    intent: {
+      target: step.candidate.target,
+      pocket: step.candidate.pocket,
+      centerAngle: step.candidate.angle,
+      halfWidth: step.candidate.tolerance,
+    },
+    breaking: false,
   };
 }
 
@@ -124,7 +131,69 @@ describe('buildShotReview 复盘判定', () => {
       power: 50,
       spin: { x: 0, y: 0 },
       planned: null,
+      intent: null,
+      breaking: false,
     });
     expect(review).toBeNull();
+  });
+
+  it('未查看计划但能推断目标球/袋口 → 生成自主复盘且不暴露计划轨迹', () => {
+    const { world, step } = setup();
+    const capture = makeCapture(world, step);
+    capture.planned = null;
+    const review = buildShotReview(capture);
+    expect(review).not.toBeNull();
+    expect(review!.planned).toBeNull();
+    expect(review!.actual.pocketedTarget).toBe(true);
+    expect(review!.message).toContain('下一杆');
+  });
+
+  it('规则判定犯规时只给一个最高优先级纠正', () => {
+    const { world, step } = setup();
+    const review = buildShotReview(makeCapture(world, step), {
+      pocketed: [],
+      firstContact: null,
+      foulReason: 'no-contact',
+    });
+    expect(review?.verdict).toBe('foul');
+    expect(review?.message).toContain('没有碰到目标球');
+  });
+
+  it('开球没有明确目标袋时也会生成赛后建议', () => {
+    const { world } = setup();
+    const review = buildShotReview({
+      worldBefore: world,
+      angle: 0,
+      power: 75,
+      spin: { x: 0, y: 0 },
+      planned: null,
+      intent: null,
+      breaking: true,
+    }, {
+      pocketed: [],
+      firstContact: 1,
+      foulReason: null,
+    });
+    expect(review?.planned).toBeNull();
+    expect(review?.message).toContain('开球');
+  });
+
+  it('普通杆没有明确目标袋时不会误报为开球', () => {
+    const { world } = setup();
+    const review = buildShotReview({
+      worldBefore: world,
+      angle: 0,
+      power: 45,
+      spin: { x: 0, y: 0 },
+      planned: null,
+      intent: null,
+      breaking: false,
+    }, {
+      pocketed: [],
+      firstContact: 1,
+      foulReason: null,
+    });
+    expect(review?.message).toContain('定球、定袋');
+    expect(review?.message).not.toContain('开球');
   });
 });

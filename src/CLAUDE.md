@@ -4,13 +4,13 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；顾燃回合锁定俯视并按竖屏纵台/横屏横台定向，禁用球桌和视角控件的观战旋转，交棒后玩家选择非俯视即恢复杆向跟随；零出杆新用户按真实操作推进首局提示；走位 Worker 只在用户点亮灯泡后启动；移动和桌面运动中保持 240Hz 物理，并以手机 45Hz / 桌面 30Hz 基线发布 React/WebGL 快照；接收 Scene3D 温控档位后可在运行中改为 30/24Hz 或 24/20Hz，不重启 240Hz 物理时钟；规则在 `match/`、输入在 `input/`、AI 在 `hooks/useOpponentAI`、走位在 `hooks/usePositionPlan`、物理时钟在 `simulation/`，DEV 调试句柄只用于浏览器门禁。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；每个玩家杆捕获自主目标意图，复盘默认收起且由灯泡独立开关，中性文案只在显式计划后提供轨迹对比；瞄准默认拨轮并可切方向键；介绍页不装配 Scene3D，开始对局后才创建 WebGL；运动帧由 Scene3D 直接消费 worldRef，React 世界只在出杆/结算等语义边界更新；走位 Worker 仅由灯泡启动。
 
 `first-match-guide.ts`: 首局引导纯产品状态机；只有零出杆记录且无完成标记的新用户启用，以放球、拖动结束角度变化、拨轮有效角度变化和成功出杆约束核心节奏，视角/杆法/布局是可跳过的非阻塞发现，容错读写 `guagua-billiards:first-match-guide:v1`，不依赖 React/DOM 或规则实现。
 
 `first-match-guide.test.ts`: 首次/完成存储、受限存储降级、误触与环绕角阈值、真实事件推进、越级防护、可选发现及快速出杆收敛回归。
 
-`match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
+`match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；普通回合只有打进本组球才续杆，只带进对方花色则保留进球并交换回合。
 
 `opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；出杆在整局结束时一次评估，技术分只由准度 72% 与走位 28% 组成；生成 +3/+10 目标与独立限预算战术 Worker，挑战档优先真实进球、避免洗袋并保留下一杆。
 
@@ -30,7 +30,7 @@
 
 `camera-view.test.ts`: 连续高度不吸附、相机高度单调、顾燃锁定路由、竖屏纵台/横屏横台、玩家非俯视杆向跟随、各高度 180° 位姿与全台安全边界回归。
 
-`Scene3D.ts`: Three.js 场景适配器；移动端基线 `2×/1024/45Hz/low-power`，桌面基线 `1.75×/1536/30Hz/low-power`，最终渲染出口同时限制相机/球杆/落袋动画；以 WebGL2 GPU timer query 为主、CPU+掉帧为退化监控连续负载，手机按 `2×/45Hz → 1.5×/30Hz → 1.25×/24Hz`、桌面按原三档降低 DPR/阴影/帧率并提供可诊断快照；阴影仅动态刷新，静止收敛后停止 rAF，停帧每 2.5 秒逐级恢复清晰度；消费统一 PocketGeometry 生成球高前探鼻尖/下沿内凹的真实库边及台内凹口、皮圈、网袋与暗底，球杆瞄准角和纯视觉相机方位分离。
+`Scene3D.ts`: Three.js 场景适配器；移动端基线 `2×/1024/45Hz/low-power`，桌面 `1.75×/1536/30Hz/low-power`，WebGL2 GPU timer/CPU 退化监控驱动 balanced/warm/hot；静止停止 rAF，resize 重新计算 DPR/阴影/展示帧率；dispose 去重释放全部几何、材质、贴图和环境纹理；消费统一 PocketGeometry 构建真实球桌，六袋护口穿过 jaw 锚点、下沉木帮并沿同曲线向下包住袋腔。
 
 `render-policy.ts`: 不依赖 Three.js 的纯渲染预算；以粗指针或视口短边识别手机，输出基线预算及 balanced/warm/hot 对应的像素比、阴影、帧率与合成策略。
 
@@ -38,7 +38,7 @@
 
 `render-policy.test.ts` / `thermal-governor.test.ts`: 手机/桌面基线预算、三档降质参数、持续高压降档与多稳定窗口逐级恢复回归。
 
-`physics.ts`: 以米为单位的 240 Hz 确定性二维台球内核，白球固定从开球线中点标准位开局；公开统一 `TABLE/POCKETS/CUSHION_SEGMENTS` 与共享球碰走向预测；球心对直库/圆弧角衬做连续扫掠，一固定步最多三次边界接触，解析求交越过 8/7mm 台内半椭圆捕获弧即发出含入袋位置/速度的事件。球球碰撞按 TOI 回滚，叉路接触三联立，每次有效碰撞均发出带强度的音效事件。
+`physics.ts`: 以米为单位的 240 Hz 确定性二维台球内核，白球固定从开球线中点标准位开局；公开统一 `TABLE/POCKETS/CUSHION_SEGMENTS` 与共享球碰走向预测；球心连续扫掠袋口/库边，球球碰撞按 TOI 回滚、叉路接触三联立；每步只让当前活跃球进入 O(n²) 配对，落袋球立即退出后续搜索且不改变原球号结算顺序。
 
 `physics/`: 可复用纯碰撞与袋口几何子模块；角袋 100mm/中袋 102mm 的六袋参数、8/7mm 台内捕获弧、恢复/throw 参数、直线/圆弧库边段、台阶及安全瞄准窗口由 physics、aim、planner 和 Scene3D 共享。
 
@@ -57,7 +57,7 @@
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
   - `useGameState`：集中管理对局状态、局内锁定双方档案与整局一次评估；新局重置 shot 结算守卫
   - `useAimAssist`：默认关闭且容错持久化的预测辅助线偏好
-  - `useAimInteraction`：封装开球实体母球按住拖放与合法区域约束、自由球虚影落位、世界角点哪打哪、抓影子球、360° 粗瞄、默认左右键精瞄，以及只从灯泡显式开启并可切换固定精瞄档的无边界拨轮
+  - `useAimInteraction`：封装开球实体母球按住拖放与合法区域约束、自由球虚影落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及默认拨轮/可选方向键与拨轮显式粗精档
   - `useOpponentAI`：消费局前锁定档案，调度限预算战术 Worker、选杆扰动与袋口容错内的执行误差
   - `useAudioManager`：音效初始化和物理/胜局事件播放，暴露 audioRef/playStrike/playPhysicsEvents/playVictory/resetEvents
   - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在灯泡显式点亮后经可抢占 Worker 执行 320 次、两层、2.5 秒截止搜索
@@ -66,7 +66,7 @@
 `utils/`: 纯工具函数层，不依赖 React 或 DOM：
   - `renderMatchMessage`：将规则层消息键+参数映射为中文文案，纯函数可测试
 
-`textures.ts`: 为台呢、木纹、皮革与球体生成 CanvasTexture；台呢使用确定性的均匀底色、细密经纬/倒毛微结构及连续法线，供 Scene3D 初始化使用。
+`textures.ts`: 为台呢、木纹、皮革与球体生成 CanvasTexture；全部视觉噪声使用固定种子，刷新、设备与截图门禁可复现，供 Scene3D 延迟初始化使用。
 
 `main.tsx`: React 应用挂载入口，首帧前应用青瓷/决赛之夜/霓虹球房主题，启用 StrictMode 并按 base → layout → controls → themes 顺序加载样式。
 

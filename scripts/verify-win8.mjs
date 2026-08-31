@@ -1,11 +1,11 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core 与 __bj8 调试句柄
-[OUTPUT]: 清组后干净进 8 号的胜负、文案与庆祝动效断言
+[OUTPUT]: 清组后干净进 8 号的胜负、庆祝动效与整局单点训练总结断言
 [POS]: 8 号胜负规则到 UI 呈现的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
  * 8 号球胜负回归门禁：清台后干净打进 8 号（无碰库）应获胜并播放庆祝动效
- * 流程：开球进 1 号 → 进 2 号分全色 → 摆"全色已清"局面直打 8 号 → 断言 win + confetti
+ * 流程：连续进球完成分组 → 摆"本组已清"局面直打 8 号 → 断言 win + confetti + 训练总结
  * 回归对象：曾把 8 号排除在"进球"外，干净进 8 被误判 no-cushion 犯规判负
  * 前置:
  *   npx vite --port 5199 --strictPort &
@@ -16,6 +16,7 @@ import puppeteer from 'puppeteer-core';
 
 const GAME_URL = process.env.GAME_URL || 'http://localhost:5199/';
 const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9333';
+const SHOT_DIR = process.env.SHOT_DIR || 'shots';
 const results = [];
 const ok = (name, pass, detail = '') => {
   results.push({ name, pass });
@@ -116,7 +117,7 @@ await aimAndFire();
 await stage(2, false);
 await aimAndFire();
 const group = await page.evaluate(() => document.querySelector('.player-card .identity small')?.textContent);
-ok('分组为全色球', group === '全色球', group);
+ok('连续进球后已完成分组', group === '全色球' || group === '花色球', group);
 
 // 3) 模拟全色已清台，直打 8 号（干净入袋、无碰库——原 bug 场景）
 await stage(8, true);
@@ -126,14 +127,19 @@ const end = await page.evaluate(() => ({
   h1: document.querySelector('.finish-mask h1')?.textContent ?? null,
   won: !!document.querySelector('.finish-mask.won'),
   confetti: document.querySelectorAll('.finish-mask .confetti i').length,
+  trainingFocus: document.querySelector('.training-summary strong')?.textContent ?? null,
+  nextGoal: document.querySelector('.training-summary em')?.textContent ?? null,
   messageKey: window.__bj8.match.current.messageKey,
 }));
 ok('清台进 8 号：对局结束且玩家获胜', end.h1 === '你赢了！', JSON.stringify(end));
 ok('结算事实为 win-8（非犯规判负）', end.messageKey === 'win-8', end.messageKey);
 ok('庆祝彩带已渲染', end.won && end.confetti === 28, `confetti=${end.confetti}`);
+ok('结算页只显示一个训练重点和下一局目标',
+  Boolean(end.trainingFocus?.includes('本局重点')) && Boolean(end.nextGoal?.includes('下一局目标')),
+  JSON.stringify({ focus: end.trainingFocus, nextGoal: end.nextGoal }));
 ok('页面无 JS 错误', errors.length === 0, errors[0] ?? '');
 
-await page.screenshot({ path: 'shots/35-win8-celebration.png' });
+await page.screenshot({ path: `${SHOT_DIR}/35-win8-celebration.png` });
 const passed = results.filter(r => r.pass).length;
 console.log(`\n${passed}/${results.length} 通过`);
 await page.close();

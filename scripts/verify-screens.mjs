@@ -11,9 +11,11 @@ const shots = [
   { name: 'playing-first', wait: 1500, action: 'start' },
   { name: 'overhead', wait: 1500, action: 'overhead' },
 ];
+const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9333';
+const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:5199/';
 
 const browser = await puppeteer.connect({
-  browserURL: 'http://127.0.0.1:9333',
+  browserURL: BROWSER_URL,
   defaultViewport: { width: 1280, height: 800 },
 });
 
@@ -23,7 +25,7 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 
-await page.goto('http://localhost:5199/', { waitUntil: 'networkidle0', timeout: 20000 });
+await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
 await new Promise(r => setTimeout(r, 2500));
 await page.screenshot({ path: 'shots/01-intro.png' });
 

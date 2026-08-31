@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供带前探鼻尖/下沿内凹的真实库边与六袋结构、静止按需渲染、最终帧率上限、GPU 负载监控/三档自适应温控、纵横屏全台适配相机、观战锁定与玩家手动环绕、世界角瞄准辅助、摆球、球杆动画、走位/复盘及屏幕↔台面映射
+[OUTPUT]: 对外提供真实球桌、静止按需渲染、GPU 自适应温控、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -60,6 +60,36 @@ const CUSHION_NOSE_HEIGHT = R * 1.24;
 const POCKET_POS: [number, number][] = POCKETS.map(
   pocket => [pocket.x, pocket.z],
 );
+
+/** Scene3D 可延迟装配也必须可完整卸载；共享资源用 Set 去重后统一释放。 */
+function disposeSceneResources(scene: THREE.Scene) {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  scene.traverse(object => {
+    const renderable = object as THREE.Object3D & {
+      geometry?: THREE.BufferGeometry;
+      material?: THREE.Material | THREE.Material[];
+    };
+    if (renderable.geometry) geometries.add(renderable.geometry);
+    const objectMaterials = Array.isArray(renderable.material)
+      ? renderable.material
+      : renderable.material
+        ? [renderable.material]
+        : [];
+    for (const material of objectMaterials) {
+      materials.add(material);
+      for (const value of Object.values(material as unknown as Record<string, unknown>)) {
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+    }
+  });
+  if (scene.environment instanceof THREE.Texture) textures.add(scene.environment);
+  for (const texture of textures) texture.dispose();
+  for (const material of materials) material.dispose();
+  for (const geometry of geometries) geometry.dispose();
+  scene.environment = null;
+}
 
 /**
  * 真实胶边剖面：鼻尖位于球心上方并探向台内，鼻尖下方逐级退向木帮，
@@ -898,14 +928,16 @@ export class Scene3D {
 
       // 木框顶面的薄皮护口：沿袋口外半圈铺一条扁平硬挺的带状实体。
       // 顶面宽度足以在全台俯视中识别，厚度仅 1.6mm，避免再次出现软、厚、外凸的感觉。
-      // 护口使用独立曲线，把两端藏进木帮一小段；袋腔内的深色袋唇仍沿原曲线落到 jaw 入口。
-      const trimLocalPoints = trimSourceLocalPoints.map(([depth, lateral], index) => {
-        const isEnd = index === 0 || index === trimSourceLocalPoints.length - 1;
-        return [
-          isEnd ? pocket.shelfDepth * 0.5 : depth,
-          lateral,
-        ] as [number, number];
-      });
+      // 护口使用独立曲线，把两端藏进木帮，并精确穿过两侧 jaw 锚点；
+      // 否则顶盖会从袋腔侧直接拐向端点，俯视时就像与库边错开的一轮月牙。
+      const trimJoinExtension = pocket.kind === 'corner' ? R * 0.36 : R * 0.3;
+      const trimLocalPoints: Array<[number, number]> = [
+        [-trimJoinExtension, -halfWidth * 0.94],
+        [0, -halfWidth],
+        ...trimSourceLocalPoints.slice(1, -1),
+        [0, halfWidth],
+        [-trimJoinExtension, halfWidth * 0.94],
+      ];
       const trimCurve = new THREE.CatmullRomCurve3(
         trimLocalPoints.map(([depth, lateral]) => {
           const point = pocketLocalToWorld(pocket, depth, lateral);
@@ -915,9 +947,10 @@ export class Scene3D {
         'centripetal',
       );
       const trimPoints = trimCurve.getPoints(48);
-      const trimWidth = pocket.kind === 'corner' ? 0.019 : 0.015;
-      const trimTopY = RAIL_H + 0.007;
-      const trimBottomY = trimTopY - 0.006;
+      const trimWidth = pocket.kind === 'corner' ? 0.023 : 0.019;
+      // 护口下沉进木帮顶面，既遮住袋腔与库边的接缝，也避免俯视时像浮在洞内的月牙。
+      const trimTopY = RAIL_H + 0.003;
+      const trimBottomY = trimTopY - 0.007;
       const trimPositions: number[] = [];
       const trimIndices: number[] = [];
       for (let index = 0; index < trimPoints.length; index += 1) {
@@ -994,9 +1027,46 @@ export class Scene3D {
       topTrim.userData.widthMm = trimWidth * 1000;
       topTrim.userData.heightMm = (trimTopY - trimBottomY) * 1000;
       topTrim.userData.seamlessEndCount = 2;
+      topTrim.userData.jawAnchorCount = 2;
+      topTrim.userData.joinExtensionMm = trimJoinExtension * 1000;
+      topTrim.userData.embeddedDepthMm = (RAIL_H - trimBottomY) * 1000;
       topTrim.castShadow = true;
       topTrim.receiveShadow = true;
       this.tableGroup.add(topTrim);
+
+      // 顶盖内沿向下包住袋腔，消除顶盖、深色袋壁和低位缝边之间的悬空断层。
+      // 这条竖向皮裙与顶盖复用同一曲线，因此六袋在俯视/斜视下都不会产生视觉偏心。
+      const apronPositions: number[] = [];
+      const apronIndices: number[] = [];
+      for (let index = 0; index < trimPoints.length; index += 1) {
+        const point = trimPoints[index];
+        apronPositions.push(
+          point.x, trimBottomY + 0.0005, point.z,
+          point.x, 0.0035, point.z,
+        );
+        if (index === 0) continue;
+        const previousBase = (index - 1) * 2;
+        const currentBase = index * 2;
+        apronIndices.push(
+          previousBase, currentBase, previousBase + 1,
+          currentBase, currentBase + 1, previousBase + 1,
+        );
+      }
+      const apronGeometry = new THREE.BufferGeometry();
+      apronGeometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(apronPositions, 3),
+      );
+      apronGeometry.setIndex(apronIndices);
+      apronGeometry.computeVertexNormals();
+      const apron = new THREE.Mesh(apronGeometry, pocketTopTrimMat);
+      apron.name = `pocket-leather-apron-${pocket.index}`;
+      apron.userData.materialRole = 'aligned-leather-apron';
+      apron.userData.jawAnchorCount = 2;
+      apron.userData.joinExtensionMm = trimJoinExtension * 1000;
+      apron.castShadow = true;
+      apron.receiveShadow = true;
+      this.tableGroup.add(apron);
 
       const lip = new THREE.Mesh(
         new THREE.TubeGeometry(
@@ -1541,7 +1611,7 @@ export class Scene3D {
    */
   showReviewOverlay(review: ShotReview | null) {
     this.clearReview();
-    if (!review) {
+    if (!review?.planned) {
       this.requestRender();
       return;
     }
@@ -2417,6 +2487,30 @@ export class Scene3D {
   handleResize = () => {
     const w = this.element.clientWidth;
     const h = this.element.clientHeight;
+    const nextBudget = renderBudgetFor({
+      width: w,
+      height: h,
+      devicePixelRatio: window.devicePixelRatio,
+      coarsePointer: window.matchMedia?.('(pointer: coarse)').matches ?? false,
+    });
+    const nextQuality = adaptiveRenderQualityFor(nextBudget, this.adaptiveQuality.tier);
+    const budgetChanged =
+      nextQuality.pixelRatio !== this.adaptiveQuality.pixelRatio ||
+      nextQuality.shadowMapSize !== this.adaptiveQuality.shadowMapSize ||
+      nextQuality.movingPresentationFps !== this.adaptiveQuality.movingPresentationFps;
+    this.renderBudget = nextBudget;
+    if (budgetChanged) {
+      this.adaptiveQuality = nextQuality;
+      this.shadowMapSize = nextQuality.shadowMapSize;
+      this.renderer.setPixelRatio(nextQuality.pixelRatio);
+      this.thermalGovernor.setTargetFps(nextQuality.movingPresentationFps);
+      if (this.keyLight) {
+        this.keyLight.shadow.map?.dispose();
+        this.keyLight.shadow.map = null;
+        this.keyLight.shadow.mapSize.set(nextQuality.shadowMapSize, nextQuality.shadowMapSize);
+      }
+      this.onThermalQualityChange?.(nextQuality, this.thermalGovernor.snapshot());
+    }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
@@ -2433,6 +2527,8 @@ export class Scene3D {
     }
     this.pendingGpuQueries = [];
     delete document.documentElement.dataset.renderQuality;
+    disposeSceneResources(this.scene);
+    this.renderer.renderLists.dispose();
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.element) {
       this.element.removeChild(this.renderer.domElement);

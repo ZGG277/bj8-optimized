@@ -1,6 +1,6 @@
 /*
-[INPUT]: 五个游戏控件状态、观战视角锁、手动相机、默认左右微调/显式拨轮档、瞄准辅助/走位入口、视口尺寸与 Pointer 手势
-[OUTPUT]: 纯视觉五控件层；灯泡展开三项独立辅助，默认显示球杆左右微调，显式开启后原位切换拨轮；并保留逐帧自由拖动、右/底吸附与 v3 持久化
+[INPUT]: 五个游戏控件状态、模式门控、观战视角锁、默认拨轮/可选方向键、四项辅助入口、视口尺寸与 Pointer 手势
+[OUTPUT]: 纯视觉五控件层；灯泡展开瞄准线、走位、复盘、瞄准器四项开关，陪练/挑战均按玩家回合门控；保留自由拖动、右/底吸附与 v3 持久化
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimControls·AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
@@ -294,6 +294,7 @@ interface ControlDeckProps {
   breaking: boolean;
   planStatus: PositionPlanStatus;
   guidanceEnabled: boolean;
+  reviewEnabled: boolean;
   hasReview: boolean;
   aimAssistEnabled: boolean;
   aimDialEnabled: boolean;
@@ -304,6 +305,7 @@ interface ControlDeckProps {
   onSpinChange: (spin: CueSpin) => void;
   onLayoutAdjusted: () => void;
   onToggleGuidance: () => void;
+  onToggleReview: () => void;
   onToggleAimAssist: () => void;
   onToggleAimDial: () => void;
   onAimButtonAdjust: (angleDelta: number) => void;
@@ -348,6 +350,7 @@ export function ControlDeck({
   breaking,
   planStatus,
   guidanceEnabled,
+  reviewEnabled,
   hasReview,
   aimAssistEnabled,
   aimDialEnabled,
@@ -358,6 +361,7 @@ export function ControlDeck({
   onSpinChange,
   onLayoutAdjusted,
   onToggleGuidance,
+  onToggleReview,
   onToggleAimAssist,
   onToggleAimDial,
   onAimButtonAdjust,
@@ -741,7 +745,7 @@ export function ControlDeck({
   // 按需规划从 idle 开始：玩家瞄准时必须允许先点亮，Worker 才会进入 computing。
   // 已点亮时保持可用，用户可在计算中途再次点击熄灭并取消。
   const guidanceAvailable =
-    canAim || guidanceEnabled || planStatus === 'ready' || planStatus === 'showing' || hasReview;
+    canAim || guidanceEnabled || planStatus === 'ready' || planStatus === 'showing';
   const guidanceStateClass = guidanceEnabled ? 'is-open' : 'is-off';
 
   const nodes = useMemo<Record<DockItemId, ReactNode>>(() => ({
@@ -759,7 +763,7 @@ export function ControlDeck({
       <div className={`assist-control ${assistMenuOpen ? 'menu-open' : ''}`}>
         <button
           type="button"
-          className={`plan-button ${guidanceStateClass} ${aimAssistEnabled || aimDialEnabled ? 'has-aim-assist' : ''}`}
+          className={`plan-button ${guidanceStateClass} ${aimAssistEnabled || aimDialEnabled || reviewEnabled ? 'has-aim-assist' : ''}`}
           aria-label="打开辅助功能"
           aria-expanded={assistMenuOpen}
           onClick={() => setAssistMenuOpen(open => !open)}
@@ -786,7 +790,7 @@ export function ControlDeck({
               type="button"
               className={`assist-option guidance-option ${guidanceEnabled ? 'active' : ''}`}
               role="switch"
-              aria-label="走位与击球复盘"
+              aria-label="走位规划"
               aria-checked={guidanceEnabled}
               disabled={!guidanceAvailable}
               onClick={onToggleGuidance}
@@ -795,16 +799,30 @@ export function ControlDeck({
             </button>
             <button
               type="button"
+              className={`assist-option review-option ${reviewEnabled ? 'active' : ''} ${hasReview ? 'has-review' : ''}`}
+              role="switch"
+              aria-label="显示击球复盘"
+              aria-checked={reviewEnabled}
+              onClick={onToggleReview}
+            >
+              <span className="review-icon" aria-hidden="true"><i /></span>
+            </button>
+            <button
+              type="button"
               className={`assist-option dial-option ${aimDialEnabled ? 'active' : ''}`}
               role="switch"
-              aria-label="拨轮瞄准"
+              aria-label={aimDialEnabled ? '切换为方向键瞄准' : '切换为拨轮瞄准'}
               aria-checked={aimDialEnabled}
               onClick={() => {
                 onToggleAimDial();
                 setAssistMenuOpen(false);
               }}
             >
-              <span className="dial-icon" aria-hidden="true"><i /></span>
+              {aimDialEnabled ? (
+                <span className="direction-keys-icon" aria-hidden="true"><i /><i /></span>
+              ) : (
+                <span className="dial-icon" aria-hidden="true"><i /></span>
+              )}
             </button>
           </div>
         )}
@@ -867,11 +885,13 @@ export function ControlDeck({
     onTapShot,
     onToggleAimAssist,
     onToggleGuidance,
+    onToggleReview,
     onToggleManualCamera,
     onUpdateCharge,
     onViewLevel,
     planStatus,
     previewPower,
+    reviewEnabled,
     spin,
     viewLevel,
   ]);

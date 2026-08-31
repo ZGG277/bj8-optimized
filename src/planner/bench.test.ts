@@ -1,10 +1,10 @@
 /*
 [INPUT]: 依赖 vitest 与 ../physics 的世界创建、击球与步进接口
-[OUTPUT]: 对外提供单杆全仿真耗时 benchmark（无导出），为走位规划搜索定采样预算
-[POS]: 规划层的性能基线：240Hz 与降频仿真的单杆成本对比
+[OUTPUT]: 对外提供单杆全仿真耗时 benchmark 与宽松回归门禁，为走位规划搜索定采样预算
+[POS]: 规划层的性能基线：记录 240/120/60Hz 成本，并阻止 240Hz 或世界克隆出现数量级退化
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   createInitialWorld,
   cloneWorld,
@@ -14,13 +14,14 @@ import {
 } from '../physics';
 
 // 临时 benchmark：测单杆全仿真的耗时（240Hz 与降频版），为走位规划搜索定采样预算。
-function bench(label: string, fn: () => void, iters: number) {
+function bench(label: string, fn: () => void, iters: number): number {
   // warmup
   for (let i = 0; i < Math.min(5, iters); i++) fn();
   const t0 = performance.now();
   for (let i = 0; i < iters; i++) fn();
   const ms = (performance.now() - t0) / iters;
   console.log(`[bench] ${label}: ${ms.toFixed(2)} ms/iter (${iters} iters)`);
+  return ms;
 }
 
 function simAtRate(base: ReturnType<typeof createInitialWorld>, rate: number) {
@@ -38,9 +39,13 @@ function simAtRate(base: ReturnType<typeof createInitialWorld>, rate: number) {
 describe('planner benchmark', () => {
   it('single shot sim cost', () => {
     const base = createInitialWorld();
-    bench('sim 240Hz (simulateUntilStop)', () => simAtRate(base, 240), 30);
+    const sim240 = bench('sim 240Hz (simulateUntilStop)', () => simAtRate(base, 240), 30);
     bench('sim 120Hz (stepWorld dt=1/120)', () => simAtRate(base, 120), 30);
     bench('sim 60Hz (stepWorld dt=1/60)', () => simAtRate(base, 60), 30);
-    bench('cloneWorld only', () => { cloneWorld(base); }, 1000);
+    const clone = bench('cloneWorld only', () => { cloneWorld(base); }, 1000);
+
+    // 阈值刻意留出约 4× 当前 Apple Silicon 基线，捕捉数量级回退而不把机器抖动当失败。
+    expect(sim240).toBeLessThan(20);
+    expect(clone).toBeLessThan(0.2);
   });
 });

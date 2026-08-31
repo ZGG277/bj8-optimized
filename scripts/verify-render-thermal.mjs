@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动的本地游戏页、Chrome/Chromium 与 puppeteer-core
-[OUTPUT]: 桌面首屏空闲停帧、运动帧上限、GPU 监控快照、温控毛玻璃降级与手机 2× 清晰度断言
+[OUTPUT]: 介绍页零 WebGL、对局静止停帧、运动帧上限、GPU 监控快照、温控降级与手机 2× 清晰度断言
 [POS]: 自适应 GPU/发热治理的真实浏览器出口验收
 [PROTOCOL]: 温控档位、调试快照或首屏渲染契约变化时同步更新本文件与 scripts/CLAUDE.md
 */
@@ -28,29 +28,34 @@ await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
 const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
 await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
-await page.waitForFunction(() => window.__bj8?.scene?.current, { timeout: 10000 });
-
-// 允许首次相机平滑就位；验收的是“收敛后不空转”而非禁用开场过渡。
-await wait(1500);
-const introStart = await page.evaluate(() => window.__bj8.scene.current.renderedFrames());
-await wait(1200);
 const introState = await page.evaluate(() => ({
-  frames: window.__bj8.scene.current.renderedFrames(),
+  hasScene: Boolean(window.__bj8?.scene?.current),
+  canvases: document.querySelectorAll('.viewport canvas').length,
   backdropFilter: getComputedStyle(document.querySelector('.intro-backdrop')).backdropFilter,
-  pixelRatio: window.__bj8.scene.current.renderer.getPixelRatio(),
 }));
-ok('首屏静止后 WebGL 停止空转', introState.frames - introStart <= 1,
-  `1.2s 新增 ${introState.frames - introStart} 帧`);
+ok('介绍页不创建 WebGL 场景与画布', !introState.hasScene && introState.canvases === 0,
+  JSON.stringify(introState));
 ok('首屏不再对整幅 WebGL 画布做实时模糊', introState.backdropFilter === 'none',
   `backdrop-filter=${introState.backdropFilter}`);
-ok('桌面 Retina 基线 DPR 上限生效', introState.pixelRatio === 1.75,
-  `pixelRatio=${introState.pixelRatio}`);
 
 await page.evaluate(() => {
   const button = [...document.querySelectorAll('button')]
     .find(node => node.textContent?.trim() === '开始对局');
   button?.click();
 });
+await page.waitForFunction(() => window.__bj8?.scene?.current, { timeout: 10000 });
+// 允许首次相机平滑就位；验收的是“收敛后不空转”而非禁用开场过渡。
+await wait(1500);
+const idleStart = await page.evaluate(() => window.__bj8.scene.current.renderedFrames());
+await wait(1200);
+const idleState = await page.evaluate(() => ({
+  frames: window.__bj8.scene.current.renderedFrames(),
+  pixelRatio: window.__bj8.scene.current.renderer.getPixelRatio(),
+}));
+ok('对局静止后 WebGL 停止空转', idleState.frames - idleStart <= 1,
+  `1.2s 新增 ${idleState.frames - idleStart} 帧`);
+ok('桌面 Retina 基线 DPR 上限生效', idleState.pixelRatio === 1.75,
+  `pixelRatio=${idleState.pixelRatio}`);
 await wait(700);
 
 const candidates = await page.evaluate(() => {
@@ -105,6 +110,17 @@ ok('浏览器运行无 JS 错误', errors.length === 0, errors[0] ?? '');
 const mobilePage = await browser.newPage();
 await mobilePage.setViewport({ width: 390, height: 844, deviceScaleFactor: 3 });
 await mobilePage.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+const mobileIntro = await mobilePage.evaluate(() => ({
+  hasScene: Boolean(window.__bj8?.scene?.current),
+  canvases: document.querySelectorAll('.viewport canvas').length,
+}));
+ok('手机介绍页同样保持零 WebGL', !mobileIntro.hasScene && mobileIntro.canvases === 0,
+  JSON.stringify(mobileIntro));
+await mobilePage.evaluate(() => {
+  const button = [...document.querySelectorAll('button')]
+    .find(node => node.textContent?.trim() === '开始对局');
+  button?.click();
+});
 await mobilePage.waitForFunction(() => window.__bj8?.scene?.current, { timeout: 10000 });
 await wait(1500);
 const mobileSharpness = await mobilePage.evaluate(() => {

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖常量表与纯数学；禁止依赖 React、DOM、规则状态或渲染层
-[OUTPUT]: 对外输出 240 Hz 确定性世界：步进、统一袋口内弧捕获几何、球碰/首碰/碰库/落袋事件、标准开球位与击球接口
+[OUTPUT]: 对外输出 240 Hz 确定性世界：仅活跃球配对的步进、统一袋口捕获几何、球碰/首碰/碰库/落袋事件、标准开球位与击球接口
 [POS]: 物理内核层，规则与 UI 的事实来源；所有时间积分必须以 PHYSICS_DT 固定步长进行
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -1033,19 +1033,22 @@ export function stepWorld(world: BilliardsWorld, dt = PHYSICS_DT) {
   if (!world.moving) return;
   world.time += dt;
 
-  for (const ball of world.balls) {
-    if (!ball.active) continue;
+  const activeBalls = world.balls.filter(ball => ball.active);
+  for (const ball of activeBalls) {
     advanceBallAgainstTable(world, ball, dt);
   }
+
+  // 落袋球不会重新参与本步的 O(n²) 配对；保持原球号顺序，碰撞结算结果不变。
+  const collisionBalls = activeBalls.filter(ball => ball.active);
 
   let collisionOccurred = true;
   let iterations = 0;
   while (collisionOccurred && iterations < 8) {
     collisionOccurred = false;
-    for (let first = 0; first < world.balls.length; first += 1) {
-      for (let second = first + 1; second < world.balls.length; second += 1) {
+    for (let first = 0; first < collisionBalls.length; first += 1) {
+      for (let second = first + 1; second < collisionBalls.length; second += 1) {
         collisionOccurred =
-          resolveBallPair(world, world.balls[first], world.balls[second], dt) ||
+          resolveBallPair(world, collisionBalls[first], collisionBalls[second], dt) ||
           collisionOccurred;
       }
     }
@@ -1053,7 +1056,7 @@ export function stepWorld(world: BilliardsWorld, dt = PHYSICS_DT) {
   }
 
   let moving = false;
-  for (const ball of world.balls) {
+  for (const ball of collisionBalls) {
     if (!ball.active) continue;
     applyClothFriction(ball, dt);
     if (ball.vx !== 0 || ball.vz !== 0 || ball.wy !== 0) moving = true;

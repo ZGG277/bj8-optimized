@@ -14,7 +14,7 @@
 
 `planner.test.ts`: 母球杆向容错/候选/概率/遮挡/结构/预算/链条自洽/截断/分组测试，并覆盖最后一颗本组球→8 号收尾链。
 
-`bench.test.ts`: 单杆全仿真耗时 benchmark（240Hz 与降频对比，从 src/ 移入），为搜索采样预算提供实测基线。
+`bench.test.ts`: 单杆全仿真耗时 benchmark（240Hz 与降频对比）及宽松回归阈值；活跃球配对后当前约 4–5ms/杆，以 20ms/杆阻止数量级退化。
 
 `plan-worker.ts`: Web Worker 入口——接收 { world, legal, opts }（纯 JSON 结构化克隆），跑 planPosition 回传 plans；Vite module worker，把 0.2–1s 搜索移出主线程。
 
@@ -22,8 +22,8 @@
 
 `async.test.ts`: FakeWorker 回归：第二请求抢占第一请求、截止时间终止 worker、worker 不可用时限时请求立即失败、旧 Promise 以对应错误结算、新请求正常返回。
 
-`review.ts`: 击球复盘——出杆捕获快照（ShotCapture：击球前世界/杆参数/当时计划首步）在结算后把实际杆参数跑一遍 simulateForDisplay 无扰动仿真，与计划逐步比对出 ShotReview（perfect/position-miss/pot-miss + 一句话中文诊断 + 计划/实际轨迹对）。走位诊断主信号用母球行程总长差（±0.2m 阈值，碰库反弹拉长行程与力度同向，比停位投影稳健），行程相近看停位侧向偏差判杆法；未进球用实际切角 vs 计划 cutAngle 判厚薄（±2°），叉积符号判偏袋口左右侧；洗袋直接报力度偏大。无计划（planned=null）静默返回 null。
+`review.ts`: 中性赛后复盘——ShotCapture 同时记录玩家杆向推断出的目标球/袋口意图与可选显式计划；每杆至多精确回放一次，按犯规→未进球厚薄/偏侧→洗袋→袋口边缘/力度→稳定动作只给一个诊断。planned=null 仍产出自主复盘但不暴露系统轨迹；主动查看过规划时保留 zone/行程/杆法与计划/实际对比。
 
-`review.test.ts`: 复盘层单元测试——场景用种子化 planPosition 的真实 plans[0].steps[0]，覆盖 perfect（参数照抄）/真实可进球轨迹低于计划参考力/偏大力度走位偏差/瞄偏 pot-miss 厚薄与偏袋口文案/无计划返回 null；低力用例只抬高计划参考值以隔离复盘诊断，不受规划器最低可进球力度漂移影响。
+`review.test.ts`: 复盘层单元测试——覆盖显式计划 perfect/力度/厚薄、自主意图复盘不暴露计划、犯规优先、开球建议，以及既无意图也无结算事实时安全跳过。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
-[OUTPUT]: 玩家整局能力画像、袋口容错内的顾燃执行误差、限预算战术选杆档案、等级/置信度展示与安全持久化
+[OUTPUT]: 玩家整局能力画像与训练总结、袋口容错内的顾燃执行误差、限预算战术选杆档案、等级/置信度展示与安全持久化
 [POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；对局中档案锁定，只在整局结束时统一评估
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
@@ -17,6 +17,14 @@ export type ShotSkillObservation = {
   position: PositionOutcome;
   /** 本回合是否查看过系统规划；查看过则降低样本权重，但不丢弃 */
   assisted: boolean;
+};
+
+export type MatchTrainingSummary = {
+  shots: number;
+  headline: string;
+  focus: '准度' | '母球走位' | '犯规控制' | '稳定发挥';
+  detail: string;
+  nextGoal: string;
 };
 
 export type PlayerSkillProfile = {
@@ -237,6 +245,69 @@ export function applyMatchObservations(
     totalPlayerShots: profile.totalPlayerShots + batch.length,
     matchesEvaluated: profile.matchesEvaluated + 1,
     lastMatchDelta: level - profile.level,
+  };
+}
+
+/**
+ * 把本局真实出杆压缩成一个训练重点。优先处理犯规，其次准度与已有走位证据；
+ * 一局只给一个目标，避免结算页同时罗列多项指标造成无从下手。
+ */
+export function buildMatchTrainingSummary(
+  previous: PlayerSkillProfile,
+  next: PlayerSkillProfile,
+  observations: ShotSkillObservation[],
+): MatchTrainingSummary | null {
+  const batch = observations.map(normalizedObservation);
+  if (batch.length === 0) return null;
+  const shots = batch.length;
+  const fouls = batch.filter(observation => observation.foul).length;
+  const qualified = batch.filter(observation => observation.tolerance !== null);
+  const pots = qualified.filter(observation => observation.pocketed && !observation.foul).length;
+  const positioned = batch.filter(observation => observation.position !== 'unknown');
+  const positionSuccesses = positioned.filter(observation => observation.position === 'success').length;
+  const delta = next.level - previous.level;
+  const deltaText = Math.abs(delta) < 0.05
+    ? '水平保持稳定'
+    : `水平 ${delta > 0 ? '+' : ''}${delta.toFixed(1)}`;
+
+  if (fouls > 0 && fouls / shots >= 0.2) {
+    return {
+      shots,
+      headline: `本局记录 ${shots} 杆，${deltaText}`,
+      focus: '犯规控制',
+      detail: `${fouls} 杆犯规，先把合法首碰和白球安全放在得分前面。`,
+      nextGoal: '下一局目标：每次出杆前确认首碰球，并让母球留在台面。',
+    };
+  }
+
+  if (qualified.length >= 2 && pots / qualified.length < 0.55) {
+    return {
+      shots,
+      headline: `本局记录 ${shots} 杆，${deltaText}`,
+      focus: '准度',
+      detail: `可评估的 ${qualified.length} 杆中打进 ${pots} 杆，主要损失来自进球线路。`,
+      nextGoal: '下一局目标：先把容易球送进袋口中心，再增加杆法和力度。',
+    };
+  }
+
+  if (positioned.length >= 2 && positionSuccesses / positioned.length < 0.6) {
+    return {
+      shots,
+      headline: `本局记录 ${shots} 杆，${deltaText}`,
+      focus: '母球走位',
+      detail: `${positioned.length} 次可评估走位中有 ${positionSuccesses} 次到位，准度已够，下一步是控制白球。`,
+      nextGoal: '下一局目标：每杆只选一个母球落点，少走一库也算进步。',
+    };
+  }
+
+  return {
+    shots,
+    headline: `本局记录 ${shots} 杆，${deltaText}`,
+    focus: '稳定发挥',
+    detail: qualified.length > 0
+      ? `可评估的 ${qualified.length} 杆中打进 ${pots} 杆，当前节奏值得保持。`
+      : '本局以开球和防守事实为主，下一局继续积累可评估进攻杆。',
+    nextGoal: '下一局目标：出杆前先确定目标袋和母球落点，再一次完成动作。',
   };
 }
 

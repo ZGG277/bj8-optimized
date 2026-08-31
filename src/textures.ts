@@ -18,6 +18,18 @@ function clothNoise(x: number, y: number, seed: number) {
   return ((hash ^ (hash >>> 16)) >>> 0) / 4294967295;
 }
 
+/** 小型确定性 PRNG：同一种资源在刷新、截图门禁和不同设备上保持同一纹理。 */
+function textureRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function configureClothTexture(texture: THREE.CanvasTexture, colorSpace: THREE.ColorSpace) {
   texture.colorSpace = colorSpace;
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
@@ -118,21 +130,22 @@ export function makeWoodTexture(size = 512): THREE.CanvasTexture {
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
+  const random = textureRandom(0x57_4f_4f_44 ^ size);
 
   ctx.fillStyle = '#3a2413';
   ctx.fillRect(0, 0, size, size);
 
   // 木纹：横向波状条纹
   for (let i = 0; i < 90; i++) {
-    const y0 = Math.random() * size;
-    const amp = 2 + Math.random() * 6;
-    const freq = 0.008 + Math.random() * 0.02;
-    const phase = Math.random() * Math.PI * 2;
-    const light = Math.random() > 0.45;
+    const y0 = random() * size;
+    const amp = 2 + random() * 6;
+    const freq = 0.008 + random() * 0.02;
+    const phase = random() * Math.PI * 2;
+    const light = random() > 0.45;
     ctx.strokeStyle = light
-      ? `rgba(140,90,50,${0.10 + Math.random() * 0.16})`
-      : `rgba(20,10,5,${0.12 + Math.random() * 0.18})`;
-    ctx.lineWidth = 1 + Math.random() * 2.5;
+      ? `rgba(140,90,50,${0.10 + random() * 0.16})`
+      : `rgba(20,10,5,${0.12 + random() * 0.18})`;
+    ctx.lineWidth = 1 + random() * 2.5;
     ctx.beginPath();
     for (let x = 0; x <= size; x += 4) {
       const y = y0 + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 3.7 + phase * 2) * amp * 0.3;
@@ -144,9 +157,9 @@ export function makeWoodTexture(size = 512): THREE.CanvasTexture {
 
   // 木节
   for (let i = 0; i < 4; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const grad = ctx.createRadialGradient(x, y, 1, x, y, 14 + Math.random() * 10);
+    const x = random() * size;
+    const y = random() * size;
+    const grad = ctx.createRadialGradient(x, y, 1, x, y, 14 + random() * 10);
     grad.addColorStop(0, 'rgba(25,12,6,0.55)');
     grad.addColorStop(0.6, 'rgba(60,35,18,0.25)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -167,15 +180,16 @@ export function makeLeatherTexture(size = 256): THREE.CanvasTexture {
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
+  const random = textureRandom(0x4c_45_41_54 ^ size);
 
   ctx.fillStyle = '#241407';
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 5200; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    ctx.fillStyle = Math.random() > 0.5
-      ? `rgba(120,80,40,${0.04 + Math.random() * 0.08})`
-      : `rgba(0,0,0,${0.05 + Math.random() * 0.09})`;
+    const x = random() * size;
+    const y = random() * size;
+    ctx.fillStyle = random() > 0.5
+      ? `rgba(120,80,40,${0.04 + random() * 0.08})`
+      : `rgba(0,0,0,${0.05 + random() * 0.09})`;
     ctx.fillRect(x, y, 1.4, 1.4);
   }
   const tex = new THREE.CanvasTexture(canvas);
@@ -196,6 +210,7 @@ export function makeBallTexture(number: number, group: string): THREE.CanvasText
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
+  const random = textureRandom(0x42_41_4c_4c ^ number);
 
   const color = BALL_COLORS[number];
   ctx.fillStyle = group === 'stripe' ? '#f6f1e2' : color;
@@ -208,9 +223,9 @@ export function makeBallTexture(number: number, group: string): THREE.CanvasText
 
   // 轻微做旧
   for (let i = 0; i < 500; i++) {
-    const x = Math.random() * w;
-    const y = Math.random() * h;
-    ctx.fillStyle = `rgba(60,50,30,${Math.random() * 0.02})`;
+    const x = random() * w;
+    const y = random() * h;
+    ctx.fillStyle = `rgba(60,50,30,${random() * 0.02})`;
     ctx.fillRect(x, y, 1.5, 1.5);
   }
 

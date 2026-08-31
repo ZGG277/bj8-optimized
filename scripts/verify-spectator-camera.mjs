@@ -143,6 +143,11 @@ const desktopPage = await browser.newPage();
 desktopPage.on('pageerror', error => errors.push(String(error)));
 await desktopPage.setViewport({ width: 1280, height: 800 });
 await desktopPage.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+await desktopPage.evaluate(() => {
+  const button = [...document.querySelectorAll('button')]
+    .find(element => element.textContent?.includes('开始'));
+  button?.click();
+});
 await desktopPage.waitForFunction(() => window.__bj8?.scene?.current, { timeout: 10000 });
 await desktopPage.evaluate(() => window.__bj8.setMatch({
   phase: 'opponent',

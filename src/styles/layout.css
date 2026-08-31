@@ -403,6 +403,48 @@
   font-weight: 400;
 }
 
+.training-summary {
+  display: grid;
+  gap: 7px;
+  width: min(88vw, 460px);
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--green) 32%, transparent);
+  border-radius: 14px;
+  background: rgba(8, 18, 14, 0.78);
+  text-align: left;
+}
+
+.training-summary small,
+.training-summary strong,
+.training-summary p,
+.training-summary em {
+  margin: 0;
+}
+
+.training-summary small {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.training-summary strong {
+  color: var(--green);
+  font-size: var(--fs-lg);
+}
+
+.training-summary p {
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+.training-summary em {
+  color: var(--warm);
+  font-size: var(--fs-sm);
+  font-style: normal;
+  line-height: 1.5;
+}
+
 .finish-mask button {
   margin-top: 24px;
   padding: 10px 24px;

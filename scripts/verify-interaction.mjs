@@ -506,14 +506,14 @@ async function waitPlayerTurn(page, timeoutMs = 150000) {
   ok('瞄准: 拖拽末端位置决定瞄准角', aimDrag * aimRight < 0,
     `拖拽末=${aimDrag?.toFixed(3)} 应偏左(负号相对右=${aimRight?.toFixed(3)})`);
 
-  // 单点点击确定性:第一人称相机绕白球刚性随转,按下时刻的活相机单次映射
-  // 即为正解(探针实测屏幕点方位偏移 φ 与瞄准角无关,无不动点可求)。
-  // 等相机就位后用目标位姿(screenToTableAt)反算屏幕点真值,
+  // 单点点击确定性：按下时刻的视觉相机方位单次映射即为正解。
+  // 等相机就位后用真实 cameraViewAzimuth 目标位姿反算屏幕点；
+  // 开球默认处于独立俯视方位，因此不能再把球杆 aim 误当作相机方位。
   // 纯 down/up 点击(零位移)的瞄准角应与之吻合(取未钳制区间)。
   const expectedAt = (cx, cy) => page.evaluate((x, y) => {
     const s = window.__bj8.scene.current;
     const cue = window.__bj8.world.current.balls[0];
-    const hit = s.screenToTableAt(x, y, window.__bj8.aim.current);
+    const hit = s.screenToTableAt(x, y, window.__bj8.cameraViewAzimuth.current);
     if (!hit) return null;
     const worldAngle = Math.atan2(hit.x - cue.x, -(hit.z - cue.z));
     return Math.min(0.72, Math.max(-0.72, worldAngle));

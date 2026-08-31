@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
-[OUTPUT]: 对外提供对局状态（worldView / match / viewLevel）、整局结束才提交的双方能力档案、
+[OUTPUT]: 对外提供对局状态（worldView / match / viewLevel）、整局结束才提交的双方能力档案与单点训练总结、
           resetGame / settleShot / recordPlayerShot / completeMatchAssessment 等编排动作
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -22,9 +22,11 @@ import type { MatchMessageKey, MatchMessageParams, MatchState } from '../match/t
 import {
   createOpponentProfile,
   applyMatchObservations,
+  buildMatchTrainingSummary,
   loadPlayerSkillProfile,
   savePlayerSkillProfile,
   type GameMode,
+  type MatchTrainingSummary,
   type ShotSkillObservation,
 } from '../opponent/model';
 import { createShotSettlementGuard } from './shot-settlement-guard';
@@ -64,6 +66,7 @@ export function useGameState() {
   const [opponentProfile, setOpponentProfile] = useState(() =>
     createOpponentProfile(playerSkill, 'practice'),
   );
+  const [trainingSummary, setTrainingSummary] = useState<MatchTrainingSummary | null>(null);
   const matchObservationsRef = useRef<ShotSkillObservation[]>([]);
 
   // ── 派生 ──
@@ -83,6 +86,7 @@ export function useGameState() {
     worldRef.current = fresh;
     settlementGuardRef.current.reset();
     matchObservationsRef.current = [];
+    setTrainingSummary(null);
     setWorldView(cloneWorld(fresh));
     setMatch(m => beginMatch(m));
     setGameMode(nextMode);
@@ -101,8 +105,13 @@ export function useGameState() {
   const completeMatchAssessment = useCallback(() => {
     const observations = matchObservationsRef.current;
     matchObservationsRef.current = [];
-    if (observations.length === 0) return playerSkillRef.current;
-    const next = applyMatchObservations(playerSkillRef.current, observations);
+    if (observations.length === 0) {
+      setTrainingSummary(null);
+      return playerSkillRef.current;
+    }
+    const previous = playerSkillRef.current;
+    const next = applyMatchObservations(previous, observations);
+    setTrainingSummary(buildMatchTrainingSummary(previous, next, observations));
     playerSkillRef.current = next;
     setPlayerSkill(next);
     savePlayerSkillProfile(next, browserStorage());
@@ -140,6 +149,7 @@ export function useGameState() {
     viewLevel,
     setViewLevel,
     playerSkill,
+    trainingSummary,
     gameMode,
     opponentProfile,
     canAim,

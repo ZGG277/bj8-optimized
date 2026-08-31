@@ -188,9 +188,20 @@ export function resolveStoppedShot(state: MatchState, facts: ShotFacts): RoundRe
     }
   }
 
-  // ---- 普通回合：进球继续，未进换人 ----
-  const potted = objectPotted.length > 0;
-  const nextActor = potted ? actor : otherActor(actor);
+  // ---- 普通回合：只有打进本组球才续杆；只带进对方花色时球保留但换人 ----
+  const ownPotted = actorGroup
+    ? objectPotted.filter(number => groupOfNumber(number) === actorGroup)
+    : objectPotted;
+  const opponentPotted = actorGroup
+    ? objectPotted.filter(number => groupOfNumber(number) === oppositeGroup(actorGroup))
+    : [];
+  const continues = ownPotted.length > 0;
+  const nextActor = continues ? actor : otherActor(actor);
+  const messageKey = continues
+    ? 'pot-continue'
+    : opponentPotted.length > 0
+      ? 'opponent-pot-turn'
+      : 'miss-turn';
   return {
     shotId: facts.shotId,
     next: {
@@ -199,8 +210,8 @@ export function resolveStoppedShot(state: MatchState, facts: ShotFacts): RoundRe
       actor: nextActor,
       breaking: false,
       winner: null,
-      messageKey: potted ? 'pot-continue' : 'miss-turn',
-      messageParams: { actor, count: objectPotted.length || undefined },
+      messageKey,
+      messageParams: { actor, count: ownPotted.length || undefined },
     },
     effects: [],
   };

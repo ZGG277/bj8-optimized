@@ -24,6 +24,7 @@ export type MatchMessageKey =
   | 'rolling'
   | 'pot-continue'
   | 'miss-turn'
+  | 'opponent-pot-turn'
   | 'group-assigned'
   | 'foul'
   | 'win-8'

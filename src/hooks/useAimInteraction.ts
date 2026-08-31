@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖 physics 台球世界、独立视觉相机方位、Scene3D 屏幕坐标映射与 match 状态
-[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、默认左右微调、显式开启的精瞄拨轮、开球实体母球拖放/自由球预览与真实瞄准变化事实
-[POS]: 交互协调层，把当前视觉相机下的指针与微调控件映射为世界瞄准角；拨轮只在用户从灯泡开启后消费显式档位
+[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、默认拨轮/可选方向键微调、开球实体母球拖放/自由球预览与真实瞄准变化事实
+[POS]: 交互协调层，把当前视觉相机下的指针与微调控件映射为世界瞄准角；拨轮消费用户显式粗/精档位
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -87,7 +87,7 @@ export function useAimInteraction({
     return next;
   }, [breaking, worldRef, aimRef]);
 
-  // 拨轮由灯泡菜单显式开启；关闭或离开瞄准态时同时退出精瞄档。
+  // 切换为方向键或离开瞄准态时同时退出拨轮精瞄档。
   useEffect(() => {
     if (!aimDialVisible) setAimDialPrecisionActive(false);
   }, [aimDialVisible]);

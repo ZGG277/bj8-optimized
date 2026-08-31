@@ -1,13 +1,13 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 DEV __bj8 场景句柄
-[OUTPUT]: 前探鼻尖/下沿内凹库边、六袋台内圆弧凹口/浅驼皮圈/白色菱形网袋/细缝边结构、角袋跨接连续性、四机位视觉回归及页面错误门禁
+[OUTPUT]: 前探鼻尖/下沿内凹库边、六袋台内圆弧凹口/下沉护口/对齐皮裙/白色菱形网袋/细缝边结构、jaw 跨接连续性、四机位视觉回归及页面错误门禁
 [POS]: PocketGeometry 物理/视觉一体化的浏览器出口验收；只改调试页内世界，不写游戏数据
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md 与 README.md
 */
 import puppeteer from 'puppeteer-core';
 
 const BROWSER_URL = process.env.BROWSER_URL || 'http://127.0.0.1:9333';
-const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:4173/';
+const GAME_URL = process.env.GAME_URL || 'http://127.0.0.1:5199/';
 const SHOT_DIR = process.env.SHOT_DIR || 'shots';
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const results = [];
@@ -83,10 +83,15 @@ const pocketAnatomy = await page.evaluate(() => {
     minCaptureInsetMm: Number.POSITIVE_INFINITY,
     maxCaptureInsetMm: 0,
     topTrims: 0,
+    topTrimJawAnchors: 0,
     seamlessTrimEnds: 0,
+    embeddedTrims: 0,
     tanLeatherCaps: 0,
     minTrimWidthMm: Number.POSITIVE_INFINITY,
     minTrimHeightMm: Number.POSITIVE_INFINITY,
+    minTrimJoinExtensionMm: Number.POSITIVE_INFINITY,
+    aprons: 0,
+    apronJawAnchors: 0,
     trimColor: null,
     lips: 0,
     stitchedWelts: 0,
@@ -145,6 +150,7 @@ const pocketAnatomy = await page.evaluate(() => {
     if (object.name.startsWith('pocket-top-trim-')) {
       counts.topTrims += 1;
       counts.seamlessTrimEnds += Number(object.userData.seamlessEndCount ?? 0);
+      counts.topTrimJawAnchors += Number(object.userData.jawAnchorCount ?? 0);
       counts.tanLeatherCaps += Number(
         object.userData.materialRole === 'tan-leather-cap',
       );
@@ -156,7 +162,16 @@ const pocketAnatomy = await page.evaluate(() => {
         counts.minTrimHeightMm,
         Number(object.userData.heightMm ?? 0),
       );
+      counts.minTrimJoinExtensionMm = Math.min(
+        counts.minTrimJoinExtensionMm,
+        Number(object.userData.joinExtensionMm ?? 0),
+      );
+      counts.embeddedTrims += Number(object.userData.embeddedDepthMm ?? 0) >= 3.9 ? 1 : 0;
       counts.trimColor = object.material?.color?.getHex?.() ?? null;
+    }
+    if (object.name.startsWith('pocket-leather-apron-')) {
+      counts.aprons += 1;
+      counts.apronJawAnchors += Number(object.userData.jawAnchorCount ?? 0);
     }
     if (object.name.startsWith('pocket-lip-')) {
       counts.lips += 1;
@@ -210,11 +225,16 @@ ok(
     pocketAnatomy.minCaptureInsetMm >= 7 &&
     pocketAnatomy.maxCaptureInsetMm <= 8.01 &&
     pocketAnatomy.topTrims === 6 &&
+    pocketAnatomy.topTrimJawAnchors === 12 &&
     pocketAnatomy.seamlessTrimEnds === 12 &&
+    pocketAnatomy.embeddedTrims === 6 &&
     pocketAnatomy.tanLeatherCaps === 6 &&
-    pocketAnatomy.minTrimWidthMm >= 15 &&
-    pocketAnatomy.minTrimHeightMm >= 5.99 &&
+    pocketAnatomy.minTrimWidthMm >= 19 &&
+    pocketAnatomy.minTrimHeightMm >= 6.99 &&
+    pocketAnatomy.minTrimJoinExtensionMm >= 8 &&
     pocketAnatomy.trimColor === 0x86623f &&
+    pocketAnatomy.aprons === 6 &&
+    pocketAnatomy.apronJawAnchors === 12 &&
     pocketAnatomy.lips === 6 &&
     pocketAnatomy.stitchedWelts === 6 &&
     pocketAnatomy.maxWeltRadiusMm <= 1.8 &&

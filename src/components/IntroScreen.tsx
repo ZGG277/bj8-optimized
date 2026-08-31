@@ -52,7 +52,7 @@ export function IntroScreen({ playerSkill, onStart }: IntroScreenProps) {
             <span>挑战</span>
             <strong>高一档，持续挑战</strong>
             <small>顾燃 {levelLabel(challengeLevel)} · {challengeLevel}</small>
-            <em>赛中关闭规划提示</em>
+            <em>更强对手，辅助仍由你决定</em>
             <button className="mode-start" onClick={() => onStart('challenge')}>
               开始挑战
             </button>

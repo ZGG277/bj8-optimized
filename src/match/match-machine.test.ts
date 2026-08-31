@@ -96,6 +96,37 @@ describe('普通回合', () => {
     expect(r.next.phase).toBe('opponent');
     expect(r.next.messageKey).toBe('miss-turn');
   });
+
+  it('玩家只带进顾燃的花色球：球保留但换顾燃出杆', () => {
+    const r = resolveStoppedShot(
+      S({ playerGroup: 'solid' }),
+      F({ firstContact: 3, pocketed: [10], remainingSolids: 5 }),
+    );
+    expect(r.next.actor).toBe('opponent');
+    expect(r.next.phase).toBe('opponent');
+    expect(r.next.messageKey).toBe('opponent-pot-turn');
+  });
+
+  it('顾燃只带进玩家的花色球：球保留并换玩家出杆', () => {
+    const r = resolveStoppedShot(
+      S({ actor: 'opponent', phase: 'opponent', playerGroup: 'stripe' }),
+      F({ firstContact: 3, pocketed: [10], remainingSolids: 5 }),
+    );
+    expect(r.next.actor).toBe('player');
+    expect(r.next.phase).toBe('aiming');
+    expect(r.next.messageKey).toBe('opponent-pot-turn');
+  });
+
+  it('同时进本组和对方花色：因为进了本组球而继续', () => {
+    const r = resolveStoppedShot(
+      S({ actor: 'opponent', phase: 'opponent', playerGroup: 'stripe' }),
+      F({ firstContact: 3, pocketed: [3, 10], remainingSolids: 4 }),
+    );
+    expect(r.next.actor).toBe('opponent');
+    expect(r.next.phase).toBe('opponent');
+    expect(r.next.messageKey).toBe('pot-continue');
+    expect(r.next.messageParams.count).toBe(1);
+  });
 });
 
 describe('犯规判定', () => {

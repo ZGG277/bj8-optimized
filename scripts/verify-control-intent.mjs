@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动的本地游戏页、Chrome/Chromium 与 puppeteer-core
-[OUTPUT]: 从灯泡显式开启拨轮后，真实触摸回归瞄准拨动不触发布局拖位、蓄力移出取消与正常出杆
+[OUTPUT]: 默认拨轮下真实触摸回归瞄准拨动不触发布局拖位、蓄力移出取消与正常出杆
 [POS]: 控件手势意图互斥的真实浏览器出口验收
 [PROTOCOL]: 瞄准长按、蓄力取消走廊或调试句柄变化时同步更新本文件与 scripts/CLAUDE.md
 */
@@ -28,19 +28,16 @@ await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, hasTouch
 const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
 await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
-await page.waitForFunction(() => window.__bj8?.scene?.current, { timeout: 10000 });
 await page.waitForSelector('.start-btn', { timeout: 10000 });
 await page.click('.start-btn');
+await page.waitForFunction(() => window.__bj8?.scene?.current, { timeout: 10000 });
 await page.waitForFunction(() => window.__bj8?.match?.current?.phase === 'aiming');
 await wait(300);
 await page.waitForFunction(() => document.querySelector('[data-control-slot="aimDial"]'), {
   timeout: 10000,
 });
 
-// 产品默认使用球杆左右键；真实拨轮验收必须沿用户入口从灯泡菜单显式开启。
-await page.click('button[aria-label="打开辅助功能"]');
-await page.waitForSelector('button[aria-label="拨轮瞄准"]', { timeout: 5000 });
-await page.click('button[aria-label="拨轮瞄准"]');
+// 产品默认使用拨轮，方向键只从灯泡菜单按需切换。
 await page.waitForFunction(
   () => document.querySelector('[data-control-slot="aimDial"] .aim-dial'),
   { timeout: 5000 },

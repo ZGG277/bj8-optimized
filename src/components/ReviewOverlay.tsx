@@ -1,6 +1,6 @@
 /*
 [INPUT]: ShotReview（planner/review 判定结果）+ open 状态与开关回调
-[OUTPUT]: 渲染击球复盘 UI——折叠态 .review-chip（一句话诊断 + ▶ 对比入口）/ 展开态 .review-bar（诊断 + 图例 + ✕）
+[OUTPUT]: 渲染以“复盘”开头的中性击球诊断；有显式计划时提供 ▶ 计划/实际对比
 [POS]: HUD 组件层，只做展示与事件转发；场景对比渲染经父组件回调委托 Scene3D.showReviewOverlay
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -21,6 +21,7 @@ const VERDICT_LABEL: Record<ShotReview['verdict'], string> = {
   perfect: '完美复现',
   'position-miss': '走位偏差',
   'pot-miss': '未进球',
+  foul: '先避犯规',
 };
 
 /**
@@ -29,14 +30,22 @@ const VERDICT_LABEL: Record<ShotReview['verdict'], string> = {
  */
 export function ReviewOverlay({ review, open, onOpen, onClose }: ReviewOverlayProps) {
   const drag = useDraggableOverlay();
+  const canCompare = review.planned !== null;
   if (!open) {
     return (
       <div ref={drag.elementRef} className="review-float" style={drag.style}>
         <span className="overlay-drag-handle" aria-label="拖动复盘提示" {...drag.dragHandleProps}>⠿</span>
-        <button type="button" className="review-chip" onClick={onOpen} aria-label="展开击球复盘对比">
-          <span className={`review-verdict-dot ${review.verdict}`} />
-          {`复盘：${review.message} · ▶ 对比`}
-        </button>
+        {canCompare ? (
+          <button type="button" className="review-chip" onClick={onOpen} aria-label="展开击球复盘对比">
+            <span className={`review-verdict-dot ${review.verdict}`} />
+            {`复盘：${review.message} · ▶ 对比`}
+          </button>
+        ) : (
+          <div className="review-chip coach-only" role="status" aria-live="polite">
+            <span className={`review-verdict-dot ${review.verdict}`} />
+            {`复盘：${review.message}`}
+          </div>
+        )}
       </div>
     );
   }
@@ -44,6 +53,7 @@ export function ReviewOverlay({ review, open, onOpen, onClose }: ReviewOverlayPr
     <div ref={drag.elementRef} className="review-float" style={drag.style}>
       <div className="review-bar" role="dialog" aria-label="击球复盘">
         <span className="overlay-drag-handle" aria-label="拖动复盘提示" {...drag.dragHandleProps}>⠿</span>
+        <span className="review-title">复盘</span>
         <span className={`review-verdict ${review.verdict}`}>{VERDICT_LABEL[review.verdict]}</span>
         <span className="review-bar-message">{review.message}</span>
         <span className="review-bar-legend">

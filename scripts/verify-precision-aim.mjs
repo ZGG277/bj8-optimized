@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core、__bj8 调试句柄与 Scene3D 台面↔屏幕映射
-[OUTPUT]: 开球白球标准位/实体拖放/非法区域阻挡、横竖屏默认左右键、单步/低速长按、灯泡三入口、按需拨轮、显式轻点精瞄与页面稳定性断言
-[POS]: “本地 main 视觉基线 + 左右键默认瞄准 + 灯泡显式开启拨轮”的浏览器出口门禁
+[OUTPUT]: 开球白球标准位/实体拖放/非法区域阻挡、默认拨轮、灯泡四入口、方向键切换、显式粗精档与页面稳定性断言
+[POS]: “本地 main 视觉基线 + 拨轮默认瞄准 + 灯泡切换方向键”的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
@@ -59,8 +59,8 @@ ok(
     !beforePlacement.ghostVisible &&
     Math.abs(beforePlacement.cue.x) < 0.000001 &&
     Math.abs(beforePlacement.cue.z - 0.635) < 0.000001 &&
-    beforePlacement.buttons &&
-    !beforePlacement.dial,
+    !beforePlacement.buttons &&
+    beforePlacement.dial,
   JSON.stringify(beforePlacement),
 );
 
@@ -107,6 +107,22 @@ ok(
   JSON.stringify(blocked),
 );
 
+// 默认拨轮；从灯泡切到方向键后再验方向键的固定步长与长按。
+await page.click('.plan-button');
+await wait(100);
+await page.click('.assist-menu .dial-option');
+await wait(140);
+const directionMode = await page.evaluate(() => ({
+  buttons: Boolean(document.querySelector('.aim-controls')),
+  dial: Boolean(document.querySelector('.aim-dial')),
+  menuOpen: Boolean(document.querySelector('.assist-menu')),
+}));
+ok(
+  '灯泡: 可把默认拨轮切换为方向键并自动收起菜单',
+  directionMode.buttons && !directionMode.dial && !directionMode.menuOpen,
+  JSON.stringify(directionMode),
+);
+
 const beforeButton = await page.evaluate(() => window.__bj8.aim.current);
 await page.click('.aim-controls button:first-child');
 await wait(100);
@@ -116,7 +132,7 @@ const clickDelta = Math.atan2(
   Math.cos(afterButton - beforeButton),
 );
 ok(
-  '默认瞄准: 单击左键只走一次固定精瞄步长',
+  '方向键瞄准: 单击左键只走一次固定精瞄步长',
   Math.abs(clickDelta + 0.004) < 0.000001,
   `${beforeButton} → ${afterButton} (Δ=${clickDelta})`,
 );
@@ -141,11 +157,11 @@ const holdDelta = Math.atan2(
   Math.cos(afterHold - beforeHold),
 );
 ok(
-  '默认瞄准: 长按右键不会触发控件拖位',
+  '方向键瞄准: 长按右键不会触发控件拖位',
   holdDidNotDragLayout,
 );
 ok(
-  '默认瞄准: 长按右键连续移动且速度受限',
+  '方向键瞄准: 长按右键连续移动且速度受限',
   holdDelta >= 0.016 && holdDelta <= 0.032,
   `${beforeHold} → ${afterHold} (Δ=${holdDelta})`,
 );
@@ -169,7 +185,7 @@ const portraitButtons = await page.evaluate(() => {
   };
 });
 ok(
-  '竖屏默认瞄准: 左右键可见且完整位于视口内',
+  '竖屏方向键瞄准: 左右键可见且完整位于视口内',
   portraitButtons.exists &&
     portraitButtons.display !== 'none' &&
     portraitButtons.rect &&
@@ -188,11 +204,12 @@ const assistMenu = await page.evaluate(() => ({
   options: document.querySelectorAll('.assist-menu .assist-option').length,
   aim: Boolean(document.querySelector('.assist-menu .aim-option')),
   plan: Boolean(document.querySelector('.assist-menu .guidance-option')),
+  review: Boolean(document.querySelector('.assist-menu .review-option')),
   dial: Boolean(document.querySelector('.assist-menu .dial-option')),
 }));
 ok(
-  '灯泡: 展开瞄准线、走位复盘、拨轮瞄准三个独立入口',
-  assistMenu.options === 3 && assistMenu.aim && assistMenu.plan && assistMenu.dial,
+  '灯泡: 展开瞄准线、走位、复盘、瞄准器四个独立入口',
+  assistMenu.options === 4 && assistMenu.aim && assistMenu.plan && assistMenu.review && assistMenu.dial,
   JSON.stringify(assistMenu),
 );
 
@@ -204,7 +221,7 @@ const dialEnabled = await page.evaluate(() => ({
   menuOpen: Boolean(document.querySelector('.assist-menu')),
 }));
 ok(
-  '灯泡: 主动打开拨轮后原位取代默认左右键并收起菜单',
+  '灯泡: 可切回拨轮并原位取代方向键',
   dialEnabled.dial && !dialEnabled.buttons && !dialEnabled.menuOpen,
   JSON.stringify(dialEnabled),
 );

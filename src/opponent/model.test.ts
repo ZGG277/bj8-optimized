@@ -12,6 +12,7 @@ import {
   PLAYER_SKILL_STORAGE_KEY,
   applyShotObservation,
   applyMatchObservations,
+  buildMatchTrainingSummary,
   confidenceAdjustedLevel,
   createOpponentProfile,
   createPlayerSkillProfile,
@@ -155,6 +156,30 @@ describe('player skill model', () => {
     expect(fouled.foulAttempts).toBe(3);
     expect(fouled.fouls).toBe(1);
     expect(fouled.level).toBeCloseTo(clean.level, 10);
+  });
+
+  it('整局只输出一个最高优先级训练重点', () => {
+    const previous = createPlayerSkillProfile();
+    const observations = [
+      { tolerance: 0.02, pocketed: false, foul: true, position: 'unknown' as const, assisted: false },
+      { tolerance: 0.02, pocketed: true, foul: false, position: 'unknown' as const, assisted: false },
+      { tolerance: 0.02, pocketed: true, foul: false, position: 'unknown' as const, assisted: false },
+    ];
+    const next = applyMatchObservations(previous, observations);
+    const summary = buildMatchTrainingSummary(previous, next, observations);
+    expect(summary?.focus).toBe('犯规控制');
+    expect(summary?.nextGoal).toContain('下一局目标');
+  });
+
+  it('没有高犯规率时把低进球率识别为准度训练', () => {
+    const previous = createPlayerSkillProfile();
+    const observations = [
+      { tolerance: 0.02, pocketed: false, foul: false, position: 'unknown' as const, assisted: false },
+      { tolerance: 0.02, pocketed: false, foul: false, position: 'unknown' as const, assisted: false },
+      { tolerance: 0.02, pocketed: true, foul: false, position: 'unknown' as const, assisted: false },
+    ];
+    const next = applyMatchObservations(previous, observations);
+    expect(buildMatchTrainingSummary(previous, next, observations)?.focus).toBe('准度');
   });
 
   it('never crosses the 0–100 score boundaries', () => {

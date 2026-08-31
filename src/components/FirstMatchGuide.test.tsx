@@ -1,6 +1,6 @@
 /*
 [INPUT]: FirstMatchGuide 服务端静态渲染结果
-[OUTPUT]: 断言一行提示只保留弱化跳过入口、默认左右微调且不回归手动下一步/完成控件
+[OUTPUT]: 断言一行提示只保留弱化跳过入口、默认拨轮微调且不回归手动下一步/完成控件
 [POS]: 首局微提示结构门禁，不依赖浏览器布局
 [PROTOCOL]: 变更时更新此头部，然后检查 components/CLAUDE.md
 */
@@ -25,7 +25,7 @@ describe('FirstMatchGuide 微提示结构', () => {
     expect(markup).not.toContain('guide-next');
   });
 
-  it('精瞄提示默认引导球杆左右键微调', () => {
+  it('精瞄提示默认引导拨轮微调', () => {
     const markup = renderToStaticMarkup(
       <FirstMatchGuide
         step="break-fine"
@@ -34,6 +34,6 @@ describe('FirstMatchGuide 微提示结构', () => {
       />,
     );
 
-    expect(markup).toContain('用球杆左右键微调');
+    expect(markup).toContain('拨动瞄准轮微调');
   });
 });

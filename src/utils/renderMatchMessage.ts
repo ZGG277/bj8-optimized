@@ -16,6 +16,7 @@ export function renderMatchMessage(m: MatchState): string {
     case 'rolling': return '球在运动中...';
     case 'pot-continue': return `${name}${count && count > 1 ? `${count}颗球进` : '进球'}，继续`;
     case 'miss-turn': return `${name}未进球，${other}的回合`;
+    case 'opponent-pot-turn': return `${name}只进了对方花色，${other}的回合`;
     case 'group-assigned': return `${group === 'solid' ? '全色球' : '花色球'}，${name}的回合`;
     case 'foul': {
       const r = reason === 'scratch' ? '白球落袋'

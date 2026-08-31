@@ -1,7 +1,7 @@
 /*
 [INPUT]: AimControls 服务端静态渲染结果
-[OUTPUT]: 断言默认左右微调入口、球杆中线与禁用语义
-[POS]: 默认瞄准控件结构门禁，不依赖浏览器 Pointer 实现
+[OUTPUT]: 断言可选方向键微调入口、球杆中线与禁用语义
+[POS]: 方向键瞄准控件结构门禁，不依赖浏览器 Pointer 实现
 [PROTOCOL]: 变更时更新此头部，然后检查 components/CLAUDE.md
 */
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -13,7 +13,7 @@ import {
   AimControls,
 } from './AimControls';
 
-describe('AimControls 默认左右微调结构', () => {
+describe('AimControls 可选方向键微调结构', () => {
   it('提供球杆两侧的左右按钮', () => {
     const markup = renderToStaticMarkup(
       <AimControls disabled={false} onAdjust={() => {}} />,

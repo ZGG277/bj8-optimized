@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、首局分阶段引导、整局结束能力评估、可热更新的运动快照节流、按需走位预算、顾燃横竖屏固定俯视、玩家非俯视杆向跟随及默认左右微调/显式拨轮 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、默认收起的中性赛后复盘、整局训练总结、默认拨轮/可选方向键、延迟 3D 启动、无 React 克隆的运动快照、按需走位预算与相机/控制 HUD
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -32,11 +32,12 @@ import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
 import { ControlDeck } from './components/ControlDeck';
 import { PlanOverlay } from './components/PlanOverlay';
+import { PlanStatusNotice } from './components/PlanStatusNotice';
 import { ReviewOverlay } from './components/ReviewOverlay';
 import { IntroScreen } from './components/IntroScreen';
 import { FirstMatchGuide } from './components/FirstMatchGuide';
 import { Scene3D } from './Scene3D';
-import type { PositionPlan } from './planner/search';
+import type { PlannedStep, PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
 import {
@@ -82,7 +83,7 @@ export default function Game() {
     worldRef, worldView, setWorldView,
     match, matchRef, setMatch,
     viewLevel, setViewLevel,
-    playerSkill, gameMode, opponentProfile,
+    playerSkill, trainingSummary, gameMode, opponentProfile,
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
@@ -142,30 +143,29 @@ export default function Game() {
   }, []);
 
   // ── 走位规划（后台预算 + 覆盖层状态机）──
-  const guidanceAllowed = gameMode === 'practice';
   const [guidanceEnabled, setGuidanceEnabled] = useState(false);
   const positionPlan = usePositionPlan({
     worldView,
     match,
-    enabled: guidanceAllowed && guidanceEnabled,
+    enabled: guidanceEnabled,
   });
   const planOpen = positionPlan.status === 'showing';
   // 规划视图打开期间禁用瞄准输入（最小侵入：只压低 canAim，不动交互层内部）
   const canAim = canAimBase && !planOpen;
-  // positionPlan 对象每渲染换新身份；出杆捕获只需读 plans，用 ref 镜像避免 handleCommit 重建
-  const positionPlanRef = useRef(positionPlan);
-  positionPlanRef.current = positionPlan;
   const planConsultedRef = useRef(false);
+  /** 规划视图关闭会停用 Worker/清空 plans；另存用户真正看过的首杆直到本次出杆。 */
+  const consultedPlanStepRef = useRef<PlannedStep | null>(null);
 
-  // ── 击球复盘（上一杆「计划 vs 实际」）──
+  // ── 击球复盘（默认收起；玩家从灯泡打开后才显示最新复盘）──
   // 出杆瞬间在 handleCommit 的 doShot 里捕获快照；对手杆走 useOpponentAI 不经此路，天然只记玩家杆
   const shotCaptureRef = useRef<ShotCapture | null>(null);
   const skillShotCaptureRef = useRef<SkillShotCapture | null>(null);
   const [shotReview, setShotReview] = useState<ShotReview | null>(null);
+  const [reviewEnabled, setReviewEnabled] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
   const aimAssist = useAimAssist();
-  const [aimDialEnabled, setAimDialEnabled] = useState(false);
+  // 拨轮是默认瞄准器；灯泡里可切换回方向键。
+  const [aimDialEnabled, setAimDialEnabled] = useState(true);
   const [firstMatchGuideStep, setFirstMatchGuideStep] =
     useState<FirstMatchGuideStep | null>(() =>
       shouldRunFirstMatchGuide(
@@ -218,11 +218,11 @@ export default function Game() {
   // 打开前的视角，关闭时恢复
   const prevViewLevelRef = useRef(viewLevel);
   const handleOpenPlan = useCallback(() => {
-    if (!guidanceAllowed) return;
     planConsultedRef.current = true;
+    consultedPlanStepRef.current = positionPlan.plans[0]?.steps[0] ?? null;
     prevViewLevelRef.current = viewLevel;
     positionPlan.open();
-  }, [guidanceAllowed, viewLevel, positionPlan]);
+  }, [viewLevel, positionPlan]);
   const handleClosePlan = useCallback(() => {
     positionPlan.close();
     setViewLevel(prevViewLevelRef.current);
@@ -233,19 +233,17 @@ export default function Game() {
   useEffect(() => {
     if (
       guidanceEnabled &&
-      !shotReview &&
       positionPlan.status === 'ready' &&
       !planOpen
     ) {
       handleOpenPlan();
     }
-  }, [guidanceEnabled, shotReview, positionPlan.status, planOpen, handleOpenPlan]);
+  }, [guidanceEnabled, positionPlan.status, planOpen, handleOpenPlan]);
 
   // ── 复盘开合：▶ 对比切俯视 + 场景叠加；✕/💡 收起回 chip ──
   const prevReviewViewLevelRef = useRef(viewLevel);
   const handleOpenReview = useCallback(() => {
-    if (!shotReview) return;
-    setGuidanceEnabled(true);
+    if (!shotReview?.planned) return;
     prevReviewViewLevelRef.current = viewLevel;
     setReviewOpen(true);
     setViewLevel(OVERHEAD_VIEW);
@@ -255,31 +253,32 @@ export default function Game() {
     setReviewOpen(false);
     scene3DRef.current?.showReviewOverlay(null);
     setViewLevel(prevReviewViewLevelRef.current);
-    setGuidanceEnabled(false);
   }, [setViewLevel]);
 
-  // 💡 是规划与复盘的总开关：默认熄灭；复盘优先，规划仅在用户主动点亮时打开。
+  // 规划与复盘是灯泡中的两个独立开关，避免查看复盘时意外启动规划 Worker。
   const handleTogglePlan = useCallback(() => {
-    if (!guidanceAllowed) return;
     if (guidanceEnabled) {
       if (planOpen) handleClosePlan();
-      if (reviewOpen) handleCloseReview();
       setGuidanceEnabled(false);
       return;
     }
+    if (reviewOpen) handleCloseReview();
     setGuidanceEnabled(true);
-    if (!shotReview && positionPlan.status === 'ready') handleOpenPlan();
+    if (positionPlan.status === 'ready') handleOpenPlan();
   }, [
     guidanceEnabled,
-    guidanceAllowed,
     planOpen,
-    reviewOpen,
-    shotReview,
     positionPlan.status,
+    reviewOpen,
     handleCloseReview,
     handleClosePlan,
     handleOpenPlan,
   ]);
+
+  const handleToggleReview = useCallback(() => {
+    if (reviewEnabled && reviewOpen) handleCloseReview();
+    setReviewEnabled(current => !current);
+  }, [handleCloseReview, reviewEnabled, reviewOpen]);
 
   // 复盘被清空（对手杆结算/新一杆出杆）时，同步收起可能还展开着的场景叠加
   useEffect(() => {
@@ -357,8 +356,18 @@ export default function Game() {
         angle,
         power: intent.power,
         spin: intent.spin,
-        planned: positionPlanRef.current.plans[0]?.steps[0] ?? null,
+        planned: consultedPlanStepRef.current,
+        intent: declaredIntent
+          ? {
+              target: declaredIntent.target,
+              pocket: declaredIntent.pocket,
+              centerAngle: declaredIntent.centerAngle,
+              halfWidth: declaredIntent.halfWidth,
+            }
+          : null,
+        breaking: currentMatch.breaking,
       };
+      consultedPlanStepRef.current = null;
       if (!strikeCueBall(worldRef.current, angle, intent.power, intent.spin)) {
         shotCaptureRef.current = null;
         skillShotCaptureRef.current = null;
@@ -672,6 +681,7 @@ export default function Game() {
     setManualCameraPinned(false);
     manualAimTransitionPointerRef.current = null;
     planConsultedRef.current = false;
+    consultedPlanStepRef.current = null;
     skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
   }, [clearTouchAimCameraTimer, resetGame, setAim, setSpin, aimGhostDistRef]);
@@ -685,9 +695,15 @@ export default function Game() {
     // 复盘生成：有捕获（玩家杆）→ 判定；无捕获（对手杆）→ 清掉旧复盘
     const capture = shotCaptureRef.current;
     shotCaptureRef.current = null;
-    const review = capture ? buildShotReview(capture) : null;
+    const review = capture && settlement
+      ? buildShotReview(capture, {
+          pocketed: settlement.facts.pocketed,
+          firstContact: settlement.facts.firstContact,
+          foulReason: settlement.resolution.next.messageParams.reason ?? null,
+        })
+      : null;
     setShotReview(review);
-    // 只记录复盘，不主动打开；用户需要再次点亮 💡。
+    // 复盘只生成数据；是否显示由灯泡中的独立开关决定。
     setGuidanceEnabled(false);
 
     const skillCapture = skillShotCaptureRef.current;
@@ -698,14 +714,15 @@ export default function Game() {
       const foul = messageKey === 'foul' || messageKey === 'lose-8-foul';
       const pocketed =
         skillCapture.target !== null && facts.pocketed.includes(skillCapture.target);
+      const plannedCandidate = review?.planned?.candidate;
       const samePlan =
         skillCapture.target !== null &&
         skillCapture.pocket !== null &&
-        review?.planned.candidate.target === skillCapture.target &&
-        review.planned.candidate.pocket === skillCapture.pocket;
+        plannedCandidate?.target === skillCapture.target &&
+        plannedCandidate.pocket === skillCapture.pocket;
       let position: PositionOutcome = 'unknown';
       if (pocketed && samePlan) {
-        position = review.verdict === 'perfect' ? 'success' : 'miss';
+        position = review?.verdict === 'perfect' ? 'success' : 'miss';
       }
       recordPlayerShot({
         tolerance: skillCapture.tolerance,
@@ -727,8 +744,8 @@ export default function Game() {
     worldRef,
     onFrame: useCallback(() => {
       playPhysicsEvents(worldRef.current.events);
-      setWorldView(cloneWorld(worldRef.current));
-    }, [worldRef, playPhysicsEvents, setWorldView]),
+      scene3DRef.current?.sync(worldRef.current);
+    }, [worldRef, playPhysicsEvents]),
     onSettled: settleShot,
     presentationIntervalMs: physicsPresentationIntervalMs,
   });
@@ -748,8 +765,10 @@ export default function Game() {
     onShot: resetEvents,
   });
 
-  // ── 初始化 3D 场景 ──
+  // ── 初始化 3D 场景：介绍页不创建 WebGL/纹理，开始对局后再一次性装配 ──
+  const sceneEnabled = match.phase !== 'intro';
   useEffect(() => {
+    if (!sceneEnabled) return;
     const el = containerRef.current;
     if (!el) return;
 
@@ -787,7 +806,7 @@ export default function Game() {
       scene3DRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sceneEnabled]);
 
   // ── 同步世界状态到 3D 场景 ──
   useEffect(() => {
@@ -835,6 +854,7 @@ export default function Game() {
         manualCameraActive={manualCameraActive}
         firstMatchGuideActive={Boolean(firstMatchGuideStep)}
         match={match}
+        trainingSummary={trainingSummary}
         containerRef={containerRef}
         onPointerDown={handleStagePointerDown}
         onPointerMove={handleStagePointerMove}
@@ -851,9 +871,10 @@ export default function Game() {
         charging={charging}
         previewPower={previewPower}
         breaking={match.breaking}
-        planStatus={guidanceAllowed ? positionPlan.status : 'idle'}
-        guidanceEnabled={guidanceAllowed && guidanceEnabled}
-        hasReview={guidanceAllowed && Boolean(shotReview)}
+        planStatus={positionPlan.status}
+        guidanceEnabled={guidanceEnabled}
+        reviewEnabled={reviewEnabled}
+        hasReview={Boolean(shotReview)}
         aimAssistEnabled={aimAssist.enabled}
         aimDialEnabled={aimDialEnabled}
         aimDialVisible={aimDialVisible}
@@ -863,6 +884,7 @@ export default function Game() {
         onSpinChange={handleGuideSpinChange}
         onLayoutAdjusted={handleGuideLayoutAdjusted}
         onToggleGuidance={handleTogglePlan}
+        onToggleReview={handleToggleReview}
         onToggleAimAssist={aimAssist.toggle}
         onToggleAimDial={() => setAimDialEnabled(current => !current)}
         onAimButtonAdjust={handleStableAimButtonAdjust}
@@ -874,7 +896,15 @@ export default function Game() {
         onCancelCharge={cancelCharge}
         onTapShot={() => commitShot({ power: MIN_POWER, spin })}
       />
-      {guidanceAllowed && guidanceEnabled && planOpen && (
+      {guidanceEnabled && !planOpen && (
+        positionPlan.status === 'computing' || positionPlan.status === 'failed'
+      ) && (
+        <PlanStatusNotice
+          status={positionPlan.status}
+          onClose={handleTogglePlan}
+        />
+      )}
+      {guidanceEnabled && planOpen && (
         <PlanOverlay
           plans={positionPlan.plans}
           onClose={handleClosePlan}
@@ -882,7 +912,7 @@ export default function Game() {
         />
       )}
       {/* 复盘讲上一杆、规划讲下一杆可共存；planOpen 时提示条位置让位给引导，chip 隐藏 */}
-      {guidanceAllowed && guidanceEnabled && shotReview && !planOpen && (
+      {reviewEnabled && shotReview && !guidanceEnabled && match.phase !== 'finished' && (
         <ReviewOverlay
           review={shotReview}
           open={reviewOpen}
@@ -895,6 +925,7 @@ export default function Game() {
           step={firstMatchGuideStep}
           visible={
             !planOpen &&
+            !guidanceEnabled &&
             !reviewOpen &&
             (
               (match.phase === 'placing' && match.breaking) ||
