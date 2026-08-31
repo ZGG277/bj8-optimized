@@ -8,15 +8,15 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `useGameState.ts`: 状态管理收敛层，集中管理 worldView/match/viewLevel 与双方档案；局内只在 ref 收集玩家出杆事实，胜负确定后一次消费、更新可见水平、生成单点训练总结并持久化，重开局清空临时样本与上一局总结。
 
-`useAimAssist.ts`: 预测辅助线偏好 Hook；首次/损坏存储默认关闭，安全读写 `guagua-billiards:aim-assist:v1`，不控制幽灵球和合法目标环。
+`useAimAssist.ts`: 预测辅助线偏好 Hook；首次/损坏/受限存储默认开启，安全读写 `guagua-billiards:aim-assist:v1`，尊重用户显式关闭，不控制幽灵球和合法目标环。
 
-`useAimAssist.test.ts`: 默认关闭、true/false 读取、损坏/受限存储安全回退回归。
+`useAimAssist.test.ts`: 默认开启、true/false 读取、损坏/受限存储安全回退回归。
 
 `shot-settlement-guard.ts`: 同杆去重与新局 reset 的纯幂等原语。
 
 `shot-settlement-guard.test.ts`: 同局重复 shotId 拒绝、跨局相同 shotId 可重新接收的回归。
 
-`useAimInteraction.ts`: 交互协调层，封装开球实体母球按住拖放、自由球虚影落位、合法区域约束、点哪打哪、抓影子球、360° 粗瞄与默认拨轮/可选方向键微调；屏幕反算显式消费当前视觉相机方位。切到方向键或离开瞄准态时退出拨轮精瞄档，两种控件共同修改唯一世界杆向。
+`useAimInteraction.ts`: 交互协调层，封装开球实体母球合法点按/按住拖放、自由球虚影落位、合法区域约束、点哪打哪、抓影子球、360° 粗瞄与默认拨轮/可选方向键微调；屏幕反算显式消费当前视觉相机方位。切到方向键或离开瞄准态时退出拨轮精瞄档，两种控件共同修改唯一世界杆向。
 
 `useOpponentAI.ts`: AI 调度层，match.phase === 'opponent' 时消费本局锁定档案；500ms 自然停顿后调用专用战术 Worker，陪练/挑战分别以 750/1200ms 截止，超时回退轻量选杆；已验证杆的执行误差按模式压在当前杆向安全窗内。
 

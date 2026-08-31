@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 __bj8 调试句柄
-[OUTPUT]: 390×844 竖屏双方水平、辅助线、触屏拖放、压感拨轮增益/视觉/回退、沿边落点与轴向断言
+[OUTPUT]: 390×844 竖屏双方水平、默认辅助线及偏好、触屏拖放、压感拨轮增益/视觉/回退、沿边落点与轴向断言
 [POS]: v1.4 手机真实 Pointer 与统一控件布局的浏览器出口验收门禁（保留旧脚本名供现有命令调用）
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -243,9 +243,8 @@ ok('五个控件都在视口安全范围且不遮挡比分牌',
 ok('操作面无可见文字和力度数字',
   initial.controlText === '' && initial.powerNumbers === 0,
   JSON.stringify({ text: initial.controlText, numbers: initial.powerNumbers }));
-ok('首次进入预测辅助线关闭但幽灵球仍可见',
-  initial.storedAim === null && !initial.aimVisible && !initial.objVisible &&
-    !initial.tanVisible && initial.ghostVisible,
+ok('首次进入预测辅助线默认开启且幽灵球仍可见',
+  initial.storedAim === null && initial.aimVisible && initial.ghostVisible,
   JSON.stringify(initial));
 
 const rightOrderBefore = await page.evaluate(() => {
@@ -307,31 +306,31 @@ const menuOpen = await page.evaluate(() => ({
   aimSwitch: document.querySelector('.aim-option')?.getAttribute('aria-checked'),
   guidanceDisabled: document.querySelector('.guidance-option')?.disabled,
 }));
-ok('灯泡向球桌内侧展开两个独立图形开关',
-  menuOpen.expanded === 'true' && menuOpen.aimSwitch === 'false',
+ok('灯泡向球桌内侧展开独立图形开关且瞄准线默认开启',
+  menuOpen.expanded === 'true' && menuOpen.aimSwitch === 'true',
   JSON.stringify(menuOpen));
 await page.click('.aim-option');
 await wait(120);
-const enabled = await page.evaluate(() => ({
+const disabled = await page.evaluate(() => ({
   stored: localStorage.getItem('guagua-billiards:aim-assist:v1'),
   checked: document.querySelector('.aim-option')?.getAttribute('aria-checked'),
   aimVisible: window.__bj8.scene.current.aimLine.visible,
   ghostVisible: window.__bj8.scene.current.aimGhost.visible,
 }));
-ok('灯泡可独立打开预测线且不影响幽灵球',
-  enabled.stored === 'true' && enabled.checked === 'true' &&
-    enabled.aimVisible && enabled.ghostVisible,
-  JSON.stringify(enabled));
+ok('灯泡可独立关闭预测线且不影响幽灵球',
+  disabled.stored === 'false' && disabled.checked === 'false' &&
+    !disabled.aimVisible && disabled.ghostVisible,
+  JSON.stringify(disabled));
 
 await page.reload({ waitUntil: 'networkidle0' });
 await wait(350);
+await startAndPlace();
 const persisted = await page.evaluate(() => ({
   stored: localStorage.getItem('guagua-billiards:aim-assist:v1'),
-  bulbClass: document.querySelector('.plan-button')?.className ?? '',
+  aimVisible: window.__bj8.scene.current.aimLine.visible,
 }));
-ok('辅助线选择刷新后保持', persisted.stored === 'true' &&
-  persisted.bulbClass.includes('has-aim-assist'), JSON.stringify(persisted));
-await startAndPlace();
+ok('辅助线关闭选择刷新后保持', persisted.stored === 'false' &&
+  !persisted.aimVisible, JSON.stringify(persisted));
 
 const dialStartAim = await page.evaluate(() => window.__bj8.aim.current);
 await quickMove('[data-control-slot="aimDial"] .aim-dial', 34, 0);

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 台球世界、独立视觉相机方位、Scene3D 屏幕坐标映射与 match 状态
-[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、默认拨轮/可选方向键微调、开球实体母球拖放/自由球预览与真实瞄准变化事实
+[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、默认拨轮/可选方向键微调、开球实体母球点击/拖放、自由球预览与真实瞄准变化事实
 [POS]: 交互协调层，把当前视觉相机下的指针与微调控件映射为世界瞄准角；拨轮消费用户显式粗/精档位
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -233,15 +233,17 @@ export function useAimInteraction({
     return placement;
   }, [cuePlacementAt, worldRef, setWorldView]);
 
-  /** 指针落点判定：幽灵球上=抓球挪位；瞄准线段上=抓线转角；其余=点哪打哪 */
+  /** 指针落点判定：开球区合法点=点击/拖放白球；幽灵球上=抓球挪位；
+   *  瞄准线段上=抓线转角；其余=点哪打哪。 */
   const pickDragMode = useCallback((clientX: number, clientY: number): 'aim' | 'ghost' | 'line' | 'cue' => {
     const scene = scene3DRef.current;
     const cue = getCueBall(worldRef.current);
     if (!scene || !cue) return 'aim';
     const hit = scene.screenToTableAt(clientX, clientY, cameraAzimuthRef.current, viewLevel);
     if (!hit) return 'aim';
-    if (breaking && Math.hypot(hit.x - cue.x, hit.z - cue.z) <= TABLE.ballRadius * 2.4) {
-      return 'cue';
+    if (breaking) {
+      const placement = cuePlacementAt(clientX, clientY);
+      if (placement && !placement.error) return 'cue';
     }
     const ghost = scene.aimGhostPos();
     if (!ghost) return 'aim';
@@ -255,7 +257,14 @@ export function useAimInteraction({
       if (t > 0.05 && t < 1.05 && perp < 0.022) return 'line';
     }
     return 'aim';
-  }, [scene3DRef, worldRef, viewLevel, cameraAzimuthRef, breaking]);
+  }, [
+    breaking,
+    cameraAzimuthRef,
+    cuePlacementAt,
+    scene3DRef,
+    viewLevel,
+    worldRef,
+  ]);
 
   /** 指针按下 */
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -328,8 +337,14 @@ export function useAimInteraction({
     }
     const drag = dragRef.current;
     if (drag?.mode === 'cue') {
-      if (placementErrorRef.current) setMessage(placementErrorRef.current);
-      else if (drag.dragging) setMessage('placed');
+      const clickPlacement = drag.dragging
+        ? null
+        : moveCueTo(e.clientX, e.clientY);
+      const placementError = drag.dragging
+        ? placementErrorRef.current
+        : clickPlacement?.error ?? null;
+      if (placementError) setMessage(placementError);
+      else if (drag.dragging || clickPlacement) setMessage('placed');
       placementErrorRef.current = null;
     }
     const coarseAimAdjusted = Boolean(
@@ -347,7 +362,14 @@ export function useAimInteraction({
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     }
     if (coarseAimAdjusted) onCoarseAimAdjusted();
-  }, [matchPhase, commitCuePlacement, aimRef, onCoarseAimAdjusted, setMessage]);
+  }, [
+    aimRef,
+    commitCuePlacement,
+    matchPhase,
+    moveCueTo,
+    onCoarseAimAdjusted,
+    setMessage,
+  ]);
 
   const handlePointerCancel = useCallback((e: React.PointerEvent) => {
     dragRef.current = null;

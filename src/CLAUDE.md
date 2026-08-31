@@ -56,8 +56,8 @@
 
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
   - `useGameState`：集中管理对局状态、局内锁定双方档案与整局一次评估；新局重置 shot 结算守卫
-  - `useAimAssist`：默认关闭且容错持久化的预测辅助线偏好
-  - `useAimInteraction`：封装开球实体母球按住拖放与合法区域约束、自由球虚影落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及默认拨轮/可选方向键与拨轮显式粗精档
+  - `useAimAssist`：默认开启且容错持久化的预测辅助线偏好
+  - `useAimInteraction`：封装开球实体母球合法点按/按住拖放与区域约束、自由球虚影落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及默认拨轮/可选方向键与拨轮显式粗精档
   - `useOpponentAI`：消费局前锁定档案，调度限预算战术 Worker、选杆扰动与袋口容错内的执行误差
   - `useAudioManager`：音效初始化和物理/胜局事件播放，暴露 audioRef/playStrike/playPhysicsEvents/playVictory/resetEvents
   - `usePositionPlan`：走位规划预算状态机（idle→computing→ready→showing/failed），只在灯泡显式点亮后经可抢占 Worker 执行 320 次、两层、2.5 秒截止搜索

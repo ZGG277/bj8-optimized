@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core、__bj8 调试句柄与 Scene3D 台面↔屏幕映射
-[OUTPUT]: 开球白球标准位/实体拖放/非法区域阻挡、默认拨轮、灯泡四入口、方向键切换、显式粗精档与页面稳定性断言
+[OUTPUT]: 开球白球标准位/合法点按与实体拖放/非法区域阻挡、默认瞄准线与拨轮、灯泡四入口、方向键切换、显式粗精档与页面稳定性断言
 [POS]: “本地 main 视觉基线 + 拨轮默认瞄准 + 灯泡切换方向键”的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -23,6 +23,10 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
 await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+await page.evaluate(() => {
+  localStorage.removeItem('guagua-billiards:aim-assist:v1');
+});
+await page.reload({ waitUntil: 'networkidle0' });
 await page.waitForSelector('.intro-card button');
 
 async function clickText(text) {
@@ -51,20 +55,44 @@ const beforePlacement = await page.evaluate(() => ({
   phase: window.__bj8.match.current.phase,
   buttons: Boolean(document.querySelector('.aim-controls')),
   dial: Boolean(document.querySelector('.aim-dial')),
+  aimVisible: window.__bj8.scene.current.aimLine.visible,
 }));
 ok(
-  '开球: 白球自动在开球线中点实体就位且直接可瞄准',
+  '开球: 白球标准位、瞄准线与拨轮默认就绪',
   beforePlacement.phase === 'aiming' &&
     beforePlacement.realVisible &&
     !beforePlacement.ghostVisible &&
     Math.abs(beforePlacement.cue.x) < 0.000001 &&
     Math.abs(beforePlacement.cue.z - 0.635) < 0.000001 &&
     !beforePlacement.buttons &&
-    beforePlacement.dial,
+    beforePlacement.dial &&
+    beforePlacement.aimVisible,
   JSON.stringify(beforePlacement),
 );
 
-const cueStart = await page.evaluate(() => window.__bj8.scene.current.tableToScreen(0, 0.635));
+const clickTarget = await page.evaluate(() =>
+  window.__bj8.scene.current.tableToScreen(0.18, 0.88));
+await page.mouse.click(clickTarget.x, clickTarget.y);
+await wait(180);
+const clicked = await page.evaluate(() => {
+  const cue = window.__bj8.world.current.balls.find((ball) => ball.number === 0);
+  return {
+    x: cue.x,
+    z: cue.z,
+    phase: window.__bj8.match.current.phase,
+    messageKey: window.__bj8.match.current.messageKey,
+  };
+});
+ok(
+  '开球: 点击其他合法开球区位置可重新放置白球',
+  clicked.phase === 'aiming' &&
+    clicked.messageKey === 'placed' &&
+    Math.hypot(clicked.x - 0.18, clicked.z - 0.88) < 0.02,
+  JSON.stringify(clicked),
+);
+
+const cueStart = await page.evaluate(() =>
+  window.__bj8.scene.current.tableToScreen(0.18, 0.88));
 const kitchen = await page.evaluate(() => window.__bj8.scene.current.tableToScreen(0.12, 0.82));
 await page.mouse.move(cueStart.x, cueStart.y);
 await page.mouse.down();
