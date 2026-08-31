@@ -2,6 +2,7 @@
   "name": "bj8-optimized",
   "version": "1.2.0",
   "private": true,
+  "packageManager": "npm@11.9.0",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build && node scripts/inline-build.mjs",

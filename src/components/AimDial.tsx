@@ -1,36 +1,60 @@
 /*
-[INPUT]: 可见状态、最近合法袋口解与相对像素拨动回调
-[OUTPUT]: 对外提供球桌内无边界横向密码轮；固定中心线、移动刻度、键盘与 Pointer 拨动
-[POS]: 控制组件层；只采集相对位移与展示档位，不持有世界角或判断球路
+[INPUT]: 可见状态、辅助开关、最近合法袋口解与带用户选定档位的相对像素拨动回调
+[OUTPUT]: 对外提供球桌内无边界横向密码轮；普通区域固定方向档，按住中央白线进入固定精调离合
+[POS]: 控制组件层；袋口接近度只在辅助开启时提示，不得改变传动比或替用户选择档位
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PrecisionAimSolution } from '../aim/aim-solution';
-import { aimDialMode } from '../input/aim-dial';
+import {
+  AIM_DIAL_APPROACH_RATIO,
+  aimDialRatio,
+  type AimDialGear,
+} from '../input/aim-dial';
 
 interface AimDialProps {
   visible: boolean;
+  assistanceEnabled: boolean;
   solution: PrecisionAimSolution | null;
-  onAdjust: (pixelDelta: number) => void;
+  onAdjust: (pixelDelta: number, gear: AimDialGear) => void;
 }
 
-export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
+export function AimDial({
+  visible,
+  assistanceEnabled,
+  solution,
+  onAdjust,
+}: AimDialProps) {
   const lastXRef = useRef<number | null>(null);
+  const gestureGearRef = useRef<AimDialGear>('normal');
   const [tickOffset, setTickOffset] = useState(0);
   const [active, setActive] = useState(false);
+  const [fineActive, setFineActive] = useState(false);
+
+  useEffect(() => {
+    if (visible) return;
+    lastXRef.current = null;
+    gestureGearRef.current = 'normal';
+    setActive(false);
+    setFineActive(false);
+  }, [visible]);
+
   if (!visible) return null;
 
-  const mode = aimDialMode(solution);
-  const nearby = mode !== 'coarse' && solution;
-  const label = mode === 'fine'
-    ? `精瞄 ${solution?.target ?? ''}号 → ${solution?.pocketName ?? ''}`
-    : nearby
-      ? `接近 ${solution.target}号 → ${solution.pocketName}`
-      : '方向拨轮';
+  const fineReady = assistanceEnabled
+    && solution !== null
+    && (aimDialRatio(solution) ?? Infinity) <= AIM_DIAL_APPROACH_RATIO;
+  const label = fineActive
+    ? '精调离合已按住'
+    : fineReady
+      ? `接近 ${solution.target}号 → ${solution.pocketName}，可按中线精调`
+      : '方向拨轮，按中线精调';
 
   const finish = (event: React.PointerEvent<HTMLDivElement>) => {
     lastXRef.current = null;
+    gestureGearRef.current = 'normal';
     setActive(false);
+    setFineActive(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -38,7 +62,7 @@ export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
 
   return (
     <div
-      className={`aim-dial ${mode} ${active ? 'active' : ''}`}
+      className={`aim-dial ${fineReady ? 'fine-ready' : ''} ${fineActive ? 'fine-active' : ''} ${active ? 'active' : ''}`}
       role="slider"
       tabIndex={0}
       aria-label="横向拨轮调整击球方向"
@@ -46,8 +70,13 @@ export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
       onPointerDown={(event) => {
         event.stopPropagation();
         event.preventDefault();
+        const target = event.target as HTMLElement;
+        const gear: AimDialGear = target.closest('[data-aim-fine-clutch]') ? 'fine' : 'normal';
         lastXRef.current = event.clientX;
+        gestureGearRef.current = gear;
         setActive(true);
+        setFineActive(gear === 'fine');
+        if (gear === 'fine') navigator.vibrate?.(10);
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
       onPointerMove={(event) => {
@@ -56,7 +85,7 @@ export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
         const delta = event.clientX - lastX;
         lastXRef.current = event.clientX;
         if (delta === 0) return;
-        onAdjust(delta);
+        onAdjust(delta, gestureGearRef.current);
         setTickOffset((current) => (current + delta) % 24);
       }}
       onPointerUp={finish}
@@ -65,19 +94,21 @@ export function AimDial({ visible, solution, onAdjust }: AimDialProps) {
       onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
-        onAdjust(event.key === 'ArrowLeft' ? -6 : 6);
+        onAdjust(event.key === 'ArrowLeft' ? -6 : 6, event.shiftKey ? 'fine' : 'normal');
         setTickOffset((current) => (current + (event.key === 'ArrowLeft' ? -6 : 6)) % 24);
       }}
     >
       <div className="aim-dial-label" aria-hidden="true">
-        <strong>{mode === 'fine' ? '精瞄' : mode === 'approach' ? '接近' : '方向'}</strong>
+        <strong>{fineActive ? '精调' : fineReady ? '可精调' : '方向'}</strong>
         <small>
-          {nearby ? `${solution.target}号 → ${solution.pocketName}` : '左右拨动'}
+          {fineReady ? `${solution.target}号 → ${solution.pocketName}` : '按中线精调'}
         </small>
       </div>
       <div className="aim-dial-window" aria-hidden="true">
         <i className="aim-dial-ticks" style={{ backgroundPositionX: `${tickOffset}px` }} />
-        <b />
+        <b className="aim-dial-fine-clutch" data-aim-fine-clutch>
+          <span>精</span>
+        </b>
       </div>
     </div>
   );

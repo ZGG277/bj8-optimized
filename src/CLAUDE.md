@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、文案在 `utils/renderMatchMessage`；DEV 调试句柄只为浏览器门禁提供摆球/同步/固定 match 阶段。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；240 Hz 物理步进后分层同步为 60 Hz 直达 3D 与 30 Hz React/HUD 快照；同时编排默认左右键、灯泡三辅助入口与按需精瞄拨轮。规则在 `match/`、输入在 `input/`、精瞄几何在 `aim/`、控件在 `components/`、物理时钟在 `simulation/`、Pointer 交互在 `hooks/useAimInteraction`、AI 在 `hooks/useOpponentAI`、走位规划在 `hooks/usePositionPlan` + `components/PlanOverlay`、击球复盘在 `planner/review` + `components/ReviewOverlay`、音效在 `hooks/useAudioManager`、状态在 `hooks/useGameState`、偏好在 `hooks/useAimAssist`。
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；含 20 用例规则矩阵测试。
 
@@ -14,7 +14,7 @@
 
 `aim/`: 纯精瞄几何层——世界角首碰检测、统一物理袋口、2R 走廊遮挡、含 throw 的袋口左右角尖反解；同时向无限拨轮提供不受呼出阈值限制的最近合法袋口解。
 
-`components/`: HUD 控制组件（桌面/竖屏可停任意高度的长行程视角推杆、球桌内无限横向拨轮、可展开击球点、力度出杆合一控件、单行球组状态、可拖动规划/复盘浮层、球桌视口与开始界面），只转发事件，不持有对局状态；产品/回合/杆数顶栏已移除。
+`components/`: HUD 控制组件（连续视角推杆、默认球杆左右键、灯泡三入口与按需无限拨轮、可展开击球点、力度出杆合一控件、单行球组状态、可拖动规划/复盘浮层、球桌视口与开始界面），只转发事件，不持有对局状态。
 
 `styles/`: 样式体系 base → layout → controls；横屏尺寸令牌统一重定义，控件层级高于球桌、低于遮罩。
 
@@ -24,7 +24,9 @@
 
 `camera-view.test.ts`: 连续高度不吸附、相机高度单调、各高度 180° 环绕与俯视端方位变化回归。
 
-`Scene3D.ts`: Three.js 场景适配器，连续视角共享唯一世界杆向，低位保持杆/视线/球路共线，高位把环绕轴心平滑移到球台中心；活相机与屏幕拾取虚拟相机共享 `camera-view` 位姿；瞄准辅助共享 physics 恢复/throw 预测并按障碍/库边裁剪；摆球阶段隐藏实体母球、只显示跟手半透明预览，落实后恢复实体；另负责合法目标环、球杆、走位/复盘与 rAF 相机平滑。
+`Scene3D.ts`: Three.js 场景适配器，最高 60 FPS、静止时停止 rAF/WebGL、触屏 1×/桌面最高 1.5× DPR，并按物体变化刷新阴影；连续视角共享唯一世界杆向，低位保持杆/视线/球路共线，高位把环绕轴心平滑移到球台中心；活相机与屏幕拾取虚拟相机共享 `camera-view` 位姿；瞄准辅助共享 physics 恢复/throw 预测并按障碍/库边裁剪；摆球阶段隐藏实体母球、只显示跟手半透明预览，落实后恢复实体；另负责合法目标环、球杆、走位/复盘与按需相机平滑。
+
+`render-performance.ts`: 表现层性能策略纯函数，集中定义场景 60 FPS、世界→React 30 FPS、固定帧槽校时与自适应 DPR；不得改变物理步长或规则事实。
 
 `physics.ts`: 以米为单位的 240 Hz 确定性二维台球内核，公开统一 `TABLE/POCKETS` 与共享球碰走向预测；视觉袋口与二维球心捕获半径分开调校，中袋捕获从旧版 62mm 收到 52mm，高速落袋走线段扫掠防穿透；输出首碰、碰库与落袋事件。球球碰撞按 TOI 回滚，叉路接触三联立；碰撞迭代直接消费 resolveBallPair 的布尔事实，不再只观察 x 位移，纯 z 逆序链也会在同一固定步继续传播。
 
@@ -44,7 +46,8 @@
 
 `hooks/`: React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则拆分：
   - `useGameState`：集中管理对局状态（worldView/match/viewLevel）、持久化玩家能力与局间锁定对手档案；新局重置 shot 结算守卫
-  - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄，以及落位即呼出的无边界变速拨轮
+  - `useAimAssist`：默认关闭且容错持久化的预测辅助线偏好
+  - `useAimInteraction`：封装跟手虚母球落位、世界角点哪打哪、抓影子球、360° 粗瞄、默认左右微调与灯泡按需拨轮
   - `useControlSlotDrag`：编辑态下封装右侧四个控件各自的轨内纵向拖动、黑条约束与位置持久化
   - `useOpponentAI`：按局前锁定档案控制搜索预算、选杆扰动与执行误差的 AI 回合调度
   - `useAudioManager`：音效初始化和物理事件播放，暴露 audioRef/playStrike/playPhysicsEvents/resetEvents

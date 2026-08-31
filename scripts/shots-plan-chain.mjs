@@ -4,7 +4,7 @@
 [POS]: 走位规划视觉回归取证脚本，不参与运行时
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
- * 走位规划提示条目检截图：固定三球局面 → 打开提示条（整链桌上直绘）→ 截图。
+ * 走位规划提示条目检截图：固定三球局面 → 从灯泡菜单打开走位提示（整链桌上直绘）→ 截图。
  * 前置同 verify-position-plan.mjs（vite:5199 + ego lite:9333）。
  * 桌面输出 shots/40-plan-on-table.png（verify 脚本也会覆盖此文件）；
  * PORTRAIT=1 时竖屏输出 shots/41-plan-on-table-portrait.png。
@@ -80,18 +80,20 @@ await page.evaluate(() => {
   window.__bj8.sync();
 });
 
+await page.evaluate(() => document.querySelector('.plan-button')?.click());
+
 await page.evaluate(() => new Promise((resolve) => {
   const deadline = Date.now() + 20000;
   const timer = setInterval(() => {
-    const btn = document.querySelector('.plan-button');
-    if (btn && getComputedStyle(btn).visibility === 'visible' && btn.classList.contains('ready')) {
+    const btn = document.querySelector('.assist-menu .guidance-option');
+    if (btn && !btn.disabled && getComputedStyle(btn).visibility === 'visible') {
       clearInterval(timer); resolve();
     }
     if (Date.now() > deadline) { clearInterval(timer); resolve(); }
   }, 120);
 }));
 
-await clickBtn('💡 走位');
+await page.evaluate(() => document.querySelector('.assist-menu .guidance-option')?.click());
 await new Promise(r => setTimeout(r, 900));
 
 await page.screenshot({ path: out });

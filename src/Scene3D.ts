@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、textures 程序化贴图与 Three.js；不读取 React 状态
-[OUTPUT]: 对外提供场景渲染、连续环绕相机、世界角瞄准辅助（射线/分离线/幽灵球靶点）、摆球阶段虚母球与实体显隐、合法目标环、球杆动画、走位/复盘渲染及屏幕↔台面坐标映射
+[OUTPUT]: 对外提供按需且最高 60 FPS 的场景渲染、连续环绕相机、可独立开关的世界角预测线与常驻幽灵球靶点、摆球虚母球、球杆动画、走位/复盘及屏幕↔台面坐标映射
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -16,6 +16,11 @@ import {
 import type { PositionPlan } from './planner/search';
 import type { ShotReview } from './planner/review';
 import { cameraPoseAt, clampViewLevel } from './camera-view';
+import {
+  SCENE_RENDER_FPS,
+  claimFrameSlot,
+  preferredPixelRatio,
+} from './render-performance';
 import {
   makeClothMaps,
   makeWoodTexture,
@@ -93,6 +98,8 @@ export class Scene3D {
   private virtualCam: THREE.PerspectiveCamera;
 
   private aimAngle = 0;
+  /** 预测线默认关闭；幽灵球作为基础直接操作锚点仍保留。 */
+  private aimAssistVisible = false;
   /** 0=第一人称，1=俯视；中间值可停留，并在所有高度共享世界杆向。 */
   private viewLevel = 0;
   private phase = 'intro';
@@ -133,6 +140,11 @@ export class Scene3D {
 
   private animationId = 0;
   private running = false;
+  /** WebGL 只在场景脏或动画进行中绘制；rAF 本身保持轻量以响应下一次失效。 */
+  private needsRender = true;
+  /** 阴影与相机无关；只在物体/灯光变化时刷新，避免相机平滑期间重复跑 shadow pass。 */
+  private needsShadowUpdate = true;
+  private renderSlotMs: number | null = null;
 
   // ---- 走位规划渲染 ----
   /** 规划图层：瞄准线/轨迹/走位区域/序号标记，showPlanChain(null) 整体清空 */
@@ -163,11 +175,13 @@ export class Scene3D {
     this.camera = new THREE.PerspectiveCamera(46, element.clientWidth / element.clientHeight, 0.01, 60);
     this.virtualCam = new THREE.PerspectiveCamera(46, element.clientWidth / element.clientHeight, 0.01, 60);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' });
     this.renderer.setSize(element.clientWidth, element.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    this.renderer.setPixelRatio(preferredPixelRatio(window.devicePixelRatio, coarsePointer));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     element.appendChild(this.renderer.domElement);
@@ -198,6 +212,49 @@ export class Scene3D {
     this.camera.lookAt(this.smoothLookAt);
 
     window.addEventListener('resize', this.handleResize);
+  }
+
+  private invalidate(shadows = true) {
+    this.needsRender = true;
+    if (shadows) this.needsShadowUpdate = true;
+    this.scheduleFrame();
+  }
+
+  private scheduleFrame() {
+    if (!this.running || this.animationId) return;
+    this.animationId = requestAnimationFrame(this.onAnimationFrame);
+  }
+
+  private onAnimationFrame = (now: number) => {
+    this.animationId = 0;
+    if (!this.running) return;
+
+    const slot = claimFrameSlot(now, this.renderSlotMs, SCENE_RENDER_FPS);
+    if (slot === null) {
+      this.scheduleFrame();
+      return;
+    }
+    if (!this.needsRender && !this.animationIsActive()) return;
+
+    this.renderSlotMs = slot;
+    this.needsRender = false;
+    this.render();
+    if (this.needsRender || this.animationIsActive()) this.scheduleFrame();
+  };
+
+  private cameraIsMoving(): boolean {
+    return this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8
+      || this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8;
+  }
+
+  private animationIsActive(): boolean {
+    return Boolean(
+      this.lastWorld?.moving
+      || this.strikeAnim
+      || this.dropAnims.size
+      || this.planPlayAnim
+      || this.cameraIsMoving(),
+    );
   }
 
   private setupLights() {
@@ -780,6 +837,7 @@ export class Scene3D {
   /** 设置瞄准幽灵球靶点距离（白球心起算）；null = 自动取首触点距离 */
   setAimGhostDist(d: number | null) {
     this.aimGhostDist = d;
+    this.invalidate(false);
   }
 
   /** 瞄准幽灵球当前台面位置（不可见时 null），供输入层做抓取命中判定 */
@@ -797,6 +855,7 @@ export class Scene3D {
         Math.min(L / 2 - R, Math.max(-L / 2 + R, z))
       );
     }
+    this.invalidate();
   }
 
   /** 浏览器门禁读取摆球阶段虚/实母球显隐，不作为业务状态来源。 */
@@ -816,10 +875,12 @@ export class Scene3D {
 
   setSpin(spin: { x: number; y: number }) {
     this.spin = spin;
+    this.invalidate();
   }
 
   setLegalTargets(numbers: number[]) {
     this.legalTargets = new Set(numbers);
+    this.invalidate(false);
   }
 
   legalTargetCount(): number {
@@ -1005,6 +1066,7 @@ export class Scene3D {
   showPlanChain(plan: PositionPlan | null) {
     this.clearPlan();
     this.planActive = plan !== null;
+    this.invalidate();
     if (!plan || plan.steps.length === 0) {
       this.updateAimGuide();
       return;
@@ -1027,6 +1089,7 @@ export class Scene3D {
       && stepIndex >= 0
       && stepIndex < (plan?.steps.length ?? 0);
     this.planActive = plan !== null && validIndex;
+    this.invalidate();
     if (!plan || !validIndex) {
       this.updateAimGuide();
       return;
@@ -1070,6 +1133,7 @@ export class Scene3D {
    */
   showReviewOverlay(review: ShotReview | null) {
     this.clearReview();
+    this.invalidate(false);
     if (!review) return;
 
     const y = 0.006; // 比规划图层(0.005)略高，防同屏 z-fighting
@@ -1153,6 +1217,7 @@ export class Scene3D {
     if (!this.planActive || plan.steps.length === 0) return;
     this.planStepPreviewWorld = null;
     this.planPlayAnim = { plan, stepIdx: 0, t: 0, phase: 'anim', phaseT: 0, snapped: false };
+    this.invalidate();
   }
 
   /** 整链播放推进（render 每帧调用） */
@@ -1280,6 +1345,7 @@ export class Scene3D {
     };
     this.strikeAnim = anim;
     this.cueGroup.visible = true;
+    this.invalidate();
     // 兜底：rAF 被浏览器节流（后台标签页）时，按墙钟时间到点直接触球，
     // 保证"松手必出杆"，动画只是表现层
     setTimeout(() => {
@@ -1287,6 +1353,7 @@ export class Scene3D {
         this.cueGroup.position.copy(anim.contact);
         this.cueGroup.visible = false;
         this.strikeAnim = null;
+        this.invalidate();
         anim.fired = true;
         anim.onContact?.();
       }
@@ -1297,10 +1364,18 @@ export class Scene3D {
     this.viewLevel = clampViewLevel(level);
     // 高位时吊灯会挡住台面；在进入灯体高度前隐藏，避免穿模。
     if (this.lampGroup) this.lampGroup.visible = this.viewLevel < 0.78;
+    this.invalidate();
   }
 
   setAim(angle: number) {
     this.aimAngle = angle;
+    this.invalidate();
+  }
+
+  setAimAssistVisible(visible: boolean) {
+    this.aimAssistVisible = visible;
+    this.updateAimGuide();
+    this.invalidate();
   }
 
   /** 全局唯一瞄准事实：所有视角高度均消费同一个世界角。 */
@@ -1378,13 +1453,16 @@ export class Scene3D {
     if (this.planStepPreviewWorld) this.snapBallsTo(this.planStepPreviewWorld);
 
     this.updateAimGuide();
+    this.invalidate();
   }
 
   /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球+靶点影子球 */
   private updateAimGuide() {
     const world = this.lastWorld;
     const show = this.phase === 'aiming' && world && !world.moving && world.balls[0].active && !this.planActive;
-    this.aimLine.visible = this.objLine.visible = this.tanLine.visible = this.ghostRing.visible = !!show;
+    const showPrediction = Boolean(show && this.aimAssistVisible);
+    this.aimLine.visible = this.objLine.visible = this.tanLine.visible =
+      this.ghostRing.visible = showPrediction;
     this.aimGhost.visible = !!show;
     if (!show || !world) return;
 
@@ -1484,7 +1562,7 @@ export class Scene3D {
         target.x + predicted.object.x * objLen,
         target.z + predicted.object.z * objLen,
       );
-      this.objLine.visible = objLen > 0.01;
+      this.objLine.visible = showPrediction && objLen > 0.01;
       // 白球分离线同样取冲量后的真实预测方向；正碰残速过小时隐藏。
       if (predicted.cueSpeedRatio > 0.05) {
         const tanLen = clipRay(cx, cz, predicted.cue.x, predicted.cue.z, 0.32, hitBall);
@@ -1495,13 +1573,13 @@ export class Scene3D {
           cx + predicted.cue.x * tanLen,
           cz + predicted.cue.z * tanLen,
         );
-        this.tanLine.visible = tanLen > 0.01;
+        this.tanLine.visible = showPrediction && tanLen > 0.01;
       } else {
         this.tanLine.visible = false;
       }
       // 幽灵球环
       this.ghostRing.position.set(cx, y, cz);
-      this.ghostRing.visible = true;
+      this.ghostRing.visible = showPrediction;
     } else if (cushionT < Infinity) {
       // 直击库边：画反射段
       const hx = px + dx * cushionT;
@@ -1510,7 +1588,7 @@ export class Scene3D {
       let rx = dx, rz = dz;
       if (cushionAxis === 'x') rx = -rx; else rz = -rz;
       setLine(this.tanLine, hx, hz, hx + rx * 0.35, hz + rz * 0.35);
-      this.tanLine.visible = true;
+      this.tanLine.visible = showPrediction;
       this.objLine.visible = false;
       this.ghostRing.visible = false;
     } else {
@@ -1568,17 +1646,27 @@ export class Scene3D {
     // sync() 先于本方法被调用，updateAimGuide 依赖的 phase 在此刻才更新——
     // 用最新 phase 重算一次瞄准辅助，避免开局幽灵球要等下一次交互才显示
     this.updateAimGuide();
+    this.invalidate();
   }
 
   /** 渲染循环：推进落袋动画并渲染 */
   render() {
     const dt = Math.min(0.05, this.clock.getDelta());
+    const animatedShadows = Boolean(
+      this.lastWorld?.moving || this.strikeAnim || this.dropAnims.size || this.planPlayAnim,
+    );
 
-    // 相机平滑收敛:随 rAF 每帧向目标位姿推进,脱离 React 渲染节奏——
+    // 相机平滑收敛：只在目标未到位时继续申请帧，脱离 React 渲染节奏——
     // 拖拽/点击瞄准后即使 React 不再渲染,相机也能滑行就位
     const lerpK = 1 - Math.pow(0.0001, dt);
     this.camera.position.lerp(this.targetCameraPos, Math.min(0.25, lerpK * 3));
     this.smoothLookAt.lerp(this.targetLookAt, Math.min(0.3, lerpK * 4));
+    if (this.camera.position.distanceToSquared(this.targetCameraPos) <= 1e-8) {
+      this.camera.position.copy(this.targetCameraPos);
+    }
+    if (this.smoothLookAt.distanceToSquared(this.targetLookAt) <= 1e-8) {
+      this.smoothLookAt.copy(this.targetLookAt);
+    }
     this.camera.lookAt(this.smoothLookAt);
 
     // 出杆动画：加速冲向白球 → 触球瞬间回调 → 减速送杆 → 收起
@@ -1630,23 +1718,23 @@ export class Scene3D {
 
     this.updatePlanPlay(dt);
 
+    this.renderer.shadowMap.needsUpdate = this.needsShadowUpdate || animatedShadows;
+    this.needsShadowUpdate = false;
     this.renderer.render(this.scene, this.camera);
   }
 
   start() {
     if (this.running) return;
     this.running = true;
-    const loop = () => {
-      if (!this.running) return;
-      this.animationId = requestAnimationFrame(loop);
-      this.render();
-    };
-    this.animationId = requestAnimationFrame(loop);
+    this.renderSlotMs = null;
+    this.clock.start();
+    this.invalidate();
   }
 
   stop() {
     this.running = false;
     if (this.animationId) cancelAnimationFrame(this.animationId);
+    this.animationId = 0;
   }
 
   screenToTable(clientX: number, clientY: number): { x: number; z: number } | null {
@@ -1726,6 +1814,7 @@ export class Scene3D {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.invalidate();
   };
 
   dispose() {

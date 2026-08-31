@@ -1,7 +1,7 @@
 /*
-[INPUT]: 依赖连续视角高度、canAim、spin、charging、previewPower、走位总开关状态与事件回调
-[OUTPUT]: 渲染右侧黑色四控件轨；长按整轨进入抖动编辑态，槽位仅在轨内纵向调整，点击轨外锁定
-[POS]: HUD 组件层，组合 ViewToolbar / SpinControl / ShootControl；不持有对局状态
+[INPUT]: 依赖连续视角高度、canAim、spin、charging、previewPower 与三项辅助开关状态/事件回调
+[OUTPUT]: 渲染右侧黑色四控件轨及灯泡三入口菜单；长按整轨进入抖动编辑态，槽位仅在轨内纵向调整
+[POS]: HUD 组件层，组合 ViewToolbar / 辅助菜单 / SpinControl / ShootControl；不持有对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useEffect, useRef, useState } from 'react';
@@ -55,10 +55,14 @@ interface ControlDeckProps {
   planStatus: PositionPlanStatus;
   guidanceEnabled: boolean;
   hasReview: boolean;
+  aimAssistEnabled: boolean;
+  aimDialEnabled: boolean;
   onViewLevel: (level: number) => void;
   onSpinChange: (spin: CueSpin) => void;
-  /** 💡 点击：作为规划与复盘的总开关；熄灭时不允许任何提示主动出现 */
+  /** 💡 菜单内的走位与复盘开关 */
   onTogglePlan: () => void;
+  onToggleAimAssist: () => void;
+  onToggleAimDial: () => void;
   onBeginCharge: (clientY: number, availableTravel: number) => void;
   onUpdateCharge: (clientY: number) => void;
   onReleaseCharge: () => void;
@@ -76,9 +80,13 @@ export function ControlDeck({
   planStatus,
   guidanceEnabled,
   hasReview,
+  aimAssistEnabled,
+  aimDialEnabled,
   onViewLevel,
   onSpinChange,
   onTogglePlan,
+  onToggleAimAssist,
+  onToggleAimDial,
   onBeginCharge,
   onUpdateCharge,
   onReleaseCharge,
@@ -86,6 +94,7 @@ export function ControlDeck({
   onTapShot,
 }: ControlDeckProps) {
   const railRef = useRef<HTMLDivElement>(null);
+  const assistControlRef = useRef<HTMLDivElement>(null);
   const activationRef = useRef<{
     pointerId: number;
     x: number;
@@ -96,10 +105,12 @@ export function ControlDeck({
   const suppressRailClickRef = useRef(false);
   const suppressOutsideClickRef = useRef(false);
   const [editing, setEditing] = useState(false);
+  const [assistMenuOpen, setAssistMenuOpen] = useState(false);
   editingRef.current = editing;
 
-  // 灯泡只表达用户意图，不因后台 ready/computing 自动亮起。
-  const planStateClass = guidanceEnabled ? 'is-open' : 'is-off';
+  // 灯泡只表达用户已打开的辅助，不因后台 ready/computing 自动亮起。
+  const anyAssistEnabled = guidanceEnabled || aimAssistEnabled || aimDialEnabled;
+  const planStateClass = anyAssistEnabled ? 'is-open' : 'is-off';
   const planDisabled = planStatus !== 'ready' && planStatus !== 'showing' && !hasReview;
 
   const clearActivation = () => {
@@ -124,17 +135,24 @@ export function ControlDeck({
       event.stopPropagation();
     };
     const lockWithEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAssistMenuOpen(false);
       if (editingRef.current && event.key === 'Escape') {
         editingRef.current = false;
         setEditing(false);
       }
     };
+    const closeAssistMenuFromOutside = (event: PointerEvent) => {
+      if (assistControlRef.current?.contains(event.target as Node)) return;
+      setAssistMenuOpen(false);
+    };
     document.addEventListener('pointerdown', lockFromOutside, true);
+    document.addEventListener('pointerdown', closeAssistMenuFromOutside, true);
     document.addEventListener('click', suppressOutsideClick, true);
     window.addEventListener('keydown', lockWithEscape);
     return () => {
       clearActivation();
       document.removeEventListener('pointerdown', lockFromOutside, true);
+      document.removeEventListener('pointerdown', closeAssistMenuFromOutside, true);
       document.removeEventListener('click', suppressOutsideClick, true);
       window.removeEventListener('keydown', lockWithEscape);
     };
@@ -152,6 +170,7 @@ export function ControlDeck({
       activationRef.current = null;
       suppressRailClickRef.current = true;
       editingRef.current = true;
+      setAssistMenuOpen(false);
       setEditing(true);
       onCancelCharge();
     }, LAYOUT_LONG_PRESS_MS);
@@ -198,17 +217,56 @@ export function ControlDeck({
           />
         </DraggableControlSlot>
         <DraggableControlSlot id="guidance" editing={editing} railRef={railRef}>
-          <button
-            type="button"
-            className={`plan-button ${planStateClass}`}
-            aria-label={guidanceEnabled ? '关闭走位与复盘提示' : '打开走位与复盘提示'}
-            aria-pressed={guidanceEnabled}
-            disabled={planDisabled}
-            onClick={onTogglePlan}
+          <div
+            ref={assistControlRef}
+            className={`assist-control ${assistMenuOpen ? 'menu-open' : ''}`}
           >
-            <span aria-hidden="true">💡</span>
-            <strong>提示</strong>
-          </button>
+            <button
+              type="button"
+              className={`plan-button ${planStateClass}`}
+              aria-label="打开辅助功能"
+              aria-expanded={assistMenuOpen}
+              onClick={() => setAssistMenuOpen(open => !open)}
+            >
+              <span aria-hidden="true">💡</span>
+              <strong>辅助</strong>
+            </button>
+            {assistMenuOpen && (
+              <div className="assist-menu" role="group" aria-label="辅助功能">
+                <button
+                  type="button"
+                  className={`assist-option aim-option ${aimAssistEnabled ? 'active' : ''}`}
+                  role="switch"
+                  aria-label="瞄准辅助线"
+                  aria-checked={aimAssistEnabled}
+                  onClick={onToggleAimAssist}
+                >
+                  <span className="assist-aim-icon" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={`assist-option guidance-option ${guidanceEnabled ? 'active' : ''}`}
+                  role="switch"
+                  aria-label="走位与击球复盘"
+                  aria-checked={guidanceEnabled}
+                  disabled={planDisabled}
+                  onClick={onTogglePlan}
+                >
+                  <span className="assist-route-icon" aria-hidden="true"><i /><i /><i /></span>
+                </button>
+                <button
+                  type="button"
+                  className={`assist-option dial-option ${aimDialEnabled ? 'active' : ''}`}
+                  role="switch"
+                  aria-label="拨轮瞄准"
+                  aria-checked={aimDialEnabled}
+                  onClick={onToggleAimDial}
+                >
+                  <span className="assist-dial-icon" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+          </div>
         </DraggableControlSlot>
         <DraggableControlSlot id="spin" editing={editing} railRef={railRef}>
           <SpinControl spin={spin} disabled={!canAim} onSpinChange={onSpinChange} />

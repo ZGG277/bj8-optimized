@@ -1,7 +1,7 @@
 /*
-[INPUT]: 依赖 physics 台球世界、Scene3D 屏幕坐标映射、match 对局状态
-[OUTPUT]: 对外提供各视角高度一致的 360° 世界角粗瞄、幽灵球落位后的无限变速拨轮，以及跟手虚母球放置处理器
-[POS]: 交互协调层，把连续视角目标相机下的指针映射为世界瞄准角；袋口几何委托 aim/，拨轮传动委托 input/
+[INPUT]: 依赖 physics 台球世界、Scene3D 屏幕坐标映射、match 对局状态与用户显式选择的拨轮开关/档位
+[OUTPUT]: 对外提供各视角高度一致的左右微调、360° 粗瞄、按需双档拨轮，以及跟手虚母球放置处理器
+[POS]: 交互协调层，把连续视角目标相机下的指针映射为世界瞄准角；袋口几何只产出提示，固定传动委托 input/
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,6 +20,7 @@ import {
   AIM_DIAL_UNLOCK_RATIO,
   aimDialAngleDelta,
   aimDialRatio,
+  type AimDialGear,
 } from '../input/aim-dial';
 import { FIRST_PERSON_VIEW } from '../camera-view';
 
@@ -35,6 +36,7 @@ interface AimInteractionProps {
   aimRef: React.MutableRefObject<number>;
   aimGhostDistRef: React.MutableRefObject<number | null>;
   canAim: boolean;
+  aimDialEnabled: boolean;
   matchPhase: string;
   breaking: boolean;
   legalTargets: number[];
@@ -52,6 +54,7 @@ export function useAimInteraction({
   aimRef,
   aimGhostDistRef,
   canAim,
+  aimDialEnabled,
   matchPhase,
   breaking,
   legalTargets,
@@ -65,7 +68,6 @@ export function useAimInteraction({
   // 'line' 模式下用相对增量旋转，避免手机端绝对映射导致的方向跳变
   const lineLastXRef = useRef<number | null>(null);
   const aimDialLockRef = useRef<Pick<PrecisionAimSolution, 'target' | 'pocket'> | null>(null);
-  const pendingDialAfterPlacementRef = useRef(false);
   const [aimDialVisible, setAimDialVisible] = useState(false);
   const [aimDialSolution, setAimDialSolution] = useState<PrecisionAimSolution | null>(null);
   // 用 ref 持有 setAim 避免与 useShotInput 的循环依赖
@@ -105,9 +107,10 @@ export function useAimInteraction({
   }, [worldRef, legalTargets]);
 
   const showAimDial = useCallback((angle = aimRef.current) => {
+    if (!aimDialEnabled) return;
     setAimDialVisible(true);
     setAimDialSolution(resolveAimDialSolution(angle));
-  }, [aimRef, resolveAimDialSolution]);
+  }, [aimDialEnabled, aimRef, resolveAimDialSolution]);
 
   const clearAimDial = useCallback(() => {
     aimDialLockRef.current = null;
@@ -115,17 +118,14 @@ export function useAimInteraction({
     setAimDialSolution(null);
   }, []);
 
-  // 出杆或回合切换清掉拨轮；开球/自由球落位后的下一帧立即呼出。
+  // 拨轮只在用户从灯泡菜单显式开启且当前可瞄准时显示。
   useEffect(() => {
-    if (!canAim) {
+    if (!canAim || !aimDialEnabled) {
       clearAimDial();
       return;
     }
-    if (pendingDialAfterPlacementRef.current) {
-      pendingDialAfterPlacementRef.current = false;
-      showAimDial();
-    }
-  }, [canAim, clearAimDial, showAimDial]);
+    showAimDial();
+  }, [canAim, aimDialEnabled, clearAimDial, showAimDial]);
 
   /** 点哪打哪：把触点映射到台面坐标，瞄准线直接指向它。
    *  所有高度都用连续视角的目标相机位姿反算（screenToTableAt），避免活相机平滑插值造成反馈振荡；
@@ -239,7 +239,6 @@ export function useAimInteraction({
       active: true,
     });
     scene3DRef.current?.setGhostCue(0, 0, false);
-    pendingDialAfterPlacementRef.current = true;
     if (breaking) setViewLevel(FIRST_PERSON_VIEW);
     setMatch((current) => ({ ...current, phase: 'aiming', messageKey: 'placed', messageParams: {} }));
     setWorldView(cloneWorld(world));
@@ -352,12 +351,17 @@ export function useAimInteraction({
     }
   }, [matchPhase, scene3DRef, clearAimDial]);
 
-  const handleAimDialAdjust = useCallback((pixelDelta: number) => {
+  const handleAimDialAdjust = useCallback((pixelDelta: number, gear: AimDialGear) => {
     if (!canAim || !aimDialVisible || pixelDelta === 0) return;
     const current = aimRef.current;
-    const solution = resolveAimDialSolution(current);
-    const next = applyAim(current + aimDialAngleDelta(pixelDelta, solution));
+    const next = applyAim(current + aimDialAngleDelta(pixelDelta, gear));
     setAimDialSolution(resolveAimDialSolution(next));
+  }, [canAim, aimDialVisible, aimRef, resolveAimDialSolution, applyAim]);
+
+  const handleAimButtonAdjust = useCallback((angleDelta: number) => {
+    if (!canAim || angleDelta === 0) return;
+    const next = applyAim(aimRef.current + angleDelta);
+    if (aimDialVisible) setAimDialSolution(resolveAimDialSolution(next));
   }, [canAim, aimDialVisible, aimRef, resolveAimDialSolution, applyAim]);
 
   return {
@@ -365,6 +369,7 @@ export function useAimInteraction({
     handlePointerMove,
     handlePointerUp,
     handlePointerCancel,
+    handleAimButtonAdjust,
     handleAimDialAdjust,
     aimDialVisible,
     aimDialSolution,

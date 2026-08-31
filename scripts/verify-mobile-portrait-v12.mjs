@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器与 puppeteer-core
-[OUTPUT]: 390×844 竖屏单手布局、开球落位拨轮、可停任意高度的长行程视角推杆、击球点弹层、出杆、灯泡与浮层拖拽断言及截图
+[OUTPUT]: 390×844 竖屏单手布局、默认左右键、灯泡三入口/按需拨轮、连续视角、击球点、出杆与提示浮层断言及截图
 [POS]: v1.2.0 手机竖屏核心交互的浏览器出口验收门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -35,6 +35,13 @@ async function tap(selector) {
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   });
   await page.touchscreen.tap(point.x, point.y);
+}
+
+async function openAssistMenu() {
+  if (!await page.$('.assist-menu')) {
+    await tap('.plan-button');
+    await wait(80);
+  }
 }
 
 await tap('.start-btn');
@@ -103,7 +110,11 @@ const layout = await page.evaluate(() => {
     bulb: box('.plan-button'),
     spin: box('.spin-preview'),
     shoot: box('.shoot-pad'),
+    aimControls: box('.aim-controls'),
+    aimButtonCount: document.querySelectorAll('.aim-controls button').length,
     dial: box('.aim-dial'),
+    dialWindow: box('.aim-dial-window'),
+    fineClutch: box('.aim-dial-fine-clutch'),
     dialText: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
     coachCount: document.querySelectorAll('.coach-card,.match-message').length,
     separateMeterCount: document.querySelectorAll('.power-meter,.power-meter-track').length,
@@ -138,15 +149,67 @@ ok('出杆有效控件高度不少于 196px', layout.shoot?.height >= 196, JSON.
 ok('视角推杆与出杆区行程等长', Math.abs(layout.view?.height - layout.shoot?.height) <= 1,
   `${layout.view?.height}/${layout.shoot?.height}`);
 ok('解说区与解说浮层已删除', layout.coachCount === 0, `count=${layout.coachCount}`);
-ok('开球母球落位后立即显示横向拨轮', layout.dial?.width >= 200 && layout.dial?.height >= 50,
-  JSON.stringify({ dial: layout.dial, text: layout.dialText }));
-ok('拨轮完全位于球桌触控区域内', layout.dial?.x >= layout.viewport?.x && layout.dial?.right <= layout.viewport?.right,
-  JSON.stringify({ dial: layout.dial, viewport: layout.viewport }));
+ok('开球母球落位后默认显示球杆左右键',
+  layout.aimControls?.width >= 150 && layout.aimButtonCount === 2 && layout.dial === null,
+  JSON.stringify({ controls: layout.aimControls, buttons: layout.aimButtonCount, dial: layout.dial }));
 ok('四个控件不再各自显示拖动点', layout.gripCount === 0, `grips=${layout.gripCount}`);
 
+const buttonStartAim = await page.evaluate(() => window.__bj8.aim.current);
+await tap('.aim-controls button:first-child');
+await wait(100);
+const buttonEndAim = await page.evaluate(() => window.__bj8.aim.current);
+ok('手机默认左键真实微调击球方向',
+  Math.atan2(Math.sin(buttonEndAim - buttonStartAim), Math.cos(buttonEndAim - buttonStartAim)) < 0,
+  `${buttonStartAim} → ${buttonEndAim}`);
+
+await tap('.plan-button');
+await wait(100);
+const assistMenu = await page.evaluate(() => {
+  const menu = document.querySelector('.assist-menu')?.getBoundingClientRect();
+  return {
+    count: document.querySelectorAll('.assist-menu .assist-option').length,
+    right: menu?.right ?? Infinity,
+    left: menu?.left ?? -Infinity,
+    labels: [...document.querySelectorAll('.assist-menu .assist-option')]
+      .map(element => element.getAttribute('aria-label')),
+  };
+});
+ok('灯泡展开三个小入口且不超出手机屏幕',
+  assistMenu.count === 3 && assistMenu.left >= 0 && assistMenu.right <= 390
+    && assistMenu.labels.includes('拨轮瞄准'),
+  JSON.stringify(assistMenu));
+await tap('.assist-menu .dial-option');
+await wait(120);
+await tap('.plan-button');
+await wait(80);
+Object.assign(layout, await page.evaluate(() => {
+  const box = selector => {
+    const element = document.querySelector(selector);
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
+  };
+  return {
+    aimControls: box('.aim-controls'),
+    dial: box('.aim-dial'),
+    dialWindow: box('.aim-dial-window'),
+    fineClutch: box('.aim-dial-fine-clutch'),
+  };
+}));
+ok('点击第三入口后拨轮取代默认左右键',
+  layout.aimControls === null && layout.dial?.width >= 200 && layout.dial?.height >= 50,
+  JSON.stringify({ controls: layout.aimControls, dial: layout.dial }));
+ok('拨轮完全位于球桌触控区域内', layout.dial?.x >= layout.viewport?.x && layout.dial?.right <= layout.viewport?.right,
+  JSON.stringify({ dial: layout.dial, viewport: layout.viewport }));
+ok('中央精调离合在手机上提供至少 60px 明确触发宽度',
+  layout.fineClutch?.width >= 60
+    && layout.fineClutch?.x >= layout.dialWindow?.x
+    && layout.fineClutch?.right <= layout.dialWindow?.right,
+  JSON.stringify({ clutch: layout.fineClutch, window: layout.dialWindow }));
+
 const dialStartAim = await page.evaluate(() => window.__bj8.aim.current);
-await page.touchscreen.touchStart(layout.dial.x + layout.dial.width * 0.6, layout.dial.y + layout.dial.height / 2);
-await page.touchscreen.touchMove(layout.dial.x + layout.dial.width * 0.78, layout.dial.y + layout.dial.height / 2);
+await page.touchscreen.touchStart(layout.dialWindow.x + layout.dialWindow.width * 0.82, layout.dialWindow.y + layout.dialWindow.height / 2);
+await page.touchscreen.touchMove(layout.dialWindow.x + layout.dialWindow.width * 0.98, layout.dialWindow.y + layout.dialWindow.height / 2);
 await page.touchscreen.touchEnd();
 await wait(160);
 const dialEndAim = await page.evaluate(() => window.__bj8.aim.current);
@@ -184,8 +247,8 @@ const midOrbitBefore = await page.evaluate(() => {
     z: scene.camera.position.z,
   };
 });
-await page.touchscreen.touchStart(layout.dial.x + layout.dial.width * 0.55, layout.dial.y + layout.dial.height / 2);
-await page.touchscreen.touchMove(layout.dial.x + layout.dial.width * 0.8, layout.dial.y + layout.dial.height / 2);
+await page.touchscreen.touchStart(layout.dialWindow.x + layout.dialWindow.width * 0.82, layout.dialWindow.y + layout.dialWindow.height / 2);
+await page.touchscreen.touchMove(layout.dialWindow.x + layout.dialWindow.width * 1.16, layout.dialWindow.y + layout.dialWindow.height / 2);
 await page.touchscreen.touchEnd();
 await wait(700);
 const midOrbitAfter = await page.evaluate(() => {
@@ -363,9 +426,11 @@ await page.evaluate(() => {
 let planBefore = null;
 const planDeadline = Date.now() + 30000;
 while (!planBefore && Date.now() < planDeadline) {
-  const bulbEnabled = await page.$eval('.plan-button', button => !button.disabled);
-  if (bulbEnabled) {
-    await tap('.plan-button');
+  await openAssistMenu();
+  const guidanceReady = await page.$eval('.assist-menu .guidance-option', button =>
+    !button.disabled && button.getAttribute('aria-checked') === 'false');
+  if (guidanceReady) {
+    await tap('.assist-menu .guidance-option');
     await wait(180);
     planBefore = await page.$eval('.plan-bar', element => {
       const rect = element.getBoundingClientRect();
@@ -376,6 +441,7 @@ while (!planBefore && Date.now() < planDeadline) {
 }
 ok('灯泡在提示可用时可点击', Boolean(planBefore));
 if (planBefore) {
+  if (await page.$('.assist-menu')) await tap('.plan-button');
   ok('灯泡点亮显示紧凑走位浮层', !!planBefore && planBefore.right <= 306, JSON.stringify(planBefore));
   const planPresentation = await page.evaluate(() => ({
     plans: document.querySelectorAll('.plan-bar').length,
@@ -402,13 +468,23 @@ if (planBefore) {
   ok('走位浮层可拖动且仍留在视口', planAfter.x > planBefore.x + 20 && planAfter.y > planBefore.y + 40,
     `${JSON.stringify(planBefore)} → ${JSON.stringify(planAfter)}`);
   await page.screenshot({ path: `${SHOT_DIR}/46-mobile-plan-float.png` });
-  await tap('.plan-button');
+  await openAssistMenu();
+  await tap('.assist-menu .guidance-option');
   await wait(100);
-  ok('灯泡熄灭同时收起提示区域', await page.$eval('.plan-button', () =>
+  ok('灯泡菜单关闭走位同时收起提示区域', await page.$eval('.plan-button', () =>
     !document.querySelector('.plan-bar') && !document.querySelector('.review-float')));
+  if (await page.$('.assist-menu')) await tap('.plan-button');
 }
 
 // 规划关闭会从俯视平滑恢复杆后视角；等相机稳定后再取视觉基线，避免把过渡帧误判为空间浪费。
+await openAssistMenu();
+const dialStillEnabled = await page.$eval('.assist-menu .dial-option', button =>
+  button.getAttribute('aria-checked') === 'true');
+if (dialStillEnabled) await tap('.assist-menu .dial-option');
+if (await page.$('.assist-menu')) await tap('.plan-button');
+await wait(100);
+ok('视觉基线恢复默认左右键',
+  Boolean(await page.$('.aim-controls')) && !await page.$('.aim-dial'));
 await wait(1500);
 await page.screenshot({ path: `${SHOT_DIR}/44-mobile-portrait.png` });
 
@@ -448,16 +524,16 @@ await page.waitForFunction(() => !window.__bj8.world.current.moving, { timeout: 
 await wait(300);
 const reviewStayedHidden = !await page.$('.review-float');
 ok('击球结束后复盘不会主动弹出', reviewStayedHidden);
-const reviewBulbReady = await page.$eval('.plan-button', button => {
-  const style = getComputedStyle(button);
-  return style.visibility === 'visible' && !button.disabled && button.getAttribute('aria-pressed') === 'false';
-}).catch(() => false);
-if (reviewBulbReady) await tap('.plan-button');
+await openAssistMenu();
+const reviewBulbReady = await page.$eval('.assist-menu .guidance-option', button =>
+  !button.disabled && button.getAttribute('aria-checked') === 'false').catch(() => false);
+if (reviewBulbReady) await tap('.assist-menu .guidance-option');
 await wait(120);
+if (await page.$('.assist-menu')) await tap('.plan-button');
 const reviewAppeared = Boolean(await page.$('.review-float'));
 ok('再次点亮灯泡后才显示复盘信息', reviewBulbReady && reviewAppeared);
 if (reviewAppeared) {
-  // 停住对手调度，隔离验证复盘自身的拖拽与灯泡总开关。
+  // 停住对手调度，隔离验证复盘自身的拖拽与灯泡菜单开关。
   await page.evaluate(() => window.__bj8.setMatch({ actor: 'player', phase: 'aiming' }));
   await wait(80);
   const before = await page.$eval('.review-float', element => {
@@ -484,7 +560,10 @@ if (reviewAppeared) {
     return style.visibility === 'visible' && !button.disabled;
   });
   ok('有复盘时灯泡始终可用', bulbVisible);
-  if (bulbVisible) await tap('.plan-button');
+  if (bulbVisible) {
+    await openAssistMenu();
+    await tap('.assist-menu .guidance-option');
+  }
   await wait(100);
   ok('熄灭灯泡收起复盘浮层', !await page.$('.review-float'));
 }

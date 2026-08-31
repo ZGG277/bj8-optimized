@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、动态能力记录、局间锁定 AI、连续环绕视角、360° 瞄准/无限拨轮与走位复盘 HUD
+[OUTPUT]: 对外提供完整对局编排：连续视角、默认左右键、灯泡三辅助入口/按需拨轮、走位复盘 HUD，以及 60 Hz 场景/30 Hz UI 分层同步
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -19,6 +19,7 @@ import { useAimInteraction } from './hooks/useAimInteraction';
 import { useOpponentAI } from './hooks/useOpponentAI';
 import { useAudioManager } from './hooks/useAudioManager';
 import { usePositionPlan } from './hooks/usePositionPlan';
+import { useAimAssist } from './hooks/useAimAssist';
 import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
 import { ControlDeck } from './components/ControlDeck';
@@ -31,6 +32,11 @@ import { buildShotReview, type ShotCapture, type ShotReview } from './planner/re
 import { findPrecisionAim } from './aim/aim-solution';
 import { OVERHEAD_VIEW } from './camera-view';
 import type { GameMode, PositionOutcome } from './opponent/model';
+import {
+  WORLD_SCENE_SYNC_FPS,
+  WORLD_UI_SYNC_FPS,
+  claimFrameSlot,
+} from './render-performance';
 
 type SkillShotCapture = {
   target: number;
@@ -61,6 +67,8 @@ export default function Game() {
   // ── 3D 场景 ──
   const containerRef = useRef<HTMLDivElement>(null);
   const scene3DRef = useRef<Scene3D | null>(null);
+  const sceneSyncSlotRef = useRef<number | null>(null);
+  const uiSyncSlotRef = useRef<number | null>(null);
 
   // 禁用移动端长按唤出复制/全选/分享菜单，避免干扰击球与蓄力
   useEffect(() => {
@@ -88,6 +96,9 @@ export default function Game() {
   const [reviewOpen, setReviewOpen] = useState(false);
   // 💡 是用户主动控制的总开关；默认熄灭，规划与复盘都只缓存、不主动弹出。
   const [guidanceEnabled, setGuidanceEnabled] = useState(false);
+  const aimAssist = useAimAssist();
+  // 默认使用球杆左右键；拨轮只在用户从灯泡菜单显式打开后取代左右键。
+  const [aimDialEnabled, setAimDialEnabled] = useState(false);
 
   // 打开前的视角，关闭时恢复
   const prevViewLevelRef = useRef(viewLevel);
@@ -248,6 +259,7 @@ export default function Game() {
     handlePointerMove,
     handlePointerUp,
     handlePointerCancel,
+    handleAimButtonAdjust,
     handleAimDialAdjust,
     aimDialVisible,
     aimDialSolution,
@@ -259,6 +271,7 @@ export default function Game() {
     aimRef,
     aimGhostDistRef,
     canAim,
+    aimDialEnabled,
     matchPhase: match.phase,
     breaking: match.breaking,
     legalTargets,
@@ -321,8 +334,21 @@ export default function Game() {
     active: match.phase === 'rolling',
     worldRef,
     onFrame: useCallback(() => {
-      playPhysicsEvents(worldRef.current.events);
-      setWorldView(cloneWorld(worldRef.current));
+      const world = worldRef.current;
+      playPhysicsEvents(world.events);
+
+      const now = performance.now();
+      const sceneSlot = claimFrameSlot(now, sceneSyncSlotRef.current, WORLD_SCENE_SYNC_FPS);
+      if (!world.moving || sceneSlot !== null) {
+        scene3DRef.current?.sync(world);
+        sceneSyncSlotRef.current = sceneSlot ?? now;
+      }
+
+      const uiSlot = claimFrameSlot(now, uiSyncSlotRef.current, WORLD_UI_SYNC_FPS);
+      if (!world.moving || uiSlot !== null) {
+        setWorldView(cloneWorld(world));
+        uiSyncSlotRef.current = uiSlot ?? now;
+      }
     }, [worldRef, playPhysicsEvents, setWorldView]),
     onSettled: settleShot,
   });
@@ -387,15 +413,18 @@ export default function Game() {
     aimRef.current = aim;
     scene.setViewLevel(viewLevel);
     scene.setAim(aim);
+    scene.setAimAssistVisible(aimAssist.enabled);
     scene.setSpin(spin);
     scene.setAimGhostDist(aimGhostDistRef.current);
     // 合法目标高亮：只在玩家回合显示
     scene.setLegalTargets(legalTargets);
-    scene.sync(worldView);
+    // 运动中由物理桥直接以 60 Hz 同步 3D；React 快照只需 30 Hz 服务 HUD，
+    // 避免同一世界被重复同步并让 240 Hz 物理步进保持完全独立。
+    if (!worldView.moving) scene.sync(worldView);
 
     const cue = getCueBall(worldView);
     scene.update(cue?.x ?? 0, cue?.z ?? 0, previewPower, match.phase);
-  }, [worldView, viewLevel, aim, previewPower, match, spin, aimGhostDistRef, legalTargets]);
+  }, [worldView, viewLevel, aim, aimAssist.enabled, previewPower, match, spin, aimGhostDistRef, legalTargets]);
 
   // ── 渲染 ──
   return (
@@ -404,13 +433,17 @@ export default function Game() {
       <TableStage
         viewLevel={viewLevel}
         match={match}
+        canAim={canAim}
+        aimDialEnabled={aimDialEnabled}
         aimDialVisible={aimDialVisible}
+        aimAssistanceEnabled={aimAssist.enabled}
         aimDialSolution={aimDialSolution}
         containerRef={containerRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
+        onAimButtonAdjust={handleAimButtonAdjust}
         onAimDialAdjust={handleAimDialAdjust}
         onResetGame={handleReplay}
       />
@@ -424,9 +457,13 @@ export default function Game() {
         planStatus={guidanceAllowed ? positionPlan.status : 'idle'}
         guidanceEnabled={guidanceAllowed && guidanceEnabled}
         hasReview={guidanceAllowed && Boolean(shotReview)}
+        aimAssistEnabled={aimAssist.enabled}
+        aimDialEnabled={aimDialEnabled}
         onViewLevel={setViewLevel}
         onSpinChange={setSpin}
         onTogglePlan={handleTogglePlan}
+        onToggleAimAssist={aimAssist.toggle}
+        onToggleAimDial={() => setAimDialEnabled(current => !current)}
         onBeginCharge={beginCharge}
         onUpdateCharge={updateCharge}
         onReleaseCharge={releaseCharge}

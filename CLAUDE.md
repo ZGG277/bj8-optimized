@@ -6,9 +6,9 @@
 
 ## 成员清单
 
-`src/`: 游戏业务源码，包含 physics 物理世界、aim 精瞄几何、match 规则状态机、opponent 玩家能力/模式化对手档案、planner 走位搜索、input 出杆、components HUD、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式。
+`src/`: 游戏业务源码，包含 physics 物理世界、aim 精瞄几何、match 规则状态机、opponent 玩家能力/模式化对手档案、planner 走位搜索、input 出杆、components HUD、simulation 固定步调度、React 对局编排、Three.js 场景、音频、程序化贴图与样式；瞄准默认用球杆左右键，灯泡菜单按需开启预测线、走位/复盘或精瞄拨轮。
 
-`scripts/`: 构建发布适配、浏览器交互、画面与场景对象验证脚本；含妙搭单 HTML 门禁、真实指针回归（41 断言）、手机竖屏（48 断言）、虚母球/无限拨轮（8 断言）、预测球路一致性（19 断言）及规划/规则/视觉专项，成员清单见 `scripts/CLAUDE.md`。
+`scripts/`: 构建发布适配、浏览器交互、画面与场景对象验证脚本；含妙搭单 HTML 门禁、真实指针回归（41 断言）、手机竖屏（49 断言）、虚母球/固定双档无限拨轮（10 断言）、预测球路一致性（19 断言）及规划/规则/视觉专项，成员清单见 `scripts/CLAUDE.md`。
 
 `shots/`: 人工与自动化试玩截图，仅作为视觉回归证据，不作为运行时依赖。
 
@@ -30,7 +30,7 @@
 
 `POSITION_PLAY_DESIGN.md`: 走位规划（已交付，`src/planner/`）与拍照还原球局（方案阶段）的完整调研、方案决策、实测数据与交互设计文档。
 
-`PRECISION_AIM_V2_ACCEPTANCE.md`: `codex/precision-aim-v2-20260728` 的功能边界、双档精瞄操作规格、自动化证据与人工验收清单。
+`PRECISION_AIM_V2_ACCEPTANCE.md`: 默认球杆左右键、灯泡三辅助入口与按需双档精瞄拨轮的操作规格、自动化证据与人工验收清单。
 
 `MULTIPLAYER_DESIGN.md`: 实时联网对战评估稿（两方案：Kimi 建站数据库轮询 vs 静态托管+实时层），含共用同步协议（快照权威+本地重放）、数据表/消息设计、利弊对比与开放问题；待 codex 审核后决策。
 

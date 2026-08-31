@@ -1,7 +1,7 @@
 /*
 [INPUT]: 依赖已启动游戏页、ego lite 调试端口、puppeteer-core、__bj8 调试句柄与 Scene3D 台面↔屏幕映射
-[OUTPUT]: 开球虚母球跟手/落实、拨轮无条件呼出、360° 连续拨动、近袋平滑降档与页面稳定性断言
-[POS]: “摆球/幽灵球落位即显示无限拨轮 + 延长线近袋连续提精度”的浏览器出口门禁
+[OUTPUT]: 开球虚母球跟手/落实、默认左右键、灯泡三入口、按需拨轮、固定双档与页面稳定性断言
+[POS]: “左右键默认瞄准 + 灯泡按需开启精瞄拨轮”的浏览器出口门禁
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import puppeteer from 'puppeteer-core';
@@ -23,6 +23,8 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
 await page.goto(GAME_URL, { waitUntil: 'networkidle0', timeout: 20000 });
+await page.evaluate(() => localStorage.removeItem('guagua-billiards:aim-assist:v1'));
+await page.reload({ waitUntil: 'networkidle0' });
 await page.waitForSelector('.intro-card button');
 
 async function clickText(text) {
@@ -62,14 +64,65 @@ await page.waitForFunction(() => window.__bj8.match.current.phase === 'aiming');
 await wait(220);
 const placed = await page.evaluate(() => ({
   ...window.__bj8.scene.current.cuePlacementVisualState(),
+  buttons: Boolean(document.querySelector('.aim-controls')),
   dial: Boolean(document.querySelector('.aim-dial')),
-  dialMode: document.querySelector('.aim-dial')?.className ?? '',
 }));
 ok(
-  '摆球: 点击落实体母球并立即呼出拨轮',
-  placed.realVisible && !placed.ghostVisible && placed.dial,
+  '摆球: 点击落实体母球后默认显示左右键而非拨轮',
+  placed.realVisible && !placed.ghostVisible && placed.buttons && !placed.dial,
   JSON.stringify(placed),
 );
+
+const beforeButton = await page.evaluate(() => window.__bj8.aim.current);
+await page.click('.aim-controls button:first-child');
+await wait(100);
+const afterButton = await page.evaluate(() => window.__bj8.aim.current);
+ok(
+  '默认瞄准: 球杆左键直接微调世界杆向',
+  Math.atan2(Math.sin(afterButton - beforeButton), Math.cos(afterButton - beforeButton)) < 0,
+  `${beforeButton} → ${afterButton}`,
+);
+
+await page.click('.plan-button');
+await wait(80);
+const assistMenu = await page.evaluate(() => ({
+  options: document.querySelectorAll('.assist-menu .assist-option').length,
+  aim: Boolean(document.querySelector('.assist-menu .aim-option')),
+  plan: Boolean(document.querySelector('.assist-menu .guidance-option')),
+  dial: Boolean(document.querySelector('.assist-menu .dial-option')),
+}));
+ok(
+  '灯泡: 展开瞄准线、走位复盘、拨轮瞄准三个小入口',
+  assistMenu.options === 3 && assistMenu.aim && assistMenu.plan && assistMenu.dial,
+  JSON.stringify(assistMenu),
+);
+const predictionBefore = await page.evaluate(() => window.__bj8.scene.current.aimLine.visible);
+await page.click('.assist-menu .aim-option');
+await wait(100);
+const predictionAfter = await page.evaluate(() => ({
+  visible: window.__bj8.scene.current.aimLine.visible,
+  active: document.querySelector('.assist-menu .aim-option')?.getAttribute('aria-checked'),
+}));
+ok(
+  '灯泡: 瞄准辅助线默认关闭且可独立打开',
+  !predictionBefore && predictionAfter.visible && predictionAfter.active === 'true',
+  JSON.stringify({ before: predictionBefore, after: predictionAfter }),
+);
+await page.click('.assist-menu .aim-option');
+await wait(80);
+await page.click('.assist-menu .dial-option');
+await wait(120);
+const dialEnabled = await page.evaluate(() => ({
+  buttons: Boolean(document.querySelector('.aim-controls')),
+  dial: Boolean(document.querySelector('.aim-dial')),
+  active: document.querySelector('.assist-menu .dial-option')?.classList.contains('active'),
+}));
+ok(
+  '灯泡: 主动打开拨轮后以精瞄工具取代默认左右键',
+  dialEnabled.dial && !dialEnabled.buttons && dialEnabled.active,
+  JSON.stringify(dialEnabled),
+);
+await page.click('.plan-button');
 
 await clickText('俯视');
 await wait(700);
@@ -110,10 +163,11 @@ await wait(150);
 const coarse = await page.evaluate(() => ({
   visible: Boolean(document.querySelector('.aim-dial')),
   mode: document.querySelector('.aim-dial')?.className ?? '',
+  label: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
 }));
 ok(
-  '拨轮: 幽灵球落在非袋口候选方向也保持可见粗档',
-  coarse.visible && coarse.mode.includes('coarse'),
+  '拨轮: 非袋口方向保持可见且默认不泄露目标信息',
+  coarse.visible && !coarse.mode.includes('fine-ready') && !coarse.label.includes('号 →'),
   JSON.stringify(coarse),
 );
 
@@ -127,10 +181,20 @@ const fine = await page.evaluate(() => ({
   visible: Boolean(document.querySelector('.aim-dial')),
   mode: document.querySelector('.aim-dial')?.className ?? '',
   label: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
+  ratio: (() => {
+    const solution = window.__bj8.precisionAt(window.__bj8.aim.current, 8);
+    return solution ? Math.abs(solution.error) / solution.halfWidth : null;
+  })(),
 }));
 ok(
-  '拨轮: 合法幽灵球落位后进入右中袋精瞄档',
-  fine.visible && fine.mode.includes('fine') && fine.label.includes('1号') && fine.label.includes('右中袋'),
+  '拨轮: 辅助关闭时对准袋口也不自动换档或显示目标袋',
+  fine.visible
+    && fine.ratio !== null
+    && fine.ratio <= 1
+    && !fine.mode.includes('fine-ready')
+    && !fine.mode.includes('fine-active')
+    && !fine.label.includes('1号')
+    && !fine.label.includes('右中袋'),
   JSON.stringify(fine),
 );
 
@@ -165,6 +229,7 @@ await wait(180);
 const approach = await page.evaluate(() => ({
   visible: Boolean(document.querySelector('.aim-dial')),
   mode: document.querySelector('.aim-dial')?.className ?? '',
+  label: document.querySelector('.aim-dial')?.getAttribute('aria-valuetext') ?? '',
   aim: window.__bj8.aim.current,
   ratio: (() => {
     const solution = window.__bj8.precisionAt(window.__bj8.aim.current, 8);
@@ -172,26 +237,49 @@ const approach = await page.evaluate(() => ({
   })(),
 }));
 ok(
-  '拨轮: 旧精瞄窗外的扩大接近区进入平滑降档',
-  approach.visible && approach.mode.includes('approach'),
+  '拨轮: 接近袋口只保留几何事实，不在无辅助状态自动降档',
+  approach.visible
+    && !approach.mode.includes('fine-ready')
+    && !approach.label.includes('号 →'),
   JSON.stringify({ ...approach, expectedAngle: expandedPoint.expectedAngle, point: expandedPoint, hit: expandedHit }),
 );
 
-const dial = await page.$eval('.aim-dial', (element) => {
+const dial = await page.$eval('.aim-dial-window', (element) => {
   const rect = element.getBoundingClientRect();
-  return { x: rect.x + rect.width * 0.65, y: rect.y + rect.height / 2 };
+  return {
+    normal: { x: rect.x + rect.width * 0.82, y: rect.y + rect.height / 2 },
+    fine: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+  };
 });
 const beforeDial = await page.evaluate(() => window.__bj8.aim.current);
-await page.mouse.move(dial.x, dial.y);
+await page.mouse.move(dial.normal.x, dial.normal.y);
 await page.mouse.down();
-await page.mouse.move(dial.x + 42, dial.y, { steps: 12 });
+await page.mouse.move(dial.normal.x + 42, dial.normal.y, { steps: 12 });
 await page.mouse.up();
 await wait(120);
 const afterDial = await page.evaluate(() => window.__bj8.aim.current);
+const normalDelta = Math.atan2(Math.sin(afterDial - beforeDial), Math.cos(afterDial - beforeDial));
 ok(
-  '拨轮: 横向拨动平滑改变唯一世界杆向',
-  afterDial > beforeDial && afterDial - beforeDial < 0.2,
-  `${beforeDial} → ${afterDial}`,
+  '拨轮: 普通区域使用固定 900px/周传动',
+  normalDelta > 0 && Math.abs(normalDelta - 42 * Math.PI * 2 / 900) < 0.015,
+  `${beforeDial} → ${afterDial}（Δ=${normalDelta}）`,
+);
+
+await page.mouse.move(dial.fine.x, dial.fine.y);
+await page.mouse.down();
+const clutchActive = await page.$eval('.aim-dial', (element) => element.classList.contains('fine-active'));
+ok('拨轮: 按住中央 64px 白线明确接合精调离合', clutchActive);
+await page.mouse.move(dial.fine.x + 42, dial.fine.y, { steps: 12 });
+await page.mouse.up();
+await wait(120);
+const afterFine = await page.evaluate(() => window.__bj8.aim.current);
+const fineDelta = Math.atan2(Math.sin(afterFine - afterDial), Math.cos(afterFine - afterDial));
+ok(
+  '拨轮: 精调离合使用固定 12000px/周传动并在整次手势保持',
+  fineDelta > 0
+    && fineDelta < normalDelta / 10
+    && Math.abs(fineDelta - 42 * Math.PI * 2 / 12000) < 0.006,
+  `${afterDial} → ${afterFine}（普通Δ=${normalDelta}，精调Δ=${fineDelta}）`,
 );
 
 ok('拨轮: 页面无 JS 错误', errors.length === 0, errors[0] ?? '');
