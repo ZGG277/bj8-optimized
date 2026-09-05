@@ -1,10 +1,11 @@
 /*
-[INPUT]: 三套作用域主题 CSS、URL theme 参数、localStorage 与键盘输入
+[INPUT]: 三套作用域主题 CSS、URL theme 参数、localStorage、键盘输入与逐控件学习记录
 [OUTPUT]: 对外提供首帧主题初始化、纯主题解析函数与调色盘折叠式三主题切换器
 [POS]: HUD 工具组件；与 Game 并列挂载，只改 html[data-theme]，不接触游戏状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useEffect, useRef, useState } from 'react';
+import { markControlLearned } from '../control-onboarding';
 
 export const THEME_OPTIONS = [
   { id: 'celadon', label: '青瓷', hint: '宋代天青玉质' },
@@ -84,6 +85,7 @@ export default function ThemeSwitcher() {
     persistTheme(theme);
     updateThemeUrl(theme);
     setOpen(false);
+    if (theme !== current) markControlLearned(`theme-${theme}`);
   };
 
   useEffect(() => {
@@ -131,9 +133,12 @@ export default function ThemeSwitcher() {
         className="theme-palette-button"
         aria-label={`选择视觉主题，当前${currentOption.label}`}
         aria-expanded={open}
+        data-control-tip="theme-menu"
         aria-controls="theme-options"
-        title={`视觉主题：${currentOption.label}（快捷键 [ / ]）`}
-        onClick={() => setOpen(value => !value)}
+        onClick={() => {
+          setOpen(value => !value);
+          markControlLearned('theme-menu');
+        }}
       >
         <span className="theme-palette-icon" aria-hidden="true">
           <i /><i /><i />
@@ -151,9 +156,9 @@ export default function ThemeSwitcher() {
               key={theme.id}
               type="button"
               data-theme-option={theme.id}
+              data-control-tip={`theme-${theme.id}`}
               aria-pressed={current === theme.id}
               className={current === theme.id ? 'active' : ''}
-              title={theme.hint}
               onClick={() => select(theme.id)}
             >
               {theme.label}

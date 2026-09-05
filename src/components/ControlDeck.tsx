@@ -1,11 +1,12 @@
 /*
-[INPUT]: 五个游戏控件状态、模式门控、观战视角锁、默认拨轮/可选方向键、四项辅助入口、视口尺寸与 Pointer 手势
-[OUTPUT]: 纯视觉五控件层；灯泡展开瞄准线、走位、复盘、瞄准器四项开关，陪练/挑战均按玩家回合门控；保留自由拖动、右/底吸附与 v3 持久化
+[INPUT]: 五个游戏控件状态、模式门控、观战视角锁、默认拨轮/可选方向键、四项辅助入口、视口尺寸、Pointer 手势与逐控件学习记录
+[OUTPUT]: 纯视觉五控件层；灯泡展开瞄准线、走位、复盘、瞄准器四项开关；全部内容手势统一交回控件消费真实变化回执，保留自由拖动、右/底吸附与 v3 持久化
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimControls·AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { markControlLearned } from '../control-onboarding';
 import { AimControls } from './AimControls';
 import { AimDial } from './AimDial';
 import { SpinControl } from './SpinControl';
@@ -13,7 +14,6 @@ import { ShootControl } from './ShootControl';
 import { ViewToolbar } from './ViewToolbar';
 import type { CueSpin } from '../physics';
 import type { PositionPlanStatus } from '../hooks/usePositionPlan';
-import { aimDialPressureProfile } from '../input/aim-dial';
 import {
   CONTROL_LAYOUT_LONG_PRESS_MS,
   CONTROL_LAYOUT_MOVE_THRESHOLD,
@@ -91,13 +91,6 @@ type DockableControlSlotProps = {
     rect: DOMRect,
     element: HTMLElement,
   ) => void;
-  onQuickGesture: (
-    id: DockItemId,
-    deltaX: number,
-    deltaY: number,
-    pointerType: string,
-    pressure: number,
-  ) => boolean;
 };
 
 function DockableControlSlot({
@@ -107,7 +100,6 @@ function DockableControlSlot({
   children,
   className = '',
   onLayoutStart,
-  onQuickGesture,
 }: DockableControlSlotProps) {
   const activationRef = useRef<{
     pointerId: number;
@@ -235,29 +227,22 @@ function DockableControlSlot({
         if (intent === 'quick-gesture') {
           clearActivation();
           event.stopPropagation();
-          const handled = onQuickGesture(
-            id,
-            event.clientX - activation.x,
-            event.clientY - activation.y,
-            event.pointerType,
-            event.pressure,
-          );
-          if (!handled) {
-            activation.originalTarget?.dispatchEvent(new PointerEvent('pointermove', {
-              bubbles: true,
-              cancelable: true,
-              pointerId: event.pointerId,
-              pointerType: event.pointerType,
-              isPrimary: event.isPrimary,
-              buttons: event.buttons || 1,
-              button: event.button,
-              clientX: event.clientX,
-              clientY: event.clientY,
-              pressure: event.pressure,
-              width: event.width,
-              height: event.height,
-            }));
-          }
+          // 首次内容移动也交回原控件，让拨轮统一消费真实变化回执；
+          // 不在布局层旁路调整角度，否则单次移动的成功事实会丢失。
+          activation.originalTarget?.dispatchEvent(new PointerEvent('pointermove', {
+            bubbles: true,
+            cancelable: true,
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            isPrimary: event.isPrimary,
+            buttons: event.buttons || 1,
+            button: event.button,
+            clientX: event.clientX,
+            clientY: event.clientY,
+            pressure: event.pressure,
+            width: event.width,
+            height: event.height,
+          }));
           return;
         }
         event.stopPropagation();
@@ -308,9 +293,9 @@ interface ControlDeckProps {
   onToggleReview: () => void;
   onToggleAimAssist: () => void;
   onToggleAimDial: () => void;
-  onAimButtonAdjust: (angleDelta: number) => void;
-  onAimDialAdjust: (pixelDelta: number, pressureGain?: number) => void;
-  onToggleAimDialPrecision: () => void;
+  onAimButtonAdjust: (angleDelta: number) => boolean;
+  onAimDialAdjust: (pixelDelta: number, pressureGain?: number) => boolean;
+  onToggleAimDialPrecision: () => boolean;
   onBeginCharge: (coordinate: number, availableTravel: number) => void;
   onUpdateCharge: (coordinate: number) => void;
   onReleaseCharge: () => void;
@@ -765,8 +750,12 @@ export function ControlDeck({
           type="button"
           className={`plan-button ${guidanceStateClass} ${aimAssistEnabled || aimDialEnabled || reviewEnabled ? 'has-aim-assist' : ''}`}
           aria-label="打开辅助功能"
+          data-control-tip="assist-menu"
           aria-expanded={assistMenuOpen}
-          onClick={() => setAssistMenuOpen(open => !open)}
+          onClick={() => {
+            setAssistMenuOpen(open => !open);
+            markControlLearned('assist-menu');
+          }}
         >
           <span className="bulb-icon" aria-hidden="true"><i /></span>
         </button>
@@ -781,8 +770,12 @@ export function ControlDeck({
               className={`assist-option aim-option ${aimAssistEnabled ? 'active' : ''}`}
               role="switch"
               aria-label="瞄准辅助线"
+              data-control-tip="assist-aim"
               aria-checked={aimAssistEnabled}
-              onClick={onToggleAimAssist}
+              onClick={() => {
+                onToggleAimAssist();
+                markControlLearned('assist-aim');
+              }}
             >
               <span className="trajectory-icon" aria-hidden="true"><i /></span>
             </button>
@@ -791,9 +784,14 @@ export function ControlDeck({
               className={`assist-option guidance-option ${guidanceEnabled ? 'active' : ''}`}
               role="switch"
               aria-label="走位规划"
+              data-control-tip="assist-plan"
               aria-checked={guidanceEnabled}
               disabled={!guidanceAvailable}
-              onClick={onToggleGuidance}
+              onClick={() => {
+                if (!guidanceAvailable) return;
+                onToggleGuidance();
+                markControlLearned('assist-plan');
+              }}
             >
               <span className="route-icon" aria-hidden="true"><i /><i /><i /></span>
             </button>
@@ -802,8 +800,12 @@ export function ControlDeck({
               className={`assist-option review-option ${reviewEnabled ? 'active' : ''} ${hasReview ? 'has-review' : ''}`}
               role="switch"
               aria-label="显示击球复盘"
+              data-control-tip="assist-review"
               aria-checked={reviewEnabled}
-              onClick={onToggleReview}
+              onClick={() => {
+                onToggleReview();
+                markControlLearned('assist-review');
+              }}
             >
               <span className="review-icon" aria-hidden="true"><i /></span>
             </button>
@@ -812,9 +814,11 @@ export function ControlDeck({
               className={`assist-option dial-option ${aimDialEnabled ? 'active' : ''}`}
               role="switch"
               aria-label={aimDialEnabled ? '切换为方向键瞄准' : '切换为拨轮瞄准'}
+              data-control-tip="assist-input"
               aria-checked={aimDialEnabled}
               onClick={() => {
                 onToggleAimDial();
+                markControlLearned('assist-input');
                 setAssistMenuOpen(false);
               }}
             >
@@ -908,22 +912,6 @@ export function ControlDeck({
         : 0;
     });
   const free = visibleIds.filter(id => layout[id].mode === 'free');
-  const transferQuickGesture = useCallback((
-    id: DockItemId,
-    deltaX: number,
-    deltaY: number,
-    pointerType: string,
-    pressure: number,
-  ) => {
-    if (id !== 'aimDial' || !aimDialEnabled) return false;
-    const pressureProfile = aimDialPressureProfile(pointerType, pressure);
-    onAimDialAdjust(controlAxisDelta(
-      layoutRef.current.aimDial,
-      deltaX,
-      deltaY,
-    ), pressureProfile.gain);
-    return true;
-  }, [aimDialEnabled, onAimDialAdjust]);
 
   const renderSlot = (id: DockItemId) => (
     <DockableControlSlot
@@ -933,7 +921,6 @@ export function ControlDeck({
       dragging={draggingId === id}
       className={id === 'aimDial' && !aimDialEnabled ? 'is-aim-buttons' : ''}
       onLayoutStart={startLayoutDrag}
-      onQuickGesture={transferQuickGesture}
     >
       {nodes[id]}
     </DockableControlSlot>

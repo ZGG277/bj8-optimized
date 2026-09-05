@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖已启动游戏页、远程调试浏览器、puppeteer-core 与 DEV __bj8 场景句柄
-[OUTPUT]: 前探鼻尖/下沿内凹库边、六袋台内圆弧凹口/下沉护口/对齐皮裙/白色菱形网袋/细缝边结构、jaw 跨接连续性、四机位视觉回归及页面错误门禁
+[OUTPUT]: 六袋共享木框裁口/一体护口皮裙/同站点缝边的装配与最终壳体闭合检查、四机位截图及页面错误门禁；承托/面域由最终几何单测证明
 [POS]: PocketGeometry 物理/视觉一体化的浏览器出口验收；只改调试页内世界，不写游戏数据
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md 与 README.md
 */
@@ -62,6 +62,7 @@ async function waitForCameraSettled() {
   }, { timeout: 10000 });
 }
 
+try {
 await openGame({ width: 1280, height: 800 });
 const hasDebug = await page.evaluate(() => Boolean(window.__bj8?.scene?.current));
 ok('开发页暴露可复现视觉场景', hasDebug);
@@ -85,19 +86,18 @@ const pocketAnatomy = await page.evaluate(() => {
     topTrims: 0,
     topTrimJawAnchors: 0,
     seamlessTrimEnds: 0,
-    embeddedTrims: 0,
+    sharedFrameContracts: 0,
+    integratedAprons: 0,
+    closedTrimShells: 0,
     tanLeatherCaps: 0,
     minTrimWidthMm: Number.POSITIVE_INFINITY,
     minTrimHeightMm: Number.POSITIVE_INFINITY,
-    minTrimJoinExtensionMm: Number.POSITIVE_INFINITY,
     aprons: 0,
-    apronJawAnchors: 0,
     trimColor: null,
     lips: 0,
     stitchedWelts: 0,
     maxWeltRadiusMm: 0,
     cornerLipJawAnchors: 0,
-    minCornerLipExtensionMm: Number.POSITIVE_INFINITY,
     nets: 0,
     whiteDiamondNets: 0,
     netRows: 0,
@@ -106,6 +106,32 @@ const pocketAnatomy = await page.evaluate(() => {
     netColor: null,
     wells: 0,
     bottoms: 0,
+  };
+  // 检查浏览器装配后的实际三角形，不把 userData 自报当闭壳证据。
+  const isClosedFiniteShell = geometry => {
+    const position = geometry?.getAttribute('position');
+    if (!position || position.count < 4) return false;
+    const index = geometry.getIndex();
+    const count = index?.count ?? position.count;
+    if (count % 3) return false;
+    const edges = new Map();
+    const point = i => [position.getX(i), position.getY(i), position.getZ(i)];
+    for (let i = 0; i < count; i += 3) {
+      const p = [0, 1, 2].map(j => point(index ? index.getX(i + j) : i + j));
+      if (!p.flat().every(Number.isFinite)) return false;
+      const a = p[1].map((v, k) => v - p[0][k]);
+      const b = p[2].map((v, k) => v - p[0][k]);
+      const cross = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      if (cross.reduce((sum, v) => sum + v * v, 0) <= 1e-24) return false;
+      const keys = p.map(v => v.map(n => n.toFixed(7)).join(','));
+      for (let j = 0; j < 3; j++) {
+        const ends = [keys[j], keys[(j + 1) % 3]];
+        if (ends[0] === ends[1]) return false;
+        const key = ends.sort().join('|');
+        edges.set(key, (edges.get(key) ?? 0) + 1);
+      }
+    }
+    return edges.size > 0 && [...edges.values()].every(count => count === 2);
   };
   root?.traverse(object => {
     if (object.name.startsWith('cushion-')) {
@@ -126,6 +152,7 @@ const pocketAnatomy = await page.evaluate(() => {
     }
     if (object.name === 'table-wood-frame') {
       counts.outerWoodFrames += 1;
+      counts.sharedFrameContracts += Number(object.userData.sharedSurfaceContract === true);
       counts.pocketCutouts += Number(object.userData.pocketCutoutCount ?? 0);
       counts.roundedOuterCorners += Number(
         object.userData.roundedOuterCornerCount ?? 0,
@@ -162,16 +189,12 @@ const pocketAnatomy = await page.evaluate(() => {
         counts.minTrimHeightMm,
         Number(object.userData.heightMm ?? 0),
       );
-      counts.minTrimJoinExtensionMm = Math.min(
-        counts.minTrimJoinExtensionMm,
-        Number(object.userData.joinExtensionMm ?? 0),
-      );
-      counts.embeddedTrims += Number(object.userData.embeddedDepthMm ?? 0) >= 3.9 ? 1 : 0;
+      counts.integratedAprons += Number(object.userData.integratedApron === true && object.userData.surfaceContractVersion === 2);
+      counts.closedTrimShells += Number(isClosedFiniteShell(object.geometry));
       counts.trimColor = object.material?.color?.getHex?.() ?? null;
     }
     if (object.name.startsWith('pocket-leather-apron-')) {
       counts.aprons += 1;
-      counts.apronJawAnchors += Number(object.userData.jawAnchorCount ?? 0);
     }
     if (object.name.startsWith('pocket-lip-')) {
       counts.lips += 1;
@@ -185,10 +208,6 @@ const pocketAnatomy = await page.evaluate(() => {
       const jawAnchorCount = Number(object.userData.jawAnchorCount ?? 0);
       if (jawAnchorCount > 0) {
         counts.cornerLipJawAnchors += jawAnchorCount;
-        counts.minCornerLipExtensionMm = Math.min(
-          counts.minCornerLipExtensionMm,
-          Number(object.userData.joinExtensionMm ?? 0),
-        );
       }
     }
     if (object.name.startsWith('pocket-net-')) {
@@ -209,7 +228,7 @@ const pocketAnatomy = await page.evaluate(() => {
   return counts;
 });
 ok(
-  '一体木框内沿切出六袋，150 段库边均为前探鼻尖与下沿内凹剖面',
+  '同源木框六袋与六个最终闭合护口壳体，保留原库边和袋腔结构',
   pocketAnatomy.outerWoodFrames === 1 &&
     pocketAnatomy.pocketCutouts === 6 &&
     pocketAnatomy.roundedOuterCorners === 4 &&
@@ -227,19 +246,18 @@ ok(
     pocketAnatomy.topTrims === 6 &&
     pocketAnatomy.topTrimJawAnchors === 12 &&
     pocketAnatomy.seamlessTrimEnds === 12 &&
-    pocketAnatomy.embeddedTrims === 6 &&
+    pocketAnatomy.sharedFrameContracts === 1 &&
+    pocketAnatomy.integratedAprons === 6 &&
+    pocketAnatomy.closedTrimShells === 6 &&
     pocketAnatomy.tanLeatherCaps === 6 &&
     pocketAnatomy.minTrimWidthMm >= 19 &&
     pocketAnatomy.minTrimHeightMm >= 6.99 &&
-    pocketAnatomy.minTrimJoinExtensionMm >= 8 &&
     pocketAnatomy.trimColor === 0x86623f &&
-    pocketAnatomy.aprons === 6 &&
-    pocketAnatomy.apronJawAnchors === 12 &&
+    pocketAnatomy.aprons === 0 &&
     pocketAnatomy.lips === 6 &&
     pocketAnatomy.stitchedWelts === 6 &&
     pocketAnatomy.maxWeltRadiusMm <= 1.8 &&
-    pocketAnatomy.cornerLipJawAnchors === 8 &&
-    pocketAnatomy.minCornerLipExtensionMm >= 7 &&
+    pocketAnatomy.cornerLipJawAnchors === 12 &&
     pocketAnatomy.nets === 6 &&
     pocketAnatomy.whiteDiamondNets === 6 &&
     pocketAnatomy.netRows === 36 &&
@@ -297,8 +315,9 @@ ok('390×844 全台无横向溢出', portrait.canvasVisible && !portrait.overflo
 await page.screenshot({ path: `${SHOT_DIR}/pocket-portrait.png` });
 
 ok('袋口视觉回归无页面脚本错误', errors.length === 0, errors[0] ?? '');
-await page.close();
-await browser.disconnect();
+} finally {
+  try { await page.close(); } finally { await browser.disconnect(); }
+}
 
 const failed = results.filter(result => !result.pass);
 console.log(`\n${results.length - failed.length}/${results.length} 通过`);

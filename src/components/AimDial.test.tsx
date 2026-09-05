@@ -14,8 +14,8 @@ function render(precisionActive: boolean): string {
       visible
       precisionActive={precisionActive}
       orientation="horizontal"
-      onAdjust={() => {}}
-      onTogglePrecision={() => {}}
+      onAdjust={() => true}
+      onTogglePrecision={() => true}
     />,
   );
 }

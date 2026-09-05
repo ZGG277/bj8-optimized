@@ -1,0 +1,4 @@
+
+> bj8-optimized@1.5.0 typecheck
+> tsc --noEmit
+

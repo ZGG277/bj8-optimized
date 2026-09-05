@@ -1,0 +1,1743 @@
+{
+  "method": "Actual Scene3D meshes, 12 azimuths x 3 elevations x 6 pockets x 9 cap-face samples; occlusion is reported, not mistaken for a missing surface",
+  "rows": [
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 15,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 45,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 0,
+      "elevation": 80,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 15,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 45,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 1,
+      "elevation": 80,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 240,
+      "visibleTrim": 8,
+      "occluders": [
+        "table-wood-frame"
+      ],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 270,
+      "visibleTrim": 8,
+      "occluders": [
+        "table-wood-frame"
+      ],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 15,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 45,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 2,
+      "elevation": 80,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 60,
+      "visibleTrim": 8,
+      "occluders": [
+        "table-wood-frame"
+      ],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 90,
+      "visibleTrim": 8,
+      "occluders": [
+        "table-wood-frame"
+      ],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 15,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 45,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 3,
+      "elevation": 80,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 15,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 45,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 4,
+      "elevation": 80,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 15,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 45,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 0,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 30,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 60,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 90,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 120,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 150,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 180,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 210,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 240,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 270,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 300,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    },
+    {
+      "pocket": 5,
+      "elevation": 80,
+      "azimuth": 330,
+      "visibleTrim": 9,
+      "occluders": [],
+      "missing": 0
+    }
+  ],
+  "rays": 1944,
+  "missing": 0
+}

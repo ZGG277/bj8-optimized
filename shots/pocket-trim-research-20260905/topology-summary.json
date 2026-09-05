@@ -1,0 +1,806 @@
+[
+  {
+    "index": 0,
+    "kind": "corner",
+    "outerCrossInner": [
+      [
+        2,
+        7
+      ],
+      [
+        45,
+        40
+      ]
+    ],
+    "outerSelf": [],
+    "minorityTriangleCount": 19,
+    "minorityTriangleAreaMm2": 251.88767489225927,
+    "inverted": [
+      {
+        "triangle": 0,
+        "station": 0,
+        "area": 3.31788701046771
+      },
+      {
+        "triangle": 1,
+        "station": 0,
+        "area": 1.8956082783461359
+      },
+      {
+        "triangle": 2,
+        "station": 1,
+        "area": 6.852663567258341
+      },
+      {
+        "triangle": 3,
+        "station": 1,
+        "area": 1.2671827960274857
+      },
+      {
+        "triangle": 4,
+        "station": 2,
+        "area": 14.437547900314486
+      },
+      {
+        "triangle": 6,
+        "station": 3,
+        "area": 28.676550567041666
+      },
+      {
+        "triangle": 8,
+        "station": 4,
+        "area": 38.748118925013834
+      },
+      {
+        "triangle": 10,
+        "station": 5,
+        "area": 31.359210488801594
+      },
+      {
+        "triangle": 12,
+        "station": 6,
+        "area": 9.097092100063303
+      },
+      {
+        "triangle": 82,
+        "station": 41,
+        "area": 5.03732700707358
+      },
+      {
+        "triangle": 84,
+        "station": 42,
+        "area": 27.075366972439987
+      },
+      {
+        "triangle": 86,
+        "station": 43,
+        "area": 33.06252396129143
+      },
+      {
+        "triangle": 88,
+        "station": 44,
+        "area": 24.103737466418842
+      },
+      {
+        "triangle": 90,
+        "station": 45,
+        "area": 12.356168248572843
+      },
+      {
+        "triangle": 91,
+        "station": 45,
+        "area": 1.2672852456318964
+      },
+      {
+        "triangle": 92,
+        "station": 46,
+        "area": 6.17347293285776
+      },
+      {
+        "triangle": 93,
+        "station": 46,
+        "area": 1.946094091209721
+      },
+      {
+        "triangle": 94,
+        "station": 47,
+        "area": 3.1676145866299357
+      },
+      {
+        "triangle": 95,
+        "station": 47,
+        "area": 2.0462227467987577
+      }
+    ],
+    "firstInner": [
+      -47.000022713570814,
+      -10.286998781015678,
+      48.00000041723251
+    ],
+    "firstOuter": [
+      -46.99998056672231,
+      -2.236992862283429,
+      48.00000041723251
+    ],
+    "lastInner": [
+      46.99996707973061,
+      -10.287040927864192,
+      48.00000041723251
+    ],
+    "lastOuter": [
+      46.99996707973061,
+      -2.236992862283432,
+      48.00000041723251
+    ]
+  },
+  {
+    "index": 1,
+    "kind": "corner",
+    "outerCrossInner": [
+      [
+        2,
+        7
+      ],
+      [
+        45,
+        40
+      ]
+    ],
+    "outerSelf": [],
+    "minorityTriangleCount": 19,
+    "minorityTriangleAreaMm2": 251.8872176757725,
+    "inverted": [
+      {
+        "triangle": 0,
+        "station": 0,
+        "area": 3.3178597647065406
+      },
+      {
+        "triangle": 1,
+        "station": 0,
+        "area": 1.8959775687221532
+      },
+      {
+        "triangle": 2,
+        "station": 1,
+        "area": 6.852857332262386
+      },
+      {
+        "triangle": 3,
+        "station": 1,
+        "area": 1.2667096918050937
+      },
+      {
+        "triangle": 4,
+        "station": 2,
+        "area": 14.437095146035924
+      },
+      {
+        "triangle": 6,
+        "station": 3,
+        "area": 28.67633690328835
+      },
+      {
+        "triangle": 8,
+        "station": 4,
+        "area": 38.74860229302617
+      },
+      {
+        "triangle": 10,
+        "station": 5,
+        "area": 31.35899557094038
+      },
+      {
+        "triangle": 12,
+        "station": 6,
+        "area": 9.096676059527878
+      },
+      {
+        "triangle": 82,
+        "station": 41,
+        "area": 5.037615707692619
+      },
+      {
+        "triangle": 84,
+        "station": 42,
+        "area": 27.07561302273117
+      },
+      {
+        "triangle": 86,
+        "station": 43,
+        "area": 33.06216419218799
+      },
+      {
+        "triangle": 88,
+        "station": 44,
+        "area": 24.103598946112484
+      },
+      {
+        "triangle": 90,
+        "station": 45,
+        "area": 12.3565910286061
+      },
+      {
+        "triangle": 91,
+        "station": 45,
+        "area": 1.2671827960275914
+      },
+      {
+        "triangle": 92,
+        "station": 46,
+        "area": 6.173417308019669
+      },
+      {
+        "triangle": 93,
+        "station": 46,
+        "area": 1.946429055266159
+      },
+      {
+        "triangle": 94,
+        "station": 47,
+        "area": 3.1675873408687134
+      },
+      {
+        "triangle": 95,
+        "station": 47,
+        "area": 2.0459079479451323
+      }
+    ],
+    "firstInner": [
+      -46.99996707973061,
+      -10.287040927864192,
+      48.00000041723251
+    ],
+    "firstOuter": [
+      -46.99996707973061,
+      -2.236992862283432,
+      48.00000041723251
+    ],
+    "lastInner": [
+      47.000022713570814,
+      -10.286998781015678,
+      48.00000041723251
+    ],
+    "lastOuter": [
+      46.99998056672231,
+      -2.236992862283429,
+      48.00000041723251
+    ]
+  },
+  {
+    "index": 2,
+    "kind": "side",
+    "outerCrossInner": [
+      [
+        2,
+        7
+      ],
+      [
+        45,
+        40
+      ]
+    ],
+    "outerSelf": [],
+    "minorityTriangleCount": 19,
+    "minorityTriangleAreaMm2": 197.79347633297476,
+    "inverted": [
+      {
+        "triangle": 0,
+        "station": 0,
+        "area": 2.5699939608658795
+      },
+      {
+        "triangle": 1,
+        "station": 0,
+        "area": 1.6321662016371974
+      },
+      {
+        "triangle": 2,
+        "station": 1,
+        "area": 4.982948324072645
+      },
+      {
+        "triangle": 3,
+        "station": 1,
+        "area": 1.2322024449673563
+      },
+      {
+        "triangle": 4,
+        "station": 2,
+        "area": 10.334032101377844
+      },
+      {
+        "triangle": 6,
+        "station": 3,
+        "area": 20.882436224112233
+      },
+      {
+        "triangle": 8,
+        "station": 4,
+        "area": 28.71055587772009
+      },
+      {
+        "triangle": 10,
+        "station": 5,
+        "area": 23.840212873160738
+      },
+      {
+        "triangle": 12,
+        "station": 6,
+        "area": 11.32234525136333
+      },
+      {
+        "triangle": 82,
+        "station": 41,
+        "area": 8.885260637248038
+      },
+      {
+        "triangle": 84,
+        "station": 42,
+        "area": 20.814833573412628
+      },
+      {
+        "triangle": 86,
+        "station": 43,
+        "area": 24.51310896600667
+      },
+      {
+        "triangle": 88,
+        "station": 44,
+        "area": 17.530819549027576
+      },
+      {
+        "triangle": 90,
+        "station": 45,
+        "area": 8.893046971492069
+      },
+      {
+        "triangle": 91,
+        "station": 45,
+        "area": 1.2322024449673563
+      },
+      {
+        "triangle": 92,
+        "station": 46,
+        "area": 4.5523190214113995
+      },
+      {
+        "triangle": 93,
+        "station": 46,
+        "area": 1.6628317476286014
+      },
+      {
+        "triangle": 94,
+        "station": 47,
+        "area": 2.485395625084763
+      },
+      {
+        "triangle": 95,
+        "station": 47,
+        "area": 1.7167645374183138
+      }
+    ],
+    "firstInner": [
+      -47.940000891685486,
+      -8.572528362274179,
+      48.00000041723251
+    ],
+    "firstOuter": [
+      -47.940000891685486,
+      -1.9224977493286222,
+      48.00000041723251
+    ],
+    "lastInner": [
+      47.940000891685486,
+      -8.572528362274179,
+      48.00000041723251
+    ],
+    "lastOuter": [
+      47.940000891685486,
+      -1.9224977493286222,
+      48.00000041723251
+    ]
+  },
+  {
+    "index": 3,
+    "kind": "side",
+    "outerCrossInner": [
+      [
+        2,
+        7
+      ],
+      [
+        45,
+        40
+      ]
+    ],
+    "outerSelf": [],
+    "minorityTriangleCount": 19,
+    "minorityTriangleAreaMm2": 197.79347633297476,
+    "inverted": [
+      {
+        "triangle": 0,
+        "station": 0,
+        "area": 2.5699939608658795
+      },
+      {
+        "triangle": 1,
+        "station": 0,
+        "area": 1.6321662016371974
+      },
+      {
+        "triangle": 2,
+        "station": 1,
+        "area": 4.982948324072645
+      },
+      {
+        "triangle": 3,
+        "station": 1,
+        "area": 1.2322024449673563
+      },
+      {
+        "triangle": 4,
+        "station": 2,
+        "area": 10.334032101377844
+      },
+      {
+        "triangle": 6,
+        "station": 3,
+        "area": 20.882436224112233
+      },
+      {
+        "triangle": 8,
+        "station": 4,
+        "area": 28.71055587772009
+      },
+      {
+        "triangle": 10,
+        "station": 5,
+        "area": 23.840212873160738
+      },
+      {
+        "triangle": 12,
+        "station": 6,
+        "area": 11.32234525136333
+      },
+      {
+        "triangle": 82,
+        "station": 41,
+        "area": 8.885260637248038
+      },
+      {
+        "triangle": 84,
+        "station": 42,
+        "area": 20.814833573412628
+      },
+      {
+        "triangle": 86,
+        "station": 43,
+        "area": 24.51310896600667
+      },
+      {
+        "triangle": 88,
+        "station": 44,
+        "area": 17.530819549027576
+      },
+      {
+        "triangle": 90,
+        "station": 45,
+        "area": 8.893046971492069
+      },
+      {
+        "triangle": 91,
+        "station": 45,
+        "area": 1.2322024449673563
+      },
+      {
+        "triangle": 92,
+        "station": 46,
+        "area": 4.5523190214113995
+      },
+      {
+        "triangle": 93,
+        "station": 46,
+        "area": 1.6628317476286014
+      },
+      {
+        "triangle": 94,
+        "station": 47,
+        "area": 2.485395625084763
+      },
+      {
+        "triangle": 95,
+        "station": 47,
+        "area": 1.7167645374183138
+      }
+    ],
+    "firstInner": [
+      -47.940000891685486,
+      -8.572528362274179,
+      48.00000041723251
+    ],
+    "firstOuter": [
+      -47.940000891685486,
+      -1.9224977493286222,
+      48.00000041723251
+    ],
+    "lastInner": [
+      47.940000891685486,
+      -8.572528362274179,
+      48.00000041723251
+    ],
+    "lastOuter": [
+      47.940000891685486,
+      -1.9224977493286222,
+      48.00000041723251
+    ]
+  },
+  {
+    "index": 4,
+    "kind": "corner",
+    "outerCrossInner": [
+      [
+        2,
+        7
+      ],
+      [
+        45,
+        40
+      ]
+    ],
+    "outerSelf": [],
+    "minorityTriangleCount": 19,
+    "minorityTriangleAreaMm2": 251.8872176757725,
+    "inverted": [
+      {
+        "triangle": 0,
+        "station": 0,
+        "area": 3.3178597647065406
+      },
+      {
+        "triangle": 1,
+        "station": 0,
+        "area": 1.8959775687221532
+      },
+      {
+        "triangle": 2,
+        "station": 1,
+        "area": 6.852857332262386
+      },
+      {
+        "triangle": 3,
+        "station": 1,
+        "area": 1.2667096918050937
+      },
+      {
+        "triangle": 4,
+        "station": 2,
+        "area": 14.437095146035924
+      },
+      {
+        "triangle": 6,
+        "station": 3,
+        "area": 28.67633690328835
+      },
+      {
+        "triangle": 8,
+        "station": 4,
+        "area": 38.74860229302617
+      },
+      {
+        "triangle": 10,
+        "station": 5,
+        "area": 31.35899557094038
+      },
+      {
+        "triangle": 12,
+        "station": 6,
+        "area": 9.096676059527878
+      },
+      {
+        "triangle": 82,
+        "station": 41,
+        "area": 5.037615707692619
+      },
+      {
+        "triangle": 84,
+        "station": 42,
+        "area": 27.07561302273117
+      },
+      {
+        "triangle": 86,
+        "station": 43,
+        "area": 33.06216419218799
+      },
+      {
+        "triangle": 88,
+        "station": 44,
+        "area": 24.103598946112484
+      },
+      {
+        "triangle": 90,
+        "station": 45,
+        "area": 12.3565910286061
+      },
+      {
+        "triangle": 91,
+        "station": 45,
+        "area": 1.2671827960275914
+      },
+      {
+        "triangle": 92,
+        "station": 46,
+        "area": 6.173417308019669
+      },
+      {
+        "triangle": 93,
+        "station": 46,
+        "area": 1.946429055266159
+      },
+      {
+        "triangle": 94,
+        "station": 47,
+        "area": 3.1675873408687134
+      },
+      {
+        "triangle": 95,
+        "station": 47,
+        "area": 2.0459079479451323
+      }
+    ],
+    "firstInner": [
+      -46.99996707973061,
+      -10.287040927864192,
+      48.00000041723251
+    ],
+    "firstOuter": [
+      -46.99996707973061,
+      -2.236992862283432,
+      48.00000041723251
+    ],
+    "lastInner": [
+      47.000022713570814,
+      -10.286998781015678,
+      48.00000041723251
+    ],
+    "lastOuter": [
+      46.99998056672231,
+      -2.236992862283429,
+      48.00000041723251
+    ]
+  },
+  {
+    "index": 5,
+    "kind": "corner",
+    "outerCrossInner": [
+      [
+        2,
+        7
+      ],
+      [
+        45,
+        40
+      ]
+    ],
+    "outerSelf": [],
+    "minorityTriangleCount": 19,
+    "minorityTriangleAreaMm2": 251.88767489225927,
+    "inverted": [
+      {
+        "triangle": 0,
+        "station": 0,
+        "area": 3.31788701046771
+      },
+      {
+        "triangle": 1,
+        "station": 0,
+        "area": 1.8956082783461359
+      },
+      {
+        "triangle": 2,
+        "station": 1,
+        "area": 6.852663567258341
+      },
+      {
+        "triangle": 3,
+        "station": 1,
+        "area": 1.2671827960274857
+      },
+      {
+        "triangle": 4,
+        "station": 2,
+        "area": 14.437547900314486
+      },
+      {
+        "triangle": 6,
+        "station": 3,
+        "area": 28.676550567041666
+      },
+      {
+        "triangle": 8,
+        "station": 4,
+        "area": 38.748118925013834
+      },
+      {
+        "triangle": 10,
+        "station": 5,
+        "area": 31.359210488801594
+      },
+      {
+        "triangle": 12,
+        "station": 6,
+        "area": 9.097092100063303
+      },
+      {
+        "triangle": 82,
+        "station": 41,
+        "area": 5.03732700707358
+      },
+      {
+        "triangle": 84,
+        "station": 42,
+        "area": 27.075366972439987
+      },
+      {
+        "triangle": 86,
+        "station": 43,
+        "area": 33.06252396129143
+      },
+      {
+        "triangle": 88,
+        "station": 44,
+        "area": 24.103737466418842
+      },
+      {
+        "triangle": 90,
+        "station": 45,
+        "area": 12.356168248572843
+      },
+      {
+        "triangle": 91,
+        "station": 45,
+        "area": 1.2672852456318964
+      },
+      {
+        "triangle": 92,
+        "station": 46,
+        "area": 6.17347293285776
+      },
+      {
+        "triangle": 93,
+        "station": 46,
+        "area": 1.946094091209721
+      },
+      {
+        "triangle": 94,
+        "station": 47,
+        "area": 3.1676145866299357
+      },
+      {
+        "triangle": 95,
+        "station": 47,
+        "area": 2.0462227467987577
+      }
+    ],
+    "firstInner": [
+      -47.000022713570814,
+      -10.286998781015678,
+      48.00000041723251
+    ],
+    "firstOuter": [
+      -46.99998056672231,
+      -2.236992862283429,
+      48.00000041723251
+    ],
+    "lastInner": [
+      46.99996707973061,
+      -10.287040927864192,
+      48.00000041723251
+    ],
+    "lastOuter": [
+      46.99996707973061,
+      -2.236992862283432,
+      48.00000041723251
+    ]
+  }
+]

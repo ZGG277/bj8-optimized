@@ -1,3 +1,7 @@
 node_modules/
 dist/
 tsconfig.tsbuildinfo
+
+# 本地代理原始交互日志不是产品或公开验收材料；保留在磁盘，不推送。
+shots/optimization-spark.jsonl
+shots/optimization-spark.stderr.log

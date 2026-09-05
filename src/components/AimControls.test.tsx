@@ -16,7 +16,7 @@ import {
 describe('AimControls 可选方向键微调结构', () => {
   it('提供球杆两侧的左右按钮', () => {
     const markup = renderToStaticMarkup(
-      <AimControls disabled={false} onAdjust={() => {}} />,
+      <AimControls disabled={false} onAdjust={() => true} />,
     );
     expect(markup).toContain('aria-label="球杆方向微调"');
     expect(markup).toContain('aria-label="瞄准向左微调"');
@@ -36,7 +36,7 @@ describe('AimControls 可选方向键微调结构', () => {
 
   it('禁用态同时禁用两个按钮', () => {
     const markup = renderToStaticMarkup(
-      <AimControls disabled onAdjust={() => {}} />,
+      <AimControls disabled onAdjust={() => false} />,
     );
     expect(markup.match(/disabled=""/g)).toHaveLength(2);
   });

@@ -1,11 +1,12 @@
 /*
-[INPUT]: ShotReview（planner/review 判定结果）+ open 状态与开关回调
+[INPUT]: ShotReview（planner/review 判定结果）+ open 状态、开关回调与逐控件学习记录
 [OUTPUT]: 渲染以“复盘”开头的中性击球诊断；有显式计划时提供 ▶ 计划/实际对比
 [POS]: HUD 组件层，只做展示与事件转发；场景对比渲染经父组件回调委托 Scene3D.showReviewOverlay
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import type { ShotReview } from '../planner/review';
 import { useDraggableOverlay } from '../hooks/useDraggableOverlay';
+import { markControlLearned } from '../control-onboarding';
 
 interface ReviewOverlayProps {
   review: ShotReview;
@@ -36,7 +37,10 @@ export function ReviewOverlay({ review, open, onOpen, onClose }: ReviewOverlayPr
       <div ref={drag.elementRef} className="review-float" style={drag.style}>
         <span className="overlay-drag-handle" aria-label="拖动复盘提示" {...drag.dragHandleProps}>⠿</span>
         {canCompare ? (
-          <button type="button" className="review-chip" onClick={onOpen} aria-label="展开击球复盘对比">
+          <button type="button" className="review-chip" data-control-tip="review-open" onClick={() => {
+            onOpen();
+            markControlLearned('review-open');
+          }} aria-label="展开击球复盘对比">
             <span className={`review-verdict-dot ${review.verdict}`} />
             {`复盘：${review.message} · ▶ 对比`}
           </button>
@@ -60,7 +64,10 @@ export function ReviewOverlay({ review, open, onOpen, onClose }: ReviewOverlayPr
           <span className="legend-plan">┄ 计划</span>
           <span className="legend-actual">— 实际</span>
         </span>
-        <button type="button" className="plan-bar-close" aria-label="收起击球复盘" onClick={onClose}>
+        <button type="button" className="plan-bar-close" data-control-tip="review-close" aria-label="收起击球复盘" onClick={() => {
+          onClose();
+          markControlLearned('review-close');
+        }}>
           ✕
         </button>
       </div>

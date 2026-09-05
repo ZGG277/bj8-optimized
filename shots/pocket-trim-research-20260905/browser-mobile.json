@@ -1,0 +1,26 @@
+{
+  "canvas": [
+    {
+      "height": 798,
+      "rect": {
+        "bottom": 844,
+        "height": 798,
+        "left": 0,
+        "right": 390,
+        "top": 46,
+        "width": 390,
+        "x": 0,
+        "y": 46
+      },
+      "width": 390
+    }
+  ],
+  "overhead": "true",
+  "url": "http://localhost:5199/",
+  "view": "100",
+  "viewport": {
+    "dpr": 1,
+    "h": 844,
+    "w": 390
+  }
+}

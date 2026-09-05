@@ -1,11 +1,14 @@
 /*
 [INPUT]: 母球位置、独立相机方位角、力度预览、归一化视角高度与视口宽高比
-[OUTPUT]: 对外提供连续视角钳制、观战锁定路由、横竖屏固定俯视方向、玩家非俯视杆向跟随、全台适配与相机位姿
-[POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式
+[OUTPUT]: 对外提供稍高出杆瞄准位、连续视角钳制、观战锁定路由、横竖屏全台方向、玩家非俯视杆向跟随与相机位姿
+[POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式，全台投影拟合委托 camera-framing
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
+import { fullTableCameraPose, type CameraSafetyInsets } from './camera-framing';
 
 export const FIRST_PERSON_VIEW = 0;
+/** 稍高于第一人称，保留沿杆向观察白球与目标的出杆感。 */
+export const SHOT_AIM_VIEW = 0.16;
 export const OVERHEAD_VIEW = 1;
 export const FULL_TABLE_AZIMUTH = 0;
 export const LANDSCAPE_TABLE_AZIMUTH = Math.PI / 2;
@@ -15,13 +18,10 @@ const FP_CAM_DIST = 0.72;
 const FP_CAM_SIDE = 0.015;
 const FP_CAM_HEIGHT = 0.16;
 const FP_LOOK_AHEAD = 0.42;
-const OVERHEAD_HEIGHT = 3.7;
 const OVERHEAD_ORBIT_RADIUS = 0.85;
-const OVERHEAD_LOOK_RADIUS = 0.05;
 /** 木帮外缘的半尺寸，略留 1cm 给阴影和抗锯齿边缘。 */
 const TABLE_OUTER_HALF_WIDTH = 0.76;
 const TABLE_OUTER_HALF_LENGTH = 1.4;
-const TABLE_FIT_MARGIN = 1.23;
 const ORBIT_RADIANS_PER_PIXEL = 0.008;
 export const GLOBAL_CAMERA_VIEW_LEVEL = 0.42;
 export const OVERHEAD_LOCK_VIEW_LEVEL = 0.995;
@@ -59,12 +59,15 @@ export function isOverheadCameraView(level: number): boolean {
 }
 
 /** 竖屏让球台长边沿屏幕纵轴，横屏转 90° 让球台横放。 */
-export function opponentOverheadAzimuth(width: number, height: number): number {
+export function fullTableAzimuth(width: number, height: number): number {
   if (!Number.isFinite(width) || !Number.isFinite(height)) {
     return LANDSCAPE_TABLE_AZIMUTH;
   }
   return width < height ? FULL_TABLE_AZIMUTH : LANDSCAPE_TABLE_AZIMUTH;
 }
+
+/** 兼容既有观战调用；玩家与对手共享同一全台构图。 */
+export const opponentOverheadAzimuth = fullTableAzimuth;
 
 /** 顾燃回合锁定球桌；只有玩家显式开启手动视角时，球桌手势才用于环绕。 */
 export function cameraInteractionMode(
@@ -111,23 +114,13 @@ const mix = (from: number, to: number, amount: number) => from + (to - from) * a
  * 竖屏的水平 FOV 最窄，因此方位角转到横台时会自动继续拉远，始终保留整台。
  */
 export function overheadFitHeight(aspect: number, cameraAzimuth: number): number {
-  const safeAspect = Number.isFinite(aspect)
-    ? Math.min(4, Math.max(0.25, aspect))
-    : 16 / 9;
-  const angle = normalizeCameraAzimuth(cameraAzimuth);
-  const absSin = Math.abs(Math.sin(angle));
-  const absCos = Math.abs(Math.cos(angle));
-  const horizontalExtent =
-    TABLE_OUTER_HALF_WIDTH * absCos + TABLE_OUTER_HALF_LENGTH * absSin;
-  const verticalExtent =
-    TABLE_OUTER_HALF_WIDTH * absSin + TABLE_OUTER_HALF_LENGTH * absCos;
-  const tanHalfVerticalFov = Math.tan((CAMERA_FOV_DEGREES * Math.PI) / 360);
-  const heightForWidth = horizontalExtent / (tanHalfVerticalFov * safeAspect);
-  const heightForLength = verticalExtent / tanHalfVerticalFov;
-  return Math.max(
-    OVERHEAD_HEIGHT,
-    Math.max(heightForWidth, heightForLength) * TABLE_FIT_MARGIN,
-  );
+  return fullTableCameraPose({
+    aspect,
+    azimuth: normalizeCameraAzimuth(cameraAzimuth),
+    halfWidth: TABLE_OUTER_HALF_WIDTH,
+    halfLength: TABLE_OUTER_HALF_LENGTH,
+    orbitRadius: OVERHEAD_ORBIT_RADIUS,
+  }).pose.position.y;
 }
 
 /**
@@ -144,6 +137,7 @@ export function cameraPoseAt(
   previewPower: number,
   viewLevel: number,
   aspect = 16 / 9,
+  fullTableSafety?: Partial<CameraSafetyInsets>,
 ): CameraPose {
   const level = clampViewLevel(viewLevel);
   const transition = level * level * (3 - 2 * level);
@@ -151,7 +145,14 @@ export function cameraPoseAt(
   const sin = Math.sin(angle);
   const cos = Math.cos(angle);
   const firstDistance = FP_CAM_DIST + previewPower * 0.0022;
-  const overheadHeight = overheadFitHeight(aspect, angle);
+  const overheadPose = fullTableCameraPose({
+    aspect,
+    azimuth: angle,
+    halfWidth: TABLE_OUTER_HALF_WIDTH,
+    halfLength: TABLE_OUTER_HALF_LENGTH,
+    orbitRadius: OVERHEAD_ORBIT_RADIUS,
+    safety: fullTableSafety,
+  }).pose;
 
   const firstPosition: CameraPoint = {
     x: cueX - sin * firstDistance + cos * FP_CAM_SIDE,
@@ -164,16 +165,8 @@ export function cameraPoseAt(
     z: cueZ - cos * FP_LOOK_AHEAD,
   };
 
-  const overheadPosition: CameraPoint = {
-    x: -sin * OVERHEAD_ORBIT_RADIUS,
-    y: overheadHeight,
-    z: cos * OVERHEAD_ORBIT_RADIUS,
-  };
-  const overheadLookAt: CameraPoint = {
-    x: -sin * OVERHEAD_LOOK_RADIUS,
-    y: 0,
-    z: cos * OVERHEAD_LOOK_RADIUS,
-  };
+  const overheadPosition: CameraPoint = overheadPose.position;
+  const overheadLookAt: CameraPoint = overheadPose.lookAt;
 
   return {
     position: {

@@ -38,7 +38,7 @@ const challenge = {
 };
 
 describe('challenge tactical shot', () => {
-  it('直球近袋会选中已验证的低杆，而不是跟进洗袋', () => {
+  it('直球近袋会选中已验证的安全中杆，并以真实结果避免洗袋', () => {
     const world = placeWorld([
       { number: 0, x: 0.2, z: 0 },
       { number: 1, x: 0.5, z: 0 },
@@ -46,11 +46,12 @@ describe('challenge tactical shot', () => {
     const result = chooseTacticalShot(world, [1], challenge, () => 0.5);
     expect(result.simulations).toBeLessThanOrEqual(challenge.simulationLimit);
     expect(result.shot).not.toBeNull();
-    expect(result.shot?.spin.x).toBeLessThan(0);
+    expect(result.shot?.spin.x).toBe(0);
 
     const replay = cloneWorld(world);
     strikeCueBall(replay, result.shot!.angle, result.shot!.power, result.shot!.spin);
     simulateUntilStop(replay);
+    expect(replay.firstContact).toBe(1);
     expect(pocketedThisShot(replay)).toContain(1);
     expect(isCueBallPocketed(replay)).toBe(false);
   });
@@ -63,4 +64,3 @@ describe('challenge tactical shot', () => {
     });
   });
 });
-

@@ -184,10 +184,11 @@ describe('自旋（杆法）测试', () => {
     const followZ = runHit(1);
     const stunZ = runHit(0);
     const drawZ = runHit(-1);
-    // 击球点在 z≈-0.24：高杆应跟进（z 明显更小），低杆应拉回（z 明显更大）
-    expect(followZ).toBeLessThan(-0.4);
-    expect(stunZ).toBeGreaterThan(followZ + 0.3);
-    expect(drawZ).toBeGreaterThan(stunZ + 0.15);
+    // 中杆现在从滑动开始，不再是旧模型的“预置纯滚动”；
+    // 验收改为杆法顺序与强低杆确实拉回起点一侧，而非沿用旧中杆位移差。
+    expect(followZ).toBeLessThan(stunZ);
+    expect(drawZ).toBeGreaterThan(stunZ);
+    expect(drawZ).toBeGreaterThan(0.3);
   });
 
   it('侧旋影响碰库后的切向反弹', () => {

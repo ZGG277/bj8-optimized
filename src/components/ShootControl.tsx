@@ -1,6 +1,6 @@
 /*
 [INPUT]: 禁用/蓄力态、横竖停靠方向、预览力度与 begin/update/release/cancel/tap 回调
-[OUTPUT]: 对外提供无文字的球杆回缩/能量填充出杆控件，移出有效走廊松手取消，保留 meter 与键盘语义
+[OUTPUT]: 对外提供无文字的球杆回缩/能量填充出杆控件、方向准确且禁用时仍可只读的提示锚点，移出有效走廊松手取消，成功学习由 Game 确认物理击球后提交
 [POS]: 控制组件层,只负责手势出口与语义;力度事实由 input 层计算,物理击球由 Game 提交
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -66,14 +66,25 @@ export function ShootControl({
 }: Props) {
   const gestureRef = useRef<ChargeGesture | null>(null);
   const rounded = Math.round(power);
+  const chargeHint = orientation === 'vertical'
+    ? '出杆：向下拉蓄力，松开出杆；横向移出取消；Enter 轻杆'
+    : '出杆：向右拉蓄力，松开出杆；纵向移出取消；Enter 轻杆';
+  const chargeLabel = `${breaking ? '开球' : '出杆'}：${orientation === 'vertical' ? '向下拉' : '向右拉'}蓄力，松开出杆，回车轻杆`;
   const coordinate = (event: React.PointerEvent) =>
     orientation === 'vertical' ? event.clientY : event.clientX;
   return (
-    <div className={`shoot-zone is-${orientation}`} onPointerDown={(e) => e.stopPropagation()}>
+    <div
+      className={`shoot-zone is-${orientation}`}
+      data-control-tip="shoot"
+      data-control-tip-copy={chargeHint}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       <div
         className={`shoot-pad is-${orientation} ${charging ? 'charging' : ''} ${disabled ? 'disabled' : ''}`}
         role="button"
-        aria-label={breaking ? '开球:下拉蓄力松开出杆,回车轻杆' : '出杆:下拉蓄力松开出杆,回车轻杆'}
+        data-control-tip="shoot"
+        data-control-tip-copy={chargeHint}
+        aria-label={chargeLabel}
         aria-disabled={disabled}
         tabIndex={disabled ? -1 : 0}
         onPointerDown={(e) => {

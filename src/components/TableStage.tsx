@@ -1,10 +1,11 @@
 /*
-[INPUT]: 依赖连续 viewLevel / match / 固定俯视观战、首局引导、整局训练总结与 pointer 事件处理器
+[INPUT]: 依赖连续 viewLevel / match / 固定俯视观战、首局引导、整局训练总结、pointer 事件处理器与逐控件学习记录
 [OUTPUT]: 渲染 3D 球桌、手动相机状态、首局语境观战提示及带下一局目标的结束遮罩
 [POS]: HUD 组件层；瞄准拨轮已并入统一可停靠控制层，相机/对局状态由上层持有
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import React from 'react';
+import { markControlLearned } from '../control-onboarding';
 import type { MatchState } from '../match/types';
 import type { MatchTrainingSummary } from '../opponent/model';
 
@@ -87,7 +88,10 @@ export function TableStage({
                 <em>{trainingSummary.nextGoal}</em>
               </section>
             )}
-            <button onClick={onResetGame}>再来一局</button>
+            <button data-control-tip="new-match" onClick={() => {
+              onResetGame();
+              markControlLearned('new-match');
+            }}>再来一局</button>
           </div>
         )}
       </div>

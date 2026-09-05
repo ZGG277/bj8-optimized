@@ -1,0 +1,33 @@
+{
+  "canvas": [
+    {
+      "height": 752,
+      "rect": {
+        "bottom": 800,
+        "height": 752,
+        "left": 0,
+        "right": 1280,
+        "top": 48,
+        "width": 1280,
+        "x": 0,
+        "y": 48
+      },
+      "width": 1280
+    }
+  ],
+  "scripts": [
+    {
+      "type": "module",
+      "src": "",
+      "chars": 1199686,
+      "sha256": "f15cbc61166d5fe84335aabe50774c237a8c4825ae99d122b34b6c5ec63a3b0d",
+      "method": "100000-character DOM chunks; previous oversized DOM text was truncated by the tool and discarded"
+    }
+  ],
+  "url": "http://localhost:5199/",
+  "viewport": {
+    "dpr": 1,
+    "h": 800,
+    "w": 1280
+  }
+}

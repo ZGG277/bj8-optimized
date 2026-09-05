@@ -1,0 +1,20 @@
+
+> bj8-optimized@1.5.0 test:unit
+> vitest run src/pocket-render/trim-geometry.test.ts src/pocket-render/cushion-join.test.ts src/pocket-render/profile.test.ts src/pocket-render/rope-net.test.ts src/physics/table-geometry.test.ts src/pocket-drop.test.ts
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /Users/zgg/Projects/游戏/bl8-3D台球/bj8-main-integration
+
+ ✓ src/pocket-render/rope-net.test.ts (1 test) 1ms
+ ✓ src/pocket-render/profile.test.ts (1 test) 1ms
+ ✓ src/pocket-render/cushion-join.test.ts (1 test) 14ms
+ ✓ src/physics/table-geometry.test.ts (11 tests) 49ms
+ ✓ src/pocket-drop.test.ts (11 tests) 123ms
+ ✓ src/pocket-render/trim-geometry.test.ts (20 tests) 521ms
+
+ Test Files  6 passed (6)
+      Tests  45 passed (45)
+   Start at  12:45:46
+   Duration  739ms (transform 134ms, setup 0ms, collect 326ms, tests 710ms, environment 0ms, prepare 170ms)
+

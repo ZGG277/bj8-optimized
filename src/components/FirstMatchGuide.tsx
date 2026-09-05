@@ -1,11 +1,12 @@
 /*
-[INPUT]: 当前首局微提示、对局是否允许展示与跳过回调
+[INPUT]: 当前首局微提示、对局是否允许展示、跳过回调与逐控件学习记录
 [OUTPUT]: 对外提供跟随球桌或可移动控件的一行非阻塞提示，含弱化跳过入口与无障碍名称
 [POS]: HUD 展示层；只观察稳定 DOM 锚点，不持有引导状态或改写对局
 [PROTOCOL]: 提示文案、锚点或布局变化时更新本注释、components/CLAUDE.md 与样式文档
 */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { FirstMatchGuideStep } from '../first-match-guide';
+import { markControlLearned } from '../control-onboarding';
 
 type GuideCopy = {
   text: string;
@@ -312,8 +313,11 @@ export function FirstMatchGuide({
         type="button"
         className="guide-skip"
         aria-label="跳过新手引导"
-        title="跳过新手引导"
-        onClick={onSkip}
+        data-control-tip="guide-skip"
+        onClick={() => {
+          onSkip();
+          markControlLearned('guide-skip');
+        }}
       >
         <i aria-hidden="true">×</i>
       </button>

@@ -1,5 +1,5 @@
 /*
-[INPUT]: 当前击球点、禁用态与变更回调;指针事件经 clampSpin 纯函数换算
+[INPUT]: 当前击球点、禁用态、变更回调与逐控件学习记录;指针事件经 clampSpin 纯函数换算
 [OUTPUT]: 对外提供 SpinControl 击球点盘,支持拖拽、键盘方向调整与 0 键复位,带 aria 语义
 [POS]: 控制组件层,只做事件到 CueSpin 的映射,几何事实计算委托 input/shot-input
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
@@ -7,6 +7,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { CueSpin } from '../physics';
 import { clampSpin } from '../input/shot-input';
+import { markControlLearned } from '../control-onboarding';
 
 type Props = {
   spin: CueSpin;
@@ -32,16 +33,24 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
     x: number;
     y: number;
     moved: boolean;
+    changed: boolean;
   } | null>(null);
 
   useEffect(() => {
     if (disabled || (spin.x === 0 && spin.y === 0)) setExpanded(false);
   }, [disabled, spin.x, spin.y]);
 
+  const changeSpin = (next: CueSpin) => {
+    if (disabled || (Math.abs(next.x - spin.x) < 0.00001 && Math.abs(next.y - spin.y) < 0.00001)) return;
+    onSpinChange(next);
+    if (pointerStartRef.current) pointerStartRef.current.changed = true;
+    else markControlLearned('spin');
+  };
+
   const applyPointer = (e: React.PointerEvent) => {
     if (disabled) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    onSpinChange(clampSpin(
+    changeSpin(clampSpin(
       { x: e.clientX - rect.left, y: e.clientY - rect.top },
       { width: rect.width, height: rect.height },
     ));
@@ -57,7 +66,7 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
     else if (e.key === '0' || e.key === 'Backspace') { next.x = 0; next.y = 0; }
     else return;
     e.preventDefault();
-    onSpinChange(next);
+    changeSpin(next);
   };
 
   const pad = (extraClass = '') => (
@@ -65,6 +74,7 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
       className={`spin-pad ${extraClass}`}
       role="slider"
       aria-label="击球点(杆法)"
+      data-control-tip="spin"
       aria-valuetext={spinLabel(spin)}
       aria-disabled={disabled}
       tabIndex={disabled ? -1 : 0}
@@ -77,6 +87,7 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
           x: e.clientX,
           y: e.clientY,
           moved: false,
+          changed: false,
         };
       }}
       onPointerMove={(e) => {
@@ -92,6 +103,7 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
         const start = pointerStartRef.current;
         if (!start || start.pointerId !== e.pointerId) return;
         if (!start.moved) applyPointer(e);
+        if (!disabled && start.changed) markControlLearned('spin');
         pointerStartRef.current = null;
       }}
       onPointerCancel={(e) => {
@@ -119,10 +131,14 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
         type="button"
         className="spin-preview"
         aria-label={`调节母球击球点，当前${spinLabel(spin)}`}
+        data-control-tip="spin-open"
         aria-expanded={expanded}
         disabled={disabled}
         onPointerDown={(event) => event.stopPropagation()}
-        onClick={() => setExpanded(value => !value)}
+        onClick={() => {
+          setExpanded(value => !value);
+          markControlLearned('spin-open');
+        }}
       >
         <span className="spin-preview-ball">
           <i style={{ left: `${50 + spin.y * 28}%`, top: `${50 - spin.x * 28}%` }} />
@@ -132,7 +148,10 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
         <div className="spin-popover" role="dialog" aria-label="母球击球点调节">
           <div className="spin-popover-head">
             <span className="spin-popover-ball" aria-hidden="true"><i /></span>
-            <button type="button" aria-label="收起击球点调节" onClick={() => setExpanded(false)}>✕</button>
+            <button type="button" data-control-tip="spin-close" aria-label="收起击球点调节" onClick={() => {
+              setExpanded(false);
+              markControlLearned('spin-close');
+            }}>✕</button>
           </div>
           {pad('mobile-spin-pad')}
         </div>

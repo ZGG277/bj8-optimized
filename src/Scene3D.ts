@@ -1,5 +1,5 @@
 /*
-[INPUT]: 依赖 physics 物理世界快照、独立瞄准/相机方位、textures 程序化贴图与 Three.js
+[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位、textures 程序化贴图与 Three.js
 [OUTPUT]: 对外提供真实球桌、静止按需渲染、GPU 自适应温控、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -15,7 +15,6 @@ import {
   pocketLocalToWorld,
   predictBallCollisionDirections,
   type BilliardsWorld,
-  type CushionSegment,
   type Point2,
   type PocketGeometry,
 } from './physics';
@@ -26,8 +25,15 @@ import {
   cameraPoseAt,
   clampViewLevel,
   isGlobalCameraView,
+  isOverheadCameraView,
   normalizeCameraAzimuth,
 } from './camera-view';
+import {
+  aimCameraPose,
+  DEFAULT_CAMERA_SAFETY,
+  type CameraFraming,
+  type CameraSafetyInsets,
+} from './camera-framing';
 import {
   makeClothMaps,
   makeWoodTexture,
@@ -47,16 +53,18 @@ import {
   createThermalGovernor,
   type ThermalSnapshot,
 } from './thermal-governor';
+import { createPocketDropTrajectory, type PocketDropTrajectory } from './pocket-drop';
+import { createMergedRopeGeometry, type RopeSegment } from './pocket-render/rope-net';
+import { pocketRenderProfile } from './pocket-render/profile';
+import { pocketSeamContract } from './pocket-render/seam-contract';
+import { createPocketTrimGeometry, createPocketWeltGeometry } from './pocket-render/trim-geometry';
+import { makeCushionGeometry, CUSHION_PROFILE, CUSHION_NOSE_HEIGHT, TABLE_RENDER } from './pocket-render/cushion-geometry';
+import { createTableFrameGeometry } from './pocket-render/frame-geometry';
 
 const R = TABLE.ballRadius;
 const W = TABLE.width;
 const L = TABLE.length;
-const RAIL_H = 0.045;
-const RAIL_W = 0.07;
-const CUSHION_H = 0.038;
-const CUSHION_W = 0.048;
-const CUSHION_BASE_RECESS = 0.019;
-const CUSHION_NOSE_HEIGHT = R * 1.24;
+const RAIL_W = TABLE_RENDER.railWidth;
 const POCKET_POS: [number, number][] = POCKETS.map(
   pocket => [pocket.x, pocket.z],
 );
@@ -91,69 +99,6 @@ function disposeSceneResources(scene: THREE.Scene) {
   scene.environment = null;
 }
 
-/**
- * 真实胶边剖面：鼻尖位于球心上方并探向台内，鼻尖下方逐级退向木帮，
- * 让连接台呢的位置形成内凹阴影；端点仍严格落在共享物理碰撞线上。
- */
-const CUSHION_PROFILE: ReadonlyArray<readonly [outwardOffset: number, y: number]> = [
-  [CUSHION_W, 0.001],
-  [CUSHION_W, CUSHION_H],
-  [0.0075, CUSHION_H],
-  [0.0008, CUSHION_NOSE_HEIGHT + 0.0012],
-  [0, CUSHION_NOSE_HEIGHT],
-  [0.0015, CUSHION_NOSE_HEIGHT - 0.003],
-  [0.0045, 0.021],
-  [0.0115, 0.009],
-  [CUSHION_BASE_RECESS, 0.001],
-];
-
-function makeCushionGeometry(segment: CushionSegment) {
-  const positions: number[] = [];
-  const indices: number[] = [];
-  const appendProfileVertex = (point: Point2, outwardOffset: number, y: number) => {
-    positions.push(
-      point.x - segment.inward.x * outwardOffset,
-      y,
-      point.z - segment.inward.z * outwardOffset,
-    );
-  };
-
-  // 侧面共享剖面顶点，使法线在鼻尖与内凹曲面之间连续过渡。
-  for (const [outwardOffset, y] of CUSHION_PROFILE) {
-    appendProfileVertex(segment.a, outwardOffset, y);
-    appendProfileVertex(segment.b, outwardOffset, y);
-  }
-  for (let index = 0; index < CUSHION_PROFILE.length; index += 1) {
-    const next = (index + 1) % CUSHION_PROFILE.length;
-    const a = index * 2;
-    const b = a + 1;
-    const nextA = next * 2;
-    const nextB = nextA + 1;
-    indices.push(a, nextA, nextB, a, nextB, b);
-  }
-
-  // 端盖使用独立顶点，避免短角衬的端面法线污染绒面剖面的高光。
-  const capAStart = positions.length / 3;
-  for (const [outwardOffset, y] of CUSHION_PROFILE) {
-    appendProfileVertex(segment.a, outwardOffset, y);
-  }
-  const capBStart = positions.length / 3;
-  for (const [outwardOffset, y] of CUSHION_PROFILE) {
-    appendProfileVertex(segment.b, outwardOffset, y);
-  }
-  for (let index = 1; index < CUSHION_PROFILE.length - 1; index += 1) {
-    indices.push(capAStart, capAStart + index + 1, capAStart + index);
-    indices.push(capBStart, capBStart + index, capBStart + index + 1);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  return geometry;
-}
-
 /** 整链规划的分杆配色（台呢绿底可读：暖橙/青/紫），轨迹/高亮环/序号标记同色 */
 const PLAN_STEP_COLORS = [0xffa03c, 0x35d6d6, 0xb478ff];
 
@@ -181,9 +126,9 @@ function mkStepBadge(n: number, color: number, x: number, z: number): THREE.Spri
 }
 
 type DropAnim = {
-  t: number;
-  from: THREE.Vector3;
-  to: THREE.Vector3;
+  elapsed: number;
+  trajectory: PocketDropTrajectory;
+  spinAxis: THREE.Vector3;
 };
 
 type GpuTimerExtension = {
@@ -217,6 +162,10 @@ export class Scene3D {
   private cameraAzimuth = 0;
   /** 0=第一人称，1=俯视；中间值可停留。 */
   private viewLevel = 0;
+  /** 实际 HUD/视口测得的可用边缘；全台与瞄准共用，不能冻结在单次确认时。 */
+  private cameraSafety: CameraSafetyInsets = DEFAULT_CAMERA_SAFETY;
+  /** 幽灵球确认后的稳定目标/袋口构图；不包含杆向，杆向仍每帧由 cameraAzimuth 消费。 */
+  private cameraFraming: CameraFraming | null = null;
   private phase = 'intro';
   private lastCueX = 0;
   private lastCueZ = 0;
@@ -493,150 +442,13 @@ export class Scene3D {
       clearcoatRoughness: 0.16,
       envMapIntensity: 0.85,
     });
-    // 一体式木质外框：材质与桌体完全一致，外轮廓只在四角圆弧过渡。
-    // 六个袋口只从内侧读形，不再为每个袋口添加独立外凸木圈/皮圈。
-    const outerHalfW = W / 2 + CUSHION_W + RAIL_W;
-    const outerHalfL = L / 2 + CUSHION_W + RAIL_W;
-    const innerHalfW = W / 2 + CUSHION_W;
-    const innerHalfL = L / 2 + CUSHION_W;
-    // 实体中式台的角部不是方框斜切：外沿约等于整段台帮宽度的一次连续圆角。
-    const outerCornerRadius = CUSHION_W + RAIL_W - 0.003;
-    const appendRoundedRect = (
-      path: THREE.Path,
-      halfW: number,
-      halfL: number,
-      radius: number,
-    ) => {
-      path.moveTo(-halfW + radius, -halfL);
-      path.lineTo(halfW - radius, -halfL);
-      path.quadraticCurveTo(halfW, -halfL, halfW, -halfL + radius);
-      path.lineTo(halfW, halfL - radius);
-      path.quadraticCurveTo(halfW, halfL, halfW - radius, halfL);
-      path.lineTo(-halfW + radius, halfL);
-      path.quadraticCurveTo(-halfW, halfL, -halfW, halfL - radius);
-      path.lineTo(-halfW, -halfL + radius);
-      path.quadraticCurveTo(-halfW, -halfL, -halfW + radius, -halfL);
-      path.closePath();
-    };
-    const appendPocketedOpening = (path: THREE.Path) => {
-      const sidePocketHalfWidth = POCKETS[2].mouthHalfWidth + 0.014;
-      const sidePocketDepth = RAIL_W - 0.018;
-      const cornerPocketSpan = POCKETS[0].mouthHalfWidth * Math.SQRT2 + 0.008;
-      const cornerPocketOffset = 0.029;
-      const appendRoundedCornerCutout = (
-        centerX: number,
-        centerY: number,
-        endX: number,
-        endY: number,
-      ) => {
-        const current = path.currentPoint;
-        const startX = current.x - centerX;
-        const startY = current.y - centerY;
-        const endLocalX = endX - centerX;
-        const endLocalY = endY - centerY;
-        const startAngle = Math.atan2(startY, startX);
-        let endAngle = Math.atan2(endLocalY, endLocalX);
-        while (endAngle >= startAngle) endAngle -= Math.PI * 2;
-        const startRadius = Math.hypot(startX, startY);
-        const endRadius = Math.hypot(endLocalX, endLocalY);
-        const outerRadius = Math.SQRT2 * (CUSHION_W + cornerPocketOffset);
-        const points: THREE.Vector2[] = [];
-        const steps = 10;
-
-        // 沿袋心画一段鼓出的光滑弧：两端顺接直库，中段向木框圆角收进去。
-        // 半径用正弦缓动增大，避免旧版两段二次曲线在角点形成可见折痕。
-        for (let step = 1; step <= steps; step += 1) {
-          const t = step / steps;
-          const angle = THREE.MathUtils.lerp(startAngle, endAngle, t);
-          const edgeRadius = THREE.MathUtils.lerp(startRadius, endRadius, t);
-          const radius = edgeRadius + (outerRadius - edgeRadius) * Math.sin(Math.PI * t);
-          points.push(new THREE.Vector2(
-            centerX + Math.cos(angle) * radius,
-            centerY + Math.sin(angle) * radius,
-          ));
-        }
-        path.splineThru(points);
-      };
-
-      // 顺时针走内孔：四个角袋圆润收肩，中袋在左右内沿形成浅半圆凹口。
-      path.moveTo(-innerHalfW + cornerPocketSpan, -innerHalfL);
-      appendRoundedCornerCutout(
-        -W / 2,
-        -L / 2,
-        -innerHalfW,
-        -innerHalfL + cornerPocketSpan,
-      );
-      path.lineTo(-innerHalfW, -sidePocketHalfWidth);
-      path.quadraticCurveTo(
-        -innerHalfW - sidePocketDepth,
-        -sidePocketHalfWidth,
-        -innerHalfW - sidePocketDepth,
-        0,
-      );
-      path.quadraticCurveTo(
-        -innerHalfW - sidePocketDepth,
-        sidePocketHalfWidth,
-        -innerHalfW,
-        sidePocketHalfWidth,
-      );
-      path.lineTo(-innerHalfW, innerHalfL - cornerPocketSpan);
-      appendRoundedCornerCutout(
-        -W / 2,
-        L / 2,
-        -innerHalfW + cornerPocketSpan,
-        innerHalfL,
-      );
-      path.lineTo(innerHalfW - cornerPocketSpan, innerHalfL);
-      appendRoundedCornerCutout(
-        W / 2,
-        L / 2,
-        innerHalfW,
-        innerHalfL - cornerPocketSpan,
-      );
-      path.lineTo(innerHalfW, sidePocketHalfWidth);
-      path.quadraticCurveTo(
-        innerHalfW + sidePocketDepth,
-        sidePocketHalfWidth,
-        innerHalfW + sidePocketDepth,
-        0,
-      );
-      path.quadraticCurveTo(
-        innerHalfW + sidePocketDepth,
-        -sidePocketHalfWidth,
-        innerHalfW,
-        -sidePocketHalfWidth,
-      );
-      path.lineTo(innerHalfW, -innerHalfL + cornerPocketSpan);
-      appendRoundedCornerCutout(
-        W / 2,
-        -L / 2,
-        innerHalfW - cornerPocketSpan,
-        -innerHalfL,
-      );
-      path.lineTo(-innerHalfW + cornerPocketSpan, -innerHalfL);
-      path.closePath();
-    };
-    const woodFrameShape = new THREE.Shape();
-    appendRoundedRect(
-      woodFrameShape,
-      outerHalfW,
-      outerHalfL,
-      outerCornerRadius,
-    );
-    const woodFrameOpening = new THREE.Path();
-    appendPocketedOpening(woodFrameOpening);
-    woodFrameShape.holes.push(woodFrameOpening);
-    const woodFrameGeometry = new THREE.ExtrudeGeometry(woodFrameShape, {
-      depth: RAIL_H,
-      bevelEnabled: true,
-      bevelSegments: 2,
-      bevelSize: 0.003,
-      bevelThickness: 0.002,
-    });
-    woodFrameGeometry.rotateX(-Math.PI / 2);
+    // 同一边界同时生成护口与木框内裁口；孔边不再有独立袋型参数。
+    const pocketSurfaces = POCKETS.map(pocket => pocketSeamContract(pocket, pocketRenderProfile(pocket)));
+    const woodFrameGeometry = createTableFrameGeometry(pocketSurfaces);
     const woodFrame = new THREE.Mesh(woodFrameGeometry, woodMat);
     woodFrame.name = 'table-wood-frame';
     woodFrame.userData.pocketCutoutCount = 6;
+    woodFrame.userData.sharedSurfaceContract = true;
     woodFrame.userData.roundedOuterCornerCount = 4;
     woodFrame.userData.roundedCornerPocketCount = 4;
     woodFrame.castShadow = true;
@@ -658,7 +470,7 @@ export class Scene3D {
       mesh.userData.profileRole = 'molded-undercut';
       mesh.userData.profilePointCount = CUSHION_PROFILE.length;
       mesh.userData.noseHeightMm = CUSHION_NOSE_HEIGHT * 1000;
-      mesh.userData.noseOverhangMm = CUSHION_BASE_RECESS * 1000;
+      mesh.userData.noseOverhangMm = TABLE_RENDER.cushionBaseRecess * 1000;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.tableGroup.add(mesh);
@@ -722,21 +534,26 @@ export class Scene3D {
       depthWrite: false,
       side: THREE.DoubleSide,
     });
-    const pocketNetMat = new THREE.LineBasicMaterial({
+    const pocketNetMat = new THREE.MeshStandardMaterial({
       color: 0xeee6d3,
+      roughness: 0.78,
+      metalness: 0,
       transparent: true,
-      opacity: 0.92,
+      opacity: 0.9,
       depthWrite: false,
+      side: THREE.DoubleSide,
     });
     for (const pocket of POCKETS) {
-      const halfWidth = pocket.mouthHalfWidth;
-      const depthRadius = pocket.shelfDepth + (pocket.kind === 'corner' ? 0.016 : 0.014);
-      const centerDepth = depthRadius + 0.002;
-      const topHalfWidth = halfWidth * 1.1;
-      const bottomHalfWidth = topHalfWidth * 0.66;
-      const bottomDepthRadius = depthRadius * 0.64;
-      const bottomCenterDepth = centerDepth + 0.012;
-      const radialSteps = 36;
+      const profile = pocketRenderProfile(pocket);
+      // 可见孔洞使用 mouthWidth；dropHalfWidth 仅是球心捕获线，绝不能代替或放大孔洞。
+      // 这两道椭圆同时供 pocket-drop 作完整球体安全域；不能在渲染/动画各推一套尺寸。
+      const depthRadius = profile.topDepthRadius;
+      const centerDepth = profile.topCenterDepth;
+      const topHalfWidth = profile.topLateralRadius;
+      const bottomHalfWidth = profile.bottomLateralRadius;
+      const bottomDepthRadius = profile.bottomDepthRadius;
+      const bottomCenterDepth = profile.bottomCenterDepth;
+      const radialSteps = profile.wellRadialSteps;
       const wallPositions: number[] = [];
       const wallIndices: number[] = [];
       const bottomPoints: Point2[] = [];
@@ -757,13 +574,13 @@ export class Scene3D {
           bottomCenterDepth + Math.sin(angle) * bottomDepthRadius,
           Math.cos(angle) * bottomHalfWidth,
         );
-        wallPositions.push(top.x, -0.006, top.z, lower.x, -0.072, lower.z);
+        wallPositions.push(top.x, profile.wellTopY, top.z, lower.x, profile.wellBottomY, lower.z);
         bottomPoints.push(lower);
         mouthPoints.push(
           pocketLocalToWorld(
             pocket,
             mouthCenterDepth + Math.sin(angle) * depthRadius,
-            Math.cos(angle) * topHalfWidth * 0.94,
+            Math.cos(angle) * profile.visibleHoleHalfWidth,
           ),
         );
         const next = (step + 1) % radialSteps;
@@ -799,7 +616,7 @@ export class Scene3D {
         pocketBottomMat,
       );
       bottom.rotation.x = -Math.PI / 2;
-      bottom.position.y = -0.0715;
+      bottom.position.y = profile.wellBottomY + 0.0005;
       bottom.name = `pocket-bottom-${pocket.index}`;
       bottom.receiveShadow = true;
       this.tableGroup.add(bottom);
@@ -821,6 +638,8 @@ export class Scene3D {
       mouth.name = `pocket-mouth-${pocket.index}`;
       mouth.userData.captureShape = 'inward-arc';
       mouth.userData.captureInsetMm = pocket.captureInset * 1000;
+      mouth.userData.visibleOpeningWidthMm = pocket.mouthWidth * 1000;
+      mouth.userData.ballCenterCaptureWidthMm = profile.captureHalfWidth * 2000;
       mouth.renderOrder = 2;
       this.tableGroup.add(mouth);
 
@@ -828,7 +647,7 @@ export class Scene3D {
       // 两组反向斜线跨越相邻高度层，形成真正的菱形网格，而不是贴图或平行竖线。
       const netRows = 6;
       const netStrands = 18;
-      const netPositions: number[] = [];
+      const netSegments: RopeSegment[] = [];
       const netPoint = (row: number, strand: number) => {
         const rowT = row / (netRows - 1);
         const angle = (strand / netStrands) * Math.PI * 2;
@@ -859,7 +678,7 @@ export class Scene3D {
         );
       };
       const appendNetSegment = (a: THREE.Vector3, b: THREE.Vector3) => {
-        netPositions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        netSegments.push([a, b]);
       };
       for (let strand = 0; strand < netStrands; strand += 1) {
         appendNetSegment(
@@ -879,212 +698,43 @@ export class Scene3D {
           );
         }
       }
-      const netGeometry = new THREE.BufferGeometry();
-      netGeometry.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(netPositions, 3),
-      );
-      const net = new THREE.LineSegments(netGeometry, pocketNetMat);
+      const netGeometry = createMergedRopeGeometry(netSegments);
+      const net = new THREE.Mesh(netGeometry, pocketNetMat);
       net.name = `pocket-net-${pocket.index}`;
+      // 保留既有门禁的角色名；新增标识明确这是实体合并绳网，不是 LineSegments。
       net.userData.materialRole = 'white-diamond-net';
       net.userData.rowCount = netRows;
       net.userData.strandCount = netStrands;
       net.userData.diamondSegmentCount = (netRows - 1) * netStrands * 2;
+      net.userData.mergedRopeMesh = true;
+      net.userData.ropeMesh = true;
+      net.userData.ropeRadiusMm = 0.72;
       net.renderOrder = 3;
       this.tableGroup.add(net);
 
-      // 只包住袋口外半圈，不做悬浮的完整圆环；中间沿袋腔向外回弯，
-      // 现在只模拟真实皮圈内沿的一道浅色缝边；黑暗退到网袋与袋底之后。
-      const trimSourceLocalPoints: Array<[number, number]> = [
-        [-pocket.captureInset * 0.16, -halfWidth * 0.98],
-        [pocket.shelfDepth * 0.58, -halfWidth * 1.06],
-        [centerDepth + depthRadius * 0.52, -halfWidth * 0.72],
-        [centerDepth + depthRadius, 0],
-        [centerDepth + depthRadius * 0.52, halfWidth * 0.72],
-        [pocket.shelfDepth * 0.58, halfWidth * 1.06],
-        [-pocket.captureInset * 0.16, halfWidth * 0.98],
-      ];
-      // 四个角袋的浅色缝边显式穿过两侧 jaw 入口，并继续向台内藏入约 8mm。
-      // 曲线若直接从 jaw 附近起步，Tube 端帽与圆弧库边在斜视角会露出一小段断缝。
-      // 增加“隐藏端点 → 精确 jaw 锚点”后，端帽被库边覆盖，曲线切向仍连续。
-      const cornerJoinExtension = R * 0.275;
-      const lipLocalPoints: Array<[number, number]> = pocket.kind === 'corner'
-        ? [
-            [-cornerJoinExtension, -halfWidth * 0.94],
-            [0, -halfWidth],
-            ...trimSourceLocalPoints.slice(1, -1),
-            [0, halfWidth],
-            [-cornerJoinExtension, halfWidth * 0.94],
-          ]
-        : trimSourceLocalPoints;
-      const lipCurve = new THREE.CatmullRomCurve3(
-        lipLocalPoints.map(([depth, lateral]) => {
-          const point = pocketLocalToWorld(pocket, depth, lateral);
-          return new THREE.Vector3(point.x, 0.0045, point.z);
-        }),
-        false,
-        'centripetal',
-      );
-
-      // 木框顶面的薄皮护口：沿袋口外半圈铺一条扁平硬挺的带状实体。
-      // 顶面宽度足以在全台俯视中识别，厚度仅 1.6mm，避免再次出现软、厚、外凸的感觉。
-      // 护口使用独立曲线，把两端藏进木帮，并精确穿过两侧 jaw 锚点；
-      // 否则顶盖会从袋腔侧直接拐向端点，俯视时就像与库边错开的一轮月牙。
-      const trimJoinExtension = pocket.kind === 'corner' ? R * 0.36 : R * 0.3;
-      const trimLocalPoints: Array<[number, number]> = [
-        [-trimJoinExtension, -halfWidth * 0.94],
-        [0, -halfWidth],
-        ...trimSourceLocalPoints.slice(1, -1),
-        [0, halfWidth],
-        [-trimJoinExtension, halfWidth * 0.94],
-      ];
-      const trimCurve = new THREE.CatmullRomCurve3(
-        trimLocalPoints.map(([depth, lateral]) => {
-          const point = pocketLocalToWorld(pocket, depth, lateral);
-          return new THREE.Vector3(point.x, 0, point.z);
-        }),
-        false,
-        'centripetal',
-      );
-      const trimPoints = trimCurve.getPoints(48);
-      const trimWidth = pocket.kind === 'corner' ? 0.023 : 0.019;
-      // 护口下沉进木帮顶面，既遮住袋腔与库边的接缝，也避免俯视时像浮在洞内的月牙。
-      const trimTopY = RAIL_H + 0.003;
-      const trimBottomY = trimTopY - 0.007;
-      const trimPositions: number[] = [];
-      const trimIndices: number[] = [];
-      for (let index = 0; index < trimPoints.length; index += 1) {
-        const point = trimPoints[index];
-        const previous = trimPoints[Math.max(0, index - 1)];
-        const next = trimPoints[Math.min(trimPoints.length - 1, index + 1)];
-        const dx = next.x - previous.x;
-        const dz = next.z - previous.z;
-        const length = Math.hypot(dx, dz) || 1;
-        let normalX = -dz / length;
-        let normalZ = dx / length;
-        // 护口只压在木框一侧：内沿贴袋腔曲线，外沿朝远离台心的方向展开。
-        // 若以曲线为中心对称铺带，一半会悬在洞口上，低机位就会误读成 U 形软圈。
-        if (normalX * point.x + normalZ * point.z < 0) {
-          normalX *= -1;
-          normalZ *= -1;
-        }
-        const t = index / (trimPoints.length - 1);
-        const edgeDistance = Math.min(t, 1 - t);
-        const endBlend = 1 - THREE.MathUtils.smoothstep(edgeDistance, 0, 0.18);
-        normalX = THREE.MathUtils.lerp(normalX, pocket.outward.x, endBlend);
-        normalZ = THREE.MathUtils.lerp(normalZ, pocket.outward.z, endBlend);
-        const blendedNormalLength = Math.hypot(normalX, normalZ) || 1;
-        normalX /= blendedNormalLength;
-        normalZ /= blendedNormalLength;
-        // 实体皮圈接近库边时会自然收窄；保留 35% 宽度避免归零尖角，
-        // 同时消除旧版全宽直截面在低机位形成的两块方形小舌。
-        const widthScale = THREE.MathUtils.lerp(
-          0.35,
-          1,
-          THREE.MathUtils.smoothstep(edgeDistance, 0, 0.2),
-        );
-        const capWidth = trimWidth * widthScale;
-        const leftX = point.x + normalX * capWidth;
-        const leftZ = point.z + normalZ * capWidth;
-        const rightX = point.x;
-        const rightZ = point.z;
-        trimPositions.push(
-          leftX, trimTopY, leftZ,
-          rightX, trimTopY, rightZ,
-          leftX, trimBottomY, leftZ,
-          rightX, trimBottomY, rightZ,
-        );
-        if (index === 0) continue;
-        const previousBase = (index - 1) * 4;
-        const currentBase = index * 4;
-        trimIndices.push(
-          previousBase, currentBase, previousBase + 1,
-          currentBase, currentBase + 1, previousBase + 1,
-          previousBase + 2, previousBase + 3, currentBase + 2,
-          currentBase + 2, previousBase + 3, currentBase + 3,
-          previousBase, previousBase + 2, currentBase,
-          currentBase, previousBase + 2, currentBase + 2,
-          previousBase + 1, currentBase + 1, previousBase + 3,
-          currentBase + 1, currentBase + 3, previousBase + 3,
-        );
-      }
-      const lastTrimBase = (trimPoints.length - 1) * 4;
-      trimIndices.push(
-        0, 1, 2, 1, 3, 2,
-        lastTrimBase, lastTrimBase + 2, lastTrimBase + 1,
-        lastTrimBase + 1, lastTrimBase + 2, lastTrimBase + 3,
-      );
-      const trimGeometry = new THREE.BufferGeometry();
-      trimGeometry.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(trimPositions, 3),
-      );
-      trimGeometry.setIndex(trimIndices);
-      trimGeometry.computeVertexNormals();
-      const topTrim = new THREE.Mesh(trimGeometry, pocketTopTrimMat);
+      // 顶盖与有厚度皮裙为单一闭壳；两个端座逐字落在既有 jaw 顶面。
+      const seam = pocketSurfaces[pocket.index];
+      const topTrim = new THREE.Mesh(createPocketTrimGeometry(seam), pocketTopTrimMat);
       topTrim.name = `pocket-top-trim-${pocket.index}`;
       topTrim.userData.materialRole = 'tan-leather-cap';
-      topTrim.userData.widthMm = trimWidth * 1000;
-      topTrim.userData.heightMm = (trimTopY - trimBottomY) * 1000;
+      topTrim.userData.widthMm = seam.width * 1000;
+      topTrim.userData.heightMm = seam.thickness * 1000;
       topTrim.userData.seamlessEndCount = 2;
       topTrim.userData.jawAnchorCount = 2;
-      topTrim.userData.joinExtensionMm = trimJoinExtension * 1000;
-      topTrim.userData.embeddedDepthMm = (RAIL_H - trimBottomY) * 1000;
+      topTrim.userData.integratedApron = true;
+      topTrim.userData.sharedSeamContract = true;
+      topTrim.userData.surfaceContractVersion = 2;
       topTrim.castShadow = true;
       topTrim.receiveShadow = true;
       this.tableGroup.add(topTrim);
 
-      // 顶盖内沿向下包住袋腔，消除顶盖、深色袋壁和低位缝边之间的悬空断层。
-      // 这条竖向皮裙与顶盖复用同一曲线，因此六袋在俯视/斜视下都不会产生视觉偏心。
-      const apronPositions: number[] = [];
-      const apronIndices: number[] = [];
-      for (let index = 0; index < trimPoints.length; index += 1) {
-        const point = trimPoints[index];
-        apronPositions.push(
-          point.x, trimBottomY + 0.0005, point.z,
-          point.x, 0.0035, point.z,
-        );
-        if (index === 0) continue;
-        const previousBase = (index - 1) * 2;
-        const currentBase = index * 2;
-        apronIndices.push(
-          previousBase, currentBase, previousBase + 1,
-          currentBase, currentBase + 1, previousBase + 1,
-        );
-      }
-      const apronGeometry = new THREE.BufferGeometry();
-      apronGeometry.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(apronPositions, 3),
-      );
-      apronGeometry.setIndex(apronIndices);
-      apronGeometry.computeVertexNormals();
-      const apron = new THREE.Mesh(apronGeometry, pocketTopTrimMat);
-      apron.name = `pocket-leather-apron-${pocket.index}`;
-      apron.userData.materialRole = 'aligned-leather-apron';
-      apron.userData.jawAnchorCount = 2;
-      apron.userData.joinExtensionMm = trimJoinExtension * 1000;
-      apron.castShadow = true;
-      apron.receiveShadow = true;
-      this.tableGroup.add(apron);
-
-      const lip = new THREE.Mesh(
-        new THREE.TubeGeometry(
-          lipCurve,
-          44,
-          pocket.kind === 'corner' ? 0.0018 : 0.0016,
-          8,
-          false,
-        ),
-        pocketLipMat,
-      );
+      const weltRadius = pocket.kind === 'corner' ? 0.0018 : 0.0016;
+      const lip = new THREE.Mesh(createPocketWeltGeometry(seam, weltRadius), pocketLipMat);
       lip.name = `pocket-lip-${pocket.index}`;
       lip.userData.materialRole = 'stitched-welt';
-      lip.userData.radiusMm = pocket.kind === 'corner' ? 1.8 : 1.6;
-      lip.userData.jawAnchorCount = pocket.kind === 'corner' ? 2 : 0;
-      lip.userData.joinExtensionMm = pocket.kind === 'corner'
-        ? cornerJoinExtension * 1000
-        : 0;
+      lip.userData.radiusMm = weltRadius * 1000;
+      lip.userData.jawAnchorCount = 2;
+      lip.userData.sharedSeamContract = true;
       lip.castShadow = true;
       lip.receiveShadow = true;
       this.tableGroup.add(lip);
@@ -1858,12 +1508,51 @@ export class Scene3D {
     this.requestRender();
   }
 
+  /**
+   * Game 只在幽灵球抬手确认时设置目标身份；null 表示回退常规相机。
+   * 活相机与拾取虚拟相机都通过 cameraPoseFor 消费这一份状态，禁止两条投影路径漂移。
+   */
+  setCameraFraming(framing: CameraFraming | null) {
+    this.cameraFraming = framing;
+    this.updateCameraTarget();
+    this.requestRender();
+  }
+
+  setCameraSafety(safety: CameraSafetyInsets) {
+    this.cameraSafety = safety;
+    this.updateCameraTarget();
+    this.requestRender();
+  }
+
+  private cameraPoseFor(
+    cameraAzimuth: number,
+    viewLevel: number,
+    aspect: number,
+    previewPower = this.lastPreviewPower,
+    cueX = this.lastCueX,
+    cueZ = this.lastCueZ,
+  ) {
+    if (
+      this.cameraFraming !== null &&
+      this.phase === 'aiming' &&
+      !isOverheadCameraView(viewLevel)
+    ) {
+      return aimCameraPose(this.cameraFraming, cameraAzimuth, aspect).pose;
+    }
+    return cameraPoseAt(
+      cueX,
+      cueZ,
+      cameraAzimuth,
+      previewPower,
+      viewLevel,
+      aspect,
+      this.cameraSafety,
+    );
+  }
+
   private updateCameraTarget() {
-    const cameraPose = cameraPoseAt(
-      this.lastCueX,
-      this.lastCueZ,
+    const cameraPose = this.cameraPoseFor(
       this.cameraAzimuth,
-      this.lastPreviewPower,
       this.viewLevel,
       this.camera.aspect,
     );
@@ -1900,36 +1589,52 @@ export class Scene3D {
         mesh.visible = true;
         mesh.scale.setScalar(1);
       } else if (!ball.active && mesh.visible && !dropping) {
-        // 刚落袋：启动落袋动画
+        // 刚落袋：只消费物理事件快照。轨迹模块不改口袋规则，只把已有 entry
+        // 位置/速度约束到同一 PocketGeometry 的可见袋腔中。
         const pocketEvent = [...world.events].reverse().find(
           e => e.type === 'pocket' && e.ball === ball.number
         );
-        let target: THREE.Vector3;
+        let pocket = POCKETS[0];
+        let entryX = ball.x;
+        let entryZ = ball.z;
+        let entryVx = 0;
+        let entryVz = 0;
+        let entryWx = 0;
+        let entryWy = 0;
+        let entryWz = 0;
         if (pocketEvent && pocketEvent.type === 'pocket') {
-          const entrySpeed = Math.hypot(pocketEvent.entryVx, pocketEvent.entryVz);
-          const travel = 0.06;
-          const dirX = entrySpeed > 1e-6
-            ? pocketEvent.entryVx / entrySpeed
-            : POCKETS[pocketEvent.pocket].outward.x;
-          const dirZ = entrySpeed > 1e-6
-            ? pocketEvent.entryVz / entrySpeed
-            : POCKETS[pocketEvent.pocket].outward.z;
-          target = new THREE.Vector3(
-            pocketEvent.entryX + dirX * travel,
-            -0.2,
-            pocketEvent.entryZ + dirZ * travel,
-          );
+          pocket = POCKETS[pocketEvent.pocket] ?? pocket;
+          entryX = pocketEvent.entryX;
+          entryZ = pocketEvent.entryZ;
+          entryVx = pocketEvent.entryVx;
+          entryVz = pocketEvent.entryVz;
+          entryWx = pocketEvent.entryWx ?? 0;
+          entryWy = pocketEvent.entryWy ?? 0;
+          entryWz = pocketEvent.entryWz ?? 0;
         } else {
-          // 找最近袋口
-          let best: [number, number] = POCKET_POS[0];
+          // 旧快照/复盘没有 pocket event 时，降级到最近袋，但仍走同一受限轨迹。
           let bestD = Infinity;
-          for (const [px, pz] of POCKET_POS) {
-            const d = (ball.x - px) ** 2 + (ball.z - pz) ** 2;
-            if (d < bestD) { bestD = d; best = [px, pz]; }
+          for (const candidate of POCKETS) {
+            const d = (ball.x - candidate.x) ** 2 + (ball.z - candidate.z) ** 2;
+            if (d < bestD) { bestD = d; pocket = candidate; }
           }
-          target = new THREE.Vector3(best[0], -0.2, best[1]);
         }
-        this.dropAnims.set(ball.number, { t: 0, from: mesh.position.clone(), to: target });
+        const trajectory = createPocketDropTrajectory({
+          pocket,
+          entryX,
+          entryZ,
+          entryVx,
+          entryVz,
+          entryWx,
+          entryWy,
+          entryWz,
+        });
+        const spinAxis = trajectory.sample(0).spinAxis;
+        this.dropAnims.set(ball.number, {
+          elapsed: 0,
+          trajectory,
+          spinAxis: new THREE.Vector3(spinAxis.x, spinAxis.y, spinAxis.z),
+        });
       }
 
       if (ball.active && !dropping) {
@@ -2340,20 +2045,18 @@ export class Scene3D {
 
     for (const [num, anim] of this.dropAnims) {
       const mesh = this.ballMeshes[num];
-      anim.t += dt / 0.45;
-      if (anim.t >= 1) {
+      anim.elapsed += dt;
+      const sample = anim.trajectory.sample(anim.elapsed);
+      if (sample.progress >= 1) {
         mesh.visible = false;
         mesh.scale.setScalar(1);
         this.dropAnims.delete(num);
         continue;
       }
-      const t = anim.t;
-      const ease = t * t;
-      mesh.position.lerpVectors(anim.from, anim.to, ease);
-      mesh.position.y = R * (1 - ease) + anim.to.y * ease;
-      mesh.scale.setScalar(1 - ease * 0.25);
-      // 落袋翻滚
-      mesh.rotation.x += dt * 6;
+      mesh.position.set(sample.x, sample.y, sample.z);
+      mesh.scale.setScalar(sample.scale);
+      // 只消费 pocket event 的真实角速度；真实零旋转保持静止。
+      if (sample.spinRate > 1e-9) mesh.rotateOnWorldAxis(anim.spinAxis, sample.spinRate * dt);
     }
 
     this.updatePlanPlay(dt);
@@ -2429,15 +2132,10 @@ export class Scene3D {
   private positionVirtualCamera(cameraAzimuth: number, viewLevel = this.viewLevel): boolean {
     const cue = this.ballMeshes[0];
     if (!cue) return false;
-    const cueX = cue.position.x;
-    const cueZ = cue.position.z;
     this.virtualCam.aspect = this.camera.aspect;
     this.virtualCam.updateProjectionMatrix();
-    const pose = cameraPoseAt(
-      cueX,
-      cueZ,
+    const pose = this.cameraPoseFor(
       cameraAzimuth,
-      0,
       viewLevel,
       this.virtualCam.aspect,
     );

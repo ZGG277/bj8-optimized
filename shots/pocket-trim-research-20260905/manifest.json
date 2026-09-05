@@ -1,0 +1,116 @@
+{
+  "time": "2026-09-05T04:02:34.157981+00:00",
+  "status": "RESEARCH_COMPLETE_NOT_IMPLEMENTED",
+  "sourceSha256": "f95ea7349ec417aecadbd40178d4897e1be42c330d3bc776138bb412bb4582eb",
+  "artifactSha256": "0a9ea5aedc4aa8bb3ad27f2d180a5993751bd33ee9e423db15021627c92bdee1",
+  "cleanup": {
+    "ownBrowserTabs": 0,
+    "previewPidPreserved": 21302,
+    "viewportOverride": "reset",
+    "startedServices": 0,
+    "builtProduct": false
+  },
+  "files": [
+    {
+      "name": "analyze-geometry.cjs",
+      "bytes": 6074,
+      "sha256": "c48ad5ee38aadf3639b2802c6cd040dccfd642c078c32d3bfcac6f7b61a0a93d"
+    },
+    {
+      "name": "artifact-scripts.json",
+      "bytes": 146,
+      "sha256": "5f5796123a81526aba921f263160dca3017ffbd96078e1ab38c8e597999e63a8"
+    },
+    {
+      "name": "browser-desktop.json",
+      "bytes": 655,
+      "sha256": "e6eecd7e94f004ce8dbf665a06de4312bf5b9f335730a32e91ad575b43f5d411"
+    },
+    {
+      "name": "browser-mobile.json",
+      "bytes": 394,
+      "sha256": "c6f2ef2602ce1da5a85b68101f24f2ec9dbae499803e8fd60e1b53682a25c85a"
+    },
+    {
+      "name": "desktop-near-native.jpg",
+      "bytes": 6966,
+      "sha256": "36d3750e13c3f339ce3a8c4500e075c925d77203f2cf068a8c679c2ded5ca8f1",
+      "excludedReason": "Native clip returned inconsistent scaling; do not use for position or gap measurement."
+    },
+    {
+      "name": "desktop-oblique85-1280x800.jpg",
+      "bytes": 54185,
+      "sha256": "2cd583ac07845756e86723f94e3bfc1888b5690a335174d0ed2096e20106c9aa"
+    },
+    {
+      "name": "desktop-top-1280x800.jpg",
+      "bytes": 52329,
+      "sha256": "f1a6be77f9506b7fdef7c565fc29494918c2c06d878f902bef5cb7209d28c30c"
+    },
+    {
+      "name": "desktop-top-opposite-1280x800.jpg",
+      "bytes": 51062,
+      "sha256": "cf137351d9b0a56ab9653257061f41b6a8d422ff76977d565cad50a18a51a759"
+    },
+    {
+      "name": "geometry-analysis.json",
+      "bytes": 517849,
+      "sha256": "84745e56d1185edc452bac860ce4f55ef9de727c96813b09ec007558da86bfab"
+    },
+    {
+      "name": "geometry-plan.png",
+      "bytes": 354906,
+      "sha256": "cc5ce8d365cd1ad1e3c0a738dd68b2d76cac9b6c1c1a2f785584e3d10320ad21"
+    },
+    {
+      "name": "geometry-plan.svg",
+      "bytes": 186348,
+      "sha256": "08944f7b863c2821a552ef2c47d848e4d8431e789f5bf69e29cfe4acc60e7f00"
+    },
+    {
+      "name": "http-entry.json",
+      "bytes": 531,
+      "sha256": "a5230230433f2a857fec153b3962d429e58d1e002f8988de51c8e957133d3cd1"
+    },
+    {
+      "name": "http-resumed.json",
+      "bytes": 531,
+      "sha256": "894114a1a3fcc52ca2c5adb0fc4b2607eeca188e67738ccb73a7f5a9ec3610c1"
+    },
+    {
+      "name": "inspect-numeric.cjs",
+      "bytes": 1319,
+      "sha256": "bdfb0f543692954746105b381b044633eaa2e09bd4a348056aedaab9e3df356f"
+    },
+    {
+      "name": "mobile-top-390x844.jpg",
+      "bytes": 20619,
+      "sha256": "1e9946ab79aff480c13029cf76bf8b04e195a642e9f843316c99d243be2f0b0a"
+    },
+    {
+      "name": "plot-geometry.py",
+      "bytes": 2969,
+      "sha256": "9e3464de4ad9f3216bc8c321573ce60fe34a13d01eabdf0684f28cfce14c419b"
+    },
+    {
+      "name": "snapshot-before.json",
+      "bytes": 553,
+      "sha256": "6f6ac8a92d2bf7b9c43e7eb6409a55091ca5c189b81e42eca4d018d58f689ef1"
+    },
+    {
+      "name": "snapshot-final.json",
+      "bytes": 553,
+      "sha256": "f821fc659111beb470fde1eaa9a90d796ffd0c74d3b976b702977bd63966c246"
+    },
+    {
+      "name": "snapshot-resumed.json",
+      "bytes": 553,
+      "sha256": "f821fc659111beb470fde1eaa9a90d796ffd0c74d3b976b702977bd63966c246"
+    },
+    {
+      "name": "topology-summary.json",
+      "bytes": 15304,
+      "sha256": "1b2df287b8bbcabcb81ee5d8be4866070a4c52736992261ffa0293b4f9826b47"
+    }
+  ]
+}

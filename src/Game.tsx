@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、默认收起的中性赛后复盘、整局训练总结、默认拨轮/可选方向键、延迟 3D 启动、无 React 克隆的运动快照、按需走位预算与相机/控制 HUD
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、复盘/训练总结、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球回全台与控件学习成功事实
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -14,6 +14,9 @@ import {
 } from 'react';
 import {
   getCueBall,
+  getPocketAimWindow,
+  POCKETS,
+  TABLE,
   strikeCueBall,
   cloneWorld,
 } from './physics';
@@ -40,16 +43,28 @@ import { Scene3D } from './Scene3D';
 import type { PlannedStep, PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
+import { inferCameraAimIntent } from './camera-aim-intent';
+import {
+  cameraSafetyFromControlRects,
+  cameraControlRectsFromElements,
+  createAimCameraFraming,
+  DEFAULT_CAMERA_SAFETY,
+  framingForConfirmedAim,
+  type CameraFraming,
+  type CameraSafetyInsets,
+} from './camera-framing';
 import {
   FULL_TABLE_AZIMUTH,
   OVERHEAD_VIEW,
+  SHOT_AIM_VIEW,
   cameraAzimuthAfterDrag,
   cameraAzimuthAtView,
   cameraInteractionMode,
   isGlobalCameraView,
   isOverheadCameraView,
-  opponentOverheadAzimuth,
+  fullTableAzimuth,
 } from './camera-view';
+import { markControlLearned } from './control-onboarding';
 import type { GameMode, PositionOutcome } from './opponent/model';
 import {
   guideStepAfterEvent,
@@ -75,6 +90,19 @@ function browserStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+/** 仅为贴边停靠控件预留屏幕安全区；自由控件不会把整块构图区错误缩小。 */
+function aimCameraSafetyFor(viewport: HTMLElement) {
+  const bounds = viewport.getBoundingClientRect();
+  const controls = cameraControlRectsFromElements(
+    document.querySelectorAll<HTMLElement>('[data-control-slot]'),
+  );
+  return cameraSafetyFromControlRects(bounds, controls);
+}
+
+function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
+  return a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
 }
 
 export default function Game() {
@@ -104,12 +132,40 @@ export default function Game() {
   const [touchAimCameraLocked, setTouchAimCameraLocked] = useState(false);
   const [manualCameraActive, setManualCameraActive] = useState(false);
   const [manualCameraPinned, setManualCameraPinned] = useState(false);
+  const [cameraSafety, setCameraSafety] = useState<CameraSafetyInsets>(DEFAULT_CAMERA_SAFETY);
+  const [aimCameraFraming, setAimCameraFraming] = useState<CameraFraming | null>(null);
   const touchAimCameraTimerRef = useRef<number | null>(null);
   const manualAimTransitionPointerRef = useRef<number | null>(null);
   const cameraAzimuthRef = useRef(cameraAzimuth);
   cameraAzimuthRef.current = cameraAzimuth;
   const spectatorActive =
     match.actor === 'opponent' && (match.phase === 'opponent' || match.phase === 'rolling');
+  const clearTouchAimCameraTimer = useCallback(() => {
+    if (touchAimCameraTimerRef.current === null) return;
+    window.clearTimeout(touchAimCameraTimerRef.current);
+    touchAimCameraTimerRef.current = null;
+  }, []);
+  const clearAimCameraFraming = useCallback(() => {
+    setAimCameraFraming(null);
+  }, []);
+  const orientFullTable = useCallback(() => {
+    const element = containerRef.current;
+    setCameraAzimuth(fullTableAzimuth(
+      element?.clientWidth || window.innerWidth,
+      element?.clientHeight || window.innerHeight,
+    ));
+    setCameraDetached(true);
+  }, []);
+  const showFullTable = useCallback(() => {
+    clearTouchAimCameraTimer();
+    clearAimCameraFraming();
+    manualAimTransitionPointerRef.current = null;
+    setTouchAimCameraLocked(false);
+    setManualCameraActive(false);
+    setManualCameraPinned(false);
+    orientFullTable();
+    setViewLevel(OVERHEAD_VIEW);
+  }, [clearTouchAimCameraTimer, clearAimCameraFraming, orientFullTable, setViewLevel]);
   const renderBudget = useMemo(() => {
     if (typeof window === 'undefined') {
       return {
@@ -305,23 +361,98 @@ export default function Game() {
   // 瞄准值同步到 3D 场景用的 ref
   const aimRef = useRef(0);
   const resetSpinRef = useRef<() => void>(() => {});
-  // 顾燃回合始终锁定完整俯视：竖屏纵向放台，横屏横向放台；旋转屏幕时同步重排。
+  // 全台视角统一按球桌视口重排；玩家显式手动环绕时保留手选方位。
   useEffect(() => {
-    if (!spectatorActive) return;
-    const lockOpponentCamera = () => {
-      const element = containerRef.current;
-      const width = element?.clientWidth ?? window.innerWidth;
-      const height = element?.clientHeight ?? window.innerHeight;
-      setCameraAzimuth(opponentOverheadAzimuth(width, height));
-      setCameraDetached(true);
-      setViewLevel(OVERHEAD_VIEW);
-      setManualCameraActive(false);
-      setManualCameraPinned(false);
+    if (spectatorActive) showFullTable();
+    else if (!isOverheadCameraView(viewLevel) || manualCameraActive || manualCameraPinned) return;
+    orientFullTable();
+    const observer = new ResizeObserver(orientFullTable);
+    if (containerRef.current) observer.observe(containerRef.current);
+    window.addEventListener('resize', orientFullTable);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', orientFullTable);
     };
-    lockOpponentCamera();
-    window.addEventListener('resize', lockOpponentCamera);
-    return () => window.removeEventListener('resize', lockOpponentCamera);
-  }, [spectatorActive, setViewLevel]);
+  }, [spectatorActive, viewLevel, manualCameraActive, manualCameraPinned, orientFullTable, showFullTable]);
+
+  // 真实触球后的 rolling 是全台优先级最高的自动状态：即使未来的触发路径绕过
+  // handleCommit，也不能遗留瞄准构图、触控锁镜或低机位。显式手动环绕也不跨击球保留。
+  useEffect(() => {
+    if (match.phase === 'rolling') showFullTable();
+  }, [match.phase, showFullTable]);
+
+  const handleGhostPlaced = useCallback(() => {
+    const world = worldRef.current;
+    const cue = getCueBall(world);
+    const legal = legalNumbers(world, 'player', matchRef.current.playerGroup);
+    const intent = inferCameraAimIntent(world, aimRef.current, legal);
+    const object = intent === null
+      ? null
+      : world.balls.find(ball => ball.active && ball.number === intent.target) ?? null;
+    const pocket = intent === null ? null : POCKETS[intent.pocket] ?? null;
+    if (cue && object && pocket) {
+      const mouth = getPocketAimWindow(pocket);
+      setAimCameraFraming(framingForConfirmedAim(createAimCameraFraming({
+        kind: 'aim',
+        targetNumber: object.number,
+        pocketIndex: pocket.index,
+        cue: { x: cue.x, y: TABLE.ballRadius, z: cue.z, radius: TABLE.ballRadius },
+        object: { x: object.x, y: TABLE.ballRadius, z: object.z, radius: TABLE.ballRadius },
+        pocket: {
+          index: pocket.index,
+          center: { x: mouth.center.x, y: 0.005, z: mouth.center.z },
+          left: { x: mouth.left.x, y: 0.005, z: mouth.left.z },
+          right: { x: mouth.right.x, y: 0.005, z: mouth.right.z },
+          depth: pocket.shelfDepth + pocket.captureInset,
+          outward: pocket.outward,
+        },
+        safety: containerRef.current ? aimCameraSafetyFor(containerRef.current) : DEFAULT_CAMERA_SAFETY,
+      })).framing);
+    } else {
+      // 未形成稳定首碰+袋口意图时保留既有稍高出杆位，绝不猜袋或改杆向。
+      setAimCameraFraming(framingForConfirmedAim(null).framing);
+    }
+    clearTouchAimCameraTimer();
+    manualAimTransitionPointerRef.current = null;
+    setTouchAimCameraLocked(false);
+    setManualCameraActive(false);
+    setManualCameraPinned(false);
+    setCameraDetached(false);
+    setCameraAzimuth(aimRef.current);
+    setViewLevel(SHOT_AIM_VIEW);
+  }, [clearAimCameraFraming, clearTouchAimCameraTimer, matchRef, setViewLevel, worldRef]);
+
+  // 首碰目标与袋口身份只在抬手时冻结；但横竖旋转、窗口大小和控件停靠/拖位会改变
+  // 可用屏幕区域。全台和瞄准共用这个实时 safety；仅在存在构图帧时复制 safety，绝不重选目标或口袋。
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    const viewport = containerRef.current;
+    if (!viewport) return;
+    const refreshSafety = () => {
+      const nextSafety = aimCameraSafetyFor(viewport);
+      setCameraSafety(current => sameCameraSafety(current, nextSafety) ? current : nextSafety);
+      setAimCameraFraming(current => {
+        if (!current || sameCameraSafety(current.safety, nextSafety)) return current;
+        return { ...current, safety: nextSafety };
+      });
+    };
+    const resizeObserver = new ResizeObserver(refreshSafety);
+    resizeObserver.observe(viewport);
+    const mutationObserver = new MutationObserver(refreshSafety);
+    mutationObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['style', 'data-dock-edge', 'data-placement'],
+      childList: true,
+      subtree: true,
+    });
+    window.addEventListener('resize', refreshSafety);
+    refreshSafety();
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener('resize', refreshSafety);
+    };
+  }, []);
 
   // ── 出杆提交：输入层只给 ShotIntent，这里负责球杆动画与物理击球 ──
   const handleCommit = useCallback((intent: ShotIntent) => {
@@ -374,6 +505,8 @@ export default function Game() {
         return;
       }
       advanceFirstMatchGuide('shot-committed');
+      markControlLearned('shoot');
+      showFullTable();
       // 每杆只在物理确认击球成功后复位中杆，避免动画取消时误清用户设置。
       resetSpinRef.current();
       playStrike(intent.power);
@@ -388,7 +521,7 @@ export default function Game() {
     } else {
       doShot();
     }
-  }, [advanceFirstMatchGuide, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch]);
+  }, [advanceFirstMatchGuide, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch, showFullTable]);
 
   // ── 出杆输入协调器 ──
   const {
@@ -417,12 +550,6 @@ export default function Game() {
   const cameraViewAzimuthRef = useRef(cameraViewAzimuth);
   cameraViewAzimuthRef.current = cameraViewAzimuth;
 
-  const clearTouchAimCameraTimer = useCallback(() => {
-    if (touchAimCameraTimerRef.current === null) return;
-    window.clearTimeout(touchAimCameraTimerRef.current);
-    touchAimCameraTimerRef.current = null;
-  }, []);
-
   const lockTouchAimCamera = useCallback(() => {
     if (isGlobalCameraView(viewLevel)) return;
     clearTouchAimCameraTimer();
@@ -440,6 +567,7 @@ export default function Game() {
 
   const handleToggleManualCamera = useCallback(() => {
     clearTouchAimCameraTimer();
+    clearAimCameraFraming();
     manualAimTransitionPointerRef.current = null;
     setTouchAimCameraLocked(false);
     if (manualCameraActive) {
@@ -451,7 +579,7 @@ export default function Game() {
     setCameraDetached(true);
     setManualCameraPinned(false);
     setManualCameraActive(true);
-  }, [clearTouchAimCameraTimer, manualCameraActive]);
+  }, [clearAimCameraFraming, clearTouchAimCameraTimer, manualCameraActive]);
 
   useEffect(
     () => () => clearTouchAimCameraTimer(),
@@ -464,18 +592,6 @@ export default function Game() {
     clearTouchAimCameraTimer();
     setTouchAimCameraLocked(false);
   }, [clearTouchAimCameraTimer, spectatorActive]);
-
-  // 玩家主动到达俯视端点时冻结进入瞬间的方位；非俯视高度始终跟随杆向。
-  useEffect(() => {
-    if (
-      !spectatorActive &&
-      !cameraDetached &&
-      isOverheadCameraView(viewLevel)
-    ) {
-      setCameraAzimuth(cameraViewAzimuthRef.current);
-      setCameraDetached(true);
-    }
-  }, [cameraDetached, spectatorActive, viewLevel]);
 
   // 顾燃交棒后，只要玩家选择非俯视视角就立即恢复“镜头跟杆向”。
   useEffect(() => {
@@ -510,7 +626,7 @@ export default function Game() {
     setMatch,
     setMessage,
     setWorldView,
-    setViewLevel,
+    onGhostPlaced: handleGhostPlaced,
     onCoarseAimAdjusted: () => {
       advanceFirstMatchGuide('coarse-aim-adjusted');
     },
@@ -604,10 +720,11 @@ export default function Game() {
       const adjustedMode = handleAimDialAdjust(pixelDelta, pressureGain);
       if (adjustedMode === 'fine') advanceFirstMatchGuide('fine-aim-adjusted');
       releaseTouchAimCameraLater();
-      return;
+      return adjustedMode !== null;
     }
     const adjustedMode = handleAimDialAdjust(pixelDelta, pressureGain);
     if (adjustedMode === 'fine') advanceFirstMatchGuide('fine-aim-adjusted');
+    return adjustedMode !== null;
   }, [
     advanceFirstMatchGuide,
     canAim,
@@ -633,12 +750,14 @@ export default function Game() {
       !isGlobalCameraView(viewLevel)) {
       lockTouchAimCamera();
     }
-    if (handleAimButtonAdjust(angleDelta)) {
+    const adjusted = handleAimButtonAdjust(angleDelta);
+    if (adjusted) {
       advanceFirstMatchGuide('fine-aim-adjusted');
     }
     if ((coarsePointer || resumePinnedCamera) && canAim) {
       releaseTouchAimCameraLater();
     }
+    return adjusted;
   }, [
     advanceFirstMatchGuide,
     canAim,
@@ -652,9 +771,13 @@ export default function Game() {
 
   const handleGuideViewLevel = useCallback((level: number) => {
     const adjusted = Math.abs(level - viewLevel) > 0.0005;
-    setViewLevel(level);
+    if (isOverheadCameraView(level) && !manualCameraActive) showFullTable();
+    else {
+      clearAimCameraFraming();
+      setViewLevel(level);
+    }
     if (canAim && adjusted) advanceFirstMatchGuide('view-adjusted');
-  }, [advanceFirstMatchGuide, canAim, setViewLevel, viewLevel]);
+  }, [advanceFirstMatchGuide, canAim, clearAimCameraFraming, setViewLevel, viewLevel, manualCameraActive, showFullTable]);
 
   const handleGuideSpinChange = useCallback((nextSpin: typeof spin) => {
     const adjusted =
@@ -671,20 +794,15 @@ export default function Game() {
   // ── 重置游戏 ──
   const handleResetGame = useCallback((nextMode: GameMode) => {
     resetGame(setAim, nextMode);
+    markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
     setSpin({ x: 0, y: 0 });
     setGuidanceEnabled(false);
-    setCameraAzimuth(FULL_TABLE_AZIMUTH);
-    setCameraDetached(false);
-    clearTouchAimCameraTimer();
-    setTouchAimCameraLocked(false);
-    setManualCameraActive(false);
-    setManualCameraPinned(false);
-    manualAimTransitionPointerRef.current = null;
+    showFullTable();
     planConsultedRef.current = false;
     consultedPlanStepRef.current = null;
     skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
-  }, [clearTouchAimCameraTimer, resetGame, setAim, setSpin, aimGhostDistRef]);
+  }, [showFullTable, resetGame, setAim, setSpin, aimGhostDistRef]);
   const handleReplay = useCallback(() => {
     handleResetGame(gameMode);
   }, [gameMode, handleResetGame]);
@@ -815,6 +933,8 @@ export default function Game() {
 
     aimRef.current = aim;
     scene.setViewLevel(viewLevel);
+    scene.setCameraSafety(cameraSafety);
+    scene.setCameraFraming(aimCameraFraming);
     scene.setAim(aim);
     scene.setCameraAzimuth(cameraViewAzimuth);
     scene.setAimAssistVisible(aimAssist.enabled);
@@ -829,6 +949,8 @@ export default function Game() {
   }, [
     worldView,
     viewLevel,
+    cameraSafety,
+    aimCameraFraming,
     aim,
     cameraViewAzimuth,
     aimAssist.enabled,

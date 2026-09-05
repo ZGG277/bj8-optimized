@@ -1,0 +1,284 @@
+{
+  "method": "Unmodified Scene3D.buildTable, texture stubs, no WebGL or app constructor",
+  "beforeTableMeshCount": 201,
+  "tableMeshCount": 195,
+  "wood": {
+    "triangles": 2232,
+    "degenerate": 0,
+    "nonManifoldEdges": 0,
+    "inconsistentEdges": 0,
+    "signedVolume": 0.02807243960021498
+  },
+  "pockets": [
+    {
+      "p": 0,
+      "kind": "corner",
+      "stations": 47,
+      "leather": {
+        "triangles": 544,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.000045702237120099906
+      },
+      "welt": {
+        "triangles": 656,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.000002092614492735283
+      },
+      "topTriangleCount": 92,
+      "topDown": 0,
+      "intersections": 0,
+      "occludedTop": 0,
+      "support": {
+        "boundaryChecks": 40,
+        "maxBoundaryDistance": 5.40104344971459e-8,
+        "interiorChecks": 54,
+        "interiorMisses": 0,
+        "maxInteriorHeightError": 1.2218952169518182e-9,
+        "boundaryTolerance": 0.000001
+      },
+      "rawBoundaryRayMisses": [
+        {
+          "row": 3,
+          "t": 0.95,
+          "hit": null,
+          "y": null,
+          "distanceToJaw": 3.7528382192642576e-9
+        }
+      ]
+    },
+    {
+      "p": 1,
+      "kind": "corner",
+      "stations": 47,
+      "leather": {
+        "triangles": 544,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.000045702236910917456
+      },
+      "welt": {
+        "triangles": 656,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.00000209261466776397
+      },
+      "topTriangleCount": 92,
+      "topDown": 0,
+      "intersections": 0,
+      "occludedTop": 0,
+      "support": {
+        "boundaryChecks": 40,
+        "maxBoundaryDistance": 5.40104344971459e-8,
+        "interiorChecks": 54,
+        "interiorMisses": 0,
+        "maxInteriorHeightError": 1.2218952169518182e-9,
+        "boundaryTolerance": 0.000001
+      },
+      "rawBoundaryRayMisses": [
+        {
+          "row": 43,
+          "t": 0.95,
+          "hit": null,
+          "y": null,
+          "distanceToJaw": 3.7528382192642576e-9
+        }
+      ]
+    },
+    {
+      "p": 2,
+      "kind": "side",
+      "stations": 49,
+      "leather": {
+        "triangles": 564,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.00003498625528277019
+      },
+      "welt": {
+        "triangles": 656,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.0000015143437962856177
+      },
+      "topTriangleCount": 96,
+      "topDown": 0,
+      "intersections": 0,
+      "occludedTop": 0,
+      "support": {
+        "boundaryChecks": 50,
+        "maxBoundaryDistance": 9.865366643883882e-9,
+        "interiorChecks": 72,
+        "interiorMisses": 0,
+        "maxInteriorHeightError": 1.2218952169518182e-9,
+        "boundaryTolerance": 0.000001
+      },
+      "rawBoundaryRayMisses": []
+    },
+    {
+      "p": 3,
+      "kind": "side",
+      "stations": 49,
+      "leather": {
+        "triangles": 564,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.00003498625528277019
+      },
+      "welt": {
+        "triangles": 656,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.0000015143437962856177
+      },
+      "topTriangleCount": 96,
+      "topDown": 0,
+      "intersections": 0,
+      "occludedTop": 0,
+      "support": {
+        "boundaryChecks": 50,
+        "maxBoundaryDistance": 9.865366643883882e-9,
+        "interiorChecks": 72,
+        "interiorMisses": 0,
+        "maxInteriorHeightError": 1.2218952169518182e-9,
+        "boundaryTolerance": 0.000001
+      },
+      "rawBoundaryRayMisses": []
+    },
+    {
+      "p": 4,
+      "kind": "corner",
+      "stations": 47,
+      "leather": {
+        "triangles": 544,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.000045702236910917456
+      },
+      "welt": {
+        "triangles": 656,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.00000209261466776397
+      },
+      "topTriangleCount": 92,
+      "topDown": 0,
+      "intersections": 0,
+      "occludedTop": 0,
+      "support": {
+        "boundaryChecks": 40,
+        "maxBoundaryDistance": 5.40104344971459e-8,
+        "interiorChecks": 54,
+        "interiorMisses": 0,
+        "maxInteriorHeightError": 1.2218952169518182e-9,
+        "boundaryTolerance": 0.000001
+      },
+      "rawBoundaryRayMisses": [
+        {
+          "row": 43,
+          "t": 0.95,
+          "hit": null,
+          "y": null,
+          "distanceToJaw": 3.7528382192642576e-9
+        }
+      ]
+    },
+    {
+      "p": 5,
+      "kind": "corner",
+      "stations": 47,
+      "leather": {
+        "triangles": 544,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.000045702237120099906
+      },
+      "welt": {
+        "triangles": 656,
+        "degenerate": 0,
+        "nonManifoldEdges": 0,
+        "inconsistentEdges": 0,
+        "signedVolume": 0.000002092614492735283
+      },
+      "topTriangleCount": 92,
+      "topDown": 0,
+      "intersections": 0,
+      "occludedTop": 0,
+      "support": {
+        "boundaryChecks": 40,
+        "maxBoundaryDistance": 5.40104344971459e-8,
+        "interiorChecks": 54,
+        "interiorMisses": 0,
+        "maxInteriorHeightError": 1.2218952169518182e-9,
+        "boundaryTolerance": 0.000001
+      },
+      "rawBoundaryRayMisses": [
+        {
+          "row": 3,
+          "t": 0.95,
+          "hit": null,
+          "y": null,
+          "distanceToJaw": 3.7528382192642576e-9
+        }
+      ]
+    }
+  ],
+  "unchangedLoadedSourceFiles": [
+    {
+      "file": "src/physics.ts",
+      "sha256": "24b871676199d957ac977d4c9bd9a9c3d4ad6918979f174a9a8e5e90d28d9b3f"
+    },
+    {
+      "file": "src/physics/collision-model.ts",
+      "sha256": "65ec27e2eda39329dbac047617e1259d41f5ed7bd7ead07b6009311ff8840e91"
+    },
+    {
+      "file": "src/physics/table-geometry.ts",
+      "sha256": "a3a660d4f70fad769ae4b779cffb6cc4124ede6efe5a649ceecc60ba76f01b04"
+    },
+    {
+      "file": "src/camera-view.ts",
+      "sha256": "4985a225bcb8dbf08e9d31380123721b35bf27bdce501bc746ace19e747a09f7"
+    },
+    {
+      "file": "src/camera-framing.ts",
+      "sha256": "34d9255b1d3d088cdfb59735aef64a71a59dac979aaeaad959ec2fad67312229"
+    },
+    {
+      "file": "src/render-policy.ts",
+      "sha256": "bc388230b785d57e31bda1d623a5b10024d1bc10527d3ac802c823382a0b11cb"
+    },
+    {
+      "file": "src/thermal-governor.ts",
+      "sha256": "f1f940c9379e003238957630ccf705bcf9f2b953ec5e8d07131b90212c44599e"
+    },
+    {
+      "file": "src/pocket-drop.ts",
+      "sha256": "49bf8670374ad48d56174ad0359755dfc5668e2019deaac6e3c8d8863517701a"
+    },
+    {
+      "file": "src/pocket-render/profile.ts",
+      "sha256": "b87cba15f80cd60bcbd5c8929068378fb6c0b0ea786d51881f2b9cdcb8160387"
+    },
+    {
+      "file": "src/pocket-render/rope-net.ts",
+      "sha256": "85a8787255ad2d74a021873424932d260c77aaeeacdd415810a4d5fdc94b31c3"
+    },
+    {
+      "file": "src/pocket-render/cushion-join.ts",
+      "sha256": "0e7e8d3407df8b28fd6486861663336feacfb3f8c7beb6fa2f039d45628bf88d"
+    }
+  ]
+}

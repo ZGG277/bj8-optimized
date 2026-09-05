@@ -1,10 +1,11 @@
 /*
-[INPUT]: 按概率排序的 PositionPlan 列表与关闭/分杆展示回调
+[INPUT]: 按概率排序的 PositionPlan 列表、关闭/分杆展示回调与逐控件学习记录
 [OUTPUT]: 只展示最高概率方案；默认第1杆，用户点击第2/3杆后才切换对应路线
 [POS]: HUD 组件层，只做展示与分杆选择；场景渲染经 onShowStep 委托 Scene3D
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useEffect, useState } from 'react';
+import { markControlLearned, type ControlTipId } from '../control-onboarding';
 import { useDraggableOverlay } from '../hooks/useDraggableOverlay';
 import type { ShotCandidate } from '../planner/candidates';
 import type { PositionPlan } from '../planner/search';
@@ -54,8 +55,13 @@ export function PlanOverlay({ plans, onClose, onShowStep }: PlanOverlayProps) {
               type="button"
               role="tab"
               aria-selected={i === safeStepIdx}
+              data-control-tip={`plan-step-${i + 1}`}
               className={i === safeStepIdx ? 'active' : ''}
-              onClick={() => setStepIdx(i)}
+              onClick={() => {
+                if (i === safeStepIdx) return;
+                setStepIdx(i);
+                markControlLearned(`plan-step-${i + 1}` as ControlTipId);
+              }}
             >
               {`第${i + 1}球 · ${candidateStep.candidate.target}号`}
             </button>
@@ -67,7 +73,10 @@ export function PlanOverlay({ plans, onClose, onShowStep }: PlanOverlayProps) {
         </span>
       </div>
       <span className="plan-bar-prob">{`本杆 ${Math.round(step.prob * 100)}%`}</span>
-      <button type="button" className="plan-bar-close" aria-label="关闭走位规划" onClick={onClose}>
+      <button type="button" className="plan-bar-close" data-control-tip="plan-close" aria-label="关闭走位规划" onClick={() => {
+        onClose();
+        markControlLearned('plan-close');
+      }}>
         ✕
       </button>
     </div>

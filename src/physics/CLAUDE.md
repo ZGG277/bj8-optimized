@@ -6,7 +6,9 @@
 
 ## 成员清单
 
-`collision-model.ts`: 球球恢复系数、切向 throw 系数与单位速度碰撞后母球/目标球方向预测；physics 步进、aim 反解和 Scene3D 辅助线经 `physics.ts` 统一重导出消费。
+`collision-model.ts`: 球球接触点相对速度、等质量实心球法/切向冲量及瞬时碰后方向；physics 步进与 aim 无旋预测经 `physics.ts` 统一重导出消费。
+
+`continuous-collision.test.ts`: 56mm/10m/s 薄擦 CCD、球序/对称多接触、球碰→袋口与库边→球碰时序、中杆滑动、残旋恢复、旋转传递、能量和求解预算护栏。
 
 `table-geometry.ts`: 中式台球参数化袋口与库边的单一几何事实源；输出角袋 100mm/中袋 102mm 的六袋口、角袋 8mm/中袋 7mm 台内半椭圆捕获弧、直线/圆弧离散角衬段、袋口局部坐标及安全瞄准窗口，供 physics、aim、planner 与 Scene3D 共享。
 

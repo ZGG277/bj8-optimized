@@ -1,0 +1,22 @@
+/*
+[INPUT]: ControlOnboarding 的固定定位和 data-tip-side；复用主题色令牌
+[OUTPUT]: 独立于游戏布局的轻量悬停提示，不阻断鼠标/触控与键盘焦点
+[POS]: HUD 非模态说明层；最后加载，只定义自身外观，不覆盖已有用户布局样式
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+.control-onboarding-tip {
+  position: fixed;
+  z-index: 200;
+  max-width: min(228px, calc(100vw - 16px));
+  padding: 8px 11px;
+  border: 1px solid rgba(173, 207, 194, 0.28);
+  border-radius: 9px;
+  background: rgba(16, 28, 27, 0.96);
+  color: #eef4ec;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: none;
+}

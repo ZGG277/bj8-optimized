@@ -17,7 +17,7 @@ import {
   type BilliardsWorld,
 } from '../physics';
 import { generateCandidates, POCKETS } from './candidates';
-import { erfProb, monteCarloShot } from './evaluate';
+import { POWER_JITTER, erfProb, gaussian, monteCarloShot } from './evaluate';
 import { nextLegalNumbers, planPosition, type PositionPlan } from './search';
 
 /** 种子化伪随机数（确定性测试用） */
@@ -87,20 +87,47 @@ const STRAIGHT = [
 ];
 
 describe('generateCandidates 几何候选', () => {
-  it('直球近袋：应产出 1 号→右中袋(3) 候选，低杆变体 MC 进球率 ≥ 0.9', () => {
+  it('直球近袋：应产出 1 号→右中袋(3) 候选，轻低杆 MC 进球率 ≥ 0.9', () => {
     const world = placeWorld(STRAIGHT);
     const candidates = generateCandidates(world, [1]);
     const cand = candidates.find((c) => c.target === 1 && c.pocket === 3);
     expect(cand).toBeDefined();
     expect(cand!.cutAngle).toBeLessThan(0.01);
 
-    // 物理事实：中心杆/高杆直球是跟进球，母球会跟随目标球洗袋（foulRate>0.9），
-    // 直球近袋的正确打法是低杆回拉——与 search.ts 的 SPIN_VARIANTS 低杆变体一致
-    const draw = { ...cand!, spin: { x: -0.35, y: 0 }, power: cand!.power + 6 };
-    const outcome = monteCarloShot(world, draw, 48, 0.006, mulberry32(42));
+    const safeDraw = { ...cand!, spin: { x: -0.2, y: 0 } };
+    const outcome = monteCarloShot(world, safeDraw, 48, 0.006, mulberry32(42));
     expect(outcome.prob).toBeGreaterThanOrEqual(0.9);
     expect(outcome.foulRate).toBe(0);
     expect(outcome.cueEnds.length).toBeGreaterThan(0);
+
+    const replay = cloneWorld(world);
+    strikeCueBall(replay, safeDraw.angle, safeDraw.power, safeDraw.spin);
+    simulateUntilStop(replay);
+    expect(replay.firstContact).toBe(1);
+    expect(pocketedThisShot(replay)).toContain(1);
+    expect(isCueBallPocketed(replay)).toBe(false);
+  });
+
+  it('直球近袋：强低杆虽保持合法首碰和目标落袋，但存在回拉整台洗入对侧中袋的风险', () => {
+    const world = placeWorld(STRAIGHT);
+    const cand = generateCandidates(world, [1])
+      .find((candidate) => candidate.target === 1 && candidate.pocket === 3)!;
+    const strongDraw = { ...cand, spin: { x: -0.35, y: 0 }, power: cand.power + 6 };
+    const rng = mulberry32(42);
+    let scratches = 0;
+
+    for (let sample = 0; sample < 48; sample += 1) {
+      const replay = cloneWorld(world);
+      const angle = strongDraw.angle + gaussian(rng) * 0.006;
+      const power = strongDraw.power * (1 + (rng() * 2 - 1) * POWER_JITTER);
+      strikeCueBall(replay, angle, power, strongDraw.spin);
+      simulateUntilStop(replay);
+      expect(replay.firstContact).toBe(1);
+      expect(pocketedThisShot(replay)).toContain(1);
+      if (isCueBallPocketed(replay)) scratches += 1;
+    }
+
+    expect(scratches).toBeGreaterThan(0);
   });
 
   it('概率单调性：直球近台的进球率必须高于大切角远台', () => {

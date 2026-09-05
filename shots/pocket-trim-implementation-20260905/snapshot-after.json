@@ -1,0 +1,14 @@
+{
+  "head": "0e1e7193971d0aeea78075c4d980058ea25e63e2",
+  "sourceSha256": "c0abce477a32c3638af818fc0c13b960b3a68737639ef64be0522c5612b4ea24",
+  "sourceFileCount": 151,
+  "protectedFiles": {
+    "src/components/IntroScreen.tsx": "352dc8bd4ad1f5d7fd0ca16bc0829101be27c0ec7973b1ee4957fd98cbb1cb1c",
+    "src/styles/layout.css": "69accbe0b39fc3eb980ba73d43e8181e47f232e98df7d98287f6714ffdac3953"
+  },
+  "artifact": {
+    "path": "dist/index.html",
+    "sha256": "0a9ea5aedc4aa8bb3ad27f2d180a5993751bd33ee9e423db15021627c92bdee1",
+    "bytes": 1286748
+  }
+}
