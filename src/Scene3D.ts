@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位、textures 程序化贴图与 Three.js
-[OUTPUT]: 对外提供真实球桌、静止按需渲染、GPU 自适应温控、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
+[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图与 Three.js
+[OUTPUT]: 对外提供真实球桌、静止按需渲染、GPU 自适应温控、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -164,8 +164,9 @@ export class Scene3D {
   private viewLevel = 0;
   /** 实际 HUD/视口测得的可用边缘；全台与瞄准共用，不能冻结在单次确认时。 */
   private cameraSafety: CameraSafetyInsets = DEFAULT_CAMERA_SAFETY;
-  /** 幽灵球确认后的稳定目标/袋口构图；不包含杆向，杆向仍每帧由 cameraAzimuth 消费。 */
+  /** 幽灵球确认后的稳定目标/袋口构图；击球跟随时只更新目标球坐标。 */
   private cameraFraming: CameraFraming | null = null;
+  private shotCameraTarget: number | null = null;
   private phase = 'intro';
   private lastCueX = 0;
   private lastCueZ = 0;
@@ -1513,7 +1514,25 @@ export class Scene3D {
    * 活相机与拾取虚拟相机都通过 cameraPoseFor 消费这一份状态，禁止两条投影路径漂移。
    */
   setCameraFraming(framing: CameraFraming | null) {
-    this.cameraFraming = framing;
+    this.cameraFraming = framing === null ? null : {
+      ...framing,
+      cue: { ...framing.cue },
+      object: { ...framing.object },
+      pocket: {
+        ...framing.pocket,
+        center: { ...framing.pocket.center },
+        left: { ...framing.pocket.left },
+        right: { ...framing.pocket.right },
+        outward: { ...framing.pocket.outward },
+      },
+    };
+    this.updateCameraTarget();
+    this.requestRender();
+  }
+
+  /** 非 null 时在 rolling 阶段继续消费已锁定袋口，并跟新目标球坐标。 */
+  setShotCameraTarget(targetNumber: number | null) {
+    this.shotCameraTarget = targetNumber;
     this.updateCameraTarget();
     this.requestRender();
   }
@@ -1534,7 +1553,7 @@ export class Scene3D {
   ) {
     if (
       this.cameraFraming !== null &&
-      this.phase === 'aiming' &&
+      (this.phase === 'aiming' || (this.phase === 'rolling' && this.shotCameraTarget !== null)) &&
       !isOverheadCameraView(viewLevel)
     ) {
       return aimCameraPose(this.cameraFraming, cameraAzimuth, aspect).pose;
@@ -1576,6 +1595,21 @@ export class Scene3D {
     this.syncDt = this.lastSyncTime ? Math.min(0.05, (now - this.lastSyncTime) / 1000) : 1 / 60;
     this.lastSyncTime = now;
     const dt = this.syncDt;
+
+    if (this.cameraFraming && this.shotCameraTarget !== null) {
+      const target = world.balls.find(ball => ball.number === this.shotCameraTarget);
+      const pocketEvent = [...world.events].reverse().find(
+        event => event.type === 'pocket' && event.ball === this.shotCameraTarget,
+      );
+      if (target?.active) {
+        this.cameraFraming.object.x = target.x;
+        this.cameraFraming.object.z = target.z;
+      } else if (pocketEvent?.type === 'pocket') {
+        this.cameraFraming.object.x = pocketEvent.entryX;
+        this.cameraFraming.object.z = pocketEvent.entryZ;
+      }
+      this.updateCameraTarget();
+    }
 
     for (const ball of world.balls) {
       const mesh = this.ballMeshes[ball.number];

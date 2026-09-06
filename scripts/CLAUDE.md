@@ -6,6 +6,8 @@
 
 ## 成员清单
 
+`verify-shot-camera-help.mjs`: 390×844 触屏专项；实际按住瞄准控件验证说明就地出现、松手自动收起且原手势不被阻断，检查 Pointer/contextmenu 默认行为取消，并构造共线直球验证击球后目标近景先于全台。
+
 `optimization-snapshot.mjs`: 只读生成当前 HEAD、源码/脚本/构建配置指纹、用户保护文件哈希及现有构建哈希，供 Spark 与主 Session 冻结/复核验收输入。
 
 `optimization-browser.html`: 仅 Vite 开发服务器可用的可复现验收夹具；全尺寸 iframe 加载真实游戏入口，显式准备薄切/对手/六袋近景和落袋事件；F2 隐藏面板，瞄准/出杆/取消仍操作真实游戏控件，状态以 DOM 输出便于只读浏览器观察。不属于产品构建入口。

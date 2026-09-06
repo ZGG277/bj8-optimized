@@ -1,6 +1,6 @@
 /*
-[INPUT]: control-onboarding 的稳定提示表/逐控件状态，DOM data-control-tip 锚点与真实鼠标/键盘焦点
-[OUTPUT]: 全局唯一、穿透交互的左侧控件说明；一般首用提示成功学习即隐藏，三项速查始终可见，触屏不触发悬停
+[INPUT]: control-onboarding 的稳定提示表/逐控件状态，DOM data-control-tip 锚点与鼠标、键盘、触屏 Pointer 事件
+[OUTPUT]: 全局唯一、穿透交互的就地控件说明；触摸立即显示并在松手后短暂停留，鼠标/键盘继续遵循学习状态
 [POS]: HUD 非模态提示层；只观察锚点，不拦截点击、不推断动作成功，也不持有游戏状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -15,7 +15,8 @@ import {
   type ControlTipId,
 } from '../control-onboarding';
 
-type TipTarget = { element: HTMLElement; id: ControlTipId };
+type TipSource = 'hover' | 'keyboard' | 'touch';
+type TipTarget = { element: HTMLElement; id: ControlTipId; source: TipSource };
 type Rect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
 
 /** 动态控件（手动视角、横竖出杆）可覆写稳定默认文案。 */
@@ -38,14 +39,14 @@ export function controlTipPosition(anchor: Rect, tip: Pick<Rect, 'width' | 'heig
   };
 }
 
-function findTarget(target: EventTarget | null): TipTarget | null {
+function findTarget(target: EventTarget | null, source: TipSource): TipTarget | null {
   if (!(target instanceof Element)) return null;
   // 介绍页有用户独立改动，只消费既有稳定选择器，不改写它的源文件或 DOM。
   const element = target.closest<HTMLElement>('[data-control-tip], .mode-choice .mode-start');
   const id = element?.dataset.controlTip ?? (element?.closest('.mode-choice.practice') ? 'start-practice'
     : element?.closest('.mode-choice.challenge') ? 'start-challenge' : undefined);
   if (!element || !isControlTipId(id)) return null;
-  return { element, id };
+  return { element, id, source };
 }
 
 export function ControlOnboarding() {
@@ -54,30 +55,55 @@ export function ControlOnboarding() {
   const [tipCopy, setTipCopy] = useState<string | null>(null);
   const hintRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<ReturnType<typeof controlTipPosition> | null>(null);
-  // 视角端点、手动视角与出杆在学会后仍可作为常驻速查；其他控件保持首用即收起。
-  const active = target && shouldShowControlTip(target.id, controlLearning.has(target.id)) ? target : null;
+  // 触屏没有悬停态，因此每次直接触摸都显示所触控件；鼠标和键盘仍保持首用引导规则。
+  const active = target && (target.source === 'touch' ||
+    shouldShowControlTip(target.id, controlLearning.has(target.id))) ? target : null;
 
   useEffect(() => {
     let keyboard = false;
+    let touchHideTimer: number | null = null;
+    const clearTouchHideTimer = () => {
+      if (touchHideTimer === null) return;
+      window.clearTimeout(touchHideTimer);
+      touchHideTimer = null;
+    };
     const show = (candidate: TipTarget | null) => setTarget(current =>
-      current?.element === candidate?.element ? current : candidate);
+      current?.element === candidate?.element && current?.source === candidate?.source ? current : candidate);
     const pointerOver = (event: PointerEvent) => {
       if (event.pointerType !== 'mouse' || event.buttons !== 0) return;
-      show(findTarget(event.target));
+      show(findTarget(event.target, 'hover'));
     };
     const pointerOut = (event: PointerEvent) => {
-      if (event.pointerType === 'mouse') show(findTarget(event.relatedTarget));
+      if (event.pointerType === 'mouse') show(findTarget(event.relatedTarget, 'hover'));
     };
-    const pointerDown = () => { keyboard = false; show(null); };
+    const pointerDown = (event: PointerEvent) => {
+      keyboard = false;
+      clearTouchHideTimer();
+      show(event.pointerType === 'touch' ? findTarget(event.target, 'touch') : null);
+    };
     const pointerUp = (event: PointerEvent) => {
-      if (event.pointerType === 'mouse') show(findTarget(document.elementFromPoint(event.clientX, event.clientY)));
+      if (event.pointerType === 'mouse') {
+        show(findTarget(document.elementFromPoint(event.clientX, event.clientY), 'hover'));
+        return;
+      }
+      if (event.pointerType === 'touch') {
+        touchHideTimer = window.setTimeout(() => {
+          touchHideTimer = null;
+          show(null);
+        }, 1000);
+      }
+    };
+    const pointerCancel = (event: PointerEvent) => {
+      if (event.pointerType !== 'touch') return;
+      clearTouchHideTimer();
+      show(null);
     };
     const keyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { show(null); return; }
       keyboard = true;
-      show(findTarget(document.activeElement));
+      show(findTarget(document.activeElement, 'keyboard'));
     };
-    const focusIn = (event: FocusEvent) => { if (keyboard) show(findTarget(event.target)); };
+    const focusIn = (event: FocusEvent) => { if (keyboard) show(findTarget(event.target, 'keyboard')); };
     const focusOut = () => show(null);
     const storage = (event: StorageEvent) => {
       if (event.key === CONTROL_LEARNING_STORAGE_KEY) controlLearning.refresh();
@@ -86,6 +112,7 @@ export function ControlOnboarding() {
     document.addEventListener('pointerout', pointerOut, true);
     document.addEventListener('pointerdown', pointerDown, true);
     document.addEventListener('pointerup', pointerUp, true);
+    document.addEventListener('pointercancel', pointerCancel, true);
     document.addEventListener('keydown', keyDown, true);
     document.addEventListener('focusin', focusIn, true);
     document.addEventListener('focusout', focusOut, true);
@@ -95,10 +122,12 @@ export function ControlOnboarding() {
       document.removeEventListener('pointerout', pointerOut, true);
       document.removeEventListener('pointerdown', pointerDown, true);
       document.removeEventListener('pointerup', pointerUp, true);
+      document.removeEventListener('pointercancel', pointerCancel, true);
       document.removeEventListener('keydown', keyDown, true);
       document.removeEventListener('focusin', focusIn, true);
       document.removeEventListener('focusout', focusOut, true);
       window.removeEventListener('storage', storage);
+      clearTouchHideTimer();
     };
   }, []);
 

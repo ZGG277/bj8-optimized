@@ -1,7 +1,7 @@
 /*
 [INPUT]: 提示定位纯函数及 HUD 控件服务端静态结构
 [OUTPUT]: 左侧优先/视口避让定位，以及独立控件 ID 与禁用锚点回归
-[POS]: 控件新手提示结构单测；真实悬停、键盘与触屏由浏览器验收覆盖
+[POS]: 控件新手提示结构单测；真实悬停、键盘及触摸即显/松手收起由浏览器验收覆盖
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { renderToStaticMarkup } from 'react-dom/server';

@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、复盘/训练总结、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球回全台与控件学习成功事实
+[OUTPUT]: 对外提供完整对局编排：陪练/挑战、复盘/训练总结、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球后目标近景→全台与控件学习成功事实
 [POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -65,6 +65,11 @@ import {
   fullTableAzimuth,
 } from './camera-view';
 import { markControlLearned } from './control-onboarding';
+import {
+  createShotCameraFollow,
+  observeShotCameraFollow,
+  type ShotCameraFollowState,
+} from './shot-camera-follow';
 import type { GameMode, PositionOutcome } from './opponent/model';
 import {
   guideStepAfterEvent,
@@ -82,6 +87,8 @@ type SkillShotCapture = {
 };
 
 const TOUCH_AIM_CAMERA_RELEASE_MS = 650;
+const POCKETED_SHOT_CAMERA_HOLD_MS = 420;
+const STOPPED_SHOT_CAMERA_HOLD_MS = 260;
 
 function browserStorage(): Storage | null {
   if (typeof window === 'undefined') return null;
@@ -134,7 +141,10 @@ export default function Game() {
   const [manualCameraPinned, setManualCameraPinned] = useState(false);
   const [cameraSafety, setCameraSafety] = useState<CameraSafetyInsets>(DEFAULT_CAMERA_SAFETY);
   const [aimCameraFraming, setAimCameraFraming] = useState<CameraFraming | null>(null);
+  const [shotCameraTarget, setShotCameraTarget] = useState<number | null>(null);
   const touchAimCameraTimerRef = useRef<number | null>(null);
+  const shotCameraFollowRef = useRef<ShotCameraFollowState | null>(null);
+  const shotCameraReturnTimerRef = useRef<number | null>(null);
   const manualAimTransitionPointerRef = useRef<number | null>(null);
   const cameraAzimuthRef = useRef(cameraAzimuth);
   cameraAzimuthRef.current = cameraAzimuth;
@@ -156,7 +166,16 @@ export default function Game() {
     ));
     setCameraDetached(true);
   }, []);
+  const clearShotCameraFollow = useCallback(() => {
+    if (shotCameraReturnTimerRef.current !== null) {
+      window.clearTimeout(shotCameraReturnTimerRef.current);
+      shotCameraReturnTimerRef.current = null;
+    }
+    shotCameraFollowRef.current = null;
+    setShotCameraTarget(null);
+  }, []);
   const showFullTable = useCallback(() => {
+    clearShotCameraFollow();
     clearTouchAimCameraTimer();
     clearAimCameraFraming();
     manualAimTransitionPointerRef.current = null;
@@ -165,7 +184,14 @@ export default function Game() {
     setManualCameraPinned(false);
     orientFullTable();
     setViewLevel(OVERHEAD_VIEW);
-  }, [clearTouchAimCameraTimer, clearAimCameraFraming, orientFullTable, setViewLevel]);
+  }, [clearShotCameraFollow, clearTouchAimCameraTimer, clearAimCameraFraming, orientFullTable, setViewLevel]);
+  const finishShotCameraFollow = useCallback((delayMs: number) => {
+    if (!shotCameraFollowRef.current || shotCameraReturnTimerRef.current !== null) return;
+    shotCameraReturnTimerRef.current = window.setTimeout(() => {
+      shotCameraReturnTimerRef.current = null;
+      showFullTable();
+    }, delayMs);
+  }, [showFullTable]);
   const renderBudget = useMemo(() => {
     if (typeof window === 'undefined') {
       return {
@@ -207,7 +233,7 @@ export default function Game() {
   });
   const planOpen = positionPlan.status === 'showing';
   // 规划视图打开期间禁用瞄准输入（最小侵入：只压低 canAim，不动交互层内部）
-  const canAim = canAimBase && !planOpen;
+  const canAim = canAimBase && !planOpen && shotCameraTarget === null;
   const planConsultedRef = useRef(false);
   /** 规划视图关闭会停用 Worker/清空 plans；另存用户真正看过的首杆直到本次出杆。 */
   const consultedPlanStepRef = useRef<PlannedStep | null>(null);
@@ -361,9 +387,9 @@ export default function Game() {
   // 瞄准值同步到 3D 场景用的 ref
   const aimRef = useRef(0);
   const resetSpinRef = useRef<() => void>(() => {});
-  // 全台视角统一按球桌视口重排；玩家显式手动环绕时保留手选方位。
+  // 全台视角统一按球桌视口重排；击球目标近景完成前不被观战状态抢走。
   useEffect(() => {
-    if (spectatorActive) showFullTable();
+    if (spectatorActive && shotCameraTarget === null) showFullTable();
     else if (!isOverheadCameraView(viewLevel) || manualCameraActive || manualCameraPinned) return;
     orientFullTable();
     const observer = new ResizeObserver(orientFullTable);
@@ -373,13 +399,12 @@ export default function Game() {
       observer.disconnect();
       window.removeEventListener('resize', orientFullTable);
     };
-  }, [spectatorActive, viewLevel, manualCameraActive, manualCameraPinned, orientFullTable, showFullTable]);
+  }, [spectatorActive, shotCameraTarget, viewLevel, manualCameraActive, manualCameraPinned, orientFullTable, showFullTable]);
 
-  // 真实触球后的 rolling 是全台优先级最高的自动状态：即使未来的触发路径绕过
-  // handleCommit，也不能遗留瞄准构图、触控锁镜或低机位。显式手动环绕也不跨击球保留。
+  // 没有可靠目标/袋口的出杆（如开球）仍立即回全台；有跟随状态时等目标结果。
   useEffect(() => {
-    if (match.phase === 'rolling') showFullTable();
-  }, [match.phase, showFullTable]);
+    if (match.phase === 'rolling' && shotCameraTarget === null) showFullTable();
+  }, [match.phase, shotCameraTarget, showFullTable]);
 
   const handleGhostPlaced = useCallback(() => {
     const world = worldRef.current;
@@ -506,7 +531,17 @@ export default function Game() {
       }
       advanceFirstMatchGuide('shot-committed');
       markControlLearned('shoot');
-      showFullTable();
+      const followedTarget = declaredIntent && aimCameraFraming &&
+        declaredIntent.target === aimCameraFraming.targetNumber &&
+        declaredIntent.pocket === aimCameraFraming.pocketIndex
+          ? declaredIntent.target
+          : null;
+      if (followedTarget === null) {
+        showFullTable();
+      } else {
+        shotCameraFollowRef.current = createShotCameraFollow(followedTarget);
+        setShotCameraTarget(followedTarget);
+      }
       // 每杆只在物理确认击球成功后复位中杆，避免动画取消时误清用户设置。
       resetSpinRef.current();
       playStrike(intent.power);
@@ -521,7 +556,7 @@ export default function Game() {
     } else {
       doShot();
     }
-  }, [advanceFirstMatchGuide, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch, showFullTable]);
+  }, [advanceFirstMatchGuide, aimCameraFraming, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch, showFullTable]);
 
   // ── 出杆输入协调器 ──
   const {
@@ -582,7 +617,13 @@ export default function Game() {
   }, [clearAimCameraFraming, clearTouchAimCameraTimer, manualCameraActive]);
 
   useEffect(
-    () => () => clearTouchAimCameraTimer(),
+    () => () => {
+      clearTouchAimCameraTimer();
+      if (shotCameraReturnTimerRef.current !== null) {
+        window.clearTimeout(shotCameraReturnTimerRef.current);
+        shotCameraReturnTimerRef.current = null;
+      }
+    },
     [clearTouchAimCameraTimer],
   );
 
@@ -863,7 +904,16 @@ export default function Game() {
     onFrame: useCallback(() => {
       playPhysicsEvents(worldRef.current.events);
       scene3DRef.current?.sync(worldRef.current);
-    }, [worldRef, playPhysicsEvents]),
+      const follow = shotCameraFollowRef.current;
+      if (!follow) return;
+      const observation = observeShotCameraFollow(follow, worldRef.current);
+      shotCameraFollowRef.current = observation.state;
+      if (observation.outcome === 'pocketed') {
+        finishShotCameraFollow(POCKETED_SHOT_CAMERA_HOLD_MS);
+      } else if (observation.outcome === 'stopped') {
+        finishShotCameraFollow(STOPPED_SHOT_CAMERA_HOLD_MS);
+      }
+    }, [finishShotCameraFollow, worldRef, playPhysicsEvents]),
     onSettled: settleShot,
     presentationIntervalMs: physicsPresentationIntervalMs,
   });
@@ -935,6 +985,7 @@ export default function Game() {
     scene.setViewLevel(viewLevel);
     scene.setCameraSafety(cameraSafety);
     scene.setCameraFraming(aimCameraFraming);
+    scene.setShotCameraTarget(shotCameraTarget);
     scene.setAim(aim);
     scene.setCameraAzimuth(cameraViewAzimuth);
     scene.setAimAssistVisible(aimAssist.enabled);
@@ -951,6 +1002,7 @@ export default function Game() {
     viewLevel,
     cameraSafety,
     aimCameraFraming,
+    shotCameraTarget,
     aim,
     cameraViewAzimuth,
     aimAssist.enabled,

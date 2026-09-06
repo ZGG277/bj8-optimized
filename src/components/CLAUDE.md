@@ -8,7 +8,7 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 ## 成员清单
 
-`ControlOnboarding.tsx`: 全局唯一的非模态控件说明；真实鼠标悬停/键盘焦点按锚点左侧定位，左贴屏时上方避让，穿透全部交互；一般控件订阅逐控件学习后立即隐藏，俯视/手动视角/出杆保留常驻速查，动态 `data-control-tip-copy` 同帧更新，touch 不触发，aria-describedby 关联；只在显示时观察布局变化，介绍页通过既有模式按钮选择器读取而不改其 DOM。
+`ControlOnboarding.tsx`: 全局唯一的非模态控件说明；真实鼠标悬停/键盘焦点/触屏按下均按当前锚点左侧定位，左贴屏时上方避让，穿透全部交互；触摸立即出现且松手后短暂停留，不受已学会状态限制，鼠标/键盘的一般提示仍在学会后隐藏，俯视/手动视角/出杆保留常驻速查；动态 `data-control-tip-copy` 同帧更新并以 aria-describedby 关联，只在显示时观察布局变化。
 
 `ControlOnboarding.test.tsx`: 提示左侧优先/左贴屏避让纯几何，以及视角、瞄准、杆法、出杆稳定 ID 的服务端结构回归。
 
@@ -24,7 +24,7 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 `FirstMatchGuide.test.tsx`: 服务端静态结构回归，锁定短文案、具名跳过入口，并拒绝“下一步/完成”按钮回潮。
 
-`ControlDeck.tsx`: 五控件统一编排层；组合 ViewToolbar、灯泡四开关、SpinControl、ShootControl 与默认 AimDial / 可选 AimControls，按 desktop/portrait/landscape 恢复布局。首段内容移动也通过既有事件重派发交回控件，不再旁路调用拨轮，确保真实变化回执属于完整手势；复盘与走位独立，布局长按/吸附/换位门禁不变。
+`ControlDeck.tsx`: 五控件统一编排层；组合 ViewToolbar、灯泡四开关、SpinControl、ShootControl 与默认 AimDial / 可选 AimControls，按 desktop/portrait/landscape 恢复布局。首段内容移动也通过既有事件重派发交回控件，不再旁路调用拨轮，确保真实变化回执属于完整手势；触屏 Pointer/contextmenu 取消浏览器默认长按行为；复盘与走位独立，布局长按/吸附/换位门禁不变。
 
 `ControlDeck.test.ts`: 控件内容意图与布局意图互斥回归，覆盖慢速瞄准/蓄力跨过长按时限仍不移动控件，以及静止长按仍能进入布局。
 

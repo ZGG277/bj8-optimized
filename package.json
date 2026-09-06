@@ -1,6 +1,6 @@
 {
   "name": "bj8-optimized",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "private": true,
   "packageManager": "npm@11.9.0",
   "scripts": {
@@ -13,6 +13,7 @@
     "test:interaction": "node scripts/verify-interaction.mjs",
     "test:mobile": "node scripts/verify-mobile-portrait-v12.mjs",
     "test:spectator-camera": "node scripts/verify-spectator-camera.mjs",
+    "test:shot-camera-help": "node scripts/verify-shot-camera-help.mjs",
     "test:render-thermal": "node scripts/verify-render-thermal.mjs",
     "test:control-intent": "node scripts/verify-control-intent.mjs",
     "test:pockets-visual": "node scripts/verify-pockets.mjs",

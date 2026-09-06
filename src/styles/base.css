@@ -88,6 +88,7 @@ button, [role="button"], .control, .hud, .icon-btn {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
 button,

@@ -152,6 +152,8 @@ function DockableControlSlot({
         const x = event.clientX;
         const y = event.clientY;
         const touch = event.pointerType === 'touch';
+        // 取消浏览器对长按的默认接管；内容操作仍全部由 Pointer 事件提交。
+        if (touch && event.cancelable) event.preventDefault();
         const moveThreshold = touch
           ? CONTROL_LAYOUT_TOUCH_MOVE_THRESHOLD
           : CONTROL_LAYOUT_MOVE_THRESHOLD;
@@ -930,6 +932,7 @@ export function ControlDeck({
     <footer
       className={`control-deck ${draggingId ? 'is-layout-dragging' : ''}`}
       data-layout-profile={profile}
+      onContextMenuCapture={(event) => event.preventDefault()}
     >
       <div className={`dock-snap-preview dock-snap-right ${snapPreview === 'right' ? 'active' : ''}`} />
       <div className={`dock-snap-preview dock-snap-bottom ${snapPreview === 'bottom' ? 'active' : ''}`} />
