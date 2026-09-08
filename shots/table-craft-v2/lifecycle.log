@@ -1,0 +1,2 @@
+PASS 细节加载失败仍有完整六袋和台呢 {}
+PASS 卸载先于细节加载时正确释放 {"loaded":false,"attached":false,"contactsReleased":true}

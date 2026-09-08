@@ -1,0 +1,10 @@
+✓ 开发页暴露可复现视觉场景
+✓ 同源木框六袋与六个最终闭合护口壳体，保留原库边和袋腔结构 — {"outerWoodFrames":1,"pocketCutouts":6,"roundedOuterCorners":4,"roundedCornerPockets":4,"cushions":150,"undercutCushions":150,"minCushionProfilePoints":9,"minNoseOverhangMm":19,"minNoseHeightMm":35.433,"pocketWraps":0,"mouths":6,"inwardArcMouths":6,"minCaptureInsetMm":7,"maxCaptureInsetMm":8,"topTrims":6,"topTrimJawAnchors":12,"seamlessTrimEnds":12,"sharedFrameContracts":1,"integratedAprons":6,"closedTrimShells":6,"tanLeatherCaps":6,"minTrimWidthMm":19,"minTrimHeightMm":7,"aprons":0,"trimColor":8806975,"lips":6,"stitchedWelts":6,"maxWeltRadiusMm":1.8,"cornerLipJawAnchors":12,"nets":6,"whiteDiamondNets":6,"netRows":36,"netStrands":108,"netDiamondSegments":1080,"netColor":15656659,"wells":6,"bottoms":6}
+✓ 俯视相机可定位
+✓ 角袋近景相机可定位
+✓ 中袋近景相机可定位
+✓ 竖屏俯视相机可定位
+✓ 390×844 全台无横向溢出
+✓ 袋口视觉回归无页面脚本错误
+
+8/8 通过

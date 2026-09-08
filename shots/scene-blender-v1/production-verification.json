@@ -1,0 +1,60 @@
+{
+  "url": "http://127.0.0.1:5199/",
+  "production": true,
+  "results": [
+    {
+      "name": "desktop 服务字节与生产构建一致",
+      "pass": true,
+      "detail": {
+        "sha256": "78d3b9bf17c40e37a3e8c94d33075ab77b995a9cbe90031bfefeff6227012d39"
+      }
+    },
+    {
+      "name": "desktop 介绍页无 WebGL/资产加载",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 真实视角推杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 生产入口无需外部 GLB",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 无页面错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile 服务字节与生产构建一致",
+      "pass": true,
+      "detail": {
+        "sha256": "78d3b9bf17c40e37a3e8c94d33075ab77b995a9cbe90031bfefeff6227012d39"
+      }
+    },
+    {
+      "name": "mobile 介绍页无 WebGL/资产加载",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 真实视角推杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 生产入口无需外部 GLB",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 无页面错误",
+      "pass": true,
+      "detail": []
+    }
+  ]
+}

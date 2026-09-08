@@ -1,0 +1,10 @@
+PASS desktop 入口字节为最终构建 {"sha256":"56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea"}
+PASS desktop 介绍页零 WebGL 和模型加载 {}
+PASS desktop 真实低机位控件正常 {}
+PASS desktop 最终单 HTML 无外部模型请求 {}
+PASS desktop 无脚本错误或横向溢出 []
+PASS mobile 入口字节为最终构建 {"sha256":"56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea"}
+PASS mobile 介绍页零 WebGL 和模型加载 {}
+PASS mobile 真实低机位控件正常 {}
+PASS mobile 最终单 HTML 无外部模型请求 {}
+PASS mobile 无脚本错误或横向溢出 []

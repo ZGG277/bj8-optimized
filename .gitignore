@@ -5,3 +5,12 @@ tsconfig.tsbuildinfo
 # 本地代理原始交互日志不是产品或公开验收材料；保留在磁盘，不推送。
 shots/optimization-spark.jsonl
 shots/optimization-spark.stderr.log
+
+# 台内 V2 的临时材质诊断和制作中间预览；最终截图另行保留。
+shots/table-craft-v2/no-normal-map.png
+shots/table-craft-v2/no-shadows.png
+shots/table-craft-v2/original-normals.png
+shots/table-craft-v2/preview-overhead.png
+shots/table-craft-v2/preview-side-macro.png
+shots/table-craft-v2/preview-side.png
+shots/table-craft-v2/preview-state.json

@@ -11,6 +11,8 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   build: {
+    // Blender 视觉包内联到既有单 HTML，避免妙搭包装丢失独立 GLB。
+    assetsInlineLimit: file => /\/(billiards-room-v1|table-craft-v2)\.glb$/.test(file) ? true : undefined,
     cssCodeSplit: false,
     rollupOptions: {
       output: {

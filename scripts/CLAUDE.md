@@ -6,6 +6,22 @@
 
 ## 成员清单
 
+`build-blender-table-craft.py`: 接收共享皮壳站点，为六袋制作 520 段实体针脚和细包边，独立导出并保存 V2 blend。
+
+`update-blender-table-preview.py`: 将游戏实际台呢/库边/球体网格、连续法线和 Canvas 贴图同步进 V2 制作参照；纹理打包进 blend，不改变 GLB。
+
+`table-craft-asset.test.ts`: Vitest 离线验证真实 GLB 的合同哈希、坐标、拓扑、两个网格预算、全部细节顶点承托，以及台面/皮壳/库边 UV 与连续法线。
+
+`verify-table-craft.mjs`: 桌面/手机实际出杆旋转和接触阴影、静止停帧、袋口微距及细节失败/卸载；PRODUCTION=1 检查最终入口字节、双视口和零外部 GLB。
+
+`build-blender-room.py`: Blender MCP 执行的原创视觉资产作者脚本；独立场景、米制锚点、同材质合批，只导出桌体/房间/灯具 GLB。
+
+`preview-blender-room.py`: 接收既有运行时参考网格，补上不导出的台面/袋口和预览相机，保存可编辑 blend。
+
+`verify-scene-asset.mjs`: 读取真实 GLB 字节，检查锚点世界坐标、法线/三角形、台面安全范围和 2 MiB/3万三角/24网格预算。
+
+`verify-blender-scene.mjs`: 桌面与手机主入口、真实视角/出杆、加载失败回退及卸载竞态；PRODUCTION=1 时检查单 HTML 入口不请求外部 GLB，所有页面串行并自动关闭浏览器。
+
 `verify-shot-camera-help.mjs`: 390×844 触屏专项；实际按住瞄准控件验证说明就地出现、松手自动收起且原手势不被阻断，检查 Pointer/contextmenu 默认行为取消，并构造共线直球验证击球后目标近景先于全台。
 
 `optimization-snapshot.mjs`: 只读生成当前 HEAD、源码/脚本/构建配置指纹、用户保护文件哈希及现有构建哈希，供 Spark 与主 Session 冻结/复核验收输入。

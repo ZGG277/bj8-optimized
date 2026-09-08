@@ -1,0 +1,107 @@
+{
+  "url": "http://127.0.0.1:5199/",
+  "production": false,
+  "results": [
+    {
+      "name": "desktop 介绍页无 WebGL/资产加载",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 实际 GLB 已装配且俯视无灯具遮挡",
+      "pass": true,
+      "detail": {
+        "meshes": 17,
+        "frame": 36,
+        "calls": 272,
+        "triangles": 107723,
+        "pixelRatio": 1,
+        "fallbackVisible": false,
+        "lampVisible": false
+      }
+    },
+    {
+      "name": "desktop 空闲停止渲染",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 真实视角推杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 真实出杆触发物理",
+      "pass": true,
+      "detail": {
+        "moving": true,
+        "shot": 1
+      }
+    },
+    {
+      "name": "desktop 无页面错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile 介绍页无 WebGL/资产加载",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 实际 GLB 已装配且俯视无灯具遮挡",
+      "pass": true,
+      "detail": {
+        "meshes": 17,
+        "frame": 38,
+        "calls": 272,
+        "triangles": 107723,
+        "pixelRatio": 2,
+        "fallbackVisible": false,
+        "lampVisible": false
+      }
+    },
+    {
+      "name": "mobile 空闲停止渲染",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 真实视角推杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 真实出杆触发物理",
+      "pass": true,
+      "detail": {
+        "moving": true,
+        "shot": 1
+      }
+    },
+    {
+      "name": "mobile 无页面错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "加载失败保留基础场景",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "加载失败后仍可真实出杆",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "卸载后到达的资产被回收",
+      "pass": true,
+      "detail": {
+        "ready": false,
+        "detached": true,
+        "attached": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "url": "http://127.0.0.1:5199/",
+  "production": false,
+  "results": [
+    {
+      "name": "细节加载失败仍有完整六袋和台呢",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "卸载先于细节加载时正确释放",
+      "pass": true,
+      "detail": {
+        "loaded": false,
+        "attached": false,
+        "contactsReleased": true
+      }
+    }
+  ]
+}

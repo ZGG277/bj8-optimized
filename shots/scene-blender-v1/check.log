@@ -1,0 +1,148 @@
+
+> bj8-optimized@1.5.1 check
+> npm run typecheck && npm run test:unit && npm run build
+
+
+> bj8-optimized@1.5.1 typecheck
+> tsc --noEmit
+
+
+> bj8-optimized@1.5.1 test:unit
+> vitest run
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /Users/zgg/Projects/游戏/bl8-3D台球/bj8-main-integration
+
+ ✓ src/match/match-machine.test.ts (23 tests) 2ms
+ ✓ src/camera-view.test.ts (18 tests) 6ms
+ ✓ src/opponent/model.test.ts (20 tests) 3ms
+ ✓ src/camera-framing.test.ts (16 tests) 79ms
+ ✓ src/physics/table-geometry.test.ts (11 tests) 67ms
+ ✓ src/physics/continuous-collision.test.ts (11 tests) 147ms
+ ✓ src/first-match-guide.test.ts (13 tests) 5ms
+ ✓ src/layout/control-layout.test.ts (12 tests) 6ms
+ ✓ src/components/ControlLearningActions.test.tsx (8 tests) 8ms
+ ✓ src/simulation/fixed-step-runner.test.ts (6 tests) 2ms
+ ✓ src/control-onboarding.test.ts (11 tests) 5ms
+ ✓ src/components/ControlOnboarding.test.tsx (7 tests) 9ms
+stdout | src/physics.test.ts > 落袋检测测试 > 模拟开球并打印落袋
+落袋球: []
+
+stdout | src/physics.test.ts > 物理手感基准（打印指标） > 输出关键手感数据
+力度10: 滚动 0.94m, 用时 1.72s
+力度30: 滚动 0.96m, 用时 2.30s
+力度50: 滚动 -0.29m, 用时 2.68s
+力度70: 滚动 0.49m, 用时 2.82s
+力度100: 滚动 1.77m, 用时 3.09s
+低杆: 白球最终 z=0.790 (碰球点约 z=-0.49)
+
+ ✓ src/physics.test.ts (32 tests) 409ms
+ ✓ src/pocket-drop.test.ts (11 tests) 205ms
+ ✓ src/input/shot-input.test.ts (17 tests) 4ms
+ ✓ src/hooks/useAimInteraction.test.tsx (5 tests) 8ms
+ ✓ src/aim/aim-solution.test.ts (4 tests) 8ms
+ ✓ src/planner/async.test.ts (3 tests) 35ms
+ ✓ src/thermal-governor.test.ts (4 tests) 4ms
+ ✓ src/render-policy.test.ts (5 tests) 2ms
+ ✓ src/input/aim-dial.test.ts (7 tests) 2ms
+ ✓ src/opponent/tactical-async.test.ts (2 tests) 27ms
+ ✓ src/opponent/tactical-shot.test.ts (2 tests) 12ms
+ ✓ src/hooks/usePositionPlan.test.ts (5 tests) 2ms
+ ✓ src/camera-aim-intent.test.ts (5 tests) 9ms
+ ✓ src/shot-camera-follow.test.ts (4 tests) 1ms
+ ✓ src/pocket-render/profile.test.ts (1 test) 2ms
+stdout | src/spin-settle.test.ts > 加塞停球收敛 > 中力满塞残余侧旋（≈77 rad/s）应快速归零
+中力满塞原地残旋 settle 耗时 1.24s
+
+stdout | src/spin-settle.test.ts > 加塞停球收敛 > 满力满塞残余侧旋（≈238 rad/s）最恶劣情形应快速归零
+满力满塞原地残旋 settle 耗时 1.77s
+
+ ✓ src/spin-settle.test.ts (2 tests) 15ms
+ ✓ src/pocket-render/trim-geometry.test.ts (20 tests) 979ms
+   ✓ shared wood/leather boundary > makes one simple opening and a closed wood solid 393ms
+ ✓ src/components/AimControls.test.tsx (3 tests) 5ms
+ ✓ src/components/ShootControl.test.ts (4 tests) 1ms
+ ✓ src/components/AimDial.test.tsx (2 tests) 4ms
+ ✓ src/components/ThemeSwitcher.test.ts (6 tests) 1ms
+ ✓ src/pocket-render/cushion-join.test.ts (1 test) 18ms
+ ✓ src/simulation/presentation-cadence.test.ts (3 tests) 1ms
+ ✓ src/hooks/useAimAssist.test.ts (2 tests) 2ms
+ ✓ src/components/FirstMatchGuide.test.tsx (2 tests) 4ms
+ ✓ src/input/use-shot-input.test.ts (3 tests) 1ms
+stdout | src/planner/bench.test.ts > planner benchmark > single shot sim cost
+[bench] sim 240Hz (simulateUntilStop): 7.00 ms/iter (30 iters)
+[bench] sim 120Hz (stepWorld dt=1/120): 4.07 ms/iter (30 iters)
+[bench] sim 60Hz (stepWorld dt=1/60): 2.09 ms/iter (30 iters)
+[bench] cloneWorld only: 0.00 ms/iter (1000 iters)
+
+ ✓ src/planner/bench.test.ts (1 test) 476ms
+   ✓ planner benchmark > single shot sim cost 475ms
+ ✓ src/components/ControlDeck.test.ts (3 tests) 1ms
+ ✓ src/components/PlanStatusNotice.test.tsx (2 tests) 4ms
+ ✓ src/hooks/shot-settlement-guard.test.ts (2 tests) 2ms
+ ✓ src/break-spread.test.ts (4 tests) 1204ms
+   ✓ 开球球堆散开回归 > 随机摆法 8 种子：位移与分散度稳定在健康区间 734ms
+   ✓ 开球球堆散开回归 > 峰值速度分布：多球获得实质速度且无能量创生 353ms
+ ✓ src/pocket-render/rope-net.test.ts (1 test) 2ms
+stdout | src/break-variance.test.ts > 开球结果差异性验证 > 随机摆法：同力度连续 30 局应有不同落袋结果
+=== 随机摆法同力度开球结果 ===
+不同落袋组合数: 8 / 30
+平均落袋数: 0.30
+最大单局落袋数: 1
+前 8 局落袋: [9] [11] [-] [-] [-] [-] [-] [-]
+
+stdout | src/break-variance.test.ts > 开球结果差异性验证 > 随机摆法：球堆最终分布不应完全相同
+=== 球堆分布方差 ===
+平均 spread: 0.637
+spread 方差: 0.016675
+
+ ✓ src/break-variance.test.ts (3 tests) 3306ms
+   ✓ 开球结果差异性验证 > 确定性摆法：同力度 10 局结果完全相同 807ms
+   ✓ 开球结果差异性验证 > 随机摆法：同力度连续 30 局应有不同落袋结果 1477ms
+   ✓ 开球结果差异性验证 > 随机摆法：球堆最终分布不应完全相同 1022ms
+ ✓ src/planner/planner.test.ts (16 tests) 30624ms
+   ✓ generateCandidates 几何候选 > 概率单调性：直球近台的进球率必须高于大切角远台 669ms
+   ✓ planPosition 整链搜索 > 返回结构完整：steps 1–3、chainProb 连乘、zone ≥ 3 顶点、note 非空 5037ms
+   ✓ planPosition 整链搜索 > 分组语义：legal 只传本组球时，链条任何一步不得出现别组球（含深层滚动） 8284ms
+   ✓ planPosition 整链搜索 > 仿真预算不被击穿：simBudget=500/200 严格封顶且仍有结果 4181ms
+   ✓ planPosition 链条自洽性 > 三球残局：每条 plan 每步重放都真实进球 4552ms
+   ✓ planPosition 链条自洽性 > 两球残局：每条 plan 每步重放都真实进球 714ms
+   ✓ planPosition 链条自洽性 > 链条截断：第 2 杆无可行候选时 steps 缩短且不抛异常 393ms
+   ✓ planPosition 链条自洽性 > 中局分组语义：球多但几何角差之毫厘时经标定仍给出 ≥2 步 6291ms
+ ✓ src/planner/review.test.ts (9 tests) 51039ms
+   ✓ buildShotReview 复盘判定 > 参数照抄计划 → perfect 6520ms
+   ✓ buildShotReview 复盘判定 > 实际沿真实可进球轨迹，但比计划参考力度低 13 → position-miss / 力度偏小 5501ms
+   ✓ buildShotReview 复盘判定 > 力度 +20 → position-miss / 力度偏大 5669ms
+   ✓ buildShotReview 复盘判定 > 瞄准角加偏 → pot-miss / 厚薄与偏袋口文案 5717ms
+   ✓ buildShotReview 复盘判定 > 无计划 → null（静默跳过） 5759ms
+   ✓ buildShotReview 复盘判定 > 未查看计划但能推断目标球/袋口 → 生成自主复盘且不暴露计划轨迹 5476ms
+   ✓ buildShotReview 复盘判定 > 规则判定犯规时只给一个最高优先级纠正 5444ms
+   ✓ buildShotReview 复盘判定 > 开球没有明确目标袋时也会生成赛后建议 5508ms
+   ✓ buildShotReview 复盘判定 > 普通杆没有明确目标袋时不会误报为开球 5444ms
+
+ Test Files  47 passed (47)
+      Tests  352 passed (352)
+   Start at  10:00:59
+   Duration  51.48s (transform 869ms, setup 0ms, collect 2.13s, tests 88.76s, environment 5ms, prepare 1.64s)
+
+
+> bj8-optimized@1.5.1 build
+> vite build && node scripts/inline-build.mjs
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+vite v5.4.21 building for production...
+transforming...
+✓ 109 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.39 kB │ gzip:   0.29 kB
+dist/assets/style-DOcyna6I.css     82.80 kB │ gzip:  16.07 kB
+dist/assets/index-Bo0cmBdd.js   2,146.04 kB │ gzip: 652.47 kB
+
+(!) Some chunks are larger than 1200 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 909ms
+inline-build: wrote 2233158 byte single-file dist/index.html

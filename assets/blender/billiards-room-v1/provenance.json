@@ -1,0 +1,32 @@
+{
+  "asset": "quiet-room-v1",
+  "createdAt": "2026-09-08",
+  "sourceCommit": "741cae41e7686d989460a2f3feb44de677ea580d",
+  "sourceTag": "v1.5.1",
+  "tool": "configured Blender MCP; Blender 5.2.1 LTS",
+  "userPrompt": "现在有Blender了，已经都配好了，MCP也有了，你来操控做第一版的优化。",
+  "origin": "Original local modelling; no third-party downloads or paid generation",
+  "coordinateSystem": "metres, Y-up; cloth Y=0; X width=1.27; Z length=2.54; ball radius=.028575",
+  "files": {
+    "src/scene/assets/billiards-room-v1.glb": {
+      "bytes": 651768,
+      "sha256": "63320ee63b0b616a9387366a770c2e0d9d317c70ba935cb54fe55940bd1ab50f"
+    },
+    "assets/blender/billiards-room-v1/quiet-room-v1.blend": {
+      "bytes": 647033,
+      "sha256": "48f168d82800b1d75c722ffc32ad1818acf4a70f83559deeb62205364eaf41f5"
+    },
+    "assets/blender/billiards-room-v1/table-reference.json": {
+      "bytes": 1961128,
+      "sha256": "b7dc00d0f9b90e2079fd3436fe27dc1f807ff44f5d0c0305b88e0800fb84eef1"
+    },
+    "scripts/build-blender-room.py": {
+      "bytes": 8899,
+      "sha256": "217016ef21184886eeb04f3f7b74f8eaa40213608fa48745521f53d53b13b7fc"
+    },
+    "scripts/preview-blender-room.py": {
+      "bytes": 4434,
+      "sha256": "1b744313de02b9496eee33cca95aa4b56a40f2fd26597dd3e7d3f9901e313fa2"
+    }
+  }
+}

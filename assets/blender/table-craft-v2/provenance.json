@@ -1,0 +1,111 @@
+{
+  "source_commit": "741cae41e7686d989460a2f3feb44de677ea580d",
+  "accepted_visual_baseline": "Blender room V1, local uncommitted",
+  "tool": "Configured Blender MCP, Blender 5.2.1 LTS",
+  "prompt": "这个效果很不错，我们继续进行建模。我想进一步优化的是球桌内的内容，包括台泥、库边、球和台泥之间摩擦滚动的那种质感，尤其是袋口，袋口需要非常细腻的处理，这些也做一下建模。",
+  "negative_prompt": null,
+  "origin": "Original local procedural meshes and Canvas textures; no external generation or paid assets",
+  "coordinates": "Runtime XZ table / Y-up / metres; Blender (x,-z,y)",
+  "runtime_asset": "src/scene/assets/table-craft-v2.glb",
+  "stitch_count": 520,
+  "triangles": 25744,
+  "mesh_count": 2,
+  "files": {
+    "assets/blender/table-craft-v2/surface-contract.json": {
+      "bytes": 209492,
+      "sha256": "e0460f86e3f5efd638ffc92a97b15673bd323e71c926268f71dd42a93650bb6e"
+    },
+    "assets/blender/table-craft-v2/ball-2.png": {
+      "bytes": 26731,
+      "sha256": "f66899dc65e1b84f6b91d22f19b595cd8e80a4871d67870666e98c404e104c03"
+    },
+    "assets/blender/table-craft-v2/ball-3.png": {
+      "bytes": 26699,
+      "sha256": "571455470dca18ca72f413167e4e69424b22d6bb254b9d34142277f50a24a653"
+    },
+    "assets/blender/table-craft-v2/ball-1.png": {
+      "bytes": 25880,
+      "sha256": "e1256368f04e6f691d8c3a836d80ba08630335da0d45288e7567e83105efc69e"
+    },
+    "assets/blender/table-craft-v2/ball-0.png": {
+      "bytes": 12843,
+      "sha256": "7c0fce34bd746c82df42998d678298e417e6726fe95dcb4ca170918b6bd89379"
+    },
+    "assets/blender/table-craft-v2/ball-4.png": {
+      "bytes": 23918,
+      "sha256": "4aa97be32c8556ef3f62c22b20116fdacee37cf5c5dbc74215ff1fecc7932ff5"
+    },
+    "assets/blender/table-craft-v2/ball-5.png": {
+      "bytes": 27470,
+      "sha256": "2649f88e905aa09c8fde51cb92147b644e4fd9a6ea141740a9dab8a3e457ea49"
+    },
+    "assets/blender/table-craft-v2/ball-7.png": {
+      "bytes": 23098,
+      "sha256": "4159da3fe22a2e7f928777821b56c5f849bb4feda33b2f08423d856d4a7ec3eb"
+    },
+    "assets/blender/table-craft-v2/ball-6.png": {
+      "bytes": 25105,
+      "sha256": "b07bed51ab5ab35229d597b94331cefad98fadeda923e11da0b0cd8d553f76e5"
+    },
+    "assets/blender/table-craft-v2/README.md": {
+      "bytes": 1862,
+      "sha256": "981d212f336f73852e9a734c0fab915556332c1dff2fe10100d62ac705b56b62"
+    },
+    "assets/blender/table-craft-v2/ball-8.png": {
+      "bytes": 22148,
+      "sha256": "a4868873618397c5f2afa64d449efb96a6d3aff30e0097a0765dec053af3fd93"
+    },
+    "assets/blender/table-craft-v2/ball-9.png": {
+      "bytes": 27971,
+      "sha256": "a11ed2ca0c7ba8a90dad5d0e4cfac92ab0cba22c0edfe1a6e19b525de21bfbc2"
+    },
+    "assets/blender/table-craft-v2/cloth-albedo.png": {
+      "bytes": 289682,
+      "sha256": "70c296f43964ade8cb95b094c443b67fbdac2a9f98363e5c675517690469722f"
+    },
+    "assets/blender/table-craft-v2/runtime-surface-reference.json": {
+      "bytes": 5120906,
+      "sha256": "31ba8c5facbca579464d4a3f3ed219a53430fe995850a51ca79030dd8eca67ce"
+    },
+    "assets/blender/table-craft-v2/ball-13.png": {
+      "bytes": 28608,
+      "sha256": "df09c8d53afa1802bb22b4e79f8f0645d7918b2915fc1b8b3a38c6aa089b480f"
+    },
+    "assets/blender/table-craft-v2/ball-12.png": {
+      "bytes": 27217,
+      "sha256": "17a85a9da1b3965e05a7dee5b3ac78b6af16b5204fc6ab92634906a245eb639d"
+    },
+    "assets/blender/table-craft-v2/ball-10.png": {
+      "bytes": 27960,
+      "sha256": "7af2f8fd2bb016e393f86c3d77a766edf0a4628af06ab5ac8ee89c02a2074e9c"
+    },
+    "assets/blender/table-craft-v2/ball-11.png": {
+      "bytes": 26384,
+      "sha256": "3c322e3fd1cff978dc09b99303e87576d03233a02fdf5e820e37a31e5ed5f931"
+    },
+    "assets/blender/table-craft-v2/ball-15.png": {
+      "bytes": 27427,
+      "sha256": "b45a50c99d19570f7fa4776740f3a8b7926294c0f6d03bdc703c7a8e68bd3416"
+    },
+    "assets/blender/table-craft-v2/ball-14.png": {
+      "bytes": 25942,
+      "sha256": "d61ec6ae45b2388df9b3733ea295b87d9fe44b0349b986e0525d21ee3949d056"
+    },
+    "assets/blender/table-craft-v2/table-craft-v2.blend": {
+      "bytes": 2986088,
+      "sha256": "c5f4ee7c4bcf40f9724546e58081bbefd00e43596b7b452adbe6aee91a8bb5d7"
+    },
+    "src/scene/assets/table-craft-v2.glb": {
+      "bytes": 492004,
+      "sha256": "8ad4e94a876ed471c1c7384146e8944bbdd91a9a350daed07fdc4fdef44f5864"
+    },
+    "scripts/build-blender-table-craft.py": {
+      "bytes": 9491,
+      "sha256": "61c50cd2fc9cbe5b84612b18047d1a51923999902e30ddce1d690af0b1276281"
+    },
+    "scripts/update-blender-table-preview.py": {
+      "bytes": 3958,
+      "sha256": "3c852dac78fa86167f93f2873222be457a6784598178d567e6f533c5deac0bf6"
+    }
+  }
+}

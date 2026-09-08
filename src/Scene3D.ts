@@ -1,13 +1,13 @@
 /*
-[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图与 Three.js
+[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图、scene Blender 视觉资产与 Three.js
 [OUTPUT]: 对外提供真实球桌、静止按需渲染、GPU 自适应温控、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { createStudioEnvironment, setupStudioLighting, type StudioEnvironment } from './scene/studio-environment';
+import { applyClothUV, applyLeatherUV, createBallContacts } from './scene/table-surfaces';
+import { createTableDetails, type TableDetails } from './scene/table-details';
 import {
   CUSHION_SEGMENTS,
   POCKETS,
@@ -24,7 +24,6 @@ import {
   CAMERA_FOV_DEGREES,
   cameraPoseAt,
   clampViewLevel,
-  isGlobalCameraView,
   isOverheadCameraView,
   normalizeCameraAzimuth,
 } from './camera-view';
@@ -64,7 +63,6 @@ import { createTableFrameGeometry } from './pocket-render/frame-geometry';
 const R = TABLE.ballRadius;
 const W = TABLE.width;
 const L = TABLE.length;
-const RAIL_W = TABLE_RENDER.railWidth;
 const POCKET_POS: [number, number][] = POCKETS.map(
   pocket => [pocket.x, pocket.z],
 );
@@ -148,6 +146,8 @@ export class Scene3D {
 
   private ballMeshes: THREE.Mesh[] = [];
   private ballQuats: THREE.Quaternion[] = [];
+  private ballContacts?: ReturnType<typeof createBallContacts>;
+  private tableDetails?: TableDetails;
   private dropAnims = new Map<number, DropAnim>();
   private cueGroup = new THREE.Group();
   private tableGroup = new THREE.Group();
@@ -187,7 +187,7 @@ export class Scene3D {
   private objLine!: THREE.Line;
   private tanLine!: THREE.Line;
   private ghostRing!: THREE.Mesh;
-  private lampGroup?: THREE.Group;
+  private studioEnvironment?: StudioEnvironment;
   private ghostCue!: THREE.Mesh;
   /** 瞄准幽灵球靶点：白球影子球 + 定位环，玩家点击台面定位 */
   private aimGhost = new THREE.Group();
@@ -275,7 +275,7 @@ export class Scene3D {
     // 阴影只在球/球杆/规划动画实际变化时刷新；静止镜头移动复用同一张光照图。
     this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = .98;
     element.appendChild(this.renderer.domElement);
 
     const gl = this.renderer.getContext();
@@ -283,14 +283,7 @@ export class Scene3D {
       this.gpuTimerExtension = gl.getExtension('EXT_disjoint_timer_query_webgl2') as GpuTimerExtension | null;
     }
 
-    // 环境反射：程序化房间，给球体真实高光
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.55;
-    pmrem.dispose();
-
-    RectAreaLightUniformsLib.init();
-    this.setupLights();
+    this.keyLight = setupStudioLighting(this.scene, this.renderer, this.shadowMapSize);
     this.buildTable();
     this.buildBalls();
     this.buildCue();
@@ -309,38 +302,6 @@ export class Scene3D {
     this.camera.lookAt(this.smoothLookAt);
 
     window.addEventListener('resize', this.handleResize);
-  }
-
-  private setupLights() {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.07));
-
-    // 主光：略偏一侧，产生长影子
-    const key = new THREE.DirectionalLight(0xfff2dd, 2.6);
-    this.keyLight = key;
-    key.position.set(0.6, 2.6, 0.4);
-    key.castShadow = true;
-    key.shadow.mapSize.set(this.shadowMapSize, this.shadowMapSize);
-    key.shadow.camera.near = 0.5;
-    key.shadow.camera.far = 6;
-    key.shadow.camera.left = -1.4;
-    key.shadow.camera.right = 1.4;
-    key.shadow.camera.top = 2.6;
-    key.shadow.camera.bottom = -2.6;
-    key.shadow.bias = -0.0004;
-    key.shadow.radius = 3;
-    key.shadow.camera.updateProjectionMatrix();
-    this.scene.add(key);
-
-    // 台球灯：桌面上方的矩形面光，形成绒布高光带
-    const rect = new THREE.RectAreaLight(0xffe6c0, 1.8, 1.3, 2.2);
-    rect.position.set(0, 1.45, 0);
-    rect.lookAt(0, 0, 0);
-    this.scene.add(rect);
-
-    // 冷色轮廓补光
-    const rim = new THREE.PointLight(0xa8cfff, 0.35, 8);
-    rim.position.set(-1.8, 1.2, -1.6);
-    this.scene.add(rim);
   }
 
   private buildTable() {
@@ -407,16 +368,17 @@ export class Scene3D {
     clothShape.closePath();
     const clothGeo = new THREE.ShapeGeometry(clothShape, 24);
     clothGeo.rotateX(-Math.PI / 2);
+    applyClothUV(clothGeo);
     const clothMat = new THREE.MeshPhysicalMaterial({
       map: clothMaps.map,
       normalMap: clothMaps.normalMap,
-      normalScale: new THREE.Vector2(0.16, 0.26),
+      normalScale: new THREE.Vector2(0.38, 0.38),
       roughnessMap: clothMaps.roughnessMap,
       roughness: 0.94,
       metalness: 0.0,
-      sheen: 0.28,
+      sheen: 0.26,
       sheenRoughness: 0.88,
-      sheenColor: new THREE.Color(0x5f967c),
+      sheenColor: new THREE.Color(0x317757),
       envMapIntensity: 0.1,
     });
     const cloth = new THREE.Mesh(clothGeo, clothMat);
@@ -434,14 +396,14 @@ export class Scene3D {
     woodTex.repeat.set(2, 0.5);
     const woodMat = new THREE.MeshPhysicalMaterial({
       map: woodTex,
-      color: 0x8a6547,
+      color: 0x806a53,
       bumpMap: woodTex,
       bumpScale: 0.0012,
-      roughness: 0.28,
+      roughness: 0.42,
       metalness: 0.0,
-      clearcoat: 0.78,
+      clearcoat: 0.33,
       clearcoatRoughness: 0.16,
-      envMapIntensity: 0.85,
+      envMapIntensity: 0.4,
     });
     // 同一边界同时生成护口与木框内裁口；孔边不再有独立袋型参数。
     const pocketSurfaces = POCKETS.map(pocket => pocketSeamContract(pocket, pocketRenderProfile(pocket)));
@@ -458,11 +420,16 @@ export class Scene3D {
 
     // ---- 共享库边：直线段与离散圆弧段使用同一种前探鼻尖、下沿内凹的包呢实体 ----
     const cushionMat = new THREE.MeshPhysicalMaterial({
-      color: 0x0f6a4a,
-      roughness: 0.85,
-      sheen: 0.5,
-      sheenColor: new THREE.Color(0x88c8a8),
-      sheenRoughness: 0.6,
+      map: clothMaps.map,
+      normalMap: clothMaps.normalMap,
+      normalScale: new THREE.Vector2(.32, .32),
+      roughnessMap: clothMaps.roughnessMap,
+      color: 0xf3fff8,
+      roughness: 0.94,
+      sheen: 0.28,
+      sheenColor: new THREE.Color(0x388063),
+      sheenRoughness: 0.85,
+      envMapIntensity: .12,
       side: THREE.DoubleSide,
     });
     for (const segment of CUSHION_SEGMENTS) {
@@ -484,7 +451,7 @@ export class Scene3D {
     const pocketLipMat = new THREE.MeshPhysicalMaterial({
       map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.0006,
+      bumpScale: 0.00012,
       color: 0xd5c5a4,
       roughness: 0.86,
       clearcoat: 0.02,
@@ -494,19 +461,20 @@ export class Scene3D {
     // 实体乔氏袋口的外护口是机器压制牛皮 + 硬质骨架，视觉上应是薄而挺的平面，
     // 不是软包或圆绳。浅驼色用于从同色木框上读出材质边界。
     const pocketTopTrimMat = new THREE.MeshPhysicalMaterial({
+      map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.0007,
+      bumpScale: 0.00014,
       color: 0x86623f,
-      roughness: 0.9,
-      clearcoat: 0,
-      clearcoatRoughness: 1,
+      roughness: 0.77,
+      clearcoat: 0.08,
+      clearcoatRoughness: 0.65,
       side: THREE.DoubleSide,
     });
     const pocketWallMat = new THREE.MeshStandardMaterial({
       map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.0018,
-      color: 0x5c4936,
+      bumpScale: 0.00018,
+      color: 0x38271b,
       roughness: 0.96,
       side: THREE.DoubleSide,
     });
@@ -601,6 +569,7 @@ export class Scene3D {
       );
       wallGeometry.setIndex(wallIndices);
       wallGeometry.computeVertexNormals();
+      applyLeatherUV(wallGeometry);
       const wall = new THREE.Mesh(wallGeometry, pocketWallMat);
       wall.name = `pocket-well-${pocket.index}`;
       wall.receiveShadow = true;
@@ -716,6 +685,7 @@ export class Scene3D {
       // 顶盖与有厚度皮裙为单一闭壳；两个端座逐字落在既有 jaw 顶面。
       const seam = pocketSurfaces[pocket.index];
       const topTrim = new THREE.Mesh(createPocketTrimGeometry(seam), pocketTopTrimMat);
+      applyLeatherUV(topTrim.geometry);
       topTrim.name = `pocket-top-trim-${pocket.index}`;
       topTrim.userData.materialRole = 'tan-leather-cap';
       topTrim.userData.widthMm = seam.width * 1000;
@@ -731,6 +701,7 @@ export class Scene3D {
 
       const weltRadius = pocket.kind === 'corner' ? 0.0018 : 0.0016;
       const lip = new THREE.Mesh(createPocketWeltGeometry(seam, weltRadius), pocketLipMat);
+      applyLeatherUV(lip.geometry);
       lip.name = `pocket-lip-${pocket.index}`;
       lip.userData.materialRole = 'stitched-welt';
       lip.userData.radiusMm = weltRadius * 1000;
@@ -741,64 +712,11 @@ export class Scene3D {
       this.tableGroup.add(lip);
     }
 
-    // ---- 台裙与桌腿 ----
-    const skirtMat = new THREE.MeshPhysicalMaterial({
-      map: woodTex,
-      bumpMap: woodTex,
-      bumpScale: 0.001,
-      color: 0x6b4630,
-      roughness: 0.36,
-      clearcoat: 0.58,
-      clearcoatRoughness: 0.24,
-    });
-    const skirt = new THREE.Mesh(
-      new RoundedBoxGeometry(W + RAIL_W * 1.4, 0.16, L + RAIL_W * 1.4, 5, 0.022),
-      skirtMat,
-    );
-    skirt.position.y = -0.11;
-    this.tableGroup.add(skirt);
-
-    const legMat = new THREE.MeshPhysicalMaterial({ map: woodTex, color: 0x50331f, roughness: 0.55 });
-    const legGeo = new THREE.CylinderGeometry(0.055, 0.075, 0.62, 12);
-    for (const [lx, lz] of [
-      [-(W / 2 + 0.02), -(L / 2 - 0.15)], [W / 2 + 0.02, -(L / 2 - 0.15)],
-      [-(W / 2 + 0.02), L / 2 - 0.15], [W / 2 + 0.02, L / 2 - 0.15],
-    ]) {
-      const leg = new THREE.Mesh(legGeo, legMat);
-      leg.position.set(lx, -0.5, lz);
-      leg.castShadow = true;
-      this.tableGroup.add(leg);
-    }
-
-    // ---- 吊灯 ----
-    const lampGroup = new THREE.Group();
-    this.lampGroup = lampGroup;
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-    cord.position.y = 2.4;
-    lampGroup.add(cord);
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 1.5), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.4 }));
-    bar.position.y = 2.0;
-    lampGroup.add(bar);
-    const shadeMat = new THREE.MeshPhysicalMaterial({ color: 0x1d4028, metalness: 0.4, roughness: 0.35, side: THREE.DoubleSide });
-    const glowMat = new THREE.MeshBasicMaterial({ color: 0xffe2b0 });
-    for (const sz of [-0.55, 0, 0.55]) {
-      const shade = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.13, 24, 1, true), shadeMat);
-      shade.position.set(0, 1.95, sz);
-      lampGroup.add(shade);
-      const bulb = new THREE.Mesh(new THREE.CircleGeometry(0.12, 24), glowMat);
-      bulb.rotation.x = Math.PI / 2;
-      bulb.position.set(0, 1.9, sz);
-      lampGroup.add(bulb);
-    }
-    this.tableGroup.add(lampGroup);
-
-    // ---- 地板 ----
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x101312, roughness: 0.92 });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.82;
-    floor.receiveShadow = true;
-    this.tableGroup.add(floor);
+    // Blender 独立视觉外壳；台面、库边与袋口继续使用上方共享几何。
+    this.studioEnvironment = createStudioEnvironment(woodTex, () => this.requestRender(true));
+    this.tableGroup.add(this.studioEnvironment.root);
+    this.tableDetails = createTableDetails(() => this.requestRender(true));
+    this.tableGroup.add(this.tableDetails.root);
   }
 
   private buildBalls() {
@@ -807,13 +725,14 @@ export class Scene3D {
       const tex = i === 0 ? makeCueBallTexture() : makeBallTexture(i, i >= 9 ? 'stripe' : 'solid');
       const mat = new THREE.MeshPhysicalMaterial({
         map: tex,
-        roughness: 0.16,
+        roughness: 0.19,
         metalness: 0.0,
         clearcoat: 1.0,
-        clearcoatRoughness: 0.06,
-        envMapIntensity: 0.5,
+        clearcoatRoughness: 0.095,
+        envMapIntensity: 0.65,
       });
       const mesh = new THREE.Mesh(geometry, mat);
+      mesh.name = `ball-${i}`;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.visible = false;
@@ -821,6 +740,9 @@ export class Scene3D {
       this.ballMeshes[i] = mesh;
       this.ballQuats[i] = new THREE.Quaternion();
     }
+    this.ballContacts = createBallContacts(R);
+    this.ballContacts.sync(this.ballMeshes);
+    this.scene.add(this.ballContacts.mesh);
   }
 
   private buildCue() {
@@ -1494,8 +1416,6 @@ export class Scene3D {
 
   setViewLevel(level: number) {
     this.viewLevel = clampViewLevel(level);
-    // 进入全局段就直接展示无遮挡桌面；相机继续抬升时不会穿过吊灯模型。
-    if (this.lampGroup) this.lampGroup.visible = !isGlobalCameraView(this.viewLevel);
     this.requestRender();
   }
 
@@ -2046,7 +1966,7 @@ export class Scene3D {
     this.camera.lookAt(this.smoothLookAt);
     // 按相机的实际高度显隐，而不是按先一步更新的目标视角显隐。
     // 这样俯视与低机位平滑切换时，镜头不会在尚未越过灯体前看到吊灯穿模。
-    if (this.lampGroup) this.lampGroup.visible = this.camera.position.y < 1.7;
+    this.studioEnvironment?.setCameraHeight(this.camera.position.y);
 
     // 出杆动画：加速冲向白球 → 触球瞬间回调 → 减速送杆 → 收起
     if (this.strikeAnim) {
@@ -2094,6 +2014,7 @@ export class Scene3D {
     }
 
     this.updatePlanPlay(dt);
+    this.ballContacts?.sync(this.ballMeshes);
 
     this.renderer.render(this.scene, this.camera);
     this.finishGpuTimer(gpuQuery);
@@ -2252,6 +2173,9 @@ export class Scene3D {
 
   dispose() {
     this.stop();
+    this.studioEnvironment?.dispose();
+    this.tableDetails?.dispose();
+    this.ballContacts?.mesh.dispose();
     window.removeEventListener('resize', this.handleResize);
     const gl = this.renderer.getContext();
     if (gl instanceof WebGL2RenderingContext) {

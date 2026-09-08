@@ -1,0 +1,60 @@
+{
+  "url": "http://127.0.0.1:5199/",
+  "production": true,
+  "results": [
+    {
+      "name": "desktop 入口字节为最终构建",
+      "pass": true,
+      "detail": {
+        "sha256": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea"
+      }
+    },
+    {
+      "name": "desktop 介绍页零 WebGL 和模型加载",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 真实低机位控件正常",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 最终单 HTML 无外部模型请求",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 无脚本错误或横向溢出",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile 入口字节为最终构建",
+      "pass": true,
+      "detail": {
+        "sha256": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea"
+      }
+    },
+    {
+      "name": "mobile 介绍页零 WebGL 和模型加载",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 真实低机位控件正常",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 最终单 HTML 无外部模型请求",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 无脚本错误或横向溢出",
+      "pass": true,
+      "detail": []
+    }
+  ]
+}

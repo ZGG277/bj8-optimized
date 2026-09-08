@@ -1,0 +1,16 @@
+
+> bj8-optimized@1.5.1 test:render-thermal
+> node scripts/verify-render-thermal.mjs
+
+✓ 介绍页不创建 WebGL 场景与画布 — {"hasScene":false,"canvases":0,"backdropFilter":"none"}
+✓ 首屏不再对整幅 WebGL 画布做实时模糊 — backdrop-filter=none
+✓ 对局静止后 WebGL 停止空转 — 1.2s 新增 0 帧
+✓ 桌面 Retina 基线 DPR 上限生效 — pixelRatio=1.75
+✓ 桌面运动渲染不再跟随 120/144Hz 屏幕空跑 — 2.2s 渲染 55 帧
+✓ GPU 发热代理指标可读 — {"tier":"warm","source":"gpu-timer","estimatedGpuDuty":0.16499588142857144,"droppedFrameRatio":0.42857142857142855,"averageRenderMs":5.499862714285714,"targetFps":24,"pixelRatio":1.25,"shadowMapSize":1024}
+✓ 温控降档会关闭 HUD 毛玻璃 GPU 合成 — backdrop-filter=none
+✓ 浏览器运行无 JS 错误
+✓ 手机介绍页同样保持零 WebGL — {"hasScene":false,"canvases":0}
+✓ 手机高 DPR 首屏使用 2× 绘制缓冲区 — {"devicePixelRatio":3,"pixelRatio":2,"cssWidth":390,"drawingBufferWidth":780}
+
+10/10 通过

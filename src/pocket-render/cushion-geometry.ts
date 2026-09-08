@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只读物理库边段、球半径与具名渲染剖面尺寸
-[OUTPUT]: Scene3D 和袋口承托契约共用的实际库边实体；不改变鼻尖/物理尺寸
+[OUTPUT]: 共用库边实体、米制包呢 UV 与跨短角衬连续法线；不改变鼻尖/物理尺寸
 [POS]: 纯渲染几何；从 Scene3D 原样提取现有剖面和生成器，供最终实体测试消费
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -42,9 +42,14 @@ export const CUSHION_PROFILE: ReadonlyArray<readonly [outwardOffset: number, y: 
 
 export function makeCushionGeometry(segment: CushionSegment, segments: readonly CushionSegment[] = CUSHION_SEGMENTS) {
   const positions: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
   const joinA = cushionJoinOutward(segment, segment.a, segments);
   const joinB = cushionJoinOutward(segment, segment.b, segments);
+  const length = Math.hypot(segment.b.x - segment.a.x, segment.b.z - segment.a.z);
+  let wrapDistance = 0;
+  let onCap = false;
+  let previousProfile = CUSHION_PROFILE[0];
   const appendProfileVertex = (point: Point2, outwardOffset: number, y: number) => {
     // 共端点剖面采用相同斜接，禁止每段独立沿法线挤出而令顶面重叠闪烁。
     const outward = point === segment.a ? joinA : joinB;
@@ -53,10 +58,14 @@ export function makeCushionGeometry(segment: CushionSegment, segments: readonly 
       y,
       point.z + outward.z * outwardOffset,
     );
+    // UV 以米为单位；材质纹理统一除以 160mm，鼻尖前后保持相同织纹尺度。
+    uvs.push(onCap ? outwardOffset : point === segment.a ? 0 : length, onCap ? y : wrapDistance);
   };
 
   // 侧面共享剖面顶点，使法线在鼻尖与内凹曲面之间连续过渡。
   for (const [outwardOffset, y] of CUSHION_PROFILE) {
+    wrapDistance += Math.hypot(outwardOffset - previousProfile[0], y - previousProfile[1]);
+    previousProfile = [outwardOffset, y];
     appendProfileVertex(segment.a, outwardOffset, y);
     appendProfileVertex(segment.b, outwardOffset, y);
   }
@@ -70,6 +79,7 @@ export function makeCushionGeometry(segment: CushionSegment, segments: readonly 
   }
 
   // 端盖使用独立顶点，避免短角衬的端面法线污染绒面剖面的高光。
+  onCap = true;
   const capAStart = positions.length / 3;
   for (const [outwardOffset, y] of CUSHION_PROFILE) {
     appendProfileVertex(segment.a, outwardOffset, y);
@@ -85,8 +95,28 @@ export function makeCushionGeometry(segment: CushionSegment, segments: readonly 
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
+  // 极短圆弧段的三角面积不同，自动平均会在每段接头出现竖条高光。
+  // 用同一剖面与共端点斜接方向计算侧面法线；端盖继续保留独立硬边。
+  const normals = geometry.getAttribute('normal');
+  for (let i = 0; i < CUSHION_PROFILE.length; i++) {
+    // 顶面/背面沿用实体三角法线，仅对可见鼻尖和内凹面消除短角衬接头。
+    if (i < 3 || i === CUSHION_PROFILE.length - 1) continue;
+    const current = CUSHION_PROFILE[i];
+    const previous = CUSHION_PROFILE[(i + CUSHION_PROFILE.length - 1) % CUSHION_PROFILE.length];
+    const next = CUSHION_PROFILE[(i + 1) % CUSHION_PROFILE.length];
+    const before = new THREE.Vector2(current[1] - previous[1], previous[0] - current[0]).normalize();
+    const after = new THREE.Vector2(next[1] - current[1], current[0] - next[0]).normalize();
+    const profileNormal = before.add(after).normalize();
+    for (const [end, outward] of [joinA, joinB].entries()) {
+      const lengthSq = outward.x ** 2 + outward.z ** 2;
+      const normal = new THREE.Vector3(outward.x * profileNormal.x / lengthSq,
+        profileNormal.y, outward.z * profileNormal.x / lengthSq).normalize();
+      normals.setXYZ(i * 2 + end, normal.x, normal.y, normal.z);
+    }
+  }
   geometry.computeBoundingSphere();
   return geometry;
 }

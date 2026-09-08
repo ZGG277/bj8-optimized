@@ -1,0 +1,20 @@
+
+> bj8-optimized@1.6.0 build
+> vite build && node scripts/inline-build.mjs
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+vite v5.4.21 building for production...
+transforming...
+✓ 112 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.39 kB │ gzip:   0.29 kB
+dist/assets/style-DOcyna6I.css     82.80 kB │ gzip:  16.07 kB
+dist/assets/index-D8UtwbYD.js   2,805.19 kB │ gzip: 990.27 kB
+
+(!) Some chunks are larger than 1200 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 950ms
+inline-build: wrote 2892342 byte single-file dist/index.html

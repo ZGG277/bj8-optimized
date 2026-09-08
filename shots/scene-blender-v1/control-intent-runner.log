@@ -1,0 +1,8 @@
+✓ 慢速拨动持续改变瞄准角 — before=0.0000 after=0.2234
+✓ 拨动超过长按时限也不进入控件拖位 — {"before":{"x":70,"y":679.953125},"after":{"x":70,"y":679.953125}}
+✓ 蓄力后缓慢横向移出并松手不出杆 — {"before":0,"after":{"shot":0,"charging":false,"power":0,"layoutDragging":false}}
+✓ 取消后蓄力预览归零且不误触布局拖位 — {"shot":0,"charging":false,"power":0,"layoutDragging":false}
+✓ 仍可沿正常方向蓄力松手出杆 — before=0 after=1
+✓ 页面无 JS 错误
+
+6/6 通过

@@ -44,7 +44,9 @@
 
 `pocket-render/cushion-join.ts`: 渲染库边剖面的共端点斜接；避免短角衬各自法向挤出造成中袋附近顶面重叠闪烁，不改变物理鼻尖。
 
-`Scene3D.ts`: Three.js 场景适配器；移动端基线 `2×/1024/45Hz/low-power`，桌面 `1.75×/1536/30Hz/low-power`，WebGL2 GPU timer/CPU 退化监控驱动 balanced/warm/hot；静止停止 rAF，resize 重新计算 DPR/阴影/展示帧率；目标球跟随期按物理快照更新已锁定球坐标，不重选袋口；dispose 去重释放全部几何、材质、贴图和环境纹理；消费统一 PocketGeometry 构建真实球桌。六袋护口在实际 jaw 顶面承托，后 U 形边界同步生成木框内裁口；每袋皮板/皮裙为一个闭合实体，缝边复用同一组站点。袋网为每袋一个合并低面数实体绳网，落袋只消费 pocket event 并保持球尺寸。
+`scene/`: Blender 桌体/球房/灯具/六袋针脚包边的独立视觉适配层，以及米制台面 UV 和单批球底接触阴影；只在开始对局后加载，保留失败回退、异步卸载和相机高度显隐。
+
+`Scene3D.ts`: Three.js 场景适配器；通过 scene/ 装配 Blender 外壳和灯光，移动端基线 `2×/1024/45Hz/low-power`，桌面 `1.75×/1536/30Hz/low-power`，WebGL2 GPU timer/CPU 退化监控驱动 balanced/warm/hot；静止停止 rAF，resize 重新计算 DPR/阴影/展示帧率；目标球跟随期按物理快照更新已锁定球坐标，不重选袋口；dispose 去重释放全部几何、材质、贴图和环境纹理；消费统一 PocketGeometry 构建真实球桌。六袋护口在实际 jaw 顶面承托，后 U 形边界同步生成木框内裁口；每袋皮板/皮裙为一个闭合实体，缝边复用同一组站点。袋网为每袋一个合并低面数实体绳网，落袋只消费 pocket event 并保持球尺寸。
 
 `pocket-drop.ts` / `pocket-drop.test.ts`: 纯视觉落袋轨迹；入口逐字消费物理 event 的位置、线速度和角速度，保持 `t=0` 连续、`scale=1`，以显式 `9.81m/s²` 重力导入 `pocket-well` 真实椭圆剖面的中心安全线。它只提供有限视觉约束，不是球-壁/网袋刚体模拟；真实零角速度保持不转。
 
@@ -84,7 +86,7 @@
 `utils/`: 纯工具函数层，不依赖 React 或 DOM：
   - `renderMatchMessage`：将规则层消息键+参数映射为中文文案，纯函数可测试
 
-`textures.ts`: 为台呢、木纹、皮革与球体生成 CanvasTexture；全部视觉噪声使用固定种子，刷新、设备与截图门禁可复现，供 Scene3D 延迟初始化使用。
+`textures.ts`: 为 160mm 无缝台呢、细皮革、木纹、球号与六点母球生成 CanvasTexture；全部视觉噪声使用固定种子，刷新、设备与截图门禁可复现，供 Scene3D 延迟初始化使用。
 
 `main.tsx`: React 应用挂载入口，首帧前应用三主题，启用 StrictMode，挂载 Game/ThemeSwitcher/ControlOnboarding，并按 base → layout → controls → themes → onboarding 顺序加载样式。
 
