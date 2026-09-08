@@ -1,6 +1,6 @@
 # 瓜瓜台球
 
-> 当前产品发布候选：`v1.6.0`（2026-09-08），Blender 球房与台内精修；版本和发布证据见 [PROJECT_BASELINE.md](PROJECT_BASELINE.md)。
+> 当前正式项目基线：`v1.6.0`（2026-09-08），Blender 球房与台内精修；已发布妙搭，正式入口桌面/手机 18 项检查通过。源码标签、提交、发布回执和证据见 [PROJECT_BASELINE.md](PROJECT_BASELINE.md)。
 
 Blender 球房第一版：独立桌体外壳、六脚底座、台帮镶点、石材地面、深绿墙面和长灯；保留既有台面/袋口物理、球杆、相机与控件。GLB 在开始对局后加载，失败保留基础场景；构建继续生成单 HTML。制作源在 `assets/blender/billiards-room-v1/`，验证见 `SCENE_BLENDER_V1_ACCEPTANCE.md`。
 

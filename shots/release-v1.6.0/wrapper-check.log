@@ -1,0 +1,40 @@
+
+> fullstack-nestjs-template@2.2.5 type:check:client
+> tsc --noEmit --project tsconfig.app.json
+
+
+> fullstack-nestjs-template@2.2.5 build:client
+> NODE_ENV=production vite build --config vite.config.ts
+
+vite v7.3.5 building client environment for production...
+[route-parser] Generated routes.json (1 routes)
+transforming...
+(node:13050) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/zgg/Projects/%E6%B8%B8%E6%88%8F/bl8-3D%E5%8F%B0%E7%90%83/bj8-miaoda-app/tailwind.config.ts?id=1788841422372 is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/zgg/Projects/游戏/bl8-3D台球/bj8-miaoda-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✓ 4123 modules transformed.
+rendering chunks...
+[CssLegacyPlugin] Generated assets/index-CG31zyUu.legacy.css (196KB)
+[CssLegacyPlugin] Updated client/index.html with CSS detection script
+[PolyfillPlugin] Generated polyfills.js (60KB)
+[PolyfillPlugin] Updated client/index.html with polyfill detection
+SourceMapUploadPlugin: Starting sourcemap consolidation process...
+SourceMapUploadPlugin: Consolidated assets/index-qpx6KGU-.js.map to /Users/zgg/Projects/游戏/bl8-3D台球/bj8-miaoda-app/dist/sourcemaps/client/assets/index-qpx6KGU-.js.map
+SourceMapUploadPlugin: Consolidated assets/safety-ivbp9Ege.js.map to /Users/zgg/Projects/游戏/bl8-3D台球/bj8-miaoda-app/dist/sourcemaps/client/assets/safety-ivbp9Ege.js.map
+computing gzip size...
+dist/client/routes.json                           0.05 kB │ gzip:   0.06 kB
+dist/client/client/index.html                     6.40 kB │ gzip:   2.27 kB
+dist/client/polyfills.js                         61.68 kB
+dist/client/assets/index-CG31zyUu.legacy.css    200.35 kB │ gzip:  30.00 kB
+dist/client/assets/index-CG31zyUu.css           212.17 kB │ gzip:  36.76 kB
+dist/client/assets/safety-ivbp9Ege.js            15.97 kB │ gzip:   4.59 kB │ map:    54.66 kB
+dist/client/assets/index-qpx6KGU-.js          1,431.23 kB │ gzip: 435.01 kB │ map: 6,466.19 kB
+
+(!) Some chunks are larger than 800 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.64s
+[html-output] Moved: /Users/zgg/Projects/游戏/bl8-3D台球/bj8-miaoda-app/dist/client/client/index.html -> /Users/zgg/Projects/游戏/bl8-3D台球/bj8-miaoda-app/dist/client/index.html
+[html-output] Minified: /Users/zgg/Projects/游戏/bl8-3D台球/bj8-miaoda-app/dist/client/index.html

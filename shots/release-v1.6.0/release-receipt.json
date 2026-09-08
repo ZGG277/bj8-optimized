@@ -1,0 +1,21 @@
+{
+  "appId": "app_17b18dh5axj",
+  "releaseId": "7683015635928927432",
+  "releaseStatus": "finished",
+  "releaseReturnedCommit": "fdc73c90ef94b4d9405699126cacd15a15076a30",
+  "createdAt": "2026-09-08T04:27:46.000Z",
+  "finishedAt": "2026-09-08T04:29:06.000Z",
+  "errorLogs": [],
+  "cliReturnedUrl": "https://lg22l37ytz.feishuapp.com/app/app_17b18dh5axj",
+  "releaseCreateCount": 1,
+  "wrapperBranch": "sprint/default",
+  "wrapperCommit": "fdc73c90ef94b4d9405699126cacd15a15076a30",
+  "sourceCommit": "8fc242a35b05a9fc3238e5767502a216e562b52e",
+  "sourceTag": "v1.6.0",
+  "artifactSha256": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea",
+  "formalUrl": "https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj",
+  "hostedAccepted": true,
+  "hostedAssertions": 18,
+  "hostedAcceptedAt": "2026-09-08T04:29:45.967Z",
+  "hostedEvidence": "hosted-verification.json"
+}

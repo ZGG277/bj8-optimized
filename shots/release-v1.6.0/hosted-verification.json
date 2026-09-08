@@ -1,0 +1,159 @@
+{
+  "url": "https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj",
+  "startedAt": "2026-09-08T04:29:27.841Z",
+  "expectedCommit": "8fc242a35b05a9fc3238e5767502a216e562b52e",
+  "sourceTag": "v1.6.0",
+  "expectedHash": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea",
+  "loginState": "fresh browser contexts, no supplied cookies or login",
+  "results": [
+    {
+      "name": "desktop 正式入口与游戏 iframe 可用",
+      "pass": true,
+      "detail": {
+        "entry": "https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj",
+        "game": "https://lf-miaoda-static.feishucdn.com/app_17b18dh5axj/fdc73c90ef94b4d9405699126cacd15a15076a30/client/game/index.html",
+        "viewport": {
+          "width": 1280,
+          "height": 800,
+          "deviceScaleFactor": 1,
+          "name": "desktop"
+        }
+      }
+    },
+    {
+      "name": "desktop 线上 HTML 与发布构建逐字节一致",
+      "pass": true,
+      "detail": {
+        "sha256": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea",
+        "bytes": 2892342
+      }
+    },
+    {
+      "name": "desktop 线上来源提交与标签一致",
+      "pass": true,
+      "detail": {
+        "sourceRepository": "https://github.com/ZGG277/bj8-optimized",
+        "sourceCommit": "8fc242a35b05a9fc3238e5767502a216e562b52e",
+        "sourceTag": "v1.6.0",
+        "artifact": "dist/index.html",
+        "artifactSha256": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea",
+        "generatedAt": "2026-09-08T04:23:37.587Z"
+      }
+    },
+    {
+      "name": "desktop 介绍页尚未创建 WebGL",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 开始对局后球桌与控件就绪",
+      "pass": true,
+      "detail": {
+        "width": 1280,
+        "height": 752
+      }
+    },
+    {
+      "name": "desktop 实际视角控件进入低机位",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 鼠标拖动正常蓄力",
+      "pass": true,
+      "detail": {
+        "power": 58
+      }
+    },
+    {
+      "name": "desktop 松开后进入击球运动画面",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop 无 JS 错误、外部模型依赖或横向溢出",
+      "pass": true,
+      "detail": {
+        "errors": [],
+        "externalGlbs": []
+      }
+    },
+    {
+      "name": "mobile 正式入口与游戏 iframe 可用",
+      "pass": true,
+      "detail": {
+        "entry": "https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj",
+        "game": "https://lf-miaoda-static.feishucdn.com/app_17b18dh5axj/fdc73c90ef94b4d9405699126cacd15a15076a30/client/game/index.html",
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "deviceScaleFactor": 2,
+          "hasTouch": true,
+          "isMobile": true,
+          "name": "mobile"
+        }
+      }
+    },
+    {
+      "name": "mobile 线上 HTML 与发布构建逐字节一致",
+      "pass": true,
+      "detail": {
+        "sha256": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea",
+        "bytes": 2892342
+      }
+    },
+    {
+      "name": "mobile 线上来源提交与标签一致",
+      "pass": true,
+      "detail": {
+        "sourceRepository": "https://github.com/ZGG277/bj8-optimized",
+        "sourceCommit": "8fc242a35b05a9fc3238e5767502a216e562b52e",
+        "sourceTag": "v1.6.0",
+        "artifact": "dist/index.html",
+        "artifactSha256": "56e1bb5782c50d75ed14bea32129c1f781f5cb68fa566b86498b22f44a499cea",
+        "generatedAt": "2026-09-08T04:23:37.587Z"
+      }
+    },
+    {
+      "name": "mobile 介绍页尚未创建 WebGL",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 开始对局后球桌与控件就绪",
+      "pass": true,
+      "detail": {
+        "width": 390,
+        "height": 798
+      }
+    },
+    {
+      "name": "mobile 实际视角控件进入低机位",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 真实触摸拖动正常蓄力",
+      "pass": true,
+      "detail": {
+        "power": 54
+      }
+    },
+    {
+      "name": "mobile 松开后进入击球运动画面",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile 无 JS 错误、外部模型依赖或横向溢出",
+      "pass": true,
+      "detail": {
+        "errors": [],
+        "externalGlbs": []
+      }
+    }
+  ],
+  "browser": "Chrome/152.0.7977.77",
+  "finishedAt": "2026-09-08T04:29:45.967Z",
+  "passed": true
+}
