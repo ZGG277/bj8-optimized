@@ -1,43 +1,42 @@
 # 瓜瓜台球项目基线
 
-2026-09-09：**v1.7.0 已发布到妙搭；release 回执返回的 `feishuapp.com` 正式入口及其发布包均已通过桌面/手机真实交互验收。**
+2026-09-10：**v1.7.2 已发布到妙搭；GitHub 主线、妙搭 release、正式租户入口和实际 CDN 构建已对齐，桌面与 390×844 关键旅程通过。**
 
 ## 固定版本与发布回执
 
 | 项目 | 已核对的值 |
 | --- | --- |
 | 产品仓库 / 分支 | https://github.com/ZGG277/bj8-optimized / `main` |
-| 不可变源码标签 | `v1.7.0`，带注释标签 |
-| 产品源码提交 | `fd7d412831a57569b8e8fd34783bca29c7d44d2e` |
-| 妙搭包装提交 | `27efed3a7bfc765cb858f4eeb09c362f716157d6`，`sprint/default` |
+| 不可变源码标签 | `v1.7.2`，带注释标签 |
+| 产品源码提交 | `ea6784f139a6b743eb386263b9721212b8317774` |
+| 妙搭包装提交 | `515ee4b6b64dc95848c67c922bf617dd3e5bab86`，`sprint/default` |
 | 妙搭应用 | `app_17b18dh5axj`，瓜瓜台球 |
-| 本次唯一 release | `7683349083205324076`，`finished`；返回的 `commit_id` 与包装提交一致 |
-| 单 HTML 产物 | 8,988,274 bytes |
-| HTML SHA-256 | `c7f0e0ba852f574c303a396da881d3ed2c415c62b5c84256e36bcea691f9abde` |
+| 本次唯一 release | `7683666047719328977`，`finished`；返回的 `commit_id` 与包装提交一致 |
+| 单 HTML 产物 | 9,422,242 bytes |
+| HTML SHA-256 | `3fc50d5cac0a9480550a13388f0eb4b1b335acf0be7429951801d40eedc8f4b2` |
 
-主树构建、包装内产物与妙搭公开 CDN 的最终 HTML 逐字节相同。公开 CDN 返回 HTTP 200，路径中的提交与发布回执一致；`BUILD_PROVENANCE.json` 固定上述源码提交、标签和哈希。
+主树构建与包装内产物逐字节相同；正式入口 iframe 精确指向妙搭包装提交 `515ee4b`。`BUILD_PROVENANCE.json` 固定上述源码提交、标签和哈希。
 
-当前正式入口：[打开瓜瓜台球](https://lg22l37ytz.feishuapp.com/app/app_17b18dh5axj)。该 URL 来自本次 release 回执，真实加载的 iframe 提交、HTML 字节与 provenance 均正确。历史固定别名 `https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj` 在本机验收时出现 `ERR_CONNECTION_CLOSED` / connection reset；这属于别名可达性问题，不影响回执入口和 CDN 发布结果。
+当前正式入口：[打开瓜瓜台球](https://lg22l37ytz.feishuapp.com/app/app_17b18dh5axj)。正式父页面标题为“瓜瓜台球”，实际 iframe 指向 `lf-miaoda-static.feishucdn.com/app_17b18dh5axj/515ee4b.../client/game/index.html`。
 
 ## 本版范围
 
-- 局前正式开放静谧球房、云海浮台、宇宙星系、雨后竹林和极光冰湖五种世界；世界链接可预选，局内不热切换。
-- 三套新 Blender 世界源文件和运行时 GLB 纳入主线；最终单 HTML 内联全部模型，不产生外部 GLB 请求。
-- 首次打开且没有对局记录时，玩家、陪练顾燃和挑战顾燃均从 25 级开始；旧版已有能力数据保持迁移结果。
-- 顾燃有效实力 50 及以下不主动做安全球，无可靠直攻时仍选择目标球到袋口的进攻意图；51 起才解锁安全球回退。
-- 击球结果可见后，以 1.4 秒 ease-in-out 从目标近景平滑拉回全台，不改变手动视角响应。
+- 局前公开静谧球房、云海浮台、安静湖面三种世界；银河、竹林、极光资源和注册能力继续保留但不显示在公共入口。
+- `lake360=1` 继续兼容湖面旧链接；选择室内或云海会清除该覆盖参数，不再误入湖面。
+- Blender 球桌新增布边下承托和两侧中袋外裙板，关闭湖面低视角可见缝隙；修复 GLB 为 781,964 bytes、19 网格、24,684 三角。
+- 顾燃 25/60/90 级在瞄准误差、力量扰动、战术搜索深度与后续走位权重上形成连续梯度；固定采样失准率分别为 47.16%、2.26%、0%。
+- 玩家界面隐藏调色盘入口；三套主题源码、URL 参数、键盘切换和本机偏好继续生效。
 
 ## 验收证据
 
-- 主线完整 `npm run check`：类型检查、54 个测试文件 / 392 项测试、生产构建全部通过。
-- 世界资产门禁：星系 484,292 bytes / 9,080 三角形，竹林 2,549,792 / 54,628，冰湖 1,515,172 / 15,142；三者来源和单 HTML 内联校验通过。
-- 本地真实浏览器：首次双方 25、五世界入口、宇宙世界实际渲染通过；镜头与触控专项 8/8，通过采样确认 1.4 秒缓动。
-- 已发布 CDN 真实浏览器：普通/未知/预选入口、桌面与手机的室内/云海、零首屏 WebGL、世界选择、视角、瞄准、真实出杆、无页面错误/横向溢出/外部 GLB，共 35/35 通过。
-- release 回执正式入口真实浏览器：桌面 1280×800 与手机 390×844 均验证入口/iframe 200、字节/来源一致、首次双方 25、五世界、零首屏 WebGL、开始对局、视角、蓄力出杆和无异常，共 20/20 通过。
-- 可复查证据位于 `shots/release-v1.7.0/`；三套新世界的合入前画面和资产记录位于 `shots/world-scenes-v3/` 与 `WORLD_SCENES_V3_ACCEPTANCE.md`。
+- 主线完整 `npm run check`：类型检查、55 个测试文件 / 394 项测试、生产构建全部通过。
+- Blender 修复自动验证：17 个原网格保持、150 段库边承托、两个中袋裙板与两项袋腔间隙检查通过；同视角前后图和源 blend 位于 `assets/blender/billiards-room-v1/`。
+- 妙搭包装 server/client typecheck、生产构建、ESLint 与 precommit 通过；裁剪器的两个顶层复制缺口均由现存嵌套依赖满足，嵌套模块和打包 AppModule 实际加载成功。
+- 正式入口桌面验证静谧球房、云海浮台均能进入对局，canvas 正常且无湖面控件；390×844 湖面局前只有三个公开世界、无横向溢出，开始后 canvas、环顾湖面和暂停水波均存在；三种入口调色盘计数均为 0。
+- 候选数值、模型哈希和本地交叉路径见 `shots/local-candidate/LOCAL_CANDIDATE_ACCEPTANCE.md`；妙搭发布前证据在包装树 `shots/release-v1.7.2/prepublish.json`。
 
 ## 发布约定
 
 妙搭只从已提交、已加精确版本标签且干净的主树执行 `npm run sync:game`。`bj8-miaoda-app` 的 `sprint/default` 消费产物，`BUILD_PROVENANCE.json` 记录源码提交、标签和 HTML SHA-256。每次发布仍需从 release 回执入口覆盖桌面 1280×800、手机 390×844 的首屏、开始对局、视角和出杆；历史 `aiforce.cloud` 别名恢复后可另做可达性复验。
 
-前次正式基线为 `v1.6.0` / `8fc242a35b05a9fc3238e5767502a216e562b52e`，妙搭 release `7683015635928927432`。后续开发继续从 `bj8-main-integration/main` 进行；不将妙搭包装树、归档或历史镜像作为产品源码。
+前次正式基线为 `v1.7.1` / `91331ffacb07163b9b46d11d24ffcebf6c20f461`，妙搭 release `7683493429225295033`。后续开发继续从 `bj8-main-integration/main` 进行；不将妙搭包装树、归档或历史镜像作为产品源码。
