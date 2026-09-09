@@ -88,7 +88,13 @@ const readCamera = () => page.evaluate(() => {
     azimuth,
     viewAzimuth,
     level,
-    lampVisible: scene.lampGroup?.visible ?? null,
+    worldId: scene.studioEnvironment?.root.userData.worldId ?? 'studio',
+    lampVisible: (() => {
+      let lamp = scene.scene.getObjectByName('BJ8_Pendant');
+      if (!lamp) return false;
+      while (lamp) { if (!lamp.visible) return false; lamp = lamp.parent; }
+      return true;
+    })(),
     viewport: {
       left: viewport.left,
       right: viewport.right,
@@ -432,7 +438,7 @@ ok(
   JSON.stringify({ firstPerson, touchAimTarget, touchAimLocked, touchAimFollowed }),
 );
 
-// 玩家自己升回全局视角：冻结进入瞬间的球台方位，点台面只更新瞄准与幽灵球。
+// v1.6.0 继承行为：全台观察无遮挡；确认幽灵球后自动进入 16% 出杆位并跟随杆向。
 await page.focus('.view-slider-track');
 await page.keyboard.press('End');
 await wait(180);
@@ -451,19 +457,21 @@ const playerGlobalTarget = await page.evaluate(() => {
 await page.touchscreen.tap(playerGlobalTarget.screen.x, playerGlobalTarget.screen.y);
 await wait(180);
 const playerGlobalAfter = await page.evaluate(() => ({
+  level: Number(document.querySelector('.viewport').getAttribute('data-view-level')),
   aim: window.__bj8.aim.current,
   azimuth: window.__bj8.cameraAzimuth.current,
   viewAzimuth: window.__bj8.cameraViewAzimuth.current,
   ghost: window.__bj8.scene.current.aimGhostPos(),
 }));
 ok(
-  '玩家拉到全局模式直接显示无遮挡桌面，点球桌只调整瞄准、不转动整张球台',
+  '全台观察无遮挡，确认幽灵球后按基线进入出杆视角并跟随杆向',
   Math.abs(playerGlobalBefore.level - 1) < 0.001 &&
-    firstPerson.lampVisible === true &&
+    firstPerson.lampVisible === (firstPerson.worldId === 'studio') &&
     playerGlobalBefore.lampVisible === false &&
     Math.abs(playerGlobalAfter.aim - playerGlobalBefore.aim) > 0.05 &&
-    Math.abs(playerGlobalAfter.azimuth - playerGlobalBefore.azimuth) < 1e-6 &&
-    Math.abs(playerGlobalAfter.viewAzimuth - playerGlobalBefore.viewAzimuth) < 1e-6 &&
+    Math.abs(playerGlobalAfter.level - 0.16) < 1e-6 &&
+    Math.abs(playerGlobalAfter.azimuth - playerGlobalAfter.aim) < 1e-6 &&
+    Math.abs(playerGlobalAfter.viewAzimuth - playerGlobalAfter.aim) < 1e-6 &&
     playerGlobalAfter.ghost &&
     Math.hypot(
       playerGlobalAfter.ghost.x - playerGlobalTarget.target.x,

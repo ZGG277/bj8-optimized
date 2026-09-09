@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖局前锁定 OpponentProfile、限预算战术 Worker、袋口容错执行误差、physics 击球/复位、match 规则与场景动画
-[OUTPUT]: 副作用 Hook：对手回合先验证进球与下一杆，超时回退轻量选杆，挑战模式不再随机舍弃最优路线
+[OUTPUT]: 副作用 Hook：对手回合先验证进球与下一杆；50 级及以下无直线时仍尝试进攻，高等级才允许安全球回退
 [POS]: AI 调度层，只做对手回合的编排；不关心 UI 交互或玩家输入
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -19,6 +19,7 @@ import {
   cancelPendingTacticalShot,
   chooseTacticalShotWithinDeadline,
 } from '../opponent/tactical-async';
+import { planAggressiveFallback } from '../opponent/tactical-shot';
 import { sampleOpponentAimOffset, type OpponentProfile } from '../opponent/model';
 import type { ShotCandidate } from '../planner/candidates';
 import type { Scene3D } from '../Scene3D';
@@ -87,13 +88,17 @@ export function useOpponentAI({
         const fallbackPlan = planned
           ? null
           : planSimpleShot(world, legal, opponentProfile.effectiveLevel);
+        const aggressiveFallback = planned || fallbackPlan || opponentProfile.tactical.allowSafety
+          ? null
+          : planAggressiveFallback(world, legal);
         const cue = getCueBall(world)!;
         const fallbackTarget = world.balls.find(b => b.active && legal.includes(b.number));
         const baseAngle =
           planned?.angle ??
           fallbackPlan?.angle ??
+          aggressiveFallback?.angle ??
           (fallbackTarget ? Math.atan2(fallbackTarget.x - cue.x, -(fallbackTarget.z - cue.z)) : 0);
-        const basePower = planned?.power ?? fallbackPlan?.power ?? 52;
+        const basePower = planned?.power ?? fallbackPlan?.power ?? aggressiveFallback?.power ?? 52;
         const spin = planned?.spin ?? { x: 0, y: 0 };
         // planner 给出理想杆；实力只在实际出杆时采样一次，不根据结果重抽。
         const angle = planned
@@ -107,7 +112,7 @@ export function useOpponentAI({
         const powerScale =
           1 + (Math.random() * 2 - 1) * opponentProfile.powerJitter;
         const shotPower = Math.min(100, Math.max(1, basePower * powerScale));
-        const target = planned?.target ?? fallbackPlan?.target;
+        const target = planned?.target ?? fallbackPlan?.target ?? aggressiveFallback?.target;
 
         const doShot = () => {
           strikeCueBall(world, angle, shotPower, spin);

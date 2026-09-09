@@ -6,6 +6,12 @@
 
 ## 成员清单
 
+`build-world-galaxy.py` / `build-world-bamboo.py` / `build-world-aurora.py`: 三套正式 Blender 场景的本地作者脚本，分别导出星系、竹林、冰湖的实体环境和暗静区；不导出相机、灯光或动画。
+
+`world_blender_common.py`: 固定米制/Y-up 转换、同材质合批、打包 PBR 微表面贴图、保存可编辑 `.blend`、导出 GLB 及离线预览/来源记录。离线预览不是游戏入口证据。
+
+`verify-world-assets.mjs`: 校验三套实际 GLB 的拓扑预算、命名根、内嵌贴图、Blender 来源哈希及最终 HTML 精确内嵌字节。
+
 `build-blender-table-craft.py`: 接收共享皮壳站点，为六袋制作 520 段实体针脚和细包边，独立导出并保存 V2 blend。
 
 `update-blender-table-preview.py`: 将游戏实际台呢/库边/球体网格、连续法线和 Canvas 贴图同步进 V2 制作参照；纹理打包进 blend，不改变 GLB。
@@ -22,7 +28,7 @@
 
 `verify-blender-scene.mjs`: 桌面与手机主入口、真实视角/出杆、加载失败回退及卸载竞态；PRODUCTION=1 时检查单 HTML 入口不请求外部 GLB，所有页面串行并自动关闭浏览器。
 
-`verify-shot-camera-help.mjs`: 390×844 触屏专项；实际按住瞄准控件验证说明就地出现、松手自动收起且原手势不被阻断，检查 Pointer/contextmenu 默认行为取消，并构造共线直球验证击球后目标近景先于全台。
+`verify-shot-camera-help.mjs`: 390×844 触屏专项；实际按住瞄准控件验证说明就地出现、松手自动收起且原手势不被阻断，检查 Pointer/contextmenu 默认行为取消，并构造共线直球验证击球后目标近景先于全台、回全台使用约 1.4 秒独立慢缓动。
 
 `optimization-snapshot.mjs`: 只读生成当前 HEAD、源码/脚本/构建配置指纹、用户保护文件哈希及现有构建哈希，供 Spark 与主 Session 冻结/复核验收输入。
 
@@ -32,7 +38,7 @@
 
 `verify-control-intent.mjs`: 启动 390×844 真实触摸 Chrome，验收慢速瞄准拨动跨过长按时限仍不触发布局拖位、蓄力横向移出取消/预览归零及正常出杆无回归。
 
-`inline-build.mjs`: 妙搭发布适配——在 Vite 构建完成后把唯一的 ESM 入口和 CSS 内联进 `dist/index.html`，拒绝残留 assets 外链、意外分包和超过 10 MB 的 HTML，避免签名对象存储重定向破坏模块相对导入。
+`inline-build.mjs`: 单 HTML 适配——把唯一 ESM/CSS 及三套正式世界 GLB 精确内嵌进 `dist/index.html`，拒绝残留模型相对 URL、assets 外链、意外分包和超过 10 MiB 的 HTML；本地构建不等于发布。
 
 `verify-desktop-compact.mjs`: 1280×800 v1.4 桌面 HUD 门禁（15 断言）：双方名字下水平、无可见操作文字、四个开球控件右侧停靠、8px 安全边界、纯视觉蓄力与页面无溢出。
 
@@ -69,5 +75,11 @@
 `debug-break-physics.mjs`: 多种随机种子开球的离线速度/spread/落袋诊断。
 
 `debug-break-place.mjs`: 开球放置与瞄准阶段的真实页面状态诊断。
+
+`verify-world-shell.mjs`: 正式多世界入口的双世界、双视口真实交互与截图；开发模式增加核心指纹、空壳、固定步物理一致性、失败和卸载；生产模式核对单 HTML 字节及实际控件旅程。
+
+`verify-blender-scene.mjs` 的室内网格统计覆盖拆分后的桌体、静区和壳体，保持原 17 网格断言。
+
+`verify-spectator-camera.mjs` 读取真实 Blender 灯具有效可见性；确认幽灵球后的断言沿用 v1.6.0 的 16% 出杆位和杆向跟随。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

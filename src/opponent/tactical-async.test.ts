@@ -30,6 +30,7 @@ class FakeWorker {
 }
 
 const config = {
+  allowSafety: true,
   candidateLimit: 3,
   simulationLimit: 9,
   followUpWeight: 0.3,
@@ -85,4 +86,3 @@ describe('tactical async lifecycle', () => {
     expect(worker.terminated).toBe(true);
   });
 });
-

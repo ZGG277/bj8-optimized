@@ -1,0 +1,15 @@
+{
+  "world": "bamboo",
+  "blenderVersion": "5.2.1 LTS",
+  "authoring": "local Blender bpy; no paid provider",
+  "runtimeFile": "src/scene/assets/world-bamboo.glb",
+  "runtimeBytes": 2549792,
+  "sha256": "9c264d41c85e6b9fcb6b2d8cef2e26c14ae743b0d08fcc3665ddf00924328835",
+  "trianglesBeforeExport": 54628,
+  "meshObjects": 8,
+  "rootGroups": [
+    "BJ8_World_Bamboo",
+    "BJ8_Quiet_Bamboo"
+  ],
+  "previewIsRuntimeEvidence": false
+}

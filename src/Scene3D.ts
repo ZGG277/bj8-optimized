@@ -1,10 +1,12 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图、scene Blender 视觉资产与 Three.js
-[OUTPUT]: 对外提供真实球桌、静止按需渲染、GPU 自适应温控、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
+[OUTPUT]: 按初始化 worldId 装配共用球桌与外围世界，提供静止按需渲染、GPU 自适应温控、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
+import type { WorldId } from './world-selection';
+import type { WorldShellFactory } from './scene/world-shell';
 import { createStudioEnvironment, setupStudioLighting, type StudioEnvironment } from './scene/studio-environment';
 import { applyClothUV, applyLeatherUV, createBallContacts } from './scene/table-surfaces';
 import { createTableDetails, type TableDetails } from './scene/table-details';
@@ -134,7 +136,10 @@ type GpuTimerExtension = {
   GPU_DISJOINT_EXT: number;
 };
 
-type Scene3DOptions = {
+export type Scene3DOptions = {
+  worldId?: WorldId;
+  /** 初始化注入；测试空壳/失败路径，不提供局内热切换。 */
+  worldShellFactory?: WorldShellFactory;
   onThermalQualityChange?: (quality: AdaptiveRenderQuality, snapshot: ThermalSnapshot) => void;
 };
 
@@ -177,6 +182,13 @@ export class Scene3D {
   private targetCameraPos = new THREE.Vector3();
   private targetLookAt = new THREE.Vector3();
   private smoothLookAt = new THREE.Vector3();
+  /** 击球结果可见后的专用拉远；不影响玩家手动调整视角的响应速度。 */
+  private shotCameraReturn: {
+    elapsed: number;
+    duration: number;
+    fromPosition: THREE.Vector3;
+    fromLookAt: THREE.Vector3;
+  } | null = null;
   private cuePull = 0;
   private clock = new THREE.Clock();
   private lastSyncTime = 0;
@@ -188,6 +200,7 @@ export class Scene3D {
   private tanLine!: THREE.Line;
   private ghostRing!: THREE.Mesh;
   private studioEnvironment?: StudioEnvironment;
+  private readonly environmentOptions: Scene3DOptions;
   private ghostCue!: THREE.Mesh;
   /** 瞄准幽灵球靶点：白球影子球 + 定位环，玩家点击台面定位 */
   private aimGhost = new THREE.Group();
@@ -244,6 +257,7 @@ export class Scene3D {
 
   constructor(element: HTMLElement, options: Scene3DOptions = {}) {
     this.element = element;
+    this.environmentOptions = options;
 
     const renderBudget = renderBudgetFor({
       width: element.clientWidth,
@@ -713,7 +727,8 @@ export class Scene3D {
     }
 
     // Blender 独立视觉外壳；台面、库边与袋口继续使用上方共享几何。
-    this.studioEnvironment = createStudioEnvironment(woodTex, () => this.requestRender(true));
+    this.studioEnvironment = createStudioEnvironment(woodTex, () => this.requestRender(true),
+      this.environmentOptions.worldId, this.environmentOptions.worldShellFactory);
     this.tableGroup.add(this.studioEnvironment.root);
     this.tableDetails = createTableDetails(() => this.requestRender(true));
     this.tableGroup.add(this.tableDetails.root);
@@ -1457,6 +1472,18 @@ export class Scene3D {
     this.requestRender();
   }
 
+  /** 在上层将目标切到全台前锁定起点，用固定时长的 ease-in-out 完成拉远。 */
+  beginShotCameraReturn(durationMs = 1400) {
+    if (this.shotCameraReturn !== null) return;
+    this.shotCameraReturn = {
+      elapsed: 0,
+      duration: durationMs / 1000,
+      fromPosition: this.camera.position.clone(),
+      fromLookAt: this.smoothLookAt.clone(),
+    };
+    this.requestRender();
+  }
+
   setCameraSafety(safety: CameraSafetyInsets) {
     this.cameraSafety = safety;
     this.updateCameraTarget();
@@ -1819,7 +1846,8 @@ export class Scene3D {
     const cameraMoving =
       this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
       this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8;
-    return cameraMoving || this.strikeAnim !== null || this.dropAnims.size > 0 || this.planPlayAnim !== null;
+    return cameraMoving || this.shotCameraReturn !== null || this.strikeAnim !== null ||
+      this.dropAnims.size > 0 || this.planPlayAnim !== null;
   }
 
   private requestRender(refreshShadows = false) {
@@ -1960,9 +1988,19 @@ export class Scene3D {
 
     // 相机平滑收敛:随 rAF 每帧向目标位姿推进,脱离 React 渲染节奏——
     // 拖拽/点击瞄准后即使 React 不再渲染,相机也能滑行就位
-    const lerpK = 1 - Math.pow(0.0001, dt);
-    this.camera.position.lerp(this.targetCameraPos, Math.min(0.25, lerpK * 3));
-    this.smoothLookAt.lerp(this.targetLookAt, Math.min(0.3, lerpK * 4));
+    if (this.shotCameraReturn) {
+      const transition = this.shotCameraReturn;
+      transition.elapsed += dt;
+      const progress = Math.min(1, transition.elapsed / transition.duration);
+      const eased = progress * progress * (3 - 2 * progress);
+      this.camera.position.lerpVectors(transition.fromPosition, this.targetCameraPos, eased);
+      this.smoothLookAt.lerpVectors(transition.fromLookAt, this.targetLookAt, eased);
+      if (progress >= 1) this.shotCameraReturn = null;
+    } else {
+      const lerpK = 1 - Math.pow(0.0001, dt);
+      this.camera.position.lerp(this.targetCameraPos, Math.min(0.25, lerpK * 3));
+      this.smoothLookAt.lerp(this.targetLookAt, Math.min(0.3, lerpK * 4));
+    }
     this.camera.lookAt(this.smoothLookAt);
     // 按相机的实际高度显隐，而不是按先一步更新的目标视角显隐。
     // 这样俯视与低机位平滑切换时，镜头不会在尚未越过灯体前看到吊灯穿模。

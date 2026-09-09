@@ -1,0 +1,15 @@
+{
+  "world": "galaxy",
+  "blenderVersion": "5.2.1 LTS",
+  "authoring": "local Blender bpy; no paid provider",
+  "runtimeFile": "src/scene/assets/world-galaxy.glb",
+  "runtimeBytes": 484292,
+  "sha256": "c13122666b25ce0096ef86fcf7b9f0df36b95466b81b45a02ed6b6bcd40d6a7d",
+  "trianglesBeforeExport": 9080,
+  "meshObjects": 4,
+  "rootGroups": [
+    "BJ8_World_Galaxy",
+    "BJ8_Quiet_Galaxy"
+  ],
+  "previewIsRuntimeEvidence": false
+}

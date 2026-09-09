@@ -1,9 +1,12 @@
 /*
-[INPUT]: 依赖玩家能力画像与 onStart(mode) 回调
-[OUTPUT]: 渲染开机界面：深空月面开球动效（纯 CSS 组装动画）、当前水平一行摘要与陪练/挑战双模式入口
+[INPUT]: 玩家能力画像、onStart(mode) 与可选局前世界选择
+[OUTPUT]: 渲染开机界面：深空月面开球动效（纯 CSS 组装动画）、当前水平、五种世界选择与陪练/挑战双模式入口
 [POS]: HUD 组件层，只展示模式差异并提交选择，不持有对局状态；开机页保持零 WebGL 零程序化纹理
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
+
+import { WORLD_OPTIONS, type WorldId } from '../world-selection';
+import '../styles/world-shell.css';
 
 import {
   levelLabel,
@@ -15,9 +18,10 @@ import {
 interface IntroScreenProps {
   playerSkill: PlayerSkillProfile;
   onStart: (mode: GameMode) => void;
+  worldSelection?: { value: WorldId; onChange: (worldId: WorldId) => void };
 }
 
-export function IntroScreen({ playerSkill, onStart }: IntroScreenProps) {
+export function IntroScreen({ playerSkill, onStart, worldSelection }: IntroScreenProps) {
   const confidenceText =
     playerSkill.confidence < 0.35
       ? '评估中'
@@ -59,6 +63,21 @@ export function IntroScreen({ playerSkill, onStart }: IntroScreenProps) {
           <strong>{levelLabel(playerSkill.level)} · {Math.round(playerSkill.level)}</strong>
           <small>{confidenceText} · {Math.floor(playerSkill.totalPlayerShots)} 杆</small>
         </div>
+        {worldSelection && (
+          <fieldset className="world-choice">
+            <legend>这一局，在哪里</legend>
+            <div className="world-choice-options">
+              {WORLD_OPTIONS.map(world => (
+                <label key={world.id} className="world-choice-option">
+                  <input type="radio" name="world" value={world.id}
+                    checked={worldSelection.value === world.id}
+                    onChange={() => worldSelection.onChange(world.id)} />
+                  <span><strong>{world.label}</strong><small>{world.hint}</small></span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <div className="mode-grid">
           <section className="mode-choice practice">
             <span>陪练</span>

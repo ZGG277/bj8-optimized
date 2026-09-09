@@ -6,9 +6,11 @@
 */
 import { describe, expect, it } from 'vitest';
 import {
+  BEGINNER_START_LEVEL,
   LEGACY_PLAYER_SKILL_STORAGE_KEY,
   PREVIOUS_PLAYER_SKILL_STORAGE_KEY,
   OPPONENT_AIM_WINDOW_FRACTION,
+  OPPONENT_SAFETY_UNLOCK_LEVEL,
   PLAYER_SKILL_STORAGE_KEY,
   applyShotObservation,
   applyMatchObservations,
@@ -114,12 +116,12 @@ describe('player skill model', () => {
     };
     const profile = createPlayerSkillProfile();
     const observations = [observation, observation, observation, observation];
-    expect(profile.level).toBe(50);
+    expect(profile.level).toBe(BEGINNER_START_LEVEL);
     expect(profile.totalPlayerShots).toBe(0);
     const settled = applyMatchObservations(profile, observations);
     expect(settled.totalPlayerShots).toBe(4);
     expect(settled.matchesEvaluated).toBe(1);
-    expect(settled.level).toBeGreaterThan(50);
+    expect(settled.level).toBeGreaterThan(BEGINNER_START_LEVEL);
     expect(settled.lastMatchDelta).toBeCloseTo(1.6);
   });
 
@@ -134,7 +136,7 @@ describe('player skill model', () => {
     }]);
     expect(settled.totalPlayerShots).toBe(1);
     expect(settled.qualifiedShots).toBe(0);
-    expect(settled.executionLevel).toBe(50);
+    expect(settled.executionLevel).toBe(BEGINNER_START_LEVEL);
   });
 
   it('records foul facts without adding a third scoring dimension', () => {
@@ -152,7 +154,7 @@ describe('player skill model', () => {
     const fouled = applyMatchObservations(createPlayerSkillProfile(), observations);
     expect(fouled.totalPlayerShots).toBe(3);
     expect(fouled.qualifiedShots).toBe(0);
-    expect(fouled.executionLevel).toBe(50);
+    expect(fouled.executionLevel).toBe(BEGINNER_START_LEVEL);
     expect(fouled.foulAttempts).toBe(3);
     expect(fouled.fouls).toBe(1);
     expect(fouled.level).toBeCloseTo(clean.level, 10);
@@ -221,15 +223,30 @@ describe('opponent profile', () => {
     return () => values[index++ % values.length];
   };
 
-  it('shrinks an uncertain player toward the neutral level', () => {
+  it('首次打开时玩家与两种模式的顾燃都从 25 起步', () => {
+    const beginner = createPlayerSkillProfile();
+    expect(beginner.level).toBe(BEGINNER_START_LEVEL);
+    expect(beginner.executionLevel).toBe(BEGINNER_START_LEVEL);
+    expect(opponentTierFor(beginner, 'practice')).toBe(BEGINNER_START_LEVEL);
+    expect(opponentTierFor(beginner, 'challenge')).toBe(BEGINNER_START_LEVEL);
+    expect(createOpponentProfile(beginner, 'practice').tactical.allowSafety).toBe(false);
+    expect(createOpponentProfile(beginner, 'challenge').tactical.allowSafety).toBe(false);
+  });
+
+  it('shrinks an uncertain returning player toward the beginner baseline', () => {
     const uncertain = { ...createPlayerSkillProfile(), level: 90, confidence: 0 };
-    expect(confidenceAdjustedLevel(uncertain)).toBe(50);
-    expect(opponentTierFor(uncertain, 'practice')).toBe(53);
-    expect(opponentTierFor(uncertain, 'challenge')).toBe(60);
+    expect(confidenceAdjustedLevel(uncertain)).toBe(BEGINNER_START_LEVEL);
+    expect(opponentTierFor({ ...uncertain, totalPlayerShots: 1 }, 'practice')).toBe(28);
+    expect(opponentTierFor({ ...uncertain, totalPlayerShots: 1 }, 'challenge')).toBe(35);
   });
 
   it('targets practice at +3 and challenge at +10 without random form drift', () => {
-    const player = { ...createPlayerSkillProfile(), level: 64, confidence: 1 };
+    const player = {
+      ...createPlayerSkillProfile(),
+      level: 64,
+      confidence: 1,
+      totalPlayerShots: 1,
+    };
     const practice = createOpponentProfile(player, 'practice');
     const challenge = createOpponentProfile(player, 'challenge');
     expect(practice.tierLevel).toBe(67);
@@ -250,6 +267,7 @@ describe('opponent profile', () => {
       ...createPlayerSkillProfile(),
       level: 90,
       confidence: 1,
+      totalPlayerShots: 1,
     };
     const next = retargetOpponentProfile(initial, stronger);
     expect(next.targetLevel).toBe(93);
@@ -261,9 +279,30 @@ describe('opponent profile', () => {
   });
 
   it('caps both mode targets at 100', () => {
-    const elite = { ...createPlayerSkillProfile(), level: 100, confidence: 1 };
+    const elite = {
+      ...createPlayerSkillProfile(),
+      level: 100,
+      confidence: 1,
+      totalPlayerShots: 1,
+    };
     expect(opponentTierFor(elite, 'practice')).toBe(100);
     expect(opponentTierFor(elite, 'challenge')).toBe(100);
+  });
+
+  it('顾燃实力 50 及以下禁止主动安全球，51 起解锁', () => {
+    const level47 = {
+      ...createPlayerSkillProfile(),
+      level: 47,
+      executionLevel: 47,
+      confidence: 1,
+      totalPlayerShots: 1,
+    };
+    expect(createOpponentProfile(level47, 'practice').effectiveLevel)
+      .toBe(OPPONENT_SAFETY_UNLOCK_LEVEL);
+    expect(createOpponentProfile(level47, 'practice').tactical.allowSafety).toBe(false);
+    expect(createOpponentProfile({ ...level47, level: 48 }, 'practice').effectiveLevel)
+      .toBe(OPPONENT_SAFETY_UNLOCK_LEVEL + 1);
+    expect(createOpponentProfile({ ...level47, level: 48 }, 'practice').tactical.allowSafety).toBe(true);
   });
 
   it('把高斯长尾连续压回当前杆向安全窗口内', () => {
@@ -330,6 +369,7 @@ describe('profile persistence', () => {
     expect(migrated.level).toBe(68);
     expect(migrated.executionLevel).toBe(66);
     expect(migrated.totalPlayerShots).toBe(0);
+    expect(opponentTierFor(migrated, 'practice')).toBeGreaterThan(BEGINNER_START_LEVEL);
   });
 
   it('migrates v2 pending shots once instead of restoring a three-shot queue', () => {
@@ -354,6 +394,6 @@ describe('profile persistence', () => {
     expect(migrated.version).toBe(3);
     expect(migrated.totalPlayerShots).toBe(2);
     expect(migrated.matchesEvaluated).toBe(1);
-    expect(migrated.level).toBeGreaterThan(50);
+    expect(migrated.level).toBeGreaterThan(BEGINNER_START_LEVEL);
   });
 });

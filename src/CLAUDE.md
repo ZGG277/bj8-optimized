@@ -4,7 +4,7 @@
 
 ## 成员清单
 
-`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；幽灵球确认后冻结首碰球/袋口构图身份，视口/HUD变化只刷新安全区，真实击球后先跟随已锁定目标球，结果可见后再回到按视口横/竖排列的全台；提供开局与击球成功学习事实。复盘默认收起且由灯泡独立开关；瞄准默认拨轮并可切方向键；开始对局后才创建 WebGL；运动帧直接消费 worldRef，React 世界只在语义边界更新；走位 Worker 仅由灯泡启动。
+`Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；幽灵球确认后冻结首碰球/袋口构图身份，视口/HUD变化只刷新安全区，真实击球后先跟随已锁定目标球，结果可见后再用独立慢缓动回到按视口横/竖排列的全台；提供开局与击球成功学习事实。复盘默认收起且由灯泡独立开关；瞄准默认拨轮并可切方向键；开始对局后才创建 WebGL；运动帧直接消费 worldRef，React 世界只在语义边界更新；走位 Worker 仅由灯泡启动。
 
 `shot-camera-follow.ts` / `shot-camera-follow.test.ts`: 击球后目标近景纯时序；目标球未被撞前不把静止误判为失败，落袋、运动后停止或整杆停止时才允许回全台。
 
@@ -91,5 +91,9 @@
 `main.tsx`: React 应用挂载入口，首帧前应用三主题，启用 StrictMode，挂载 Game/ThemeSwitcher/ControlOnboarding，并按 base → layout → controls → themes → onboarding 顺序加载样式。
 
 `vite-env.d.ts`: Vite 客户端类型声明。
+
+`world-selection.ts` / `world-selection.test.ts`: 五种局前世界的 URL 合同；未知参数保持普通室内，不写长期偏好。三套新场景由 `scene/world-registry.ts` 注册本地 Blender 资产，云海保留原 V2。
+
+多世界正式入口：`Game.tsx` 只在开局时把 worldId 传给 `Scene3D`；物理、规则与相机公式不变。`scene/` 拆分共用桌体、静区及外围壳体。选择样式独立位于 `styles/world-shell.css`。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

@@ -52,11 +52,12 @@ try {
           const s = window.__bj8.scene.current;
           const model = s.scene.getObjectByName('blender-room-v1');
           let meshes = 0;
-          model.traverse(o => { if (o.isMesh) meshes++; });
+          for (const root of [model, s.studioEnvironment.quietZone, s.studioEnvironment.worldShell.root])
+            root.traverse(o => { if (o.isMesh) meshes++; });
           return { meshes, frame: s.renderedFrames(), calls: s.renderer.info.render.calls,
             triangles: s.renderer.info.render.triangles, pixelRatio: s.renderer.getPixelRatio(),
             fallbackVisible: s.scene.getObjectByName('studio-fallback').visible,
-            lampVisible: model.getObjectByName('BJ8_Pendant').visible };
+            lampVisible: s.scene.getObjectByName('BJ8_Pendant').visible };
         });
         check(size.name + ' 实际 GLB 已装配且俯视无灯具遮挡', state.meshes === 17 && !state.fallbackVisible && !state.lampVisible, state);
         await wait(1100);

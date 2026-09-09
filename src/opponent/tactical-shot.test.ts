@@ -14,7 +14,7 @@ import {
   strikeCueBall,
   type BilliardsWorld,
 } from '../physics';
-import { chooseTacticalShot } from './tactical-shot';
+import { chooseTacticalShot, planAggressiveFallback } from './tactical-shot';
 
 function placeWorld(placements: { number: number; x: number; z: number }[]): BilliardsWorld {
   const world = createInitialWorld();
@@ -31,6 +31,7 @@ function placeWorld(placements: { number: number; x: number; z: number }[]): Bil
 }
 
 const challenge = {
+  allowSafety: true,
   candidateLimit: 6,
   simulationLimit: 24,
   followUpWeight: 0.9,
@@ -62,5 +63,18 @@ describe('challenge tactical shot', () => {
       shot: null,
       simulations: 0,
     });
+  });
+
+  it('入门顾燃无清晰线路时仍瞄向袋口进攻，不退回安全球', () => {
+    const world = placeWorld([
+      { number: 0, x: 0, z: 0.85 },
+      { number: 1, x: 0, z: 0 },
+      { number: 9, x: 0, z: 0.42 },
+    ]);
+    const attempt = planAggressiveFallback(world, [1]);
+    expect(attempt).not.toBeNull();
+    expect(attempt?.target).toBe(1);
+    expect(attempt?.pocket).toBeGreaterThanOrEqual(0);
+    expect(attempt?.pocket).toBeLessThan(6);
   });
 });

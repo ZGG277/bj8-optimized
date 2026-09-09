@@ -42,7 +42,18 @@ const scriptTags = html.match(/<script\b[^>]*\bsrc=["'][^"']+["'][^>]*><\/script
 for (const tag of scriptTags) {
   const src = tag.match(/\bsrc=["']([^"']+)["']/i)?.[1]
   if (!src || !/^(?:\.\/)?assets\//.test(src)) continue
-  const js = await readFile(localAssetPath(src), 'utf8')
+  let js = await readFile(localAssetPath(src), 'utf8')
+  // Moving the ESM entry into HTML changes import.meta.url. Embed its authored world
+  // models before that move, so a model URL cannot silently resolve to the SPA fallback.
+  const modelReferences = [...js.matchAll(/new URL\(["'](world-(?:galaxy|bamboo|aurora-lake)-[^"']+\.glb)["'],\s*import\.meta\.url\)\.href/g)]
+  for (const reference of modelReferences) {
+    const modelPath = path.posix.join(path.posix.dirname(src), reference[1])
+    const model = await readFile(localAssetPath(modelPath))
+    js = js.replace(reference[0], JSON.stringify(`data:model/gltf-binary;base64,${model.toString('base64')}`))
+  }
+  if (/new URL\(["']world-[^"']+\.glb["']/.test(js)) {
+    throw new Error('inline-build: unresolved world model URL remains after moving ESM into HTML')
+  }
   html = html.replace(
     tag,
     () => `<script type="module">${js.replace(/<\/script/gi, '<\\/script')}</script>`,

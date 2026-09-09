@@ -1,0 +1,15 @@
+{
+  "world": "aurora-lake",
+  "blenderVersion": "5.2.1 LTS",
+  "authoring": "local Blender bpy; no paid provider",
+  "runtimeFile": "src/scene/assets/world-aurora-lake.glb",
+  "runtimeBytes": 1515172,
+  "sha256": "a7f0215b7ccc4e06f395301674ffdc65c3174e257d1d208453c8f6447ab86f26",
+  "trianglesBeforeExport": 15142,
+  "meshObjects": 8,
+  "rootGroups": [
+    "BJ8_World_Aurora",
+    "BJ8_Quiet_Aurora"
+  ],
+  "previewIsRuntimeEvidence": false
+}

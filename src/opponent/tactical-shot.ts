@@ -1,12 +1,16 @@
 /*
 [INPUT]: 依赖 physics 确定性仿真、planner/candidates 几何候选；接收当前世界、合法球与严格仿真预算
-[OUTPUT]: 对外输出已验证进球且不洗袋的顾燃战术选杆，挑战模式优先保留下一杆
+[OUTPUT]: 对外输出已验证进球且不洗袋的顾燃战术选杆，以及低等级禁防守时的进攻意图回退
 [POS]: 对手 AI 纯策略层；以有界确定性仿真替代通用高预算走位搜索
 [PROTOCOL]: 候选、评分或预算变化时同步更新 tactical-shot.test.ts 与 opponent/CLAUDE.md
 */
 import {
+  getCueBall,
+  getPocketAimWindow,
   cloneWorld,
   isCueBallPocketed,
+  POCKETS,
+  TABLE,
   pocketedThisShot,
   simulateUntilStop,
   strikeCueBall,
@@ -15,10 +19,18 @@ import {
 import { generateCandidates, type ShotCandidate } from '../planner/candidates';
 
 export type TacticalSearchConfig = {
+  allowSafety: boolean;
   candidateLimit: number;
   simulationLimit: number;
   followUpWeight: number;
   alternativeChance: number;
+};
+
+export type AggressiveFallback = {
+  angle: number;
+  power: number;
+  target: number;
+  pocket: number;
 };
 
 export type TacticalShotResult = {
@@ -40,6 +52,48 @@ const SPIN_VARIANTS = [
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * 入门顾燃在无可验证直接进球线时，仍选择一个目标球→袋口的进攻意图。
+ * 路径可能被挡住、因而失误或犯规，但不会为了夺回球权而主动做安全球。
+ */
+export function planAggressiveFallback(
+  world: BilliardsWorld,
+  legal: number[],
+): AggressiveFallback | null {
+  const cue = getCueBall(world);
+  if (!cue?.active) return null;
+  let best: (AggressiveFallback & { score: number }) | null = null;
+
+  for (const target of world.balls) {
+    if (!target.active || !legal.includes(target.number)) continue;
+    for (const pocket of POCKETS) {
+      const mouth = getPocketAimWindow(pocket).center;
+      const pocketDx = mouth.x - target.x;
+      const pocketDz = mouth.z - target.z;
+      const pocketDistance = Math.hypot(pocketDx, pocketDz);
+      if (pocketDistance === 0) continue;
+      const ghostX = target.x - (pocketDx / pocketDistance) * TABLE.ballRadius * 2;
+      const ghostZ = target.z - (pocketDz / pocketDistance) * TABLE.ballRadius * 2;
+      if (Math.abs(ghostX) > TABLE.width / 2 || Math.abs(ghostZ) > TABLE.length / 2) continue;
+      const cueDistance = Math.hypot(ghostX - cue.x, ghostZ - cue.z);
+      if (cueDistance === 0) continue;
+      const score = cueDistance + pocketDistance;
+      if (best && best.score <= score) continue;
+      best = {
+        angle: Math.atan2(ghostX - cue.x, -(ghostZ - cue.z)),
+        power: clamp(35 + (cueDistance + pocketDistance) * 15, 38, 78),
+        target: target.number,
+        pocket: pocket.index,
+        score,
+      };
+    }
+  }
+
+  if (!best) return null;
+  const { score: _score, ...shot } = best;
+  return shot;
 }
 
 function candidateEase(candidate: ShotCandidate): number {

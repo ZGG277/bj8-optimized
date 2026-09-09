@@ -28,6 +28,8 @@ const center = selector => page.$eval(selector, element => {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 });
 const tap = async selector => {
+  await page.$eval(selector, element => element.scrollIntoView({ block: 'center', inline: 'center' }));
+  await wait(50);
   const point = await center(selector);
   await page.touchscreen.tap(point.x, point.y);
   await wait(100);
@@ -149,6 +151,9 @@ for (let index = 0; index < 70; index += 1) {
       phase: window.__bj8.match.current.phase,
       level: Number(document.querySelector('.viewport').getAttribute('data-view-level')),
       target: scene.shotCameraTarget,
+      returnElapsed: scene.shotCameraReturn?.elapsed ?? null,
+      returnDuration: scene.shotCameraReturn?.duration ?? null,
+      cameraDistanceToTarget: scene.camera.position.distanceTo(scene.targetCameraPos),
       targetActive: window.__bj8.world.current.balls.find(ball => ball.number === 1)?.active,
     };
   }));
@@ -157,15 +162,25 @@ for (let index = 0; index < 70; index += 1) {
     await page.screenshot({ path: '/tmp/bj8-shot-follow-near.png' });
     nearShotCaptured = true;
   }
-  if (timeline.some(item => item.target === 1) && timeline.at(-1).target === null && timeline.at(-1).level > 0.99) break;
+  const returnStarted = timeline.some(item => item.target === null && item.returnElapsed !== null);
+  if (returnStarted && timeline.at(-1).target === null && timeline.at(-1).returnElapsed === null) break;
   await wait(50);
 }
 const near = timeline.find(item => item.phase === 'rolling' && item.target === 1 && item.level < 0.5);
 const global = near && timeline.find(item => item.time > near.time && item.target === null && item.level > 0.99);
+const returning = timeline.filter(item => item.target === null && item.returnElapsed !== null);
 ok(
   '击球后先保留目标球近景，结果可见后再回全台',
   Boolean(near && global),
   JSON.stringify({ near, global, samples: timeline.length }),
+);
+ok(
+  '回全台使用约 1.4 秒的独立慢缓动',
+  returning.length >= 8 && returning.every(item =>
+    item.returnDuration >= 1.35 && item.returnDuration <= 1.45) &&
+    returning.some(item => item.returnElapsed >= 0.3 && item.returnElapsed <= 1.1 &&
+      item.cameraDistanceToTarget > 0.08),
+  JSON.stringify({ first: returning.at(0), middle: returning.at(Math.floor(returning.length / 2)), samples: returning.length }),
 );
 if (global) {
   await wait(700);

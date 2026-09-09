@@ -1,7 +1,7 @@
 /*
-[INPUT]: 依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
+[INPUT]: 局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
 [OUTPUT]: 对外提供完整对局编排：陪练/挑战、复盘/训练总结、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球后目标近景→全台与控件学习成功事实
-[POS]: 实验场的产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
+[POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import {
@@ -40,6 +40,7 @@ import { ReviewOverlay } from './components/ReviewOverlay';
 import { IntroScreen } from './components/IntroScreen';
 import { FirstMatchGuide } from './components/FirstMatchGuide';
 import { Scene3D } from './Scene3D';
+import { resolveWorldSelection, worldSelectionUrl, type WorldId } from './world-selection';
 import type { PlannedStep, PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
@@ -113,6 +114,12 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 }
 
 export default function Game() {
+  const [selectedWorld, setSelectedWorld] = useState<WorldId>(() =>
+    resolveWorldSelection(window.location.search));
+  const selectWorld = (worldId: WorldId) => {
+    setSelectedWorld(worldId);
+    window.history.replaceState(window.history.state, '', worldSelectionUrl(window.location.href, worldId));
+  };
   // ── 对局编排状态 ──
   const {
     worldRef, worldView, setWorldView,
@@ -185,13 +192,17 @@ export default function Game() {
     orientFullTable();
     setViewLevel(OVERHEAD_VIEW);
   }, [clearShotCameraFollow, clearTouchAimCameraTimer, clearAimCameraFraming, orientFullTable, setViewLevel]);
+  const showFullTableAfterShot = useCallback(() => {
+    scene3DRef.current?.beginShotCameraReturn();
+    showFullTable();
+  }, [showFullTable]);
   const finishShotCameraFollow = useCallback((delayMs: number) => {
     if (!shotCameraFollowRef.current || shotCameraReturnTimerRef.current !== null) return;
     shotCameraReturnTimerRef.current = window.setTimeout(() => {
       shotCameraReturnTimerRef.current = null;
-      showFullTable();
+      showFullTableAfterShot();
     }, delayMs);
-  }, [showFullTable]);
+  }, [showFullTableAfterShot]);
   const renderBudget = useMemo(() => {
     if (typeof window === 'undefined') {
       return {
@@ -537,7 +548,7 @@ export default function Game() {
           ? declaredIntent.target
           : null;
       if (followedTarget === null) {
-        showFullTable();
+        showFullTableAfterShot();
       } else {
         shotCameraFollowRef.current = createShotCameraFollow(followedTarget);
         setShotCameraTarget(followedTarget);
@@ -556,7 +567,7 @@ export default function Game() {
     } else {
       doShot();
     }
-  }, [advanceFirstMatchGuide, aimCameraFraming, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch, showFullTable]);
+  }, [advanceFirstMatchGuide, aimCameraFraming, worldRef, matchRef, aimGhostDistRef, scene3DRef, playStrike, resetEvents, setWorldView, setMatch, showFullTableAfterShot]);
 
   // ── 出杆输入协调器 ──
   const {
@@ -941,6 +952,7 @@ export default function Game() {
     if (!el) return;
 
     const scene = new Scene3D(el, {
+      worldId: selectedWorld,
       onThermalQualityChange: quality => handleThermalQualityChange(quality.movingPresentationFps),
     });
     scene3DRef.current = scene;
@@ -1110,7 +1122,8 @@ export default function Game() {
         />
       )}
       {match.phase === 'intro' && (
-        <IntroScreen playerSkill={playerSkill} onStart={handleResetGame} />
+        <IntroScreen playerSkill={playerSkill} onStart={handleResetGame}
+          worldSelection={{ value: selectedWorld, onChange: selectWorld }} />
       )}
     </div>
   );

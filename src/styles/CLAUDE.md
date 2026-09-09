@@ -22,4 +22,6 @@
 
 `themes/neon.css`: 霓虹球房主题；近黑蓝紫底、电光青主色、品红蓄力态。
 
+`world-shell.css`: 正式开始页的五项世界选择；桌面三列、窄屏两列，不改变既有 HUD 和触控几何。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

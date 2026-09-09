@@ -59,6 +59,8 @@ export type OpponentProfile = {
   powerJitter: number;
   aimWindowFraction: number;
   tactical: {
+    /** 入门局不允许顾燃主动退回安全球，降低新手连续丢失球权的挫败感。 */
+    allowSafety: boolean;
     candidateLimit: number;
     simulationLimit: number;
     followUpWeight: number;
@@ -78,6 +80,8 @@ const MAX_OPPONENT_LEVEL = 100;
 const MAX_LEVEL_UP_PER_SHOT = 0.4;
 const MAX_LEVEL_DOWN_PER_SHOT = 0.2;
 const MAX_OPPONENT_STEP = 3;
+export const BEGINNER_START_LEVEL = 25;
+export const OPPONENT_SAFETY_UNLOCK_LEVEL = 50;
 const POSITION_WEIGHT = 0.28;
 const PRECISION_WEIGHT = 1 - POSITION_WEIGHT;
 export const OPPONENT_AIM_WINDOW_FRACTION = 0.82;
@@ -125,9 +129,9 @@ export function levelLabel(level: number): string {
 export function createPlayerSkillProfile(): PlayerSkillProfile {
   return {
     version: 3,
-    level: 50,
-    executionLevel: 50,
-    executionSigma: levelToSigma(50),
+    level: BEGINNER_START_LEVEL,
+    executionLevel: BEGINNER_START_LEVEL,
+    executionSigma: levelToSigma(BEGINNER_START_LEVEL),
     confidence: 0,
     qualifiedShots: 0,
     difficultyBuckets: [0, 0, 0],
@@ -319,13 +323,23 @@ export function applyShotObservation(
   return applyMatchObservations(profile, [observation]);
 }
 
-/** 低置信度时向中性 50 收缩，避免冷启动误判直接生成碾压型对手。 */
+/** 低置信度时向新手基线 25 收缩，避免冷启动直接生成碾压型对手。 */
 export function confidenceAdjustedLevel(profile: PlayerSkillProfile): number {
-  return 50 + (profile.level - 50) * clamp(profile.confidence, 0, 1);
+  return BEGINNER_START_LEVEL +
+    (profile.level - BEGINNER_START_LEVEL) * clamp(profile.confidence, 0, 1);
 }
 
 /** 模式档位不含 formOffset，可在开始页稳定展示。 */
 export function opponentTierFor(profile: PlayerSkillProfile, mode: GameMode): number {
+  const hasNoRecordedPlay =
+    profile.totalPlayerShots === 0 &&
+    profile.matchesEvaluated === 0 &&
+    profile.qualifiedShots === 0 &&
+    profile.positionAttempts === 0 &&
+    profile.foulAttempts === 0;
+  if (hasNoRecordedPlay) {
+    return BEGINNER_START_LEVEL;
+  }
   const adjusted = confidenceAdjustedLevel(profile);
   return Math.round(clamp(
     adjusted + (mode === 'practice' ? 3 : 10),
@@ -357,6 +371,7 @@ function profileForLevel(
         : 0.035 - levelT * 0.02,
     aimWindowFraction: mode === 'practice' ? 0.82 : 0.55,
     tactical: {
+      allowSafety: safeEffective > OPPONENT_SAFETY_UNLOCK_LEVEL,
       candidateLimit: mode === 'practice' ? 3 : 6,
       simulationLimit: mode === 'practice' ? 12 : 24,
       followUpWeight: mode === 'practice' ? 0.35 : 0.9,
