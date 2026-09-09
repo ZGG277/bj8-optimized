@@ -1,0 +1,15 @@
+{
+  "author": "GPT-6 via Blender MCP",
+  "blender": "5.2.1 LTS",
+  "original_file": "",
+  "original_scene": "Scene",
+  "original_dirty": false,
+  "active_scene": "BJ8_Lake360_Experiment",
+  "restoration": "Switch scene selector to Scene; original Cube, Light, Camera retained.",
+  "triangles_upper_bound": 9888,
+  "meshes": 2,
+  "materials": 2,
+  "glb_bytes": 192088,
+  "glb_sha256": "7a896bfe0028f25fb6ff373f259ba47edd5204948f9423777a2d67dc75a36eaf",
+  "offline_render": false
+}

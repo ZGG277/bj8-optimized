@@ -14,3 +14,6 @@ shots/table-craft-v2/preview-overhead.png
 shots/table-craft-v2/preview-side-macro.png
 shots/table-craft-v2/preview-side.png
 shots/table-craft-v2/preview-state.json
+
+# Lake360 local install cache
+.npm-cache/

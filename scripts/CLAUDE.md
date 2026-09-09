@@ -1,5 +1,9 @@
 # scripts/
 
+`diagnose-lake360-resources.mjs`：定向记录所有HTTP错误URL并关闭Chrome。
+
+`verify-lake360.mjs`：独立 5216 入口桌面与移动模拟六方位截图、渲染提交耗时/帧间隔、真实 WebGL drawcalls/三角形及暂停/退出检查；关闭本脚本浏览器。
+
 > L2 | 父级: `../CLAUDE.md`
 
 浏览器端验证脚本层：默认驱动 `:5199` 的真实页面。多数脚本经 puppeteer-core 连接无头 ego lite（远程调试 `:9333`），支持 `BROWSER_URL` / `GAME_URL` 覆盖；`verify-render-thermal.mjs` 与 `verify-control-intent.mjs` 则自行启动 Chrome，使用 `PUPPETEER_EXECUTABLE_PATH` / `GAME_URL`。

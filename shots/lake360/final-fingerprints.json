@@ -1,0 +1,10 @@
+{
+  "src/Scene3D.ts": "68d9c9265e24446530da9c0026abaa62018faa9597bbf3918f8ba96dc5be3074",
+  "src/scene/studio-environment.ts": "68abeae80cc242db1767e6c664b7b8e035844b57e6babaafab954b031c537247",
+  "src/scene/lake360.ts": "b0acb5481fb0c0078eeaffcdd4eab74a25acf983604a287ef78b4b42904e7247",
+  "src/scene/lake360-explorer.ts": "89d93c426076217aa8840534ea662cae607ca421ba6957c81465953850ac662c",
+  "src/scene/assets/lake360.glb": "7a896bfe0028f25fb6ff373f259ba47edd5204948f9423777a2d67dc75a36eaf",
+  "assets/blender/lake360/lake360.blend": "0c5fd4227c0ecb19d34844954109e443319e4bb19a5331d57544fa4d28e5c479",
+  "assets/blender/lake360/build_lake360.py": "026d397a7d96c12524fbdea0439d5caa4ea42be82ce1b0d6051cd264d2cd95f0",
+  "dist/index.html": "da51da338a81eec066a6d70238fd9fbd1a7adf10585c403f057653629b0b2d4b"
+}

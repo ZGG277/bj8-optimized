@@ -1,5 +1,7 @@
 # bj8-optimized/
 
+湖面独立实验：`?lake360=1` 使用 Blender 制作的 192KB 全向天空/湖面及 10Hz 可暂停水波，原玩法保留。证据见 `LAKE360_ACCEPTANCE.md`；本地实验未发布。
+
 > L2 | 父级: `../CLAUDE.md`
 
 版本状态（2026-09-09）：v1.7.0 已发布到妙搭，54 个文件 / 392 项回归通过，包含五种正式世界、新手 25 级起步与 50 级以内禁主动防守、击球后 1.4 秒慢回全台；release 回执 `feishuapp.com` 正式入口桌面/手机 20 项及正式 CDN 包 35 项均已验收。历史 `aiforce.cloud` 别名在本机出现连接关闭，事实与边界以 PROJECT_BASELINE.md 为准。

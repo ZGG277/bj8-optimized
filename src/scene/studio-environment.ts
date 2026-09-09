@@ -9,6 +9,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import type { WorldId } from '../world-selection';
+import { createLake360, lake360Enabled } from './lake360';
 import { WORLD_VISUALS } from './world-registry';
 import { attachBlenderWorld } from './blender-world';
 import { createEmptyWorldShell, QUIET_ZONE_LAYOUT,
@@ -92,15 +93,16 @@ export function createStudioEnvironment(
   let pendant: THREE.Object3D | undefined;
 
   // 程序化壳体失败时静区与球桌仍独立装配；没有壳体也能打球。
-  const quietZone = WORLD_VISUALS[worldId].quietZone();
+  const lake = lake360Enabled();
+  const quietZone = lake ? new THREE.Group() : WORLD_VISUALS[worldId].quietZone();
   quietZone.name = 'quiet-zone';
   root.add(quietZone);
   let worldShell: WorldShell;
   try {
-    const createShell = shellFactory ?? WORLD_VISUALS[worldId].shell;
+    const createShell = lake ? createLake360 : shellFactory ?? WORLD_VISUALS[worldId].shell;
     worldShell = createShell({ layout: QUIET_ZONE_LAYOUT, requestRender: onReady });
     const asset = WORLD_VISUALS[worldId].asset;
-    if (asset && !shellFactory) worldShell = attachBlenderWorld(worldShell, quietZone, asset, onReady);
+    if (asset && !shellFactory && !lake) worldShell = attachBlenderWorld(worldShell, quietZone, asset, onReady);
   } catch (error) {
     worldShell = createEmptyWorldShell();
     root.userData.shellError = String(error);
@@ -122,7 +124,7 @@ export function createStudioEnvironment(
 
   const fallback = new THREE.Group();
   fallback.name = 'studio-fallback';
-  if (worldId === 'studio') {
+  if (worldId === 'studio' && !lake) {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24),
       new THREE.MeshStandardMaterial({ color: 0x282d28, roughness: .92 }));
     floor.rotation.x = -Math.PI / 2;
@@ -167,7 +169,7 @@ export function createStudioEnvironment(
     });
     root.add(model);
     root.updateMatrixWorld(true);
-    if (worldId === 'studio') {
+    if (worldId === 'studio' && !lake) {
       // 提取地面与外围装饰时保留世界变换；球桌分组完全不动。
       const floors: THREE.Mesh[] = [];
       room.traverse(object => {
@@ -206,7 +208,7 @@ export function createStudioEnvironment(
     root, ready, worldShell, quietZone,
     setCameraHeight(height) {
       cameraHeight = height;
-      if (pendant && worldId === 'studio') pendant.visible = height < 1.7;
+      if (pendant && worldId === 'studio' && !lake) pendant.visible = height < 1.7;
     },
     dispose() {
       if (disposed) return;

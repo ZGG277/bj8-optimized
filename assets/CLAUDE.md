@@ -1,5 +1,7 @@
 # assets/
 
+`blender/lake360/`：GPT-6 通过 Blender MCP 操作保存的独立作者源、可复查 Python 和来源记录，保留原默认 Scene。
+
 > L2 | 父级: `../CLAUDE.md`
 
 `blender/billiards-room-v1/`: 第一版静谧球房的 Blender 制作源、物理基线参考快照及来源清单；不直接进入生产包，运行时 GLB 位于 `src/scene/assets/`。

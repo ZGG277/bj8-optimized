@@ -1,5 +1,7 @@
 # scene/
 
+`lake360.ts` / `lake360-explorer.ts` / `assets/lake360.glb`：Blender 作者网格、方向连续天空、解析反射及 10Hz 水波；暂停/隐藏页/卸载停止请求。仅 `?lake360=1` 替换地面和外围，不修改正式世界资产。
+
 > L2 | 父级: `../CLAUDE.md`
 
 `studio-environment.ts`: 共用 Blender 桌体与比赛照明、Quiet Zone 和 World Shell 装配器；开始对局后才解析 GLB，加载失败保留基础台底/地面，卸载后到达的资产自行释放。保留单个 renderer 和 rAF，灯具显隐使用实际相机高度；主光继续消费现有温控阴影预算。

@@ -1,0 +1,114 @@
+{
+  "url": "http://127.0.0.1:5216/?lake360=1",
+  "device": "macOS host; desktop Chrome and emulated mobile viewport, NOT physical phone",
+  "views": [
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 1
+      },
+      "url": "http://127.0.0.1:5216/?lake360=1",
+      "title": "瓜瓜台球",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+      "dpr": 1,
+      "calls": 455,
+      "triangles": 211475,
+      "lakeTriangles": 9792,
+      "lakeMeshes": 2,
+      "quality": {
+        "tier": "balanced",
+        "source": "none",
+        "estimatedGpuDuty": 0,
+        "droppedFrameRatio": 0,
+        "averageRenderMs": 0,
+        "targetFps": 30,
+        "pixelRatio": 1,
+        "shadowMapSize": 1536
+      },
+      "world": {
+        "assetState": "ready",
+        "worldId": "studio",
+        "shellState": "ready"
+      },
+      "loaded": {
+        "assetState": "ready",
+        "ripples": true
+      },
+      "renderSubmissionMs": {
+        "n": 120,
+        "mean": 4.0024999966224035,
+        "p95": 4.600000023841858
+      },
+      "presentationIntervalMs": {
+        "n": 119,
+        "mean": 99.99411764665813,
+        "p95": 101.5
+      },
+      "fps": 10.000588269938303,
+      "pausedFrames": 0,
+      "returnedToGame": true,
+      "shot": {
+        "phase": "rolling",
+        "moving": true
+      },
+      "realPointerPlacement": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "deviceScaleFactor": 3,
+        "isMobile": true,
+        "hasTouch": true
+      },
+      "url": "http://127.0.0.1:5216/?lake360=1",
+      "title": "瓜瓜台球",
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+      "dpr": 2,
+      "calls": 455,
+      "triangles": 211475,
+      "lakeTriangles": 9792,
+      "lakeMeshes": 2,
+      "quality": {
+        "tier": "balanced",
+        "source": "none",
+        "estimatedGpuDuty": 0,
+        "droppedFrameRatio": 0,
+        "averageRenderMs": 0,
+        "targetFps": 45,
+        "pixelRatio": 2,
+        "shadowMapSize": 1024
+      },
+      "world": {
+        "assetState": "ready",
+        "worldId": "studio",
+        "shellState": "ready"
+      },
+      "loaded": {
+        "assetState": "ready",
+        "ripples": true
+      },
+      "renderSubmissionMs": {
+        "n": 120,
+        "mean": 3.023333325982094,
+        "p95": 3.299999952316284
+      },
+      "presentationIntervalMs": {
+        "n": 119,
+        "mean": 99.9991596636652,
+        "p95": 101.70000004768372
+      },
+      "fps": 10.000084034339652,
+      "pausedFrames": 0,
+      "returnedToGame": true,
+      "shot": {
+        "phase": "rolling",
+        "moving": true
+      },
+      "realPointerPlacement": true
+    }
+  ],
+  "errors": [],
+  "browser": "Chrome/152.0.7977.84"
+}

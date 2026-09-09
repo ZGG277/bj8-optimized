@@ -1,10 +1,12 @@
 /*
 [INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图、scene Blender 视觉资产与 Three.js
-[OUTPUT]: 按初始化 worldId 装配共用球桌与外围世界，提供静止按需渲染、GPU 自适应温控、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
+[OUTPUT]: 湖面实验额外支持隔离环顾入口；按初始化 worldId 装配共用球桌与外围世界，提供静止按需渲染、GPU 自适应温控、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
+import { lake360Enabled } from './scene/lake360';
+import { mountLakeExplorer } from './scene/lake360-explorer';
 import type { WorldId } from './world-selection';
 import type { WorldShellFactory } from './scene/world-shell';
 import { createStudioEnvironment, setupStudioLighting, type StudioEnvironment } from './scene/studio-environment';
@@ -149,6 +151,8 @@ export class Scene3D {
   renderer: THREE.WebGLRenderer;
   element: HTMLElement;
 
+  private lakeExplore: { yaw: number; pitch: number } | null = null;
+  private disposeLakeExplorer?: () => void;
   private ballMeshes: THREE.Mesh[] = [];
   private ballQuats: THREE.Quaternion[] = [];
   private ballContacts?: ReturnType<typeof createBallContacts>;
@@ -276,6 +280,7 @@ export class Scene3D {
     this.scene.fog = new THREE.Fog(0x07090a, 4, 11);
 
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
+    if (lake360Enabled()) { this.camera.far = 2000; this.camera.updateProjectionMatrix(); }
     this.virtualCam = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
 
     this.renderer = new THREE.WebGLRenderer({
@@ -730,6 +735,12 @@ export class Scene3D {
     this.studioEnvironment = createStudioEnvironment(woodTex, () => this.requestRender(true),
       this.environmentOptions.worldId, this.environmentOptions.worldShellFactory);
     this.tableGroup.add(this.studioEnvironment.root);
+    if (lake360Enabled()) this.disposeLakeExplorer = mountLakeExplorer((yaw, pitch, active) => {
+      this.lakeExplore = active ? { yaw, pitch } : null;
+      this.requestRender();
+    }, enabled => {
+      if (this.studioEnvironment) this.studioEnvironment.worldShell.root.userData.ripples = enabled;
+    });
     this.tableDetails = createTableDetails(() => this.requestRender(true));
     this.tableGroup.add(this.tableDetails.root);
   }
@@ -1846,7 +1857,7 @@ export class Scene3D {
     const cameraMoving =
       this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
       this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8;
-    return cameraMoving || this.shotCameraReturn !== null || this.strikeAnim !== null ||
+    return (!this.lakeExplore && cameraMoving) || this.shotCameraReturn !== null || this.strikeAnim !== null ||
       this.dropAnims.size > 0 || this.planPlayAnim !== null;
   }
 
@@ -2054,6 +2065,11 @@ export class Scene3D {
     this.updatePlanPlay(dt);
     this.ballContacts?.sync(this.ballMeshes);
 
+    if (this.lakeExplore) {
+      const { yaw, pitch } = this.lakeExplore;
+      this.camera.position.set(0, .8, 3.6);
+      this.camera.lookAt(Math.sin(yaw) * Math.cos(pitch) * 10, .8 + Math.sin(pitch) * 10, 3.6 + Math.cos(yaw) * Math.cos(pitch) * 10);
+    }
     this.renderer.render(this.scene, this.camera);
     this.finishGpuTimer(gpuQuery);
     if (continuousWork && !this.gpuTimerExtension) {
@@ -2211,6 +2227,7 @@ export class Scene3D {
 
   dispose() {
     this.stop();
+    this.disposeLakeExplorer?.();
     this.studioEnvironment?.dispose();
     this.tableDetails?.dispose();
     this.ballContacts?.mesh.dispose();
