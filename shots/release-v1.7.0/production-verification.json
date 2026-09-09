@@ -1,0 +1,209 @@
+{
+  "url": "https://lf-miaoda-static.feishucdn.com/app_17b18dh5axj/27efed3a7bfc765cb858f4eeb09c362f716157d6/client/game/index.html",
+  "production": true,
+  "results": [
+    {
+      "name": "入口 普通 保持约定",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "入口 ?world=unknown 保持约定",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "入口 ?world=studio 保持约定",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-studio 服务字节匹配最终构建",
+      "pass": true,
+      "detail": {
+        "sha256": "c7f0e0ba852f574c303a396da881d3ed2c415c62b5c84256e36bcea691f9abde"
+      }
+    },
+    {
+      "name": "desktop-studio 局前零 WebGL 和零资产解析",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-studio 局前选择更新链接",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-studio 局内不出现世界选择",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-studio 生产瞄准控件粗细档可切换",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-studio 真实视角滑杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-studio 生产入口实际出杆进入滚动",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-studio 无页面错误和横向溢出",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "desktop-studio 生产无外部模型请求",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-cloud-sea 服务字节匹配最终构建",
+      "pass": true,
+      "detail": {
+        "sha256": "c7f0e0ba852f574c303a396da881d3ed2c415c62b5c84256e36bcea691f9abde"
+      }
+    },
+    {
+      "name": "desktop-cloud-sea 局前零 WebGL 和零资产解析",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-cloud-sea 局前选择更新链接",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-cloud-sea 局内不出现世界选择",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-cloud-sea 生产瞄准控件粗细档可切换",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-cloud-sea 真实视角滑杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-cloud-sea 生产入口实际出杆进入滚动",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "desktop-cloud-sea 无页面错误和横向溢出",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "desktop-cloud-sea 生产无外部模型请求",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-studio 服务字节匹配最终构建",
+      "pass": true,
+      "detail": {
+        "sha256": "c7f0e0ba852f574c303a396da881d3ed2c415c62b5c84256e36bcea691f9abde"
+      }
+    },
+    {
+      "name": "mobile-studio 局前零 WebGL 和零资产解析",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-studio 局前选择更新链接",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-studio 局内不出现世界选择",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-studio 生产瞄准控件粗细档可切换",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-studio 真实视角滑杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-studio 生产入口实际出杆进入滚动",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-studio 无页面错误和横向溢出",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile-studio 生产无外部模型请求",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-cloud-sea 服务字节匹配最终构建",
+      "pass": true,
+      "detail": {
+        "sha256": "c7f0e0ba852f574c303a396da881d3ed2c415c62b5c84256e36bcea691f9abde"
+      }
+    },
+    {
+      "name": "mobile-cloud-sea 局前零 WebGL 和零资产解析",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-cloud-sea 局前选择更新链接",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-cloud-sea 局内不出现世界选择",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-cloud-sea 生产瞄准控件粗细档可切换",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-cloud-sea 真实视角滑杆可用",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-cloud-sea 生产入口实际出杆进入滚动",
+      "pass": true,
+      "detail": {}
+    },
+    {
+      "name": "mobile-cloud-sea 无页面错误和横向溢出",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile-cloud-sea 生产无外部模型请求",
+      "pass": true,
+      "detail": {}
+    }
+  ]
+}

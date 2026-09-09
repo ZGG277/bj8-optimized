@@ -1,0 +1,16 @@
+{
+  "app_id": "app_17b18dh5axj",
+  "release_id": "7683349083205324076",
+  "status": "finished",
+  "branch": "sprint/default",
+  "commit_id": "27efed3a7bfc765cb858f4eeb09c362f716157d6",
+  "source_commit": "fd7d412831a57569b8e8fd34783bca29c7d44d2e",
+  "source_tag": "v1.7.0",
+  "artifact_bytes": 8988274,
+  "artifact_sha256": "c7f0e0ba852f574c303a396da881d3ed2c415c62b5c84256e36bcea691f9abde",
+  "cdn_http_status": 200,
+  "cdn_browser_checks": "35/35",
+  "formal_entry_url": "https://lg22l37ytz.feishuapp.com/app/app_17b18dh5axj",
+  "formal_entry_browser_checks": "20/20",
+  "legacy_aiforce_alias_check": "blocked by ERR_CONNECTION_CLOSED from the verification host"
+}

@@ -1,6 +1,6 @@
 # 瓜瓜台球
 
-> 当前发布候选：`v1.7.0`（2026-09-09），五种正式世界、新手减挫败规则与更舒缓的击球回全台镜头；上一正式基线及发布证据见 [PROJECT_BASELINE.md](PROJECT_BASELINE.md)。
+> 当前正式项目基线：`v1.7.0`（2026-09-09），五种正式世界、新手减挫败规则与更舒缓的击球回全台镜头；妙搭 release 已完成，回执正式入口桌面/手机 20 项与发布包 35 项检查通过。发布证据见 [PROJECT_BASELINE.md](PROJECT_BASELINE.md)。
 
 局前现在可直接选择静谧球房、云海浮台、宇宙星系、雨后竹林与极光冰湖；`?world=` 链接仍可预选世界，整局期间保持不变。三套新 Blender 环境的可编辑源位于 `assets/blender/world-*/`，运行时 GLB 随最终单 HTML 内联，合入前验收证据见 [WORLD_SCENES_V3_ACCEPTANCE.md](WORLD_SCENES_V3_ACCEPTANCE.md)。
 
@@ -36,7 +36,7 @@ v1.4 采用纯视觉五控件 HUD：视角、灯泡、击球点、蓄力和瞄�
 
 视觉语言 v1.3 以“静谧球房”的信息架构、54px 控制轨和手势几何为共同底座，提供三套可即时切换的表达：默认「青瓷」、正式竞技「决赛之夜」、年轻夜场「霓虹球房」。左下角小调色盘展开主题选项，URL `?theme=celadon|noir|neon` 与 `[` / `]` 键也可切换，选择会保存在本机；主题只改视觉，不改游戏逻辑与触控几何。
 
-正式线上入口（飞书妙搭托管；每次发布后都必须从此入口复验）：https://lg22l37ytz.aiforce.cloud/app/app_17b18dh5axj
+正式线上入口（飞书妙搭托管；本次 release 回执 URL）：https://lg22l37ytz.feishuapp.com/app/app_17b18dh5axj
 
 ## 源码与版本约定
 
