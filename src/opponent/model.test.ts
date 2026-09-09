@@ -251,14 +251,46 @@ describe('opponent profile', () => {
     const challenge = createOpponentProfile(player, 'challenge');
     expect(practice.tierLevel).toBe(67);
     expect(practice.targetLevel).toBe(67);
-    expect(practice.tactical.candidateLimit).toBe(3);
+    expect(practice.tactical.candidateLimit).toBe(4);
     expect(practice.tactical.simulationLimit).toBe(12);
     expect(challenge.tierLevel).toBe(74);
-    expect(challenge.tactical.candidateLimit).toBe(6);
-    expect(challenge.tactical.simulationLimit).toBe(24);
+    expect(challenge.tactical.candidateLimit).toBe(5);
+    expect(challenge.tactical.simulationLimit).toBe(20);
     expect(challenge.tactical.followUpWeight).toBeGreaterThan(practice.tactical.followUpWeight);
-    expect(challenge.tactical.alternativeChance).toBe(0);
+    expect(challenge.tactical.alternativeChance).toBeLessThan(practice.tactical.alternativeChance);
     expect(challenge.aimSigma).toBeLessThan(practice.aimSigma);
+  });
+
+  it('25、60、90 级在执行误差与走位预算上形成可观察梯度', () => {
+    const low = createOpponentProfile(createPlayerSkillProfile(), 'practice');
+    const atLevel = (level: number) => createOpponentProfile({
+      ...createPlayerSkillProfile(),
+      level: level - 3,
+      confidence: 1,
+      totalPlayerShots: 1,
+    }, 'practice');
+    const mid = atLevel(60);
+    const high = atLevel(90);
+
+    expect([low.effectiveLevel, mid.effectiveLevel, high.effectiveLevel]).toEqual([25, 60, 90]);
+    expect([low.tactical.candidateLimit, mid.tactical.candidateLimit, high.tactical.candidateLimit])
+      .toEqual([1, 3, 5]);
+    expect([low.tactical.simulationLimit, mid.tactical.simulationLimit, high.tactical.simulationLimit])
+      .toEqual([3, 9, 15]);
+    expect(low.tactical.followUpWeight).toBeLessThan(mid.tactical.followUpWeight);
+    expect(mid.tactical.followUpWeight).toBeLessThan(high.tactical.followUpWeight);
+    expect(low.powerJitter).toBeGreaterThan(mid.powerJitter);
+    expect(mid.powerJitter).toBeGreaterThan(high.powerJitter);
+
+    const tolerance = 0.01;
+    const lowOffset = sampleOpponentAimOffset(
+      low.aimSigma, tolerance, sequence(0.001, 0), low.aimWindowFraction,
+    );
+    const highOffset = sampleOpponentAimOffset(
+      high.aimSigma, tolerance, sequence(0.001, 0), high.aimWindowFraction,
+    );
+    expect(Math.abs(lowOffset)).toBeGreaterThan(tolerance);
+    expect(Math.abs(highOffset)).toBeLessThan(tolerance);
   });
 
   it('retargets an in-progress opponent by at most three points', () => {

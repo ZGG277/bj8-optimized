@@ -9,7 +9,11 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import assetUrl from './assets/lake360.glb?url';
 import { ownedWorldShell, type WorldShellContext, type WorldShell } from './world-shell';
 
-export const lake360Enabled = () => typeof location !== 'undefined' && new URLSearchParams(location.search).get('lake360') === '1';
+export const lake360Enabled = () => {
+  if (typeof location === 'undefined') return false;
+  const params = new URLSearchParams(location.search);
+  return params.get('world') === 'lake' || params.get('lake360') === '1';
+};
 const skyFunction = /* glsl */ `
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise2(vec2 p){vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}

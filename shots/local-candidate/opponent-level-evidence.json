@@ -1,0 +1,33 @@
+{
+  "method": "sampleOpponentAimOffset with tolerance=0.01 rad, 10000 samples per level, mulberry32 seed 20260909, practice mode",
+  "sourceTest": "scripts/opponent-level-evidence.test.ts",
+  "levels": [
+    {
+      "level": 25,
+      "missRateOutsideAimTolerance": 0.4716,
+      "meanAbsoluteOffsetRad": 0.00916,
+      "powerJitter": 0.1893,
+      "candidateLimit": 1,
+      "simulationLimit": 3,
+      "followUpWeight": 0.0243
+    },
+    {
+      "level": 60,
+      "missRateOutsideAimTolerance": 0.0226,
+      "meanAbsoluteOffsetRad": 0.00451,
+      "powerJitter": 0.1143,
+      "candidateLimit": 3,
+      "simulationLimit": 9,
+      "followUpWeight": 0.3623
+    },
+    {
+      "level": 90,
+      "missRateOutsideAimTolerance": 0,
+      "meanAbsoluteOffsetRad": 0.00224,
+      "powerJitter": 0.05,
+      "candidateLimit": 5,
+      "simulationLimit": 15,
+      "followUpWeight": 0.75
+    }
+  ]
+}

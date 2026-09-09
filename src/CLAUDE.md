@@ -1,6 +1,6 @@
 # src/
 
-湖面实验由 Scene3D 的 `?lake360=1` 入口扩大远裁面并装配可退出环顾控件；比赛相机与输入在退出后继续使用。
+湖面作为公开世界由 `?world=lake&lake360=1` 选择，并兼容旧 `?lake360=1`；切换室内或云海会删除湖面覆盖，比赛相机与输入在退出环顾后继续使用。
 
 > L2 | 父级: `../CLAUDE.md`
 
@@ -20,7 +20,7 @@
 
 `match/`: 中式八球纯规则状态机（开球、分组、犯规、8 号胜负、自由球 effect），不依赖 React/DOM/物理实现；普通回合只有打进本组球才续杆，只带进对方花色则保留进球并交换回合。
 
-`opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；出杆在整局结束时一次评估，技术分只由准度 72% 与走位 28% 组成；生成 +3/+10 目标与独立限预算战术 Worker，挑战档优先真实进球、避免洗袋并保留下一杆。
+`opponent/`: 玩家长期能力画像与陪练/挑战模式领域层；出杆在整局结束时一次评估，技术分只由准度 72% 与走位 28% 组成；生成 +3/+10 目标，并按等级同时调节瞄准/力度误差、选杆仿真预算与下一杆权重。
 
 `layout/`: 五控件布局纯领域层；维护 desktop/portrait/landscape 三套自由或右/底停靠位置，负责 8px 钳制、48px 吸附、沿边落点、碰撞避让、容量与 v2→v3 迁移。
 
@@ -28,7 +28,7 @@
 
 `aim/`: 纯袋口瞄准几何层——世界角首碰检测、统一物理袋口、2R 走廊遮挡、含 throw 的袋口左右角尖反解；供规划、调试与可选辅助消费，不参与玩家拨轮的粗/精切档。
 
-`components/`: HUD 控制组件（双方动态水平、首局控件邻近提示、灯泡图形面板、无文字视角/击球点/蓄力/横竖拨轮、内容操作与静止长按布局互斥、蓄力移出走廊取消、五控件自由拖放与双边停靠、规划/复盘浮层、主题切换器、球桌视口与开始界面），只转发事件，不持有对局规则。
+`components/`: HUD 控制组件（双方动态水平、首局控件邻近提示、灯泡图形面板、无文字视角/击球点/蓄力/横竖拨轮、内容操作与静止长按布局互斥、蓄力移出走廊取消、五控件自由拖放与双边停靠、规划/复盘浮层、保留但当前不挂载的主题切换器、球桌视口与开始界面），只转发事件，不持有对局规则。
 
 `styles/`: 样式体系 base → layout → controls → themes → onboarding；新手提示以独立穿透层叠加。主题入口统一让控件静置 56% 内容透明、按住/聚焦/拖动恢复实色并去掉卡片式外框，不改触控几何；首屏不对全屏 WebGL 画布做实时模糊，warm/hot 档关闭 HUD 毛玻璃合成；控件层级高于球桌、低于遮罩。
 
@@ -90,12 +90,12 @@
 
 `textures.ts`: 为 160mm 无缝台呢、细皮革、木纹、球号与六点母球生成 CanvasTexture；全部视觉噪声使用固定种子，刷新、设备与截图门禁可复现，供 Scene3D 延迟初始化使用。
 
-`main.tsx`: React 应用挂载入口，首帧前应用三主题，启用 StrictMode，挂载 Game/ThemeSwitcher/ControlOnboarding，并按 base → layout → controls → themes → onboarding 顺序加载样式。
+`main.tsx`: React 应用挂载入口，首帧前应用三主题，启用 StrictMode，挂载 Game/ControlOnboarding，并按 base → layout → controls → themes → onboarding 顺序加载样式；当前隐藏调色盘入口，主题 URL、本地偏好与底层主题能力保留。
 
 `vite-env.d.ts`: Vite 客户端类型声明。
 
-`world-selection.ts` / `world-selection.test.ts`: 五种局前世界的 URL 合同；未知参数保持普通室内，不写长期偏好。三套新场景由 `scene/world-registry.ts` 注册本地 Blender 资产，云海保留原 V2。
+`world-selection.ts` / `world-selection.test.ts`: 室内、云海、湖面三种公开局前世界的互斥 URL 合同；湖面兼容旧参数，未知或已隐藏世界保持普通室内，不写长期偏好。宇宙、竹林、极光资产仍由注册表保留供恢复。
 
-多世界正式入口：`Game.tsx` 只在开局时把 worldId 传给 `Scene3D`；物理、规则与相机公式不变。`scene/` 拆分共用桌体、静区及外围壳体。选择样式独立位于 `styles/world-shell.css`。
+多世界正式入口：`Game.tsx` 只在开局时把公开 worldId 传给 `Scene3D`；物理、规则与相机公式不变。`scene/` 拆分共用桌体、静区及外围壳体。选择样式独立位于 `styles/world-shell.css`。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

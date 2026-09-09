@@ -40,7 +40,7 @@ import { ReviewOverlay } from './components/ReviewOverlay';
 import { IntroScreen } from './components/IntroScreen';
 import { FirstMatchGuide } from './components/FirstMatchGuide';
 import { Scene3D } from './Scene3D';
-import { resolveWorldSelection, worldSelectionUrl, type WorldId } from './world-selection';
+import { resolveWorldSelection, worldSelectionUrl, type PublicWorldId } from './world-selection';
 import type { PlannedStep, PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
@@ -114,9 +114,9 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 }
 
 export default function Game() {
-  const [selectedWorld, setSelectedWorld] = useState<WorldId>(() =>
+  const [selectedWorld, setSelectedWorld] = useState<PublicWorldId>(() =>
     resolveWorldSelection(window.location.search));
-  const selectWorld = (worldId: WorldId) => {
+  const selectWorld = (worldId: PublicWorldId) => {
     setSelectedWorld(worldId);
     window.history.replaceState(window.history.state, '', worldSelectionUrl(window.location.href, worldId));
   };

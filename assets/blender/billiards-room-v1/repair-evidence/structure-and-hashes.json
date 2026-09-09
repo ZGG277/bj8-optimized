@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "preservedOriginalMeshes": 17,
+  "unchangedOriginalBlendSha256": "48f168d82800b1d75c722ffc32ad1818acf4a70f83559deeb62205364eaf41f5",
+  "supportedCushionSegments": 150,
+  "closedMiddleAprons": 2,
+  "sidePocketCavityChecks": 2,
+  "files": {
+    "src/scene/assets/billiards-room-v1.glb": {
+      "bytes": 781964,
+      "sha256": "bde8a27207fad0f13dde82e828b7b46a78a5b088a76b0b8eb166932c6c44ac7d"
+    },
+    "assets/blender/billiards-room-v1/quiet-room-v1-repaired.blend": {
+      "bytes": 656224,
+      "sha256": "19204591579d77f4eb980ce30c6ada4d8b7aac3bbaf454a75c12470e4a796199"
+    },
+    "assets/blender/billiards-room-v1/repair-table.py": {
+      "bytes": 4469,
+      "sha256": "df60a4291aac01a6dcca9fec27b1cfb3d4a74d212492c3e6aa94ac044f168b56"
+    }
+  }
+}

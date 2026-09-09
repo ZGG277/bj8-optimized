@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { WorldId } from '../world-selection';
 import { createCloudSeaShell } from './cloud-sea';
 import { createGalaxyQuietZone } from './galaxy';
+import { createLake360 } from './lake360';
 import { createGalaxyAtmosphere, createBambooAtmosphere, createAuroraAtmosphere } from './world-atmospheres';
 import type { BlenderWorldAsset } from './blender-world';
 import galaxyAsset from './assets/world-galaxy.glb?url';
@@ -25,6 +26,7 @@ type WorldVisual = Readonly<{
 export const WORLD_VISUALS: Record<WorldId, WorldVisual> = {
   studio: { shell: createStudioWorldShell, quietZone: () => new THREE.Group() },
   'cloud-sea': { shell: createCloudSeaShell, quietZone: createQuietZone },
+  lake: { shell: createLake360, quietZone: () => new THREE.Group() },
   galaxy: { shell: createGalaxyAtmosphere, quietZone: createGalaxyQuietZone,
     asset: { url: galaxyAsset, shellName: 'BJ8_World_Galaxy', quietName: 'BJ8_Quiet_Galaxy' } },
   bamboo: { shell: createBambooAtmosphere, quietZone: () => createQuietZone(),

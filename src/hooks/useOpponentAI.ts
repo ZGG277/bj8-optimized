@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖局前锁定 OpponentProfile、限预算战术 Worker、袋口容错执行误差、physics 击球/复位、match 规则与场景动画
-[OUTPUT]: 副作用 Hook：对手回合先验证进球与下一杆；50 级及以下无直线时仍尝试进攻，高等级才允许安全球回退
+[INPUT]: 依赖局前锁定 OpponentProfile、分级预算战术 Worker、按等级执行误差、physics 击球/复位、match 规则与场景动画
+[OUTPUT]: 副作用 Hook：对手回合按等级选择与执行球路；50 级及以下无直线时仍尝试进攻，高等级才允许安全球回退
 [POS]: AI 调度层，只做对手回合的编排；不关心 UI 交互或玩家输入
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */

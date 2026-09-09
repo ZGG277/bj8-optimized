@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
-[OUTPUT]: 玩家整局能力画像与训练总结、袋口容错内的顾燃执行误差、限预算战术选杆档案、等级/置信度展示与安全持久化
+[OUTPUT]: 玩家整局能力画像与训练总结、按等级跨越袋口容错的顾燃执行误差、分级战术/走位预算、等级/置信度展示与安全持久化
 [POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；对局中档案锁定，只在整局结束时统一评估
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
@@ -101,9 +101,8 @@ export function levelToSigma(level: number): number {
 }
 
 /**
- * 顾燃的能力差异仍由 sigma 决定，但不允许高斯分布的无限长尾把已选定的袋口
- * 明显瞄到安全窗口之外。tanh 保留连续手感：低水平更常靠近窗口边缘，高水平
- * 更集中在中心；力度、杆法与选杆仍可造成自然失误。
+ * tanh 只截断高斯分布的无限长尾；档案可把低等级上限设到袋口容错之外，
+ * 让已找到理想球路的入门顾燃仍会真实打偏，高等级才集中在袋口中心。
  */
 export function sampleOpponentAimOffset(
   sigma: number,
@@ -114,7 +113,7 @@ export function sampleOpponentAimOffset(
   if (!Number.isFinite(sigma) || sigma <= 0) return 0;
   const raw = gaussian(rng) * sigma;
   if (!Number.isFinite(tolerance) || tolerance <= 0) return raw;
-  const limit = tolerance * clamp(windowFraction, 0.1, 1);
+  const limit = tolerance * clamp(windowFraction, 0.1, 2.5);
   return Math.tanh(raw / limit) * limit;
 }
 
@@ -356,7 +355,10 @@ function profileForLevel(
   const safeTarget = clamp(targetLevel, MIN_OPPONENT_LEVEL, MAX_OPPONENT_LEVEL);
   const safeEffective = clamp(effectiveLevel, MIN_OPPONENT_LEVEL, MAX_OPPONENT_LEVEL);
   const aimSigma = levelToSigma(safeEffective);
-  const levelT = safeEffective / 100;
+  const levelT = clamp((safeEffective - 20) / 70, 0, 1);
+  const candidateLimit = mode === 'practice'
+    ? Math.round(1 + levelT * 4)
+    : Math.round(2 + levelT * 4);
 
   return {
     mode,
@@ -367,16 +369,20 @@ function profileForLevel(
     aimSigma,
     powerJitter:
       mode === 'practice'
-        ? 0.1 - levelT * 0.065
-        : 0.035 - levelT * 0.02,
-    aimWindowFraction: mode === 'practice' ? 0.82 : 0.55,
+        ? 0.2 - levelT * 0.15
+        : 0.14 - levelT * 0.105,
+    aimWindowFraction: mode === 'practice'
+      ? 1.8 - levelT * 1.15
+      : 1.45 - levelT * 0.9,
     tactical: {
       allowSafety: safeEffective > OPPONENT_SAFETY_UNLOCK_LEVEL,
-      candidateLimit: mode === 'practice' ? 3 : 6,
-      simulationLimit: mode === 'practice' ? 12 : 24,
-      followUpWeight: mode === 'practice' ? 0.35 : 0.9,
-      alternativeChance: mode === 'practice' ? 0.22 : 0,
-      deadlineMs: mode === 'practice' ? 750 : 1200,
+      candidateLimit,
+      simulationLimit: candidateLimit * (mode === 'practice' ? 3 : 4),
+      followUpWeight: Math.pow(levelT, 1.3) * (mode === 'practice' ? 0.75 : 1.1),
+      alternativeChance: (1 - levelT) * (mode === 'practice' ? 0.5 : 0.3),
+      deadlineMs: Math.round(
+        (mode === 'practice' ? 350 : 500) + levelT * (mode === 'practice' ? 500 : 700),
+      ),
     },
   };
 }

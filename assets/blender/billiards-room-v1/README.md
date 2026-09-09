@@ -1,5 +1,7 @@
 # 静谧球房 · Blender 第一版
 
+2026-09-09 球桌接缝修复：当前运行时 GLB 由 `quiet-room-v1-repaired.blend` 导出；原始 `quiet-room-v1.blend` 保持不变。通过已连接的 Blender MCP 执行 `repair-table.py`，在原有 17 个网格之外增加台呢下承托和左右中袋台裙两个网格，合计 19 网格、24,684 三角形。原 17 个网格的位置、法线、UV、索引和世界变换逐项保持相同。前后同视角网页实图、GLB 网络哈希、结构射线检查与迁入说明见 `REPAIR_ACCEPTANCE.md` 和 `repair-evidence/`。以下第一版说明保留为原始制作记录。
+
 来源：用户授权的本地原创建模，由 GPT-6 Astra 编写脚本，经用户已配置的 Blender MCP 在 Blender 5.2.1 LTS 执行。无第三方下载、付费模型或外部纹理。
 
 - `quiet-room-v1.blend`：可编辑制作文件；默认展示本轮独立场景，保留原始默认场景。

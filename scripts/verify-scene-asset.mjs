@@ -46,7 +46,8 @@ root.traverse(object => {
   if (object.parent?.name === 'BJ8_TableShell') {
     for (let i=0; i<position.count; i++) {
       a.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld);
-      assert(a.y < -.07 || Math.abs(a.x) > .64 || Math.abs(a.z) > 1.275, `${object.name} 侵入可玩台面`);
+      const clothUnderlap = object.name === 'BJ8_ClothUnderlap' && a.y <= -.00039 && a.y >= -.03801;
+      assert(clothUnderlap || a.y < -.07 || Math.abs(a.x) > .64 || Math.abs(a.z) > 1.275, `${object.name} 侵入可玩台面`);
     }
   }
 });

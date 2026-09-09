@@ -93,7 +93,7 @@ export function createStudioEnvironment(
   let pendant: THREE.Object3D | undefined;
 
   // 程序化壳体失败时静区与球桌仍独立装配；没有壳体也能打球。
-  const lake = lake360Enabled();
+  const lake = worldId === 'lake' || lake360Enabled();
   const quietZone = lake ? new THREE.Group() : WORLD_VISUALS[worldId].quietZone();
   quietZone.name = 'quiet-zone';
   root.add(quietZone);

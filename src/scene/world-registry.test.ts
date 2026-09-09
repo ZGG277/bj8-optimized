@@ -5,12 +5,13 @@ import { WORLD_VISUALS } from './world-registry';
 import { QUIET_ZONE_LAYOUT } from './world-shell';
 
 describe('场景注册合同', () => {
-  it('所有局前选项都有配对的外围和地面', () => {
-    expect(Object.keys(WORLD_VISUALS)).toEqual(WORLD_OPTIONS.map(world => world.id));
-    expect(new Set(Object.values(WORLD_VISUALS).map(world => world.quietZone)).size).toBe(WORLD_OPTIONS.length);
+  it('所有公开局前选项都有配对的外围和地面', () => {
+    for (const { id } of WORLD_OPTIONS) expect(WORLD_VISUALS[id]).toBeTruthy();
+    expect(new Set(WORLD_OPTIONS.map(world => WORLD_VISUALS[world.id].quietZone)).size)
+      .toBe(WORLD_OPTIONS.length);
   });
 
-  it.each(['galaxy', 'bamboo', 'aurora-lake'] as const)('%s 的材质指令可由 Three 标准流程展开', worldId => {
+  it.each(['galaxy', 'bamboo', 'aurora-lake'] as const)('%s 的隐藏资产仍可由 Three 标准流程展开', worldId => {
     const shell = WORLD_VISUALS[worldId].shell({ layout: QUIET_ZONE_LAYOUT, requestRender: vi.fn() });
     const quiet = WORLD_VISUALS[worldId].quietZone();
     for (const root of [shell.root, quiet]) root.traverse(object => {
@@ -19,7 +20,8 @@ describe('场景注册合同', () => {
         if (!(material instanceof THREE.ShaderMaterial)) continue;
         for (const source of [material.vertexShader, material.fragmentShader]) {
           for (const line of source.split('\n').filter(line => line.includes('#include'))) {
-            expect(line.trim(), `${worldId}/${material.name} 的 include 必须独立成行`).toMatch(/^#include <[\w]+>$/);
+            expect(line.trim(), `${worldId}/${material.name} 的 include 必须独立成行`)
+              .toMatch(/^#include <[\w]+>$/);
           }
         }
       }

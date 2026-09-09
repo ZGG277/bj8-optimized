@@ -1,0 +1,218 @@
+{
+  "phase": "after",
+  "url": "http://127.0.0.1:5218/?lake360=1",
+  "errors": [],
+  "views": [
+    {
+      "name": "desktop-low",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 1
+      },
+      "camera": [
+        0,
+        0.19,
+        1.9
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "repairNodes": [
+        {
+          "name": "BJ8_ClothUnderlap",
+          "exists": true,
+          "visible": true,
+          "vertices": 3600
+        },
+        {
+          "name": "BJ8_MiddlePocketAprons",
+          "exists": true,
+          "visible": true,
+          "vertices": 48
+        }
+      ],
+      "state": {
+        "assetState": "ready",
+        "worldId": "studio",
+        "shellState": "ready"
+      }
+    },
+    {
+      "name": "side-right",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 1
+      },
+      "camera": [
+        1.13,
+        0.15,
+        0.32
+      ],
+      "target": [
+        0.69,
+        -0.055,
+        0
+      ],
+      "repairNodes": [
+        {
+          "name": "BJ8_ClothUnderlap",
+          "exists": true,
+          "visible": true,
+          "vertices": 3600
+        },
+        {
+          "name": "BJ8_MiddlePocketAprons",
+          "exists": true,
+          "visible": true,
+          "vertices": 48
+        }
+      ],
+      "state": {
+        "assetState": "ready",
+        "worldId": "studio",
+        "shellState": "ready"
+      }
+    },
+    {
+      "name": "side-left",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 1
+      },
+      "camera": [
+        -1.13,
+        0.15,
+        -0.32
+      ],
+      "target": [
+        -0.69,
+        -0.055,
+        0
+      ],
+      "repairNodes": [
+        {
+          "name": "BJ8_ClothUnderlap",
+          "exists": true,
+          "visible": true,
+          "vertices": 3600
+        },
+        {
+          "name": "BJ8_MiddlePocketAprons",
+          "exists": true,
+          "visible": true,
+          "vertices": 48
+        }
+      ],
+      "state": {
+        "assetState": "ready",
+        "worldId": "studio",
+        "shellState": "ready"
+      }
+    },
+    {
+      "name": "seam-close",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 1
+      },
+      "camera": [
+        0.34,
+        0.075,
+        0.68
+      ],
+      "target": [
+        0.64,
+        0,
+        0.6
+      ],
+      "repairNodes": [
+        {
+          "name": "BJ8_ClothUnderlap",
+          "exists": true,
+          "visible": true,
+          "vertices": 3600
+        },
+        {
+          "name": "BJ8_MiddlePocketAprons",
+          "exists": true,
+          "visible": true,
+          "vertices": 48
+        }
+      ],
+      "state": {
+        "assetState": "ready",
+        "worldId": "studio",
+        "shellState": "ready"
+      }
+    },
+    {
+      "name": "mobile-low",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "deviceScaleFactor": 1,
+        "isMobile": true,
+        "hasTouch": true
+      },
+      "camera": [
+        0,
+        0.19,
+        1.9
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "repairNodes": [
+        {
+          "name": "BJ8_ClothUnderlap",
+          "exists": true,
+          "visible": true,
+          "vertices": 3600
+        },
+        {
+          "name": "BJ8_MiddlePocketAprons",
+          "exists": true,
+          "visible": true,
+          "vertices": 48
+        }
+      ],
+      "state": {
+        "assetState": "ready",
+        "worldId": "studio",
+        "shellState": "ready"
+      }
+    }
+  ],
+  "assets": [
+    {
+      "url": "http://127.0.0.1:5218/src/scene/assets/billiards-room-v1.glb?t=1788956400232&import&url",
+      "sha256": "00423b21a5a4625c07054879185ac2f5b33af1bdac1973ed75f10627d5ee3c44"
+    },
+    {
+      "url": "http://127.0.0.1:5218/src/scene/assets/billiards-room-v1.glb",
+      "sha256": "bde8a27207fad0f13dde82e828b7b46a78a5b088a76b0b8eb166932c6c44ac7d"
+    },
+    {
+      "url": "http://127.0.0.1:5218/src/scene/assets/billiards-room-v1.glb?t=1788956400232&import&url",
+      "sha256": "00423b21a5a4625c07054879185ac2f5b33af1bdac1973ed75f10627d5ee3c44"
+    },
+    {
+      "url": "http://127.0.0.1:5218/src/scene/assets/billiards-room-v1.glb?t=1788956400232&import&url",
+      "sha256": "00423b21a5a4625c07054879185ac2f5b33af1bdac1973ed75f10627d5ee3c44"
+    },
+    {
+      "url": "http://127.0.0.1:5218/src/scene/assets/billiards-room-v1.glb",
+      "sha256": "bde8a27207fad0f13dde82e828b7b46a78a5b088a76b0b8eb166932c6c44ac7d"
+    }
+  ],
+  "browser": "Chrome/152.0.7977.84",
+  "localAssetSha256": "bde8a27207fad0f13dde82e828b7b46a78a5b088a76b0b8eb166932c6c44ac7d"
+}

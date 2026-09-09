@@ -1,0 +1,48 @@
+{
+  "blender_version": "5.2.1 LTS",
+  "source_file": "quiet-room-v1.blend",
+  "repaired_file": "/Users/zgg/Projects/\u6e38\u620f/bl8-3D\u53f0\u7403/bj8-table-blender-repair/assets/blender/billiards-room-v1/quiet-room-v1-repaired.blend",
+  "direct_mcp_execution": true,
+  "bands": 150,
+  "mesh_count": 19,
+  "repairs": [
+    {
+      "name": "BJ8_ClothUnderlap",
+      "vertices": 1200,
+      "polygons": 900,
+      "bounds_blender": [
+        [
+          -0.6992359757423401,
+          0.6992359757423401
+        ],
+        [
+          -1.3342359066009521,
+          1.3342359066009521
+        ],
+        [
+          -0.03799999877810478,
+          -0.00039999998989515007
+        ]
+      ]
+    },
+    {
+      "name": "BJ8_MiddlePocketAprons",
+      "vertices": 16,
+      "polygons": 12,
+      "bounds_blender": [
+        [
+          -0.75,
+          0.75
+        ],
+        [
+          -0.1599999964237213,
+          0.1599999964237213
+        ],
+        [
+          -0.2529999911785126,
+          -0.003000000026077032
+        ]
+      ]
+    }
+  ]
+}
