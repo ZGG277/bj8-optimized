@@ -1,6 +1,6 @@
 /*
 [INPUT]: 局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供完整对局编排：陪练/挑战、复盘/训练总结、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球后目标近景→全台与控件学习成功事实
+[OUTPUT]: 对外提供陪练/挑战、复盘/训练总结与局后可选留言、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球后目标近景→全台与控件学习成功事实
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -958,8 +958,8 @@ export default function Game() {
     scene3DRef.current = scene;
     scene.start();
 
-    // 开发模式暴露调试句柄
-    if (import.meta.env.DEV) {
+    // 开发服务器或显式隔离验收构建暴露调试句柄；正式构建不携带该入口。
+    if (import.meta.env.DEV || import.meta.env.VITE_BJ8_ACCEPTANCE === '1') {
       (window as unknown as { __bj8: unknown }).__bj8 = {
         world: worldRef,
         scene: scene3DRef,
@@ -1041,6 +1041,7 @@ export default function Game() {
         firstMatchGuideActive={Boolean(firstMatchGuideStep)}
         match={match}
         trainingSummary={trainingSummary}
+        gameMode={gameMode}
         containerRef={containerRef}
         onPointerDown={handleStagePointerDown}
         onPointerMove={handleStagePointerMove}

@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
 import {
+  AIM_CAMERA_ELEVATION_DEGREES,
   aimCameraPose,
   aimFramingPoints,
   cameraSafetyFromControlRects,
@@ -69,6 +70,19 @@ function threeProjection(
 }
 
 describe('adaptive camera framing', () => {
+  it('幽灵球确认后的偏好机位轻微抬高到 28°', () => {
+    const input = framing();
+    const result = aimCameraPose(input, 0.3, 1280 / 800);
+    const horizontal = Math.hypot(
+      result.pose.position.x - input.cue.x,
+      result.pose.position.z - input.cue.z,
+    );
+    const elevation = Math.atan2(result.pose.position.y, horizontal) * 180 / Math.PI;
+    expect(AIM_CAMERA_ELEVATION_DEGREES).toBe(28);
+    expect(elevation).toBeGreaterThanOrEqual(27.9);
+    expect(elevation).toBeLessThan(34);
+  });
+
   it('与 Three.js lookAt 的左右轴完全一致，避免右侧 HUD 安全区镜像', () => {
     const pose = { position: { x: 0, y: 0, z: 2 }, lookAt: { x: 0, y: 0, z: 0 } };
     const worldRight = { x: 0.4, y: 0, z: 0 };

@@ -1,6 +1,6 @@
 /*
 [INPUT]: base.css 的尺寸与色彩令牌
-[OUTPUT]: 对外提供统一烟熏表面的壳层、桌面比分/竖屏球组状态、手动相机球桌舞台、遮罩与品牌开始界面响应式布局
+[OUTPUT]: 对外提供统一烟熏表面的壳层、桌面比分/竖屏球组状态、手动相机舞台、可滚动局后留言遮罩与开始界面布局
 [POS]: 样式体系的布局层,只管几何与层级结构;控件内部样式归 controls.css
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
@@ -384,9 +384,147 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 20px 16px max(20px, env(safe-area-inset-bottom));
   background: rgba(6,9,8,0.85);
   animation: fadeIn 0.3s ease-out;
+}
+
+.viewport[data-match-finished='true'] {
+  touch-action: auto;
+}
+
+.finish-content {
+  position: relative;
+  width: min(100%, 460px);
+  margin-block: auto;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.finish-content .training-summary {
+  width: 100%;
+}
+
+.finish-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.finish-mask .finish-actions button {
+  min-width: 126px;
+  min-height: 46px;
+  margin: 0;
+}
+
+.game-shell .finish-mask .feedback-secondary {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.match-feedback {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.match-feedback label {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.match-feedback .feedback-hint {
+  margin: 7px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.match-feedback textarea {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  max-height: 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  resize: vertical;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.match-feedback textarea:focus {
+  border-color: var(--green);
+  outline: 2px solid color-mix(in srgb, var(--green) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.feedback-count {
+  display: block;
+  margin-top: 4px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.match-feedback .feedback-error,
+.match-feedback .feedback-success {
+  margin: 10px 0;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.feedback-error { color: #ffc0ac; }
+.feedback-success { color: var(--green); }
+
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.finish-mask .feedback-actions button {
+  flex: 1 1 145px;
+  margin: 0;
+  min-height: 46px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.finish-mask .feedback-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+@media (max-height: 620px) {
+  .finish-content h1 { font-size: 36px; }
+  .finish-content .training-summary { margin-top: 10px; padding: 10px 12px; }
+  .match-feedback { margin-top: 12px; }
+}
+
+@media (max-width: 420px) {
+  .finish-actions {
+    width: 100%;
+  }
+
+  .finish-mask .finish-actions button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 
 .finish-mask span {

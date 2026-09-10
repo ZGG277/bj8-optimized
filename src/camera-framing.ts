@@ -288,6 +288,8 @@ function projectedBounds(points: readonly FramingPoint[], pose: FramingPose, asp
   return { minX, maxX, minY, maxY };
 }
 
+export const AIM_CAMERA_ELEVATION_DEGREES = 28;
+
 function aimPoseAtDistance(
   framing: CameraFraming,
   azimuth: number,
@@ -295,8 +297,8 @@ function aimPoseAtDistance(
 ): FramingPose {
   const sin = Math.sin(azimuth);
   const cos = Math.cos(azimuth);
-  // 24° 的偏好仰角保留“稍高第一人称”；距离扩大时等比例抬高，极薄切才会明显上抬。
-  const elevation = Math.tan(24 * Math.PI / 180);
+  // 幽灵球确认后使用轻微抬高的 28° 构图；保留第一人称方向感，同时更容易看清目标球与袋口。
+  const elevation = Math.tan(AIM_CAMERA_ELEVATION_DEGREES * Math.PI / 180);
   const height = Math.max(0.24, distance * elevation);
   const centerX = (framing.cue.x + framing.object.x + framing.pocket.center.x) / 3;
   const centerZ = (framing.cue.z + framing.object.z + framing.pocket.center.z) / 3;

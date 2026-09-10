@@ -1,6 +1,6 @@
 # scene/
 
-`lake360.ts` / `lake360-explorer.ts` / `assets/lake360.glb`：Blender 作者网格、方向连续天空、解析反射及 10Hz 水波；暂停/隐藏页/卸载停止请求。公开 `world=lake` 与旧 `lake360=1` 均启用湖面，室内/云海选择会清除覆盖。
+`lake360.ts` / `assets/lake360.glb`：Blender 作者网格、方向连续天空、解析反射及 10Hz 动态水波；隐藏页/卸载停止请求。公开 `world=lake` 与旧 `lake360=1` 均启用湖面，室内/云海选择会清除覆盖；玩家界面不再提供环顾或暂停水波入口。
 
 > L2 | 父级: `../CLAUDE.md`
 

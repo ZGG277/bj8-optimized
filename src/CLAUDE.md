@@ -6,6 +6,8 @@
 
 ## 成员清单
 
+`post-match-feedback.ts` / `post-match-feedback.test.ts`: 局后留言与妙搭包装间的有限 postMessage 协议；父 origin 必须与嵌入页 referrer 精确一致，回执须匹配 source/origin/请求和提交 ID，12 秒未确认即失败，原正文/提交键可用于幂等重试；不读取身份和凭证，不将留言保存到 localStorage。
+
 `Game.tsx`: 对局编排器，统一以世界角提交/渲染杆向；幽灵球确认后冻结首碰球/袋口构图身份，视口/HUD变化只刷新安全区，真实击球后先跟随已锁定目标球，结果可见后再用独立慢缓动回到按视口横/竖排列的全台；提供开局与击球成功学习事实。复盘默认收起且由灯泡独立开关；瞄准默认拨轮并可切方向键；开始对局后才创建 WebGL；运动帧直接消费 worldRef，React 世界只在语义边界更新；走位 Worker 仅由灯泡启动。
 
 `shot-camera-follow.ts` / `shot-camera-follow.test.ts`: 击球后目标近景纯时序；目标球未被撞前不把静止误判为失败，落袋、运动后停止或整杆停止时才允许回全台。

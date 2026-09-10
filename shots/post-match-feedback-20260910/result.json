@@ -1,0 +1,669 @@
+{
+  "entry": "http://127.0.0.1:5221/app/app_17b18dh5axj/?feedbackPreview=1",
+  "testPrefix": "PM-FEEDBACK-20260910-1789002825607",
+  "results": [
+    {
+      "name": "desktop: exact wrapper establishes feedback origin",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: result actions expose primary rematch and secondary feedback",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: blank feedback disabled; rematch enabled",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"submissionId\":\"935930a4-9c2e-482d-aab6-fe7ef22d6853\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "desktop: server confirmed persistence",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: no horizontal overflow",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: skip never POSTs",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"submissionId\":\"c7d0b670-5bd3-4def-b889-61f65ca5f8d8\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "desktop: network failure preserves text and continuation",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"submissionId\":\"c7d0b670-5bd3-4def-b889-61f65ca5f8d8\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "desktop: retry uses the same idempotency key",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "desktop: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"submissionId\":\"25e40071-40ec-4c55-8ba7-115879ee490e\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "desktop: login error is visible without redirect",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":2,\"phase\":\"finished\",\"winner\":\"opponent\",\"actor\":\"opponent\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":2,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"顾燃赢了\",\"wonClass\":false,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"loss\"}"
+    },
+    {
+      "name": "desktop: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"shotBefore\":0,\"shotsSinceFixture\":2,\"phase\":\"finished\",\"winner\":\"opponent\",\"actor\":\"opponent\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":2,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"顾燃赢了\",\"wonClass\":false,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"loss\"}"
+    },
+    {
+      "name": "desktop: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"desktop\",\"submissionId\":\"c8d02b9c-8d90-44e0-aa36-e3cc79cd2400\",\"terminalShot\":2,\"winner\":\"opponent\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"loss\",\"submittedOutcome\":\"loss\",\"passed\":true}"
+    },
+    {
+      "name": "desktop: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: pending result does not reopen old card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop: no uncaught page errors",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: exact wrapper establishes feedback origin",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: result actions expose primary rematch and secondary feedback",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: blank feedback disabled; rematch enabled",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"submissionId\":\"fffb22a3-b3d0-4e54-833c-962adff3118a\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "mobile: server confirmed persistence",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: no horizontal overflow",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: skip never POSTs",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"submissionId\":\"00199d9c-3fa9-4fe9-87ab-d99c74edd5ac\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "mobile: network failure preserves text and continuation",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"submissionId\":\"00199d9c-3fa9-4fe9-87ab-d99c74edd5ac\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "mobile: retry uses the same idempotency key",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":1,\"phase\":\"finished\",\"winner\":\"player\",\"actor\":\"player\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":1,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"你赢了！\",\"wonClass\":true,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"win\"}"
+    },
+    {
+      "name": "mobile: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"submissionId\":\"8d75de46-b55f-4ffb-bd15-65685fba4743\",\"terminalShot\":1,\"winner\":\"player\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"win\",\"submittedOutcome\":\"win\",\"passed\":true}"
+    },
+    {
+      "name": "mobile: login error is visible without redirect",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: real play reaches a resolved win or loss",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":2,\"phase\":\"finished\",\"winner\":\"opponent\",\"actor\":\"opponent\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":2,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"顾燃赢了\",\"wonClass\":false,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"loss\"}"
+    },
+    {
+      "name": "mobile: terminal UI and feedback entry match the actual winner",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"shotBefore\":0,\"shotsSinceFixture\":2,\"phase\":\"finished\",\"winner\":\"opponent\",\"actor\":\"opponent\",\"messageKey\":\"win-8\",\"foulReason\":null,\"shot\":2,\"firstContact\":8,\"cueActive\":true,\"eightActive\":false,\"pocketedNumbers\":[8],\"title\":\"顾燃赢了\",\"wonClass\":false,\"feedbackEntryVisible\":true,\"feedbackOutcome\":\"loss\"}"
+    },
+    {
+      "name": "mobile: submitted outcome matches the actual terminal result",
+      "passed": true,
+      "detail": "{\"viewport\":\"mobile\",\"submissionId\":\"e00dcd4a-37cd-41c6-af92-1ae3fd6c258e\",\"terminalShot\":2,\"winner\":\"opponent\",\"messageKey\":\"win-8\",\"expectedOutcome\":\"loss\",\"submittedOutcome\":\"loss\",\"passed\":true}"
+    },
+    {
+      "name": "mobile: next game starts without stale card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: pending result does not reopen old card",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile: no uncaught page errors",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "matchEndings": [
+    {
+      "viewport": "desktop",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "desktop",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "desktop",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "desktop",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "desktop",
+      "shotBefore": 0,
+      "shotsSinceFixture": 2,
+      "phase": "finished",
+      "winner": "opponent",
+      "actor": "opponent",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 2,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "顾燃赢了",
+      "wonClass": false,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "loss"
+    },
+    {
+      "viewport": "mobile",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "mobile",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "mobile",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "mobile",
+      "shotBefore": 0,
+      "shotsSinceFixture": 1,
+      "phase": "finished",
+      "winner": "player",
+      "actor": "player",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 1,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "你赢了！",
+      "wonClass": true,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "win"
+    },
+    {
+      "viewport": "mobile",
+      "shotBefore": 0,
+      "shotsSinceFixture": 2,
+      "phase": "finished",
+      "winner": "opponent",
+      "actor": "opponent",
+      "messageKey": "win-8",
+      "foulReason": null,
+      "shot": 2,
+      "firstContact": 8,
+      "cueActive": true,
+      "eightActive": false,
+      "pocketedNumbers": [
+        8
+      ],
+      "title": "顾燃赢了",
+      "wonClass": false,
+      "feedbackEntryVisible": true,
+      "feedbackOutcome": "loss"
+    }
+  ],
+  "submissionChecks": [
+    {
+      "viewport": "desktop",
+      "submissionId": "935930a4-9c2e-482d-aab6-fe7ef22d6853",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "desktop",
+      "submissionId": "c7d0b670-5bd3-4def-b889-61f65ca5f8d8",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "desktop",
+      "submissionId": "c7d0b670-5bd3-4def-b889-61f65ca5f8d8",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "desktop",
+      "submissionId": "25e40071-40ec-4c55-8ba7-115879ee490e",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "desktop",
+      "submissionId": "c8d02b9c-8d90-44e0-aa36-e3cc79cd2400",
+      "terminalShot": 2,
+      "winner": "opponent",
+      "messageKey": "win-8",
+      "expectedOutcome": "loss",
+      "submittedOutcome": "loss",
+      "passed": true
+    },
+    {
+      "viewport": "mobile",
+      "submissionId": "fffb22a3-b3d0-4e54-833c-962adff3118a",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "mobile",
+      "submissionId": "00199d9c-3fa9-4fe9-87ab-d99c74edd5ac",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "mobile",
+      "submissionId": "00199d9c-3fa9-4fe9-87ab-d99c74edd5ac",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "mobile",
+      "submissionId": "8d75de46-b55f-4ffb-bd15-65685fba4743",
+      "terminalShot": 1,
+      "winner": "player",
+      "messageKey": "win-8",
+      "expectedOutcome": "win",
+      "submittedOutcome": "win",
+      "passed": true
+    },
+    {
+      "viewport": "mobile",
+      "submissionId": "e00dcd4a-37cd-41c6-af92-1ae3fd6c258e",
+      "terminalShot": 2,
+      "winner": "opponent",
+      "messageKey": "win-8",
+      "expectedOutcome": "loss",
+      "submittedOutcome": "loss",
+      "passed": true
+    }
+  ],
+  "receipts": [
+    {
+      "viewport": "desktop",
+      "status": 201,
+      "body": {
+        "submissionId": "935930a4-9c2e-482d-aab6-fe7ef22d6853",
+        "status": "saved"
+      }
+    },
+    {
+      "viewport": "desktop",
+      "status": 201,
+      "body": {
+        "submissionId": "c7d0b670-5bd3-4def-b889-61f65ca5f8d8",
+        "status": "saved"
+      }
+    },
+    {
+      "viewport": "mobile",
+      "status": 201,
+      "body": {
+        "submissionId": "fffb22a3-b3d0-4e54-833c-962adff3118a",
+        "status": "saved"
+      }
+    },
+    {
+      "viewport": "mobile",
+      "status": 201,
+      "body": {
+        "submissionId": "00199d9c-3fa9-4fe9-87ab-d99c74edd5ac",
+        "status": "saved"
+      }
+    }
+  ],
+  "limits": [
+    "Browser receipts are not independent DB read-back evidence.",
+    "Login fault is injected HTTP 401; real anonymous access still requires platform verification.",
+    "DEV fixture build is not the release artifact."
+  ]
+}

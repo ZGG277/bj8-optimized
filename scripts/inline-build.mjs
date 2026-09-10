@@ -1,7 +1,7 @@
 /*
-[INPUT]: Vite 生成的 dist/index.html 与其中引用的本地 CSS / ESM 入口
-[OUTPUT]: 将构建资源内联回 dist/index.html，并拒绝残留 assets 外链或超过妙搭 10 MB HTML 上限的产物
-[POS]: 妙搭发布适配层；仅处理正式构建产物，不参与本地开发运行时
+[INPUT]: Vite 生成的 dist/index.html（或显式 BJ8_BUILD_OUT_DIR）与本地 CSS / ESM 入口
+[OUTPUT]: 将构建资源内联回目标 index.html，并拒绝残留 assets 外链或超过妙搭 10 MB HTML 上限的产物
+[POS]: 妙搭单文件适配层；默认仍产出正式 dist，独立 DEV 候选显式指定目录，不混用发布产物
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { readFile, stat, writeFile } from 'node:fs/promises'
@@ -9,7 +9,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const distDir = path.join(projectDir, 'dist')
+const distDir = process.env.BJ8_BUILD_OUT_DIR
+  ? path.resolve(projectDir, process.env.BJ8_BUILD_OUT_DIR)
+  : path.join(projectDir, 'dist')
 const htmlPath = path.join(distDir, 'index.html')
 const maxHtmlBytes = 10 * 1024 * 1024
 
@@ -79,4 +81,4 @@ if (size > maxHtmlBytes) {
   throw new Error(`inline-build: index.html is ${size} bytes, exceeding the 10 MB Miaoda limit`)
 }
 
-console.log(`inline-build: wrote ${size} byte single-file dist/index.html`)
+console.log(`inline-build: wrote ${size} byte single-file ${path.relative(projectDir, htmlPath)}`)
