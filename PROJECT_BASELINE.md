@@ -1,23 +1,23 @@
 # 瓜瓜台球项目基线
 
-2026-09-10：**v1.7.3 已发布到妙搭；GitHub 主线、妙搭 release、正式租户入口和实际 CDN 构建已对齐，桌面与 390×844 关键旅程通过。**
+2026-09-10：**v1.7.4 已发布到妙搭；GitHub 主线、妙搭 release、正式租户入口和实际 CDN 构建已对齐，桌面、390×844 与三个正式世界入口通过。**
 
 ## 固定版本与发布回执
 
 | 项目 | 已核对的值 |
 | --- | --- |
 | 产品仓库 / 分支 | https://github.com/ZGG277/bj8-optimized / `main` |
-| 不可变源码标签 | `v1.7.3`，带注释标签 |
-| 产品源码提交 | `c0d32343643e4b8d27f2337d73f75460eab8fe43` |
-| 妙搭发布提交 | `bf70f491ad308fa5546fc27d938a693d1c6fc0c8`，`sprint/default` |
+| 不可变源码标签 | `v1.7.4`，带注释标签 |
+| 产品源码提交 | `ed47657c10dbaaaf5bebec448fbbdadc4a2899e5` |
+| 妙搭发布提交 | `07b2c2422c937b1ce4a97bfafabe952eb7eb16de`，`sprint/default` |
 | 妙搭应用 | `app_17b18dh5axj`，瓜瓜台球 |
-| 本次唯一 release | `7683723869158345951`，`finished`；返回的 `commit_id` 与包装提交一致 |
-| 单 HTML 产物 | 9,426,785 bytes |
-| HTML SHA-256 | `d62f29f5c16f75c1ec1b2fcb5057853cb79b9daf6bf7cb1f57e7635bfa5afc88` |
+| 本次唯一 release | `7683734115342830815`，`finished`；返回的 `commit_id` 与包装提交一致 |
+| 单 HTML 产物 | 9,551,919 bytes |
+| HTML SHA-256 | `66e69a898e8c82180d266c9b2d0c15a8924ed945d451496ca3ef97ec1ce846ce` |
 
-主树构建、包装内产物与线上 CDN HTML 逐字节相同；正式入口 iframe 精确指向妙搭发布提交 `bf70f49`。`BUILD_PROVENANCE.json` 固定上述源码提交、标签和哈希。
+主树构建、包装内产物与线上 CDN HTML 逐字节相同；正式入口 iframe 精确指向妙搭发布提交 `07b2c24`。`BUILD_PROVENANCE.json` 固定上述源码提交、标签和哈希。
 
-当前正式入口：[打开瓜瓜台球](https://lg22l37ytz.feishuapp.com/app/app_17b18dh5axj)。正式父页面标题为“瓜瓜台球”，实际 iframe 指向 `lf-miaoda-static.feishucdn.com/app_17b18dh5axj/bf70f49.../client/game/index.html`。
+当前正式入口：[打开瓜瓜台球](https://lg22l37ytz.feishuapp.com/app/app_17b18dh5axj)。正式父页面标题为“瓜瓜台球”，实际 iframe 指向发布提交 `07b2c24` 的 CDN 目录。
 
 ## 本版范围
 
@@ -29,17 +29,18 @@
 
 - 对局结束层同时提供“再来一局”和“留言”；留言按需展开，支持 500 字限制、幂等重试、失败保留与登录失效提示，且不会阻塞下一局。
 - 幽灵球确认后的目标镜头仰角由 24° 温和调整为 28°；玩家界面移除“环顾湖面”和“暂停水波”，动态湖面继续运行。
+- 安静湖面新增真实浅沙床和 24 颗稀疏石块，合并为一个网格；网页使用透明 Fresnel 水层、深度吸收、多向非等波长细波和解析焦散。湖面 GLB 为 283,708 bytes、3 网格、13,440 三角，SHA-256 `0cf99ecf8269f88a140ba2301759eaebca56caffbdda43b3b9b7ba00098bac79`。
 
 ## 验收证据
 
 - 主线完整 `npm run check`：类型检查、57 个测试文件 / 402 项测试、生产构建全部通过。
 - Blender 修复自动验证：17 个原网格保持、150 段库边承托、两个中袋裙板与两项袋腔间隙检查通过；同视角前后图和源 blend 位于 `assets/blender/billiards-room-v1/`。
 - 妙搭包装 server/client typecheck、生产构建、ESLint 与 precommit 通过；裁剪器的两个顶层复制缺口均由现存嵌套依赖满足，嵌套模块和打包 AppModule 实际加载成功。
-- 正式入口在桌面 1280×800 与手机 390×844 均进入对局，canvas 正常、无横向溢出或页面错误；iframe 精确指向 `bf70f49`，两个旧湖面控制入口均不存在。
-- 局后反馈在开发库完成真实胜负、写入、失败、登录失效、跳过、同键重试与新会话回读闭环；包装专项 5 个测试文件 / 43 项通过。正式发布证据在包装树 `FEEDBACK_ACCEPTANCE.md` 与 `shots/release-v1.7.3/`。
+- 正式入口在桌面 1280×800 与手机 390×844 均进入对局，canvas 正常、无横向溢出、页面错误或失败请求；iframe 精确指向 `07b2c24`。清水湖、摄影棚、云海三个线上入口均实际加载画布，两个旧湖面控制入口均不存在。
+- 局后反馈在开发库完成真实胜负、写入、失败、登录失效、跳过、同键重试与新会话回读闭环；包装专项 5 个测试文件 / 43 项通过。v1.7.4 正式发布证据在包装树 `CLEAR_WATER_RELEASE.md` 与 `shots/release-v1.7.4/`。
 
 ## 发布约定
 
 妙搭只从已提交、已加精确版本标签且干净的主树执行 `npm run sync:game`。`bj8-miaoda-app` 的 `sprint/default` 消费产物，`BUILD_PROVENANCE.json` 记录源码提交、标签和 HTML SHA-256。每次发布仍需从 release 回执入口覆盖桌面 1280×800、手机 390×844 的首屏、开始对局、视角和出杆；历史 `aiforce.cloud` 别名恢复后可另做可达性复验。
 
-前次正式基线为 `v1.7.2` / `ea6784f139a6b743eb386263b9721212b8317774`，妙搭 release `7683666047719328977`。后续开发继续从 `bj8-main-integration/main` 进行；不将妙搭包装树、归档或历史镜像作为产品源码。
+前次正式基线为 `v1.7.3` / `c0d32343643e4b8d27f2337d73f75460eab8fe43`，妙搭 release `7683723869158345951`。后续开发继续从 `bj8-main-integration/main` 进行；不将妙搭包装树、归档或历史镜像作为产品源码。
