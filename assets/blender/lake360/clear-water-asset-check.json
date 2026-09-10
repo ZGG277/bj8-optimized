@@ -1,0 +1,29 @@
+{
+  "parser": "Three.js GLTFLoader",
+  "meshes": [
+    {
+      "name": "Lake360_Lakebed",
+      "vertices": 1905,
+      "triangles": 3648,
+      "colorItemSize": 3,
+      "minY": -10.269758224487305,
+      "maxY": -1.1723034381866455
+    },
+    {
+      "name": "Lake360_SkyDome",
+      "vertices": 1223,
+      "triangles": 2208,
+      "minY": -960,
+      "maxY": 960
+    },
+    {
+      "name": "Lake360_WaterMesh",
+      "vertices": 3841,
+      "triangles": 7584,
+      "minY": -0.7599999904632568,
+      "maxY": -0.7599999904632568
+    }
+  ],
+  "triangles": 13440,
+  "bytes": 283708
+}

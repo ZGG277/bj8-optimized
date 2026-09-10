@@ -1,15 +1,37 @@
 {
-  "author": "GPT-6 via Blender MCP",
+  "author": "GPT-6 / local Blender Python",
   "blender": "5.2.1 LTS",
-  "original_file": "",
-  "original_scene": "Scene",
-  "original_dirty": false,
-  "active_scene": "BJ8_Lake360_Experiment",
-  "restoration": "Switch scene selector to Scene; original Cube, Light, Camera retained.",
-  "triangles_upper_bound": 9888,
-  "meshes": 2,
-  "materials": 2,
-  "glb_bytes": 192088,
-  "glb_sha256": "7a896bfe0028f25fb6ff373f259ba47edd5204948f9423777a2d67dc75a36eaf",
-  "offline_render": false
+  "blender_build": "9e2066aef7ef",
+  "source_file": "assets/blender/lake360/lake360.blend",
+  "source_sha256": "0c5fd4227c0ecb19d34844954109e443319e4bb19a5331d57544fa4d28e5c479",
+  "source_preserved": true,
+  "source_scene": "BJ8_Lake360_Experiment",
+  "active_scene": "BJ8_Lake360_ClearWater",
+  "editable_source": "assets/blender/lake360/lake360-clear-water.blend",
+  "blend_sha256": "4a76ca122e1396ae01b9412f9ba323e9a4df1ab27c327eed71f140101d92dd8a",
+  "script_sha256": "3be9db948bc65f78e16d026657cb0078b4177c6e0fbaddd172f1eaf5e111724c",
+  "runtime_sha256": "0d22ed09923971f574edd5a513d4099c8636b7d1bde97b41c9a840fb2f3a79b7",
+  "meshes": 3,
+  "materials": 3,
+  "triangles": 13440,
+  "mesh_statistics": {
+    "Lake360_WaterMesh": {
+      "vertices": 3841,
+      "triangles": 7584
+    },
+    "Lake360_SkyDome": {
+      "vertices": 1106,
+      "triangles": 2208
+    },
+    "Lake360_Lakebed": {
+      "vertices": 1905,
+      "triangles": 3648
+    }
+  },
+  "glb_bytes": 283708,
+  "glb_sha256": "0cf99ecf8269f88a140ba2301759eaebca56caffbdda43b3b9b7ba00098bac79",
+  "reference": "https://www.ghibli.jp/works/chihiro/",
+  "license": "Original procedural geometry/materials; no third-party media included.",
+  "offline_render": false,
+  "validation_scope": "Blender export and source preservation; browser validation delegated to PM."
 }

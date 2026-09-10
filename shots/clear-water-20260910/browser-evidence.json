@@ -1,0 +1,63 @@
+{
+  "entry": "http://127.0.0.1:5222/?world=lake&lake360=1",
+  "results": [
+    {
+      "world": "lake",
+      "assetState": "ready",
+      "ripples": true,
+      "clearWater": true,
+      "forbiddenControls": 0,
+      "horizontalOverflow": false,
+      "drawCalls": 460,
+      "triangles": 218771,
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+      "materialNames": [
+        "lake360-sand-and-pebbles",
+        "lake360-directional-sky",
+        "lake360-clear-water"
+      ],
+      "cpuMeanMs": 2.2040540559871777,
+      "cpuP95Ms": 3.299999952316284,
+      "intervalMeanMs": 70.17808219178082,
+      "intervalP95Ms": 100.79999995231628,
+      "renderCount": 74,
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 1
+      },
+      "pageErrors": []
+    },
+    {
+      "world": "lake",
+      "assetState": "ready",
+      "ripples": true,
+      "clearWater": true,
+      "forbiddenControls": 0,
+      "horizontalOverflow": false,
+      "drawCalls": 460,
+      "triangles": 218771,
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+      "materialNames": [
+        "lake360-sand-and-pebbles",
+        "lake360-directional-sky",
+        "lake360-clear-water"
+      ],
+      "cpuMeanMs": 3.2328947500178686,
+      "cpuP95Ms": 3.200000047683716,
+      "intervalMeanMs": 68.12533333301545,
+      "intervalP95Ms": 100.5,
+      "renderCount": 76,
+      "viewport": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "deviceScaleFactor": 2,
+        "isMobile": true,
+        "hasTouch": true
+      },
+      "pageErrors": []
+    }
+  ]
+}
