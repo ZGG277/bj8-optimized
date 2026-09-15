@@ -1,11 +1,12 @@
 /*
-[INPUT]: 现有可操作相机终点位姿与归一化时间
-[OUTPUT]: 约 5 秒湖面远景靠近球桌并精确落到现有相机的连续位姿
+[INPUT]: 局前已选世界、现有可操作相机终点位姿与归一化时间
+[OUTPUT]: 为湖面与云海启用约 5 秒远景靠近及各自文案，并精确落到现有相机的连续位姿
 [POS]: 纯相机几何；不读取场景、DOM、球局或持久状态
 [PROTOCOL]: 路径或时长变化时同步 opening-demo.test.ts 与本地验收记录
 */
 
 import type { CameraPose } from './camera-view';
+import type { PublicWorldId } from './world-selection';
 
 export const OPENING_DEMO_DURATION_MS = 5000;
 export const OPENING_DEMO_FAR_DISTANCE = 34;
@@ -15,13 +16,29 @@ export type OpeningDemoFrame = CameraPose & {
   distanceToHandoff: number;
 };
 
-/** 正式入口默认播放湖面开场；显式其他世界保持原有局前入口。 */
-export function openingDemoEnabledForSearch(search: string): boolean {
-  const params = new URLSearchParams(search);
-  if (params.get('openingDemo') === '0') return false;
-  if (params.get('openingDemo') === '1' || params.get('lake360') === '1') return true;
-  const world = params.get('world');
-  return world === null || world === 'lake';
+export type OpeningDemoCopy = {
+  title: string;
+  subtitle: string;
+};
+
+/**
+ * 局前公开世界各自的开场文案：湖面与云海都拥有独立开场，室内不开场。
+ * 文本由调用方在 UI 落字，纯函数不接触 DOM。
+ */
+export function openingDemoCopyForWorld(worldId: PublicWorldId): OpeningDemoCopy | null {
+  switch (worldId) {
+    case 'lake':
+      return { title: '湖面正在亮起', subtitle: '向湖心靠近' };
+    case 'cloud-sea':
+      return { title: '云海正在亮起', subtitle: '穿过云海' };
+    case 'studio':
+      return null;
+  }
+}
+
+/** 开场由玩家在局前实际选择的世界决定，URL 只负责预选，不负责自动开始。 */
+export function openingDemoEnabledForWorld(worldId: PublicWorldId): boolean {
+  return openingDemoCopyForWorld(worldId) !== null;
 }
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
@@ -37,7 +54,7 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
  * 由终点反推同一视线轴上的远景，避免动画末帧切换另一套相机公式。
- * 起点只把现有湖面当作大尺度错觉，不创建超大物理场景。
+ * 起点只把现有外围世界当作大尺度错觉，不创建超大物理场景。
  */
 export function openingDemoFrame(progress: number, handoff: CameraPose): OpeningDemoFrame {
   const t = smootherStep(progress);

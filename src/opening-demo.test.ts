@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   OPENING_DEMO_DURATION_MS,
   OPENING_DEMO_FAR_DISTANCE,
-  openingDemoEnabledForSearch,
+  openingDemoCopyForWorld,
+  openingDemoEnabledForWorld,
   openingDemoFrame,
 } from './opening-demo';
 
@@ -12,13 +13,28 @@ const handoff = {
 };
 
 describe('opening demo camera path', () => {
-  it('正式无参数入口与湖面入口播放一次开场，显式其他世界保持原入口', () => {
-    expect(openingDemoEnabledForSearch('')).toBe(true);
-    expect(openingDemoEnabledForSearch('?world=lake')).toBe(true);
-    expect(openingDemoEnabledForSearch('?lake360=1')).toBe(true);
-    expect(openingDemoEnabledForSearch('?world=studio')).toBe(false);
-    expect(openingDemoEnabledForSearch('?world=cloud-sea')).toBe(false);
-    expect(openingDemoEnabledForSearch('?openingDemo=0')).toBe(false);
+  it('湖面、云海都触发开场，室内不开场', () => {
+    expect(openingDemoEnabledForWorld('lake')).toBe(true);
+    expect(openingDemoEnabledForWorld('cloud-sea')).toBe(true);
+    expect(openingDemoEnabledForWorld('studio')).toBe(false);
+  });
+
+  it('湖面开场文案：湖面正在亮起 / 向湖心靠近', () => {
+    expect(openingDemoCopyForWorld('lake')).toEqual({
+      title: '湖面正在亮起',
+      subtitle: '向湖心靠近',
+    });
+  });
+
+  it('云海开场文案：云海正在亮起 / 穿过云海', () => {
+    expect(openingDemoCopyForWorld('cloud-sea')).toEqual({
+      title: '云海正在亮起',
+      subtitle: '穿过云海',
+    });
+  });
+
+  it('室内世界不开场，文案为 null', () => {
+    expect(openingDemoCopyForWorld('studio')).toBeNull();
   });
 
   it('约 5 秒并从远处连续靠近现有相机终点', () => {

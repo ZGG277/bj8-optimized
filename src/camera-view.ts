@@ -16,7 +16,8 @@ export const CAMERA_FOV_DEGREES = 46;
 
 const FP_CAM_DIST = 0.72;
 const FP_CAM_SIDE = 0.015;
-const FP_CAM_HEIGHT = 0.16;
+/** 用户认可湖面/云海开场后，将共享第一视角停留位从 16cm 克制抬高到 20cm。 */
+const FP_CAM_HEIGHT = 0.20;
 const FP_LOOK_AHEAD = 0.42;
 const OVERHEAD_ORBIT_RADIUS = 0.85;
 /** 木帮外缘的半尺寸，略留 1cm 给阴影和抗锯齿边缘。 */

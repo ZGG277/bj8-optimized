@@ -286,9 +286,17 @@ export class Scene3D {
     this.scene.background = new THREE.Color(0x07090a);
     this.scene.fog = new THREE.Fog(0x07090a, 4, 11);
 
-    this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
-    if (lake360Enabled()) { this.camera.far = 2000; this.camera.updateProjectionMatrix(); }
-    this.virtualCam = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
+    // 湖面穹顶半径约 960m；云海天空球半径 48m，而开场相机距中心约 34m。
+    // 远裁剪面必须跟随实际 worldId，避免相机前方的天空表面被裁掉而露出深色背景。
+    const cameraFar = options.worldId === 'lake' || lake360Enabled()
+      ? 2000
+      : options.worldId === 'cloud-sea' ? 120 : 60;
+    this.camera = new THREE.PerspectiveCamera(
+      CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, cameraFar,
+    );
+    this.virtualCam = new THREE.PerspectiveCamera(
+      CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, cameraFar,
+    );
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,

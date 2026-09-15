@@ -34,7 +34,6 @@
   inset: 0;
   z-index: 90;
   pointer-events: none;
-  transition: background 700ms ease;
 }
 
 .opening-demo-ui.pending {

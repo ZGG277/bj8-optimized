@@ -66,7 +66,7 @@ import {
   isOverheadCameraView,
   fullTableAzimuth,
 } from './camera-view';
-import { openingDemoEnabledForSearch } from './opening-demo';
+import { openingDemoCopyForWorld, openingDemoEnabledForWorld } from './opening-demo';
 import { markControlLearned } from './control-onboarding';
 import {
   createShotCameraFollow,
@@ -116,17 +116,13 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 }
 
 export default function Game() {
-  const openingDemoEnabled = useMemo(
-    () => openingDemoEnabledForSearch(window.location.search),
-    [],
-  );
   const [selectedWorld, setSelectedWorld] = useState<PublicWorldId>(() =>
-    openingDemoEnabled ? 'lake' : resolveWorldSelection(window.location.search));
-  const [openingDemoRun, setOpeningDemoRun] = useState(openingDemoEnabled ? 1 : 0);
+    resolveWorldSelection(window.location.search));
+  const [openingDemoRun, setOpeningDemoRun] = useState(0);
   const [openingDemoStatus, setOpeningDemoStatus] = useState<'off' | 'pending' | 'playing' | 'done'>(
-    openingDemoEnabled ? 'pending' : 'off',
+    'off',
   );
-  const openingDemoAutostartRef = useRef(false);
+  const openingDemoCopy = openingDemoCopyForWorld(selectedWorld);
   const openingDemoActive = openingDemoStatus === 'pending' || openingDemoStatus === 'playing';
   const selectWorld = (worldId: PublicWorldId) => {
     setSelectedWorld(worldId);
@@ -871,21 +867,24 @@ export default function Game() {
     handleResetGame(gameMode);
   }, [gameMode, handleResetGame]);
 
-  // 正式默认入口首次打开即进入湖面陪练；显式其他世界仍保留原局前选择流程。
-  useEffect(() => {
-    if (!openingDemoEnabled || openingDemoAutostartRef.current) return;
-    openingDemoAutostartRef.current = true;
-    handleResetGame('practice');
-    setCameraAzimuth(FULL_TABLE_AZIMUTH);
-    setCameraDetached(false);
-    setViewLevel(FIRST_PERSON_VIEW);
-  }, [handleResetGame, openingDemoEnabled, setViewLevel]);
+  // URL 只预选世界；玩家点击开始后，湖面或云海才播放各自的一次开场。
+  const handleStartGame = useCallback((nextMode: GameMode) => {
+    const playOpening = openingDemoEnabledForWorld(selectedWorld);
+    setOpeningDemoStatus(playOpening ? 'pending' : 'off');
+    if (playOpening) setOpeningDemoRun(current => current + 1);
+    handleResetGame(nextMode);
+    if (playOpening) {
+      setCameraAzimuth(FULL_TABLE_AZIMUTH);
+      setCameraDetached(false);
+      setViewLevel(FIRST_PERSON_VIEW);
+    }
+  }, [handleResetGame, selectedWorld, setViewLevel]);
 
   const handleReplayOpening = useCallback(() => {
-    if (!openingDemoEnabled) return;
+    if (openingDemoStatus !== 'done') return;
     setOpeningDemoStatus('pending');
     setOpeningDemoRun(current => current + 1);
-  }, [openingDemoEnabled]);
+  }, [openingDemoStatus]);
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
@@ -1053,9 +1052,9 @@ export default function Game() {
     legalTargets,
   ]);
 
-  // Scene3D 先消费当前球局与第一人称终点，再从远湖反推起点；末帧就是同一活相机。
+  // Scene3D 先消费当前球局与第一人称终点，再从外围世界反推起点；末帧就是同一活相机。
   useEffect(() => {
-    if (!openingDemoEnabled || openingDemoRun < 1 || !sceneEnabled) return;
+    if (openingDemoRun < 1 || !sceneEnabled) return;
     const scene = scene3DRef.current;
     if (!scene) return;
     let live = true;
@@ -1068,13 +1067,13 @@ export default function Game() {
       },
     });
     return () => { live = false; };
-  }, [openingDemoEnabled, openingDemoRun, sceneEnabled]);
+  }, [openingDemoRun, sceneEnabled]);
 
   // ── 渲染 ──
   return (
     <div
       className={`game-shell ${openingDemoActive ? 'opening-demo-active' : ''}`}
-      data-opening-demo={openingDemoEnabled ? openingDemoStatus : undefined}
+      data-opening-demo={openingDemoStatus !== 'off' ? openingDemoStatus : undefined}
     >
       <Scoreboard
         match={match}
@@ -1170,11 +1169,13 @@ export default function Game() {
           onSkip={finishFirstMatchGuide}
         />
       )}
-      {openingDemoEnabled && (
+      {openingDemoStatus !== 'off' && (
         <div className={`opening-demo-ui ${openingDemoStatus}`} aria-live="polite">
           {openingDemoActive ? (
             <div className="opening-demo-caption">
-              <span>{openingDemoStatus === 'pending' ? '湖面正在亮起' : '向湖心靠近'}</span>
+              <span>{openingDemoStatus === 'pending'
+                ? openingDemoCopy?.title
+                : openingDemoCopy?.subtitle}</span>
               <i aria-hidden="true" />
             </div>
           ) : (
@@ -1182,8 +1183,8 @@ export default function Game() {
           )}
         </div>
       )}
-      {match.phase === 'intro' && !openingDemoEnabled && (
-        <IntroScreen playerSkill={playerSkill} onStart={handleResetGame}
+      {match.phase === 'intro' && (
+        <IntroScreen playerSkill={playerSkill} onStart={handleStartGame}
           worldSelection={{ value: selectedWorld, onChange: selectWorld }} />
       )}
     </div>

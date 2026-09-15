@@ -68,6 +68,7 @@ describe('continuous camera view', () => {
   it('出杆位稍高于第一人称且仍沿杆向观察', () => {
     const first = cameraPoseAt(0.1, 0.7, 0.3, 0, FIRST_PERSON_VIEW);
     const shot = cameraPoseAt(0.1, 0.7, 0.3, 0, SHOT_AIM_VIEW);
+    expect(first.position.y).toBeCloseTo(0.20, 10);
     expect(shot.position.y).toBeGreaterThan(first.position.y + 0.1);
     expect(shot.position.y).toBeLessThan(first.position.y + 0.4);
     expect(isGlobalCameraView(SHOT_AIM_VIEW)).toBe(false);

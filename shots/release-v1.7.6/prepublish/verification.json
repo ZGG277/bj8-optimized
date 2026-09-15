@@ -1,0 +1,400 @@
+{
+  "baseUrl": "http://127.0.0.1:5231/",
+  "browser": "Chrome/152.0.7977.84",
+  "checks": [
+    {
+      "name": "desktop 无参数入口保留场景选择",
+      "pass": true,
+      "detail": {
+        "intro": true,
+        "selected": "studio",
+        "canvasCount": 0,
+        "opening": null,
+        "overflow": false
+      }
+    },
+    {
+      "name": "desktop 云海参数只预选且不自动开场",
+      "pass": true,
+      "detail": {
+        "intro": true,
+        "selected": "cloud-sea",
+        "canvasCount": 0,
+        "opening": null,
+        "overflow": false
+      }
+    },
+    {
+      "name": "desktop 云海首帧使用完整天空与云层",
+      "pass": true,
+      "detail": {
+        "worldId": "cloud-sea",
+        "cameraFar": 120,
+        "sky": true,
+        "clouds": true,
+        "caption": "穿过云海",
+        "opening": {
+          "active": true,
+          "progress": 0.056340000000596045,
+          "durationMs": 5000,
+          "camera": [
+            -2.3332051141779155,
+            3.448074548075168,
+            35.345743420073354
+          ],
+          "lookAt": [
+            -0.009851842237581633,
+            0.07992032146684415,
+            -0.5337400100562039
+          ],
+          "handoffCamera": [
+            0.015,
+            0.2,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        }
+      }
+    },
+    {
+      "name": "desktop 云海开场完成并精确交接",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.2,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.2,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "overflow": false,
+        "canvasCount": 1,
+        "cameraDelta": 0,
+        "lookDelta": 0
+      }
+    },
+    {
+      "name": "desktop 云海交接后可真实出杆",
+      "pass": true,
+      "detail": {
+        "phase": "rolling",
+        "moving": true,
+        "openingStatus": "done"
+      }
+    },
+    {
+      "name": "desktop 云海再来一局不复播",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "openingStatus": "done",
+        "active": false
+      }
+    },
+    {
+      "name": "desktop 重播按钮只重播云海相机",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "caption": "穿过云海",
+        "active": true
+      }
+    },
+    {
+      "name": "desktop 云海流程无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "desktop 湖面仍只预选不自动开场",
+      "pass": true,
+      "detail": {
+        "intro": true,
+        "selected": "lake",
+        "canvasCount": 0,
+        "opening": null,
+        "overflow": false
+      }
+    },
+    {
+      "name": "desktop 已认可湖面开场保持",
+      "pass": true,
+      "detail": {
+        "worldId": "lake",
+        "cameraFar": 2000,
+        "caption": "向湖心靠近"
+      }
+    },
+    {
+      "name": "desktop 湖面交接同步抬高且连续",
+      "pass": true,
+      "detail": {
+        "active": false,
+        "progress": 1,
+        "durationMs": 5000,
+        "camera": [
+          0.015,
+          0.2,
+          1.355
+        ],
+        "lookAt": [
+          0,
+          0.03,
+          0.21500000000000002
+        ],
+        "handoffCamera": [
+          0.015,
+          0.2,
+          1.355
+        ],
+        "handoffLookAt": [
+          0,
+          0.03,
+          0.21500000000000002
+        ],
+        "lakeCameraDelta": 0,
+        "lakeLookDelta": 0
+      }
+    },
+    {
+      "name": "desktop 湖面回归无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "desktop 摄影棚开始时不开场",
+      "pass": true,
+      "detail": {
+        "worldId": "studio",
+        "opening": null,
+        "canvasCount": 1,
+        "overflow": false
+      }
+    },
+    {
+      "name": "desktop 摄影棚流程无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile 无参数入口保留场景选择",
+      "pass": true,
+      "detail": {
+        "intro": true,
+        "selected": "studio",
+        "canvasCount": 0,
+        "opening": null,
+        "overflow": false
+      }
+    },
+    {
+      "name": "mobile 云海参数只预选且不自动开场",
+      "pass": true,
+      "detail": {
+        "intro": true,
+        "selected": "cloud-sea",
+        "canvasCount": 0,
+        "opening": null,
+        "overflow": false
+      }
+    },
+    {
+      "name": "mobile 云海首帧使用完整天空与云层",
+      "pass": true,
+      "detail": {
+        "worldId": "cloud-sea",
+        "cameraFar": 120,
+        "sky": true,
+        "clouds": true,
+        "caption": "穿过云海",
+        "opening": {
+          "active": true,
+          "progress": 0.05714000000059605,
+          "durationMs": 5000,
+          "camera": [
+            -2.334619007853004,
+            3.4487212840575543,
+            35.36018715987691
+          ],
+          "lookAt": [
+            -0.009857100044485652,
+            0.07994696332778037,
+            -0.5341396033809093
+          ],
+          "handoffCamera": [
+            0.015,
+            0.2,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        }
+      }
+    },
+    {
+      "name": "mobile 云海开场完成并精确交接",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.2,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.2,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "overflow": false,
+        "canvasCount": 1,
+        "cameraDelta": 0,
+        "lookDelta": 0
+      }
+    },
+    {
+      "name": "mobile 云海交接后可真实出杆",
+      "pass": true,
+      "detail": {
+        "phase": "rolling",
+        "moving": true,
+        "openingStatus": "done"
+      }
+    },
+    {
+      "name": "mobile 云海再来一局不复播",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "openingStatus": "done",
+        "active": false
+      }
+    },
+    {
+      "name": "mobile 重播按钮只重播云海相机",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "caption": "穿过云海",
+        "active": true
+      }
+    },
+    {
+      "name": "mobile 云海流程无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile 湖面仍只预选不自动开场",
+      "pass": true,
+      "detail": {
+        "intro": true,
+        "selected": "lake",
+        "canvasCount": 0,
+        "opening": null,
+        "overflow": false
+      }
+    },
+    {
+      "name": "mobile 已认可湖面开场保持",
+      "pass": true,
+      "detail": {
+        "worldId": "lake",
+        "cameraFar": 2000,
+        "caption": "向湖心靠近"
+      }
+    },
+    {
+      "name": "mobile 湖面交接同步抬高且连续",
+      "pass": true,
+      "detail": {
+        "active": false,
+        "progress": 1,
+        "durationMs": 5000,
+        "camera": [
+          0.015,
+          0.2,
+          1.355
+        ],
+        "lookAt": [
+          0,
+          0.03,
+          0.21500000000000002
+        ],
+        "handoffCamera": [
+          0.015,
+          0.2,
+          1.355
+        ],
+        "handoffLookAt": [
+          0,
+          0.03,
+          0.21500000000000002
+        ],
+        "lakeCameraDelta": 0,
+        "lakeLookDelta": 0
+      }
+    },
+    {
+      "name": "mobile 湖面回归无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile 摄影棚开始时不开场",
+      "pass": true,
+      "detail": {
+        "worldId": "studio",
+        "opening": null,
+        "canvasCount": 1,
+        "overflow": false
+      }
+    },
+    {
+      "name": "mobile 摄影棚流程无脚本错误",
+      "pass": true,
+      "detail": []
+    }
+  ]
+}
