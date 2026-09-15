@@ -7,7 +7,7 @@
  * 复现：加塞击球后白球停在原地（stun/碰撞卸速），线速度为 0 但 wy 长时间不归零，
  * world.moving 迟迟不结束——系统反馈"球还在运动中"卡数秒到十几秒 */
 import { describe, it, expect } from 'vitest';
-import { createInitialWorld, simulateUntilStop } from './physics';
+import { createInitialWorld, SIDE_SPIN_SCALE, simulateUntilStop } from './physics';
 
 function stagedSpinWorld(wy: number) {
   const world = createInitialWorld();
@@ -21,8 +21,8 @@ function stagedSpinWorld(wy: number) {
 }
 
 describe('加塞停球收敛', () => {
-  it('中力满塞残余侧旋（≈77 rad/s）应快速归零', () => {
-    const { world, cue } = stagedSpinWorld(0.85 * (2.6 / 0.028575));
+  it('中力满塞残余侧旋（≈59 rad/s）应快速归零', () => {
+    const { world, cue } = stagedSpinWorld(SIDE_SPIN_SCALE * (2.6 / 0.028575));
     simulateUntilStop(world);
     console.log(`中力满塞原地残旋 settle 耗时 ${world.time.toFixed(2)}s`);
     expect(world.time).toBeLessThan(3);
@@ -30,8 +30,8 @@ describe('加塞停球收敛', () => {
     expect(world.moving).toBe(false);
   });
 
-  it('满力满塞残余侧旋（≈238 rad/s）最恶劣情形应快速归零', () => {
-    const { world, cue } = stagedSpinWorld(0.85 * (8.0 / 0.028575));
+  it('满力满塞残余侧旋（≈182 rad/s）最恶劣情形应快速归零', () => {
+    const { world, cue } = stagedSpinWorld(SIDE_SPIN_SCALE * (8.0 / 0.028575));
     simulateUntilStop(world, 60);
     console.log(`满力满塞原地残旋 settle 耗时 ${world.time.toFixed(2)}s`);
     expect(world.time).toBeLessThan(4);

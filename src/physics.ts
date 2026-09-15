@@ -88,6 +88,12 @@ const CUSHION_E_MIN = 0.52;
 const CUSHION_TANGENTIAL_KEEP = 0.72; // 库边切向速度保留比例
 const CUSHION_SPIN_KICK = 0.18;      // 库边切向摩擦冲量上限 μ·Jn
 
+/** 65 以下保持正式版手感，只压缩高力度段；满力由 10.0m/s 收到 8.4m/s。 */
+export const HIGH_POWER_COMPRESSION_START = 65;
+export const MAX_CUE_SPEED = 8.4;
+/** 击球点到垂直轴侧旋的映射；不改变台呢或库边的全局摩擦。 */
+export const SIDE_SPIN_SCALE = 0.65;
+
 export type BallGroup = "cue" | "solid" | "eight" | "stripe";
 
 export type BallState = {
@@ -297,6 +303,17 @@ function rollingSpin(vx: number, vz: number): { wx: number; wz: number } {
   return { wx: vz / R, wz: -vx / R };
 }
 
+/** 力度 65 前沿用正式版线性速度，之后平滑压缩到新的满力上限。 */
+export function cueSpeedForPower(power: number): number {
+  const clampedPower = Math.min(100, Math.max(1, power));
+  const legacySpeed = (value: number) => 0.35 + (value / 100) * 9.65;
+  if (clampedPower <= HIGH_POWER_COMPRESSION_START) return legacySpeed(clampedPower);
+  const kneeSpeed = legacySpeed(HIGH_POWER_COMPRESSION_START);
+  const highPowerProgress = (clampedPower - HIGH_POWER_COMPRESSION_START)
+    / (100 - HIGH_POWER_COMPRESSION_START);
+  return kneeSpeed + (MAX_CUE_SPEED - kneeSpeed) * highPowerProgress;
+}
+
 /**
  * 击打白球
  * @param spin 击球点：x>0 高杆(跟进) x<0 低杆(缩杆) y 侧旋(塞)
@@ -307,9 +324,7 @@ export function strikeCueBall(world: BilliardsWorld, angle: number, power: numbe
     return false;
   }
 
-  // 力度映射：1-100 -> 速度 0.35-10.0 m/s（满分可开出有力的球堆）
-  const normalizedPower = Math.min(100, Math.max(1, power)) / 100;
-  const speed = 0.35 + normalizedPower * 9.65;
+  const speed = cueSpeedForPower(power);
 
   cue.vx = Math.sin(angle) * speed;
   cue.vz = -Math.cos(angle) * speed;
@@ -323,7 +338,7 @@ export function strikeCueBall(world: BilliardsWorld, angle: number, power: numbe
   cue.wx = roll.wx * sx * 2.6;
   cue.wz = roll.wz * sx * 2.6;
   // 侧旋：绕垂直轴
-  cue.wy = sy * (speed / R) * 0.85;
+  cue.wy = sy * (speed / R) * SIDE_SPIN_SCALE;
 
   world.events = [];
   world.firstContact = null;

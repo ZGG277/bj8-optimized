@@ -17,6 +17,11 @@ root.updateMatrixWorld(true);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 assert(bytes.length < 2 * 1024 * 1024, '首版 GLB 超过 2 MiB 资产预算');
 for (const name of ['BJ8_TableShell', 'BJ8_Room', 'BJ8_Pendant']) assert(root.getObjectByName(name), `缺少 ${name}`);
+const cornerAprons = root.getObjectByName('BJ8_CornerPocketOuterAprons');
+assert(cornerAprons?.isMesh, '缺少四角袋外侧围裙');
+assert(cornerAprons.userData.visual_only === true, '角袋外侧围裙必须保持纯视觉');
+assert(cornerAprons.userData.collision_geometry === false, '角袋外侧围裙不得成为碰撞体');
+assert(cornerAprons.userData.corner_count === 4, '角袋外侧围裙必须四角对称');
 for (const [name, expected] of [['BJ8_Origin', [0, 0, 0]], ['BJ8_Width', [.635, 0, 0]], ['BJ8_Length', [0, 0, 1.27]]]) {
   const anchor = root.getObjectByName(name);
   assert(anchor, `缺少 ${name}`);

@@ -1,0 +1,796 @@
+{
+  "baseUrl": "http://127.0.0.1:5228/",
+  "browser": "Chrome/152.0.7977.84",
+  "checks": [
+    {
+      "name": "mobile/lake 进入正确世界",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "lake",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "mobile/lake 单画布且无横向溢出",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "lake",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "mobile/lake 四角外壳保持纯视觉",
+      "pass": true,
+      "detail": {
+        "visible": true,
+        "visualOnly": true,
+        "collisionGeometry": false,
+        "cornerCount": 4
+      }
+    },
+    {
+      "name": "mobile/lake 紧密开球目标圈不叠画",
+      "pass": true,
+      "detail": {
+        "legalTargets": 14,
+        "visibleRings": 0
+      }
+    },
+    {
+      "name": "mobile 无参数湖面开场精确交接",
+      "pass": true,
+      "detail": {
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "cameraDelta": 0,
+        "lookDelta": 0
+      }
+    },
+    {
+      "name": "mobile/lake 分开单球目标提示保留",
+      "pass": true,
+      "detail": [
+        {
+          "number": 1,
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "mobile/lake 页面无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile 开场后真实轻杆可提交",
+      "pass": true,
+      "detail": "rolling"
+    },
+    {
+      "name": "mobile/studio 进入正确世界",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "studio",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.05640106450245112,
+            2.2635490097928685,
+            1.1746512387676156
+          ],
+          "lookAt": [
+            0.06574752662000016,
+            -0.01902159160522489,
+            0.3322220154776776
+          ],
+          "handoffCamera": [
+            0.12891671886274542,
+            4.839540593812271,
+            1.2256314028974071
+          ],
+          "handoffLookAt": [
+            0.12891671886274542,
+            -0.061316846284754686,
+            0.42563140289740714
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "mobile/studio 单画布且无横向溢出",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "studio",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.05640106450245112,
+            2.2635490097928685,
+            1.1746512387676156
+          ],
+          "lookAt": [
+            0.06574752662000016,
+            -0.01902159160522489,
+            0.3322220154776776
+          ],
+          "handoffCamera": [
+            0.12891671886274542,
+            4.839540593812271,
+            1.2256314028974071
+          ],
+          "handoffLookAt": [
+            0.12891671886274542,
+            -0.061316846284754686,
+            0.42563140289740714
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "mobile/studio 四角外壳保持纯视觉",
+      "pass": true,
+      "detail": {
+        "visible": true,
+        "visualOnly": true,
+        "collisionGeometry": false,
+        "cornerCount": 4
+      }
+    },
+    {
+      "name": "mobile/studio 紧密开球目标圈不叠画",
+      "pass": true,
+      "detail": {
+        "legalTargets": 14,
+        "visibleRings": 0
+      }
+    },
+    {
+      "name": "mobile/studio 分开单球目标提示保留",
+      "pass": true,
+      "detail": [
+        {
+          "number": 1,
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "mobile/studio 页面无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "mobile/cloud-sea 进入正确世界",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "cloud-sea",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.05640106450245112,
+            2.2635490097928685,
+            1.1746512387676156
+          ],
+          "lookAt": [
+            0.06574752662000016,
+            -0.01902159160522489,
+            0.3322220154776776
+          ],
+          "handoffCamera": [
+            0.12891671886274542,
+            4.839540593812271,
+            1.2256314028974071
+          ],
+          "handoffLookAt": [
+            0.12891671886274542,
+            -0.061316846284754686,
+            0.42563140289740714
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "mobile/cloud-sea 单画布且无横向溢出",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "cloud-sea",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.05640106450245112,
+            2.2635490097928685,
+            1.1746512387676156
+          ],
+          "lookAt": [
+            0.06574752662000016,
+            -0.01902159160522489,
+            0.3322220154776776
+          ],
+          "handoffCamera": [
+            0.12891671886274542,
+            4.839540593812271,
+            1.2256314028974071
+          ],
+          "handoffLookAt": [
+            0.12891671886274542,
+            -0.061316846284754686,
+            0.42563140289740714
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "mobile/cloud-sea 四角外壳保持纯视觉",
+      "pass": true,
+      "detail": {
+        "visible": true,
+        "visualOnly": true,
+        "collisionGeometry": false,
+        "cornerCount": 4
+      }
+    },
+    {
+      "name": "mobile/cloud-sea 紧密开球目标圈不叠画",
+      "pass": true,
+      "detail": {
+        "legalTargets": 14,
+        "visibleRings": 0
+      }
+    },
+    {
+      "name": "mobile/cloud-sea 分开单球目标提示保留",
+      "pass": true,
+      "detail": [
+        {
+          "number": 1,
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "mobile/cloud-sea 页面无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "desktop/lake 进入正确世界",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "lake",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "desktop/lake 单画布且无横向溢出",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "lake",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "desktop/lake 四角外壳保持纯视觉",
+      "pass": true,
+      "detail": {
+        "visible": true,
+        "visualOnly": true,
+        "collisionGeometry": false,
+        "cornerCount": 4
+      }
+    },
+    {
+      "name": "desktop/lake 紧密开球目标圈不叠画",
+      "pass": true,
+      "detail": {
+        "legalTargets": 14,
+        "visibleRings": 0
+      }
+    },
+    {
+      "name": "desktop 无参数湖面开场精确交接",
+      "pass": true,
+      "detail": {
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "lookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ],
+          "handoffCamera": [
+            0.015,
+            0.16,
+            1.355
+          ],
+          "handoffLookAt": [
+            0,
+            0.03,
+            0.21500000000000002
+          ]
+        },
+        "cameraDelta": 0,
+        "lookDelta": 0
+      }
+    },
+    {
+      "name": "desktop/lake 分开单球目标提示保留",
+      "pass": true,
+      "detail": [
+        {
+          "number": 1,
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "desktop/lake 页面无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "desktop 开场后真实轻杆可提交",
+      "pass": true,
+      "detail": "rolling"
+    },
+    {
+      "name": "desktop/studio 进入正确世界",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "studio",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            -0.4539679150156911,
+            1.1311615721376693,
+            0.6532147033518477
+          ],
+          "lookAt": [
+            -0.12119688378971996,
+            -0.020805335598450766,
+            0.13237599705015385
+          ],
+          "handoffCamera": [
+            -1.037640948607294,
+            2.251226450600387,
+            0.03377646480422325
+          ],
+          "handoffLookAt": [
+            -0.23764094860729407,
+            -0.06481438352637406,
+            0.03377646480422325
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "desktop/studio 单画布且无横向溢出",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "studio",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            -0.4539679150156911,
+            1.1311615721376693,
+            0.6532147033518477
+          ],
+          "lookAt": [
+            -0.12119688378971996,
+            -0.020805335598450766,
+            0.13237599705015385
+          ],
+          "handoffCamera": [
+            -1.037640948607294,
+            2.251226450600387,
+            0.03377646480422325
+          ],
+          "handoffLookAt": [
+            -0.23764094860729407,
+            -0.06481438352637406,
+            0.03377646480422325
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "desktop/studio 四角外壳保持纯视觉",
+      "pass": true,
+      "detail": {
+        "visible": true,
+        "visualOnly": true,
+        "collisionGeometry": false,
+        "cornerCount": 4
+      }
+    },
+    {
+      "name": "desktop/studio 紧密开球目标圈不叠画",
+      "pass": true,
+      "detail": {
+        "legalTargets": 14,
+        "visibleRings": 0
+      }
+    },
+    {
+      "name": "desktop/studio 分开单球目标提示保留",
+      "pass": true,
+      "detail": [
+        {
+          "number": 1,
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "desktop/studio 页面无脚本错误",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "desktop/cloud-sea 进入正确世界",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "cloud-sea",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            -0.2594102371518235,
+            0.7578066126500969,
+            0.8596941162010558
+          ],
+          "lookAt": [
+            -0.07129228458218821,
+            -0.0019443150579122152,
+            0.17463293944126695
+          ],
+          "handoffCamera": [
+            -1.037640948607294,
+            2.251226450600387,
+            0.03377646480422325
+          ],
+          "handoffLookAt": [
+            -0.23764094860729407,
+            -0.06481438352637406,
+            0.03377646480422325
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "desktop/cloud-sea 单画布且无横向溢出",
+      "pass": true,
+      "detail": {
+        "phase": "aiming",
+        "worldId": "cloud-sea",
+        "canvasCount": 1,
+        "overflow": false,
+        "opening": {
+          "active": false,
+          "progress": 1,
+          "durationMs": 5000,
+          "camera": [
+            -0.2594102371518235,
+            0.7578066126500969,
+            0.8596941162010558
+          ],
+          "lookAt": [
+            -0.07129228458218821,
+            -0.0019443150579122152,
+            0.17463293944126695
+          ],
+          "handoffCamera": [
+            -1.037640948607294,
+            2.251226450600387,
+            0.03377646480422325
+          ],
+          "handoffLookAt": [
+            -0.23764094860729407,
+            -0.06481438352637406,
+            0.03377646480422325
+          ]
+        },
+        "legalTargets": 14,
+        "visibleRings": 0,
+        "apron": {
+          "visible": true,
+          "visualOnly": true,
+          "collisionGeometry": false,
+          "cornerCount": 4
+        }
+      }
+    },
+    {
+      "name": "desktop/cloud-sea 四角外壳保持纯视觉",
+      "pass": true,
+      "detail": {
+        "visible": true,
+        "visualOnly": true,
+        "collisionGeometry": false,
+        "cornerCount": 4
+      }
+    },
+    {
+      "name": "desktop/cloud-sea 紧密开球目标圈不叠画",
+      "pass": true,
+      "detail": {
+        "legalTargets": 14,
+        "visibleRings": 0
+      }
+    },
+    {
+      "name": "desktop/cloud-sea 分开单球目标提示保留",
+      "pass": true,
+      "detail": [
+        {
+          "number": 1,
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "desktop/cloud-sea 页面无脚本错误",
+      "pass": true,
+      "detail": []
+    }
+  ]
+}

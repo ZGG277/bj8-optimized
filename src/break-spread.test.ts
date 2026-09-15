@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createInitialWorld,
+  cueSpeedForPower,
   strikeCueBall,
   stepWorld,
   simulateUntilStop,
@@ -95,10 +96,11 @@ describe('开球球堆散开回归', () => {
   it('峰值速度分布：多球获得实质速度且无能量创生', () => {
     for (let seed = 1; seed <= 4; seed += 1) {
       const s = breakStats(createInitialWorld(mulberry32(seed)));
-      // 防"单球火箭+球堆蠕行"回潮：至少 2 球峰值 ≥2.5（实测每局 top2 ≥4.1）
-      expect(s.peaks.filter((v) => v >= 2.5).length).toBeGreaterThanOrEqual(2);
-      // 出杆速度 9.23 m/s，任何球峰值不得明显超出（能量守恒护栏，实测最高 7.8）
-      expect(Math.max(...s.peaks)).toBeLessThan(9.4);
+      // 高力度上限下调后用入射速度比例锁定传能质量，避免绝对阈值反向阻止调低力度。
+      const launchSpeed = cueSpeedForPower(92);
+      expect(s.peaks.filter((v) => v >= launchSpeed * 0.27).length).toBeGreaterThanOrEqual(2);
+      // 防库边/球碰创生能量：目标球峰值不得超过白球入射速度。
+      expect(Math.max(...s.peaks)).toBeLessThan(launchSpeed * 1.02);
     }
   });
 

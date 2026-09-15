@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图、scene Blender 视觉资产与 Three.js
-[OUTPUT]: 按初始化 worldId 装配共用球桌与外围世界，提供静止按需渲染、GPU 自适应温控、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
+[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、opening-demo 连续镜头、textures 程序化贴图、scene Blender 视觉资产与 Three.js
+[OUTPUT]: 按初始化 worldId 装配共用球桌与外围世界，提供静止按需渲染、GPU 自适应温控、湖面开场连续接管、目标球运动近景、相机/瞄准/规划/复盘映射，以及可完整回收的几何/材质/纹理生命周期
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -62,8 +62,11 @@ import { pocketSeamContract } from './pocket-render/seam-contract';
 import { createPocketTrimGeometry, createPocketWeltGeometry } from './pocket-render/trim-geometry';
 import { makeCushionGeometry, CUSHION_PROFILE, CUSHION_NOSE_HEIGHT, TABLE_RENDER } from './pocket-render/cushion-geometry';
 import { createTableFrameGeometry } from './pocket-render/frame-geometry';
+import { OPENING_DEMO_DURATION_MS, openingDemoFrame } from './opening-demo';
+import { nonOverlappingTargetNumbers } from './scene/target-ring-visibility';
 
 const R = TABLE.ballRadius;
+const TARGET_RING_OUTER_RADIUS = R * 1.4;
 const W = TABLE.width;
 const L = TABLE.length;
 const POCKET_POS: [number, number][] = POCKETS.map(
@@ -190,6 +193,13 @@ export class Scene3D {
     fromPosition: THREE.Vector3;
     fromLookAt: THREE.Vector3;
   } | null = null;
+  /** 正式开场只接管活相机；末帧严格回到 targetCameraPos/targetLookAt。 */
+  private openingDemo: {
+    startedAt: number;
+    durationMs: number;
+    onComplete?: () => void;
+  } | null = null;
+  private openingDemoGeneration = 0;
   private cuePull = 0;
   private clock = new THREE.Clock();
   private lastSyncTime = 0;
@@ -858,7 +868,7 @@ export class Scene3D {
     this.aimGroup.add(this.ghostRing);
 
     // 合法目标高亮环（16 颗球各一个，按回合显隐）
-    const ringGeo = new THREE.RingGeometry(R * 1.12, R * 1.4, 28);
+    const ringGeo = new THREE.RingGeometry(R * 1.12, TARGET_RING_OUTER_RADIUS, 28);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x9fe8c0,
       transparent: true,
@@ -1637,11 +1647,16 @@ export class Scene3D {
       }
     }
 
-    // 合法目标高亮环跟随球位
+    // 合法目标高亮环跟随球位；紧贴球不叠画共面透明环，避免手机低机位闪烁。
+    const visibleTargetNumbers = nonOverlappingTargetNumbers(
+      world.balls,
+      this.legalTargets,
+      TARGET_RING_OUTER_RADIUS,
+    );
     for (const ball of world.balls) {
       const ring = this.targetRings[ball.number];
       if (!ring) continue;
-      ring.visible = ball.active && this.legalTargets.has(ball.number) && this.phase === 'aiming' && !world.moving && !this.planActive;
+      ring.visible = visibleTargetNumbers.has(ball.number) && this.phase === 'aiming' && !world.moving && !this.planActive && this.openingDemo === null;
       if (ring.visible) ring.position.set(ball.x, 0.0025, ball.z);
     }
 
@@ -1656,7 +1671,7 @@ export class Scene3D {
   /** 瞄准辅助线：射线求首个交点（球/库），绘制主视线+目标球线+分离线+幽灵球+靶点影子球 */
   private updateAimGuide() {
     const world = this.lastWorld;
-    const show = this.phase === 'aiming' && world && !world.moving && world.balls[0].active && !this.planActive;
+    const show = this.phase === 'aiming' && world && !world.moving && world.balls[0].active && !this.planActive && this.openingDemo === null;
     const showPrediction = Boolean(show && this.aimAssistVisible);
     this.aimLine.visible = this.objLine.visible = this.tanLine.visible =
       this.ghostRing.visible = showPrediction;
@@ -1816,7 +1831,7 @@ export class Scene3D {
       // 出杆动画期间由 render() 接管球杆
       this.cueGroup.visible = true;
     } else {
-      const showCue = cueActive && phase === 'aiming' && !this.lastWorld?.moving && !this.planActive;
+      const showCue = cueActive && phase === 'aiming' && !this.lastWorld?.moving && !this.planActive && this.openingDemo === null;
       this.cueGroup.visible = showCue;
       if (showCue) {
         const targetPull = power * 0.0032;
@@ -1848,7 +1863,7 @@ export class Scene3D {
     const cameraMoving =
       this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
       this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8;
-    return cameraMoving || this.shotCameraReturn !== null || this.strikeAnim !== null ||
+    return cameraMoving || this.openingDemo !== null || this.shotCameraReturn !== null || this.strikeAnim !== null ||
       this.dropAnims.size > 0 || this.planPlayAnim !== null;
   }
 
@@ -1990,7 +2005,33 @@ export class Scene3D {
 
     // 相机平滑收敛:随 rAF 每帧向目标位姿推进,脱离 React 渲染节奏——
     // 拖拽/点击瞄准后即使 React 不再渲染,相机也能滑行就位
-    if (this.shotCameraReturn) {
+    if (this.openingDemo) {
+      const opening = this.openingDemo;
+      const progress = Math.min(1, (renderStartedAt - opening.startedAt) / opening.durationMs);
+      const frame = openingDemoFrame(progress, {
+        position: {
+          x: this.targetCameraPos.x,
+          y: this.targetCameraPos.y,
+          z: this.targetCameraPos.z,
+        },
+        lookAt: {
+          x: this.targetLookAt.x,
+          y: this.targetLookAt.y,
+          z: this.targetLookAt.z,
+        },
+      });
+      this.camera.position.set(frame.position.x, frame.position.y, frame.position.z);
+      this.smoothLookAt.set(frame.lookAt.x, frame.lookAt.y, frame.lookAt.z);
+      if (progress >= 1) {
+        const onComplete = opening.onComplete;
+        this.openingDemo = null;
+        this.camera.position.copy(this.targetCameraPos);
+        this.smoothLookAt.copy(this.targetLookAt);
+        if (this.lastWorld) this.sync(this.lastWorld);
+        this.update(this.lastCueX, this.lastCueZ, this.lastPreviewPower, this.phase);
+        onComplete?.();
+      }
+    } else if (this.shotCameraReturn) {
       const transition = this.shotCameraReturn;
       transition.elapsed += dt;
       const progress = Math.min(1, transition.elapsed / transition.duration);
@@ -2071,6 +2112,69 @@ export class Scene3D {
     if (!this.lastWorld?.moving && !this.hasFrameWork()) {
       this.scheduleThermalIdleRecovery();
     }
+  }
+
+  /**
+   * 等现有 Blender 球桌和湖面壳体就绪后，从远湖连续靠近当前可操作相机。
+   * 复播只重播相机，不重置球局；generation 防止卸载后的异步加载重新启动动画。
+   */
+  async beginOpeningDemo(options: {
+    durationMs?: number;
+    onStart?: () => void;
+    onComplete?: () => void;
+  } = {}): Promise<boolean> {
+    const generation = ++this.openingDemoGeneration;
+    this.openingDemo = null;
+    const environment = this.studioEnvironment;
+    if (environment) {
+      await Promise.all([environment.ready, environment.worldShell.ready]);
+    }
+    if (generation !== this.openingDemoGeneration || !this.running) return false;
+
+    this.shotCameraReturn = null;
+    this.updateCameraTarget();
+    const first = openingDemoFrame(0, {
+      position: {
+        x: this.targetCameraPos.x,
+        y: this.targetCameraPos.y,
+        z: this.targetCameraPos.z,
+      },
+      lookAt: {
+        x: this.targetLookAt.x,
+        y: this.targetLookAt.y,
+        z: this.targetLookAt.z,
+      },
+    });
+    this.camera.position.set(first.position.x, first.position.y, first.position.z);
+    this.smoothLookAt.set(first.lookAt.x, first.lookAt.y, first.lookAt.z);
+    this.camera.lookAt(this.smoothLookAt);
+    this.openingDemo = {
+      startedAt: performance.now(),
+      durationMs: options.durationMs ?? OPENING_DEMO_DURATION_MS,
+      onComplete: options.onComplete,
+    };
+    this.cueGroup.visible = false;
+    this.updateAimGuide();
+    for (const ring of this.targetRings) if (ring) ring.visible = false;
+    options.onStart?.();
+    this.requestRender(true);
+    return true;
+  }
+
+  openingDemoSnapshot() {
+    const opening = this.openingDemo;
+    const progress = opening
+      ? Math.min(1, (performance.now() - opening.startedAt) / opening.durationMs)
+      : 1;
+    return {
+      active: opening !== null,
+      progress,
+      durationMs: opening?.durationMs ?? OPENING_DEMO_DURATION_MS,
+      camera: this.camera.position.toArray(),
+      lookAt: this.smoothLookAt.toArray(),
+      handoffCamera: this.targetCameraPos.toArray(),
+      handoffLookAt: this.targetLookAt.toArray(),
+    };
   }
 
   start() {
@@ -2212,6 +2316,8 @@ export class Scene3D {
   };
 
   dispose() {
+    this.openingDemoGeneration += 1;
+    this.openingDemo = null;
     this.stop();
     this.studioEnvironment?.dispose();
     this.tableDetails?.dispose();

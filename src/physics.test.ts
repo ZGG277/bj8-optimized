@@ -6,6 +6,10 @@
 */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  HIGH_POWER_COMPRESSION_START,
+  MAX_CUE_SPEED,
+  SIDE_SPIN_SCALE,
+  cueSpeedForPower,
   createInitialWorld,
   getCueBall,
   strikeCueBall,
@@ -97,8 +101,17 @@ describe('出杆机制测试', () => {
     strikeCueBall(world, 0, 100);
     cue = getCueBall(world);
     speed = Math.hypot(cue!.vx, cue!.vz);
-    expect(speed).toBeGreaterThan(9.6);
-    expect(speed).toBeLessThan(10.4);
+    expect(speed).toBeCloseTo(MAX_CUE_SPEED, 10);
+  });
+
+  it('只压缩 65 以上高力度，保留低中力度手感', () => {
+    expect(HIGH_POWER_COMPRESSION_START).toBe(65);
+    expect(cueSpeedForPower(6)).toBeCloseTo(0.929, 10);
+    expect(cueSpeedForPower(50)).toBeCloseTo(5.175, 10);
+    expect(cueSpeedForPower(65)).toBeCloseTo(6.6225, 10);
+    expect(cueSpeedForPower(80)).toBeCloseTo(7.3842857143, 9);
+    expect(cueSpeedForPower(92)).toBeCloseTo(7.9937142857, 9);
+    expect(cueSpeedForPower(100)).toBeCloseTo(8.4, 10);
   });
 
   it('角度影响速度方向', () => {
@@ -167,6 +180,15 @@ describe('自旋（杆法）测试', () => {
     const cue = getCueBall(world)!;
     // 向 -z 运动，低杆 → wx 与纯滚动方向相反（应为正）
     expect(cue.wx).toBeGreaterThan(0);
+  });
+
+  it('侧旋映射独立于台呢和库边摩擦参数', () => {
+    const world = setupSingle();
+    strikeCueBall(world, 0, 100, { x: 0, y: 1 });
+    const cue = getCueBall(world)!;
+    const speed = Math.hypot(cue.vx, cue.vz);
+    expect(SIDE_SPIN_SCALE).toBe(0.65);
+    expect(cue.wy).toBeCloseTo((speed / TABLE.ballRadius) * SIDE_SPIN_SCALE, 10);
   });
 
   it('高杆跟进、低杆拉回（打静止球后）', () => {

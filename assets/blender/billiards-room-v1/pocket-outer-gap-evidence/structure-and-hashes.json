@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "base": {
+    "bytes": 781964,
+    "sha256": "bde8a27207fad0f13dde82e828b7b46a78a5b088a76b0b8eb166932c6c44ac7d"
+  },
+  "candidate": {
+    "bytes": 789956,
+    "sha256": "d9721995f6c9695f93f1aa797fbcfef49862493a1191c2a3e8cc5b77ac71e598"
+  },
+  "preservedOriginalMeshes": 19,
+  "newMesh": {
+    "name": "BJ8_CornerPocketOuterAprons",
+    "triangles": 112,
+    "bounds": [
+      [
+        -0.7289999723434448,
+        -0.24799999594688416,
+        -1.3600000143051147
+      ],
+      [
+        0.7289999723434448,
+        -0.02800000086426735,
+        1.3600000143051147
+      ]
+    ],
+    "pocketWellIntersections": 0,
+    "degenerateTriangles": 0
+  },
+  "meshes": 20,
+  "triangles": 24796
+}

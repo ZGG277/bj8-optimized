@@ -1,14 +1,102 @@
 /*
 [INPUT]: base.css 的尺寸与色彩令牌
-[OUTPUT]: 对外提供统一烟熏表面的壳层、桌面比分/竖屏球组状态、手动相机舞台、可滚动局后留言遮罩与开始界面布局
+[OUTPUT]: 对外提供统一烟熏表面的壳层、桌面比分/竖屏球组状态、手动相机舞台、候选湖面开场层、可滚动局后留言遮罩与开始界面布局
 [POS]: 样式体系的布局层,只管几何与层级结构;控件内部样式归 controls.css
 [PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
 */
 .game-shell {
+  position: relative;
   height: 100%;
   display: grid;
   grid-template-rows: var(--scoreboard-h) minmax(0, 1fr);
   overflow: hidden;
+}
+
+/* 开场只遮住交互并淡入 HUD，保留正式游戏视口几何，末帧不会因布局变化跳动。 */
+.game-shell[data-opening-demo] .scoreboard,
+.game-shell[data-opening-demo] .control-deck {
+  transition: opacity 520ms var(--ease-ui);
+}
+
+.game-shell.opening-demo-active .scoreboard,
+.game-shell.opening-demo-active .control-deck,
+.game-shell.opening-demo-active .first-match-guide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game-shell.opening-demo-active .viewport {
+  pointer-events: none;
+}
+
+.opening-demo-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  transition: background 700ms ease;
+}
+
+.opening-demo-ui.pending {
+  background: #07110f;
+}
+
+.opening-demo-ui.playing,
+.opening-demo-ui.done {
+  background: transparent;
+}
+
+.opening-demo-caption {
+  position: absolute;
+  left: clamp(18px, 4vw, 52px);
+  bottom: clamp(22px, 6vh, 58px);
+  display: grid;
+  gap: 9px;
+  width: min(220px, 54vw);
+  color: rgba(235, 246, 239, .82);
+  font-size: 11px;
+  letter-spacing: .28em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .72);
+}
+
+.opening-demo-caption i {
+  display: block;
+  height: 1px;
+  overflow: hidden;
+  background: rgba(225, 239, 231, .2);
+}
+
+.opening-demo-caption i::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgba(226, 241, 234, .76);
+  transform: translateX(-100%);
+}
+
+.opening-demo-ui.playing .opening-demo-caption i::after {
+  animation: opening-demo-progress 5s linear forwards;
+}
+
+.opening-demo-ui.done button {
+  position: absolute;
+  left: 12px;
+  top: calc(var(--scoreboard-h) + 12px);
+  pointer-events: auto;
+  border: 1px solid rgba(225, 239, 231, .28);
+  border-radius: 999px;
+  padding: 8px 13px;
+  color: rgba(238, 247, 242, .86);
+  background: rgba(8, 18, 15, .62);
+  backdrop-filter: blur(12px);
+  font: 500 11px/1 var(--font-sans);
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+
+@keyframes opening-demo-progress {
+  to { transform: translateX(0); }
 }
 
 /* 计分板 */

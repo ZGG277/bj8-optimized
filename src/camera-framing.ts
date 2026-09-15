@@ -288,7 +288,7 @@ function projectedBounds(points: readonly FramingPoint[], pose: FramingPose, asp
   return { minX, maxX, minY, maxY };
 }
 
-export const AIM_CAMERA_ELEVATION_DEGREES = 28;
+export const AIM_CAMERA_ELEVATION_DEGREES = 30;
 
 function aimPoseAtDistance(
   framing: CameraFraming,
@@ -297,7 +297,7 @@ function aimPoseAtDistance(
 ): FramingPose {
   const sin = Math.sin(azimuth);
   const cos = Math.cos(azimuth);
-  // 幽灵球确认后使用轻微抬高的 28° 构图；保留第一人称方向感，同时更容易看清目标球与袋口。
+  // 幽灵球确认后使用轻微抬高的 30° 构图；保留第一人称方向感，同时更容易看清目标球与袋口。
   const elevation = Math.tan(AIM_CAMERA_ELEVATION_DEGREES * Math.PI / 180);
   const height = Math.max(0.24, distance * elevation);
   const centerX = (framing.cue.x + framing.object.x + framing.pocket.center.x) / 3;

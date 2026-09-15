@@ -55,6 +55,7 @@ import {
   type CameraSafetyInsets,
 } from './camera-framing';
 import {
+  FIRST_PERSON_VIEW,
   FULL_TABLE_AZIMUTH,
   OVERHEAD_VIEW,
   SHOT_AIM_VIEW,
@@ -65,6 +66,7 @@ import {
   isOverheadCameraView,
   fullTableAzimuth,
 } from './camera-view';
+import { openingDemoEnabledForSearch } from './opening-demo';
 import { markControlLearned } from './control-onboarding';
 import {
   createShotCameraFollow,
@@ -114,8 +116,18 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 }
 
 export default function Game() {
+  const openingDemoEnabled = useMemo(
+    () => openingDemoEnabledForSearch(window.location.search),
+    [],
+  );
   const [selectedWorld, setSelectedWorld] = useState<PublicWorldId>(() =>
-    resolveWorldSelection(window.location.search));
+    openingDemoEnabled ? 'lake' : resolveWorldSelection(window.location.search));
+  const [openingDemoRun, setOpeningDemoRun] = useState(openingDemoEnabled ? 1 : 0);
+  const [openingDemoStatus, setOpeningDemoStatus] = useState<'off' | 'pending' | 'playing' | 'done'>(
+    openingDemoEnabled ? 'pending' : 'off',
+  );
+  const openingDemoAutostartRef = useRef(false);
+  const openingDemoActive = openingDemoStatus === 'pending' || openingDemoStatus === 'playing';
   const selectWorld = (worldId: PublicWorldId) => {
     setSelectedWorld(worldId);
     window.history.replaceState(window.history.state, '', worldSelectionUrl(window.location.href, worldId));
@@ -244,7 +256,7 @@ export default function Game() {
   });
   const planOpen = positionPlan.status === 'showing';
   // 规划视图打开期间禁用瞄准输入（最小侵入：只压低 canAim，不动交互层内部）
-  const canAim = canAimBase && !planOpen && shotCameraTarget === null;
+  const canAim = canAimBase && !planOpen && shotCameraTarget === null && !openingDemoActive;
   const planConsultedRef = useRef(false);
   /** 规划视图关闭会停用 Worker/清空 plans；另存用户真正看过的首杆直到本次出杆。 */
   const consultedPlanStepRef = useRef<PlannedStep | null>(null);
@@ -859,6 +871,22 @@ export default function Game() {
     handleResetGame(gameMode);
   }, [gameMode, handleResetGame]);
 
+  // 正式默认入口首次打开即进入湖面陪练；显式其他世界仍保留原局前选择流程。
+  useEffect(() => {
+    if (!openingDemoEnabled || openingDemoAutostartRef.current) return;
+    openingDemoAutostartRef.current = true;
+    handleResetGame('practice');
+    setCameraAzimuth(FULL_TABLE_AZIMUTH);
+    setCameraDetached(false);
+    setViewLevel(FIRST_PERSON_VIEW);
+  }, [handleResetGame, openingDemoEnabled, setViewLevel]);
+
+  const handleReplayOpening = useCallback(() => {
+    if (!openingDemoEnabled) return;
+    setOpeningDemoStatus('pending');
+    setOpeningDemoRun(current => current + 1);
+  }, [openingDemoEnabled]);
+
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
     const settlement = settleShotRaw(setViewLevel);
@@ -1025,9 +1053,29 @@ export default function Game() {
     legalTargets,
   ]);
 
+  // Scene3D 先消费当前球局与第一人称终点，再从远湖反推起点；末帧就是同一活相机。
+  useEffect(() => {
+    if (!openingDemoEnabled || openingDemoRun < 1 || !sceneEnabled) return;
+    const scene = scene3DRef.current;
+    if (!scene) return;
+    let live = true;
+    void scene.beginOpeningDemo({
+      onStart: () => {
+        if (live) setOpeningDemoStatus('playing');
+      },
+      onComplete: () => {
+        if (live) setOpeningDemoStatus('done');
+      },
+    });
+    return () => { live = false; };
+  }, [openingDemoEnabled, openingDemoRun, sceneEnabled]);
+
   // ── 渲染 ──
   return (
-    <div className="game-shell">
+    <div
+      className={`game-shell ${openingDemoActive ? 'opening-demo-active' : ''}`}
+      data-opening-demo={openingDemoEnabled ? openingDemoStatus : undefined}
+    >
       <Scoreboard
         match={match}
         worldView={worldView}
@@ -1122,7 +1170,19 @@ export default function Game() {
           onSkip={finishFirstMatchGuide}
         />
       )}
-      {match.phase === 'intro' && (
+      {openingDemoEnabled && (
+        <div className={`opening-demo-ui ${openingDemoStatus}`} aria-live="polite">
+          {openingDemoActive ? (
+            <div className="opening-demo-caption">
+              <span>{openingDemoStatus === 'pending' ? '湖面正在亮起' : '向湖心靠近'}</span>
+              <i aria-hidden="true" />
+            </div>
+          ) : (
+            <button type="button" onClick={handleReplayOpening}>重播开场</button>
+          )}
+        </div>
+      )}
+      {match.phase === 'intro' && !openingDemoEnabled && (
         <IntroScreen playerSkill={playerSkill} onStart={handleResetGame}
           worldSelection={{ value: selectedWorld, onChange: selectWorld }} />
       )}
