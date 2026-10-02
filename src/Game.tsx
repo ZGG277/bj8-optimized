@@ -47,7 +47,6 @@ import { findPrecisionAim } from './aim/aim-solution';
 import { inferCameraAimIntent } from './camera-aim-intent';
 import {
   cameraSafetyFromControlRects,
-  cameraControlRectsFromElements,
   createAimCameraFraming,
   DEFAULT_CAMERA_SAFETY,
   framingForConfirmedAim,
@@ -65,7 +64,7 @@ import {
   isOverheadCameraView,
   fullTableAzimuth,
 } from './camera-view';
-import { markControlLearned } from './control-onboarding';
+import { controlLearning, markControlLearned } from './control-onboarding';
 import {
   createShotCameraFollow,
   observeShotCameraFollow,
@@ -100,13 +99,19 @@ function browserStorage(): Storage | null {
   }
 }
 
-/** 仅为贴边停靠控件预留屏幕安全区；自由控件不会把整块构图区错误缩小。 */
+/** 控件透明悬浮在球桌上，仅避开比分栏和屏幕边界。 */
 function aimCameraSafetyFor(viewport: HTMLElement) {
   const bounds = viewport.getBoundingClientRect();
-  const controls = cameraControlRectsFromElements(
-    document.querySelectorAll<HTMLElement>('[data-control-slot]'),
-  );
-  return cameraSafetyFromControlRects(bounds, controls);
+  const controls: Array<{ left: number; top: number; right: number; bottom: number; dockEdge: 'top' }> = [];
+  // 横屏比分栏悬浮在画布上；竖屏比分栏在画布外，由重叠检查自然跳过。
+  const scoreboard = document.querySelector<HTMLElement>('.scoreboard');
+  if (scoreboard) {
+    const { left, top, right, bottom } = scoreboard.getBoundingClientRect();
+    controls.push({ left, top, right, bottom, dockEdge: 'top' });
+  }
+  const x = 4 / Math.max(1, bounds.width);
+  const y = 4 / Math.max(1, bounds.height);
+  return cameraSafetyFromControlRects(bounds, controls, { left: x, right: x, top: y, bottom: y }, 4);
 }
 
 function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
@@ -261,7 +266,7 @@ export default function Game() {
   const [aimDialEnabled, setAimDialEnabled] = useState(true);
   const [firstMatchGuideStep, setFirstMatchGuideStep] =
     useState<FirstMatchGuideStep | null>(() =>
-      shouldRunFirstMatchGuide(
+      !controlLearning.hasCompletedMatch() && playerSkill.matchesEvaluated === 0 && shouldRunFirstMatchGuide(
         browserStorage(),
         playerSkill.totalPlayerShots,
       )
@@ -285,6 +290,14 @@ export default function Game() {
     firstMatchGuideStepRef.current = next;
     setFirstMatchGuideStep(next);
   }, [finishFirstMatchGuide]);
+
+  // 胜负都算完整一局；中途重开不算。历史已结算局数使老用户直接免提示。
+  useEffect(() => {
+    if (match.phase === 'finished' || playerSkill.matchesEvaluated > 0) {
+      controlLearning.completeMatch();
+      if (firstMatchGuideStepRef.current) finishFirstMatchGuide();
+    }
+  }, [match.phase, playerSkill.matchesEvaluated, finishFirstMatchGuide]);
 
   // 放球完成直接进入开球瞄准；首局结束即永久收起，避免第二局继续打扰。
   useEffect(() => {
@@ -458,7 +471,7 @@ export default function Game() {
     setViewLevel(SHOT_AIM_VIEW);
   }, [clearAimCameraFraming, clearTouchAimCameraTimer, matchRef, setViewLevel, worldRef]);
 
-  // 首碰目标与袋口身份只在抬手时冻结；但横竖旋转、窗口大小和控件停靠/拖位会改变
+  // 首碰目标与袋口身份只在抬手时冻结；横竖旋转、窗口大小和比分栏尺寸会改变
   // 可用屏幕区域。全台和瞄准共用这个实时 safety；仅在存在构图帧时复制 safety，绝不重选目标或口袋。
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return;
@@ -474,18 +487,12 @@ export default function Game() {
     };
     const resizeObserver = new ResizeObserver(refreshSafety);
     resizeObserver.observe(viewport);
-    const mutationObserver = new MutationObserver(refreshSafety);
-    mutationObserver.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['style', 'data-dock-edge', 'data-placement'],
-      childList: true,
-      subtree: true,
-    });
+    const scoreboard = document.querySelector('.scoreboard');
+    if (scoreboard) resizeObserver.observe(scoreboard);
     window.addEventListener('resize', refreshSafety);
     refreshSafety();
     return () => {
       resizeObserver.disconnect();
-      mutationObserver.disconnect();
       window.removeEventListener('resize', refreshSafety);
     };
   }, []);

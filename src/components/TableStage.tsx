@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 viewLevel / match / gameMode / 固定俯视观战、首局引导、训练总结、pointer 处理器与控件学习记录
-[OUTPUT]: 渲染 3D 球桌、手动相机状态、首局语境观战提示及带训练总结/可跳过留言的结束遮罩
+[OUTPUT]: 渲染 3D 球桌、手动相机状态、首局语境观战提示及带训练总结、网页留言或小工具胜局分享的结束遮罩
 [POS]: HUD 组件层；瞄准拨轮已并入统一可停靠控制层，相机/对局状态由上层持有
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -9,6 +9,7 @@ import { markControlLearned } from '../control-onboarding';
 import type { MatchState } from '../match/types';
 import type { GameMode, MatchTrainingSummary } from '../opponent/model';
 import { PostMatchFeedback } from './PostMatchFeedback';
+import { VictoryShare } from './VictoryShare';
 
 interface TableStageProps {
   viewLevel: number;
@@ -101,14 +102,19 @@ export function TableStage({
                   <em>{trainingSummary.nextGoal}</em>
                 </section>
               )}
-              <PostMatchFeedback
+              {import.meta.env.VITE_MINITOOL === '1' && match.winner === 'player' && <VictoryShare mode={gameMode} />}
+              {import.meta.env.VITE_MINITOOL === '1' ? (
+                <div className="finish-actions"><button type="button" data-control-tip="new-match" onClick={() => {
+                  onResetGame(); markControlLearned('new-match');
+                }}>再来一局</button></div>
+              ) : <PostMatchFeedback
                 outcome={match.winner === 'player' ? 'win' : 'loss'}
                 mode={gameMode}
                 onContinue={() => {
                   onResetGame();
                   markControlLearned('new-match');
                 }}
-              />
+              />}
             </div>
           </div>
         )}

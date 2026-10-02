@@ -12,8 +12,12 @@
  * 球桌上的操控件统一采用“静置退后、按住浮现”的视觉层级。
  * 透明度只作用于内容层，不改变 48px+ 触控几何；按压、键盘焦点和布局拖动时恢复实色。
  */
+:root[data-theme] .control-deck :is(.control-slot-power, .control-slot-spin) {
+  --control-rest-opacity: 0.44;
+}
+
 :root[data-theme] .control-deck .control-slot-body {
-  opacity: 0.56;
+  opacity: var(--control-rest-opacity, 0.22);
   transition:
     opacity 180ms ease,
     filter 180ms ease;
@@ -22,6 +26,8 @@
 
 :root[data-theme] .control-deck .control-slot:active .control-slot-body,
 :root[data-theme] .control-deck .control-slot.is-dragging .control-slot-body,
+:root[data-theme] .control-deck .control-slot.is-expanded .control-slot-body,
+:root[data-theme] .control-deck .control-slot:has(.spin-control.expanded) .control-slot-body,
 :root[data-theme] .control-deck .control-slot:has(:focus-visible) .control-slot-body {
   opacity: 1;
   filter: saturate(1);
@@ -35,10 +41,13 @@
   .spin-preview,
   .shoot-zone,
   .shoot-pad,
-  .aim-dial
+  .aim-dial,
+  .aim-controls
 ) {
   border: 0;
   box-shadow: none;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .theme-switcher {

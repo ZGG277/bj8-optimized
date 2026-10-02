@@ -12,6 +12,8 @@
 
 `table-details.ts`: Blender 六袋针脚与包边装配器；异步失败保留基础袋口，卸载后到达的资源自行释放。
 
+`glb-loader.ts` / `glb-loader.test.ts`: 自包含 GLB 的统一加载边界；普通相对 URL 保留既有加载，打包为 data URL 时直接解码并交给 GLTFLoader.parse，避免小工具容器触发 fetch。
+
 `assets/table-craft-v2.glb`: 沿当前六袋皮壳站点制作的 520 段双道针脚和两道细包边，合并为两个网格；制作源与纹理位于 `assets/blender/table-craft-v2/`，由 `scripts/table-craft-asset.test.ts` 校验真实字节与承托。
 
 `world-shell.ts`: 最小壳体合同与资源所有权；程序化壳体独占几何、材质、显式纹理并幂等释放，室内借用 GLB 由总场景释放。云海静区为暗冷灰石质，围桌平坦、外围圆角缓坡并渐隐到薄雾，室内保留原石材地面。
@@ -31,5 +33,9 @@
 `assets/world-galaxy.glb` / `assets/world-bamboo.glb` / `assets/world-aurora-lake.glb`: Blender 5.2.1 生成的真实实体、PBR 微纹理及两个命名根。作者源、预览和哈希记录位于 `assets/blender/world-*/`。构建脚本在把 ESM 移入 HTML 前内联三份模型，防止相对路径基准变化。
 
 `studio-environment.test.ts` / `world-shell.test.ts`: 世界隔离、体积数据预算/周期接缝、缓坡拓扑、基线桌体变换、异步失败和纹理/几何/材质幂等释放测试。
+
+
+`public-worlds.ts`: 室内/云海/湖面公开场景的唯一注册表；小工具构建只消费它，历史 world-registry 仍保留完整可恢复场景。
+`table-details.ts` / `table-details.test.ts`: 针脚使用带迟滞的距离 LOD，远景隐藏 16,640 三角形，近景恢复原网格，包边和基础袋口始终保留。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

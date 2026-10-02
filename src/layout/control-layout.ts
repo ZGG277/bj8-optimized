@@ -49,13 +49,13 @@ const DEFAULT_RIGHT_POSITIONS: Record<LayoutProfile, number[]> = {
 export function defaultProfileLayout(
   profile: LayoutProfile = 'desktop',
 ): ProfileLayout {
-  const positions = DEFAULT_RIGHT_POSITIONS[profile];
+  const positions = profile === 'landscape' ? [0.07, 0.23, 0.52, 0.82] : [0.04, 0.12, 0.65, 0.86];
   return {
     view: { mode: 'docked', edge: 'right', order: 0, position: positions[0] },
     bulb: { mode: 'docked', edge: 'right', order: 1, position: positions[1] },
     spin: { mode: 'docked', edge: 'right', order: 2, position: positions[2] },
     power: { mode: 'docked', edge: 'right', order: 3, position: positions[3] },
-    aimDial: { mode: 'free', x: 0.5, y: 0.84 },
+    aimDial: { mode: 'docked', edge: 'bottom', order: 0, position: 0.5 },
   };
 }
 
@@ -122,7 +122,15 @@ function parseProfile(
       result[id] = fallback[id];
     }
   }
-  return result;
+  // 只替换完整、未调整过的旧默认布局；任一自定义位置都整组保留。
+  const untouched = IDS.every((id, order) => {
+    const item = result[id];
+    return id === 'aimDial'
+      ? item.mode === 'free' && item.x === 0.5 && item.y === 0.84
+      : item.mode === 'docked' && item.edge === 'right' && item.order === order &&
+        item.position === DEFAULT_RIGHT_POSITIONS[profile][order];
+  });
+  return untouched ? fallback : result;
 }
 
 type StorageReader = Pick<Storage, 'getItem'>;
@@ -136,6 +144,7 @@ function migrateLegacy(storage: StorageReader): StoredControlLayouts {
     ['spin', 'spin', 2],
     ['power', 'shoot', 3],
   ];
+  if (oldIds.every(([, key]) => storage.getItem(`${LEGACY_PREFIX}${key}`) === null)) return migrated;
   const ordered = oldIds
     .map(([id, key, base]) => {
       const value = Number(storage.getItem(`${LEGACY_PREFIX}${key}`));
@@ -263,9 +272,9 @@ export function dockItemLength(
   viewportWidth: number,
   viewportHeight: number,
 ): number {
-  if (item === 'bulb') return 50;
+  if (item === 'view' || item === 'bulb') return 50;
   if (item === 'spin') return edge === 'right' ? 56 : 58;
-  if (item === 'aimDial') return edge === 'right' ? 150 : Math.min(250, viewportWidth - 92);
+  if (item === 'aimDial') return edge === 'right' ? 150 : Math.min(250, viewportWidth - 124);
   if (edge === 'bottom') {
     if (viewportHeight <= 560 && viewportWidth > viewportHeight) {
       return Math.min(180, viewportWidth * 0.23);
@@ -276,9 +285,7 @@ export function dockItemLength(
     return Math.min(210, Math.max(150, viewportWidth * 0.25));
   }
   if (viewportHeight <= 560 && viewportWidth > viewportHeight) {
-    return item === 'view'
-      ? 92
-      : Math.min(150, Math.max(100, viewportHeight * 0.28));
+    return Math.min(150, Math.max(100, viewportHeight * 0.28));
   }
   if (viewportWidth <= 640 && viewportHeight >= viewportWidth) {
     return Math.min(190, Math.max(124, viewportHeight * 0.23));

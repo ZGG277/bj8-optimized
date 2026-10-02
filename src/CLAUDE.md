@@ -100,4 +100,11 @@
 
 多世界正式入口：`Game.tsx` 只在开局时把公开 worldId 传给 `Scene3D`；物理、规则与相机公式不变。`scene/` 拆分共用桌体、静区及外围壳体。选择样式独立位于 `styles/world-shell.css`。
 
+
+`minitool/`: 小工具专属原生分享与合作式主线程调度边界；share-note / cooperative-search 分别有协议与取消/结果一致性回归。Game 使用 8px 视口留白、4px 控件间隔，横屏浮动比分栏也参与避让；俯视与拾取仍共享 camera-view 的几何解和唯一 FOV。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+2026-10-02 浮动构图：Game 的相机安全区只测比分栏与视口，透明控件不再压缩球桌。ResizeObserver 观察画布和比分栏，移除全页面 MutationObserver。
+
+2026-10-02 UI3：controlLearning 新增独立的 completed-match:v1 完局标记；Game 在实际 finished 或历史 matchesEvaluated > 0 时记录，瞄准/出杆/母球提示对触屏、鼠标、键盘一并停止；不覆盖旧画像、布局或学习列表。

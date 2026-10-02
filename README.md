@@ -1,6 +1,6 @@
 # 瓜瓜台球
 
-> 当前正式项目基线：`v1.7.4`（2026-09-10），安静湖面升级为可见浅沙床、稀疏石块、透明 Fresnel 水层与柔和焦散；v1.7.3 的局后留言、28° 镜头和湖面控制简化保持不变。Git 与妙搭发布、桌面及 390×844 正式入口验收均已完成。发布证据见 [PROJECT_BASELINE.md](PROJECT_BASELINE.md)。
+> 当前分支为小红书上传基线 `release/xhs-minitool-20261002`，源码标签 `xhs-minitool-20261002`，基于已验收的 v1.7.4 衍生；GitHub main 已到 v1.7.6，版本关系见 [PROJECT_BASELINE.md](PROJECT_BASELINE.md)。小红书尚未发布。上传回执见 [XHS_UPLOAD_20261002.md](XHS_UPLOAD_20261002.md)。
 
 局前现在只公开静谧球房、云海浮台与安静湖面；`?world=` 链接预选世界，湖面兼容 `?lake360=1`，切回室内或云海会清除湖面覆盖。宇宙、竹林与极光资产及可编辑源继续保留，当前不出现在玩家入口；历史验收见 [WORLD_SCENES_V3_ACCEPTANCE.md](WORLD_SCENES_V3_ACCEPTANCE.md)。
 
@@ -118,6 +118,17 @@ npx vite --port 5199 --strictPort &
 | `scripts/verify-screens.mjs` | 视觉回归截图（shots/01–06） |
 
 截图证据存于 `shots/`。
+
+## 小红书“小工具”离线包
+
+从本分支的已提交、带标签源码生成小红书可上传 ZIP：
+
+```bash
+MINITOOL_REQUIRE_COMMITTED=1 MINITOOL_VARIANT=xhs.20261002-upload npm run build:minitool
+npm run test:minitool-browser
+```
+
+专用构建输出到 `dist-minitool/`，ZIP 输出到 `artifacts/`；两者均为可再生本地产物，不进入 Git。该入口按小红书 `minitool-zip-builder` 1.2.0 规则外置脚本、移除网络/Worker 路径、内联全部 GLB，并在 390×844 production preview 验证。完整结论与风险见 [MINITOOL_PACKAGE.md](MINITOOL_PACKAGE.md)。
 
 ## 妙搭产物交接
 

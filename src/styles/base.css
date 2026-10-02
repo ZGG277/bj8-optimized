@@ -104,6 +104,8 @@ button,
 
 #root {
   height: 100%;
+  /* 画布延伸到底边；仅交互控件单独避开系统手势区，不留整条黑色底栏。 */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
 }
 
 /* 焦点态:所有可聚焦控件有肉眼可见焦点环,不依赖颜色差异表达状态 */

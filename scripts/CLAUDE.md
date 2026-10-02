@@ -46,6 +46,10 @@
 
 `inline-build.mjs`: 单 HTML 适配——把唯一 ESM/CSS 及三套正式世界 GLB 精确内嵌进 `dist/index.html`，拒绝残留模型相对 URL、assets 外链、意外分包和超过 10 MiB 的 HTML；本地构建不等于发布。
 
+`package-minitool.mjs`: 按小红书小工具 1.2.0 规范扫描 `dist-minitool`，拒绝内联脚本、联网/Worker/WASM/受限 API、外链、非法类型和多层目录，写入基线与构建文件哈希后生成可上传 ZIP。
+
+`verify-minitool-browser.mjs`: 自启并回收独立 production preview 与 Chrome，在 390×844 真实触控视口验证最终静态包首屏、开始对局、瞄准档触控、WebGL、无横向溢出、零外部请求与零页面错误，并输出截图。
+
 `verify-desktop-compact.mjs`: 1280×800 v1.4 桌面 HUD 门禁（15 断言）：双方名字下水平、无可见操作文字、四个开球控件右侧停靠、8px 安全边界、纯视觉蓄力与页面无溢出。
 
 `verify-interaction.mjs`: 真实指针回归门禁（41 断言）：桌面鼠标/竖屏触摸/横屏触摸三矩阵 + 瞄准映射 + 出杆动画同步；点击真值以当时 `cameraViewAzimuth` 目标位姿反算，兼容开球独立俯视方位；启动、纯视觉视角端点、蓄力、虚母球/自由球放置全部走真实事件，并通过隐藏 aria 数值验收无文字控件。
@@ -88,4 +92,18 @@
 
 `verify-spectator-camera.mjs` 读取真实 Blender 灯具有效可见性；确认幽灵球后的断言沿用 v1.6.0 的 16% 出杆位和杆向跟随。
 
+
+`package-minitool.mjs`: 本地候选支持 MINITOOL_DIST / MINITOOL_VARIANT，产物携带源码逐文件 SHA-256 与聚合指纹；无标签候选仍记录准确基线提交，不冒充已提交版本。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+`verify-minitool-upgrade.mjs`: 在同一个 Ego 浏览器任务里复验旧包→候选的存档、横竖屏/桌面和模拟 SDK 分享；测试存档和胜负 fixture 与原生客户端验收明确分开。
+`serve-minitool-preview.py`: 仅绑定 127.0.0.1 的本地 CSP 验收/预览服务器，预览保留给用户。
+
+`verify-minitool-final.mjs`: 复用同一 CSP 预览服务，以项目既有 Puppeteer/Chrome 在隔离配置中采集最终页面和原生触控回执；关闭自建浏览器，不读取用户浏览器资料。
+
+`verify-floating-controls.mjs`：复用 5218 预览服务器，独立浏览器档案验证五种尺寸、默认停靠/不重叠、展开/收起、触控瞄准、按压透明度与出杆；结果在 artifacts/xhs-floating-controls-20261002。升级/胜局共享验收支持 MINITOOL_ACCEPTANCE_DIR 指定独立证据目录。
+
+`verify-controls-ui3.mjs`：隔离浏览器验证控件宽度/透明度、胜负结束状态驱动的提示关闭、再来一局/重载以及历史存档保留。实际完局以结束状态注入，不冒充完整物理对局。
+
+2026-10-02 上传门禁：package-minitool 支持 MINITOOL_REQUIRE_COMMITTED=1，拒绝未提交源码；BUILD_PROVENANCE 区分 committed 和 working-tree，记录精确源码标签。

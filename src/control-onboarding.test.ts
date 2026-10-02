@@ -7,6 +7,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   CONTROL_LEARNING_STORAGE_KEY,
+  COMPLETED_MATCH_STORAGE_KEY,
+  MATCH_CONTROL_TIP_IDS,
   CONTROL_TIPS,
   createControlLearningStore,
   isControlTipId,
@@ -106,5 +108,35 @@ describe('逐控件新手记忆', () => {
     expect(CONTROL_TIPS['view-manual']).toContain('手动视角');
     expect(CONTROL_TIPS.shoot).toContain('出杆：向下拉蓄力');
     expect(CONTROL_TIPS.shoot).toContain('Enter 轻杆');
+  });
+});
+
+
+describe('完整一局后关闭高频控件提示', () => {
+  it('所有输入都关闭三类提示，视角提示保留', () => {
+    for (const id of MATCH_CONTROL_TIP_IDS) for (const learned of [false, true]) for (const touch of [false, true]) {
+      expect(shouldShowControlTip(id, learned, true, touch)).toBe(false);
+    }
+    expect(shouldShowControlTip('shoot', false, false, true)).toBe(true);
+    expect(shouldShowControlTip('view-overhead', true, true)).toBe(true);
+  });
+  it('完局标记重载和跨标签保持，不改已有学习记录', () => {
+    const data = new Map([[CONTROL_LEARNING_STORAGE_KEY, '["spin"]'], ['old-save', 'retain']]);
+    const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value) };
+    const first = createControlLearningStore(() => storage);
+    const second = createControlLearningStore(() => storage);
+    expect(second.hasCompletedMatch()).toBe(false);
+    const listener = vi.fn(); first.subscribe(listener);
+    first.completeMatch(); first.completeMatch();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(data.get(COMPLETED_MATCH_STORAGE_KEY)).toBe('done');
+    expect(data.get(CONTROL_LEARNING_STORAGE_KEY)).toBe('["spin"]');
+    expect(data.get('old-save')).toBe('retain');
+    expect(createControlLearningStore(() => storage).hasCompletedMatch()).toBe(true);
+    second.refresh(); expect(second.hasCompletedMatch()).toBe(true);
+  });
+  it('存储不可写时本局后仍不再打扰', () => {
+    const store = createControlLearningStore(() => { throw new Error('denied'); });
+    store.completeMatch(); expect(store.hasCompletedMatch()).toBe(true);
   });
 });

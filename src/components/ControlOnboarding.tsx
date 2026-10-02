@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { createPortal } from 'react-dom';
 import {
   CONTROL_LEARNING_STORAGE_KEY,
+  COMPLETED_MATCH_STORAGE_KEY,
   CONTROL_TIPS,
   controlLearning,
   isControlTipId,
@@ -55,9 +56,9 @@ export function ControlOnboarding() {
   const [tipCopy, setTipCopy] = useState<string | null>(null);
   const hintRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<ReturnType<typeof controlTipPosition> | null>(null);
-  // 触屏没有悬停态，因此每次直接触摸都显示所触控件；鼠标和键盘仍保持首用引导规则。
-  const active = target && (target.source === 'touch' ||
-    shouldShowControlTip(target.id, controlLearning.has(target.id))) ? target : null;
+  // 完整打过一局后，三类高频控件在所有输入方式下都停止提示。
+  const active = target && shouldShowControlTip(target.id, controlLearning.has(target.id),
+    controlLearning.hasCompletedMatch(), target.source === 'touch') ? target : null;
 
   useEffect(() => {
     let keyboard = false;
@@ -106,7 +107,7 @@ export function ControlOnboarding() {
     const focusIn = (event: FocusEvent) => { if (keyboard) show(findTarget(event.target, 'keyboard')); };
     const focusOut = () => show(null);
     const storage = (event: StorageEvent) => {
-      if (event.key === CONTROL_LEARNING_STORAGE_KEY) controlLearning.refresh();
+      if (event.key === CONTROL_LEARNING_STORAGE_KEY || event.key === COMPLETED_MATCH_STORAGE_KEY) controlLearning.refresh();
     };
     document.addEventListener('pointerover', pointerOver, true);
     document.addEventListener('pointerout', pointerOut, true);

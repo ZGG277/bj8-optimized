@@ -120,22 +120,24 @@ export function cameraSafetyFromControlRects(
   viewport: { left: number; top: number; right: number; bottom: number },
   controls: readonly CameraControlRect[],
   base: Partial<CameraSafetyInsets> = DEFAULT_CAMERA_SAFETY,
+  gapPixels?: number,
 ): CameraSafetyInsets {
   const width = Math.max(1, viewport.right - viewport.left);
   const height = Math.max(1, viewport.bottom - viewport.top);
+  // 按像素留出触控间隙，避免高屏幕比例把百分比余量放大；显式 base 仍可覆盖。
   const safety = normalizedSafety(base);
   for (const control of controls) {
     const overlapsViewport = control.right > viewport.left && control.left < viewport.right &&
       control.bottom > viewport.top && control.top < viewport.bottom;
     if (!overlapsViewport) continue;
     if (control.dockEdge === 'right') {
-      safety.right = Math.max(safety.right, clamp((viewport.right - control.left) / width + 0.018, 0, MAX_EDGE_SAFETY));
+      safety.right = Math.max(safety.right, clamp((viewport.right - control.left) / width + (gapPixels === undefined ? 0.018 : gapPixels / width), 0, MAX_EDGE_SAFETY));
     } else if (control.dockEdge === 'bottom') {
-      safety.bottom = Math.max(safety.bottom, clamp((viewport.bottom - control.top) / height + 0.018, 0, MAX_EDGE_SAFETY));
+      safety.bottom = Math.max(safety.bottom, clamp((viewport.bottom - control.top) / height + (gapPixels === undefined ? 0.018 : gapPixels / height), 0, MAX_EDGE_SAFETY));
     } else if (control.dockEdge === 'left') {
-      safety.left = Math.max(safety.left, clamp((control.right - viewport.left) / width + 0.018, 0, MAX_EDGE_SAFETY));
+      safety.left = Math.max(safety.left, clamp((control.right - viewport.left) / width + (gapPixels === undefined ? 0.018 : gapPixels / width), 0, MAX_EDGE_SAFETY));
     } else if (control.dockEdge === 'top') {
-      safety.top = Math.max(safety.top, clamp((control.bottom - viewport.top) / height + 0.018, 0, MAX_EDGE_SAFETY));
+      safety.top = Math.max(safety.top, clamp((control.bottom - viewport.top) / height + (gapPixels === undefined ? 0.018 : gapPixels / height), 0, MAX_EDGE_SAFETY));
     } else if (
       control.dockEdge === 'free' &&
       control.id === 'aimDial' &&
@@ -144,7 +146,7 @@ export function cameraSafetyFromControlRects(
     ) {
       // 默认自由瞄准拨轮虽未“dock”，但它贴近下缘且横跨球桌下中袋。
       // 仅为这个具名、可解释的遮挡物让出底边；其余自由控件保持局部覆盖语义。
-      safety.bottom = Math.max(safety.bottom, clamp((viewport.bottom - control.top) / height + 0.018, 0, MAX_EDGE_SAFETY));
+      safety.bottom = Math.max(safety.bottom, clamp((viewport.bottom - control.top) / height + (gapPixels === undefined ? 0.018 : gapPixels / height), 0, MAX_EDGE_SAFETY));
     }
   }
   return safety;

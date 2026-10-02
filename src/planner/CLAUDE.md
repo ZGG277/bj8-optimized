@@ -26,4 +26,7 @@
 
 `review.test.ts`: 复盘层单元测试——覆盖显式计划 perfect/力度/厚薄、自主意图复盘不暴露计划、犯规优先、开球建议，以及既无意图也无结算事实时安全跳过。
 
+
+`search.ts`: planPositionSteps 与同步 planPosition 共用同一迭代搜索；小工具在候选/路线边界让出主线程，普通 Worker 同步消费，规则、随机顺序与预算不变。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

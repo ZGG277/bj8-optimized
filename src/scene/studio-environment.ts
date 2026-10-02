@@ -5,7 +5,6 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import type { WorldId } from '../world-selection';
@@ -15,6 +14,7 @@ import { attachBlenderWorld } from './blender-world';
 import { createEmptyWorldShell, QUIET_ZONE_LAYOUT,
   type WorldShell, type WorldShellFactory } from './world-shell';
 import roomAssetUrl from './assets/billiards-room-v1.glb?url';
+import { loadGlb } from './glb-loader';
 
 export type StudioEnvironment = {
   root: THREE.Group;
@@ -139,7 +139,7 @@ export function createStudioEnvironment(
   fallback.add(base);
   root.add(fallback);
 
-  const ready = new GLTFLoader().loadAsync(roomAssetUrl).then(gltf => {
+  const ready = loadGlb(roomAssetUrl).then(gltf => {
     if (disposed) {
       disposeUnattached(gltf.scene);
       return false;

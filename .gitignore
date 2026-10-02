@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-minitool/
+artifacts/
 tsconfig.tsbuildinfo
 
 # 本地代理原始交互日志不是产品或公开验收材料；保留在磁盘，不推送。

@@ -1010,7 +1010,7 @@
 }
 
 .dock-rail-right {
-  top: calc(var(--scoreboard-h) + 8px);
+  top: calc(var(--scoreboard-h) + env(safe-area-inset-top, 0px) + 8px);
   right: max(8px, env(safe-area-inset-right));
   bottom: max(8px, env(safe-area-inset-bottom));
   width: 54px;
@@ -2648,3 +2648,69 @@
   border-left: 4px solid currentColor;
   transform: rotate(-20deg);
 }
+
+/* 浮动控件：默认沿边停靠；像素锚点避免矮屏上的控件互相挤压。
+ * 自定义位置仍由 v3 布局管理，拖动后不套用默认锚点。 */
+.control-deck { --floating-power-height: clamp(132px, 25vh, 210px); }
+@media (max-width: 640px) and (orientation: portrait) {
+  .control-deck { --floating-power-height: clamp(124px, 23vh, 190px); }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .control-deck { --floating-power-height: clamp(100px, 28vh, 150px); }
+}
+.control-deck .dock-rail-right {
+  top: calc(var(--scoreboard-h) + env(safe-area-inset-top, 0px) + 8px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
+}
+.control-deck .dock-rail-bottom { bottom: env(safe-area-inset-bottom, 0px); }
+.control-deck .control-slot-view .control-slot-body {
+  width: 54px;
+  height: 50px;
+}
+.control-deck .dock-rail-right .is-default-anchor { transform: none; }
+.control-deck .dock-rail-right .control-slot-view.is-default-anchor { top: 0 !important; }
+.control-deck .dock-rail-right .control-slot-bulb.is-default-anchor { top: 58px !important; }
+.control-deck .dock-rail-right .control-slot-power.is-default-anchor { top: auto !important; bottom: 0; }
+.control-deck .dock-rail-right .control-slot-spin.is-default-anchor {
+  top: auto !important;
+  bottom: calc(var(--floating-power-height) + 8px);
+}
+.view-disclosure { position: relative; width: 54px; height: 50px; }
+.edge-control-tab {
+  width: 54px; height: 50px; padding: 0; border: 0;
+  background: transparent; color: var(--text-primary); cursor: pointer;
+  display: grid; place-items: center;
+}
+/* 视觉图标收进边缘，完整触控热区仍保留。 */
+.dock-rail-right .edge-control-tab > span,
+.dock-rail-right .assist-control > .plan-button > .bulb-icon { transform: translateX(16px); }
+.edge-control-tab > span { font-size: 25px; }
+.view-control-panel {
+  position: absolute; right: 58px; top: 0;
+  width: min(250px, calc(100vw - 74px)); height: 54px;
+  border-radius: 12px; background: var(--surface-2);
+}
+.dock-rail-bottom .view-control-panel { right: 0; top: auto; bottom: 58px; }
+.control-slot.is-expanded, .control-slot:has(.spin-control.expanded) { z-index: 20; }
+.control-deck .spin-popover { position: absolute; right: 62px; bottom: 0; }
+/* 窄屏为右侧出杆区保留独立热区，瞄准条仍保持居中。 */
+.control-deck .dock-rail-bottom .control-slot-aimDial .control-slot-body {
+  width: min(250px, calc(100vw - 124px));
+}
+
+.control-deck .dock-rail-right .assist-menu-vertical {
+  top: 0; right: 58px; transform: none; flex-direction: row;
+}
+
+.control-deck .dock-rail-right .control-slot.is-default-anchor.is-dragging {
+  transform: translate3d(var(--layout-drag-x, 0px), var(--layout-drag-y, 0px), 0);
+}
+
+/* 出杆和母球略收窄，保留大于 44px 的触控宽度。 */
+.control-deck .dock-rail-right .control-slot-power .control-slot-body,
+.control-deck .control-slot-power.is-free .control-slot-body,
+.control-deck .spin-control,
+.control-deck .spin-preview { width: 48px; }
+.control-deck .dock-rail-right .control-slot-power .control-slot-body,
+.control-deck .spin-control { margin-left: auto; }

@@ -56,6 +56,12 @@
 
 `vite.config.ts`: Vite React 构建配置；正式构建合并业务、React 与 Three.js 主 chunk，CSS 不分包，规划 Worker 以内联 Blob 生成；`scripts/inline-build.mjs` 再产出妙搭兼容的单 HTML，本地开发仍保持 Vite 模块热更新。
 
+`vite.minitool.config.ts`: 小红书小工具专用构建配置；脚本外置、GLB 全部包内内联并直接解析，以主线程适配器替换受限 Worker，同时封死 Three.js 网络加载分支；不改变常规 Vite/妙搭入口。
+
+`src/minitool/`: 仅由小工具构建别名消费的走位与顾燃战术主线程消息适配器，维持原 Worker 消息合同。
+
+`MINITOOL_PACKAGE.md`: 小红书上传包检查结论、修复、验收、风险及后台上传步骤。
+
 `PHASE_0_1_EXECUTION_PLAN.md`: 规则正确性、GEB 同构、输入确定性与固定步时钟的可执行优化方案。
 
 `POSITION_PLAY_DESIGN.md`: 走位规划（已交付，`src/planner/`）与拍照还原球局（方案阶段）的完整调研、方案决策、实测数据与交互设计文档。

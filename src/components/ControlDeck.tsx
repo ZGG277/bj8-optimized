@@ -23,6 +23,7 @@ import {
   clampFreePlacement,
   controlAxisDelta,
   dockItemLength,
+  defaultProfileLayout,
   loadControlLayouts,
   nearestDockPosition,
   placeDockedControl,
@@ -366,6 +367,7 @@ export function ControlDeck({
   const [draggingId, setDraggingId] = useState<DockItemId | null>(null);
   const [snapPreview, setSnapPreview] = useState<DockEdge | null>(null);
   const [assistMenuOpen, setAssistMenuOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const dragRef = useRef<LayoutDrag | null>(null);
 
   const profile = resolveLayoutProfile(viewport.width, viewport.height);
@@ -376,6 +378,17 @@ export function ControlDeck({
   layoutRef.current = layout;
   profileRef.current = profile;
   viewportRef.current = viewport;
+
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest('[data-control-slot="view"]')) setViewMenuOpen(false);
+      if (!target.closest('[data-control-slot="bulb"]')) setAssistMenuOpen(false);
+    };
+    window.addEventListener('pointerdown', dismiss, true);
+    return () => window.removeEventListener('pointerdown', dismiss, true);
+  }, []);
 
   useEffect(() => {
     saveControlLayouts(storedLayouts, browserStorage());
@@ -476,6 +489,7 @@ export function ControlDeck({
   ) => {
     onCancelCharge();
     setAssistMenuOpen(false);
+    setViewMenuOpen(false);
     const currentViewport = viewportRef.current;
     const originFree = clampFreePlacement(
       rect.left + rect.width / 2,
@@ -711,6 +725,7 @@ export function ControlDeck({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       setAssistMenuOpen(false);
+      setViewMenuOpen(false);
       const drag = dragRef.current;
       if (drag) {
         if (drag.frame !== null) window.cancelAnimationFrame(drag.frame);
@@ -737,14 +752,23 @@ export function ControlDeck({
 
   const nodes = useMemo<Record<DockItemId, ReactNode>>(() => ({
     view: (
-      <ViewToolbar
-        viewLevel={viewLevel}
-        manualCameraActive={manualCameraActive}
-        disabled={viewLocked}
-        orientation={axisFor('view', layout.view)}
-        onViewLevel={onViewLevel}
-        onToggleManualCamera={onToggleManualCamera}
-      />
+      <div className="view-disclosure">
+        <button type="button" className="edge-control-tab" aria-label="展开视角调整"
+          aria-expanded={viewMenuOpen} aria-controls="view-control-panel"
+          onClick={() => setViewMenuOpen(open => !open)}>
+          <span className="view-icon view-icon-overhead" aria-hidden="true"><i /></span>
+        </button>
+        {viewMenuOpen && <div id="view-control-panel" className="view-control-panel" role="group" aria-label="视角调整">
+          <ViewToolbar
+            viewLevel={viewLevel}
+            manualCameraActive={manualCameraActive}
+            disabled={viewLocked}
+            orientation="horizontal"
+            onViewLevel={onViewLevel}
+            onToggleManualCamera={onToggleManualCamera}
+          />
+        </div>}
+      </div>
     ),
     bulb: (
       <div className={`assist-control ${assistMenuOpen ? 'menu-open' : ''}`}>
@@ -880,6 +904,7 @@ export function ControlDeck({
     layout,
     manualCameraActive,
     viewLocked,
+    viewMenuOpen,
     onAimDialAdjust,
     onAimButtonAdjust,
     onToggleAimDial,
@@ -915,18 +940,29 @@ export function ControlDeck({
     });
   const free = visibleIds.filter(id => layout[id].mode === 'free');
 
-  const renderSlot = (id: DockItemId) => (
+  const defaults = defaultProfileLayout(profile);
+  const renderSlot = (id: DockItemId) => {
+    const placement = layout[id];
+    const fallback = defaults[id];
+    const defaultAnchor = placement.mode === 'docked' && fallback.mode === 'docked' &&
+      placement.edge === fallback.edge && placement.position === fallback.position;
+    return (
     <DockableControlSlot
       key={id}
       id={id}
       placement={layout[id]}
       dragging={draggingId === id}
-      className={id === 'aimDial' && !aimDialEnabled ? 'is-aim-buttons' : ''}
+      className={[
+        id === 'aimDial' && !aimDialEnabled ? 'is-aim-buttons' : '',
+        defaultAnchor ? 'is-default-anchor' : '',
+        (id === 'view' && viewMenuOpen) || (id === 'bulb' && assistMenuOpen) ? 'is-expanded' : '',
+      ].filter(Boolean).join(' ')}
       onLayoutStart={startLayoutDrag}
     >
       {nodes[id]}
     </DockableControlSlot>
-  );
+    );
+  };
 
   return (
     <footer

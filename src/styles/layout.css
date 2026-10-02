@@ -1320,3 +1320,12 @@
     min-height: 30px;
   }
 }
+
+/* 胜局卡片只在玩家主动展开后生成；短屏仍由 finish-mask 负责滚动。 */
+.victory-share { display: grid; gap: 10px; width: min(100%, 340px); margin: 16px auto; }
+.victory-share img { display: block; width: min(100%, 210px); height: auto; margin: 0 auto; border-radius: 8px; }
+.finish-content .victory-share button { margin: 0; min-height: 46px; padding: 12px 18px; font-size: 15px; border-radius: 12px; cursor: pointer; }
+.finish-content .share-primary { background: var(--green); color: #101f1a; border: 0; }
+.game-shell .finish-mask .victory-share .share-collapse { background: transparent; color: var(--text-secondary); border: 1px solid var(--line); }
+.victory-share p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.victory-share button:disabled { opacity: .55; cursor: default; }

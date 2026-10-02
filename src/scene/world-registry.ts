@@ -6,15 +6,14 @@
 */
 import * as THREE from 'three';
 import type { WorldId } from '../world-selection';
-import { createCloudSeaShell } from './cloud-sea';
+import { PUBLIC_WORLD_VISUALS } from './public-worlds';
 import { createGalaxyQuietZone } from './galaxy';
-import { createLake360 } from './lake360';
 import { createGalaxyAtmosphere, createBambooAtmosphere, createAuroraAtmosphere } from './world-atmospheres';
 import type { BlenderWorldAsset } from './blender-world';
 import galaxyAsset from './assets/world-galaxy.glb?url';
 import bambooAsset from './assets/world-bamboo.glb?url';
 import auroraAsset from './assets/world-aurora-lake.glb?url';
-import { createQuietZone, createStudioWorldShell, type WorldShellFactory } from './world-shell';
+import { createQuietZone, type WorldShellFactory } from './world-shell';
 
 type WorldVisual = Readonly<{
   shell: WorldShellFactory;
@@ -24,9 +23,7 @@ type WorldVisual = Readonly<{
 
 /** 每个外围与自己的地面成对选择；云海已认可的实现保持原样。 */
 export const WORLD_VISUALS: Record<WorldId, WorldVisual> = {
-  studio: { shell: createStudioWorldShell, quietZone: () => new THREE.Group() },
-  'cloud-sea': { shell: createCloudSeaShell, quietZone: createQuietZone },
-  lake: { shell: createLake360, quietZone: () => new THREE.Group() },
+  ...PUBLIC_WORLD_VISUALS,
   galaxy: { shell: createGalaxyAtmosphere, quietZone: createGalaxyQuietZone,
     asset: { url: galaxyAsset, shellName: 'BJ8_World_Galaxy', quietName: 'BJ8_Quiet_Galaxy' } },
   bamboo: { shell: createBambooAtmosphere, quietZone: () => createQuietZone(),

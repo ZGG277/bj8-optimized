@@ -12,7 +12,7 @@ export const SHOT_AIM_VIEW = 0.16;
 export const OVERHEAD_VIEW = 1;
 export const FULL_TABLE_AZIMUTH = 0;
 export const LANDSCAPE_TABLE_AZIMUTH = Math.PI / 2;
-export const CAMERA_FOV_DEGREES = 46;
+export { CAMERA_FOV_DEGREES } from './camera-framing';
 
 const FP_CAM_DIST = 0.72;
 const FP_CAM_SIDE = 0.015;

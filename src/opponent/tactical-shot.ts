@@ -181,6 +181,17 @@ export function chooseTacticalShot(
   config: TacticalSearchConfig,
   rng: () => number = Math.random,
 ): TacticalShotResult {
+  const steps = tacticalShotSteps(world, legal, config, rng);
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+/** 主线程版本逐候选让出执行；普通 Worker 仍同步消费完全相同的结果。 */
+export function* tacticalShotSteps(
+  world: BilliardsWorld, legal: number[], config: TacticalSearchConfig,
+  rng: () => number = Math.random,
+): Generator<void, TacticalShotResult, void> {
   const simulationLimit = Math.max(1, Math.floor(config.simulationLimit));
   const bases = generateCandidates(world, legal)
     .sort((a, b) => candidateEase(b) - candidateEase(a))
@@ -205,6 +216,7 @@ export function chooseTacticalShot(
   for (const base of bases) {
     for (const variant of SPIN_VARIANTS) {
       tryCandidate(withVariant(base, variant.spin, variant.powerDelta));
+      yield;
     }
   }
 
@@ -213,6 +225,7 @@ export function chooseTacticalShot(
     for (const base of bases.slice(0, 2)) {
       for (const delta of calibrationDeltas) {
         tryCandidate(withVariant(base, SPIN_VARIANTS[1].spin, 6, delta));
+        yield;
       }
     }
   }

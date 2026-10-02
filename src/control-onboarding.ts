@@ -1,6 +1,6 @@
 /*
 [INPUT]: 显式控件成功事实与可选 Storage；不依赖 React、DOM 或对局规则
-[OUTPUT]: 稳定控件提示表、逐控件已学会存储、三项常驻速查规则与共享成功记录入口
+[OUTPUT]: 稳定控件提示表、逐控件已学会存储、完局后瞄准/出杆/母球提示关闭规则与共享成功记录入口
 [POS]: 控件新手提示领域层；展示由 ControlOnboarding 订阅，成功事实由实际动作拥有者提交
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -39,18 +39,21 @@ export const CONTROL_TIPS = {
 } as const;
 
 export type ControlTipId = keyof typeof CONTROL_TIPS;
+export const COMPLETED_MATCH_STORAGE_KEY = 'guagua-billiards:completed-match:v1';
+export const MATCH_CONTROL_TIP_IDS: readonly ControlTipId[] = ['aim-dial', 'aim-left', 'aim-right', 'shoot', 'spin', 'spin-open', 'spin-close'];
 export const CONTROL_LEARNING_STORAGE_KEY = 'guagua-billiards:learned-controls:v1';
 type LearningStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 /**
- * 这三项同时承担长期的“说明书索引”职责。学习记录只结束首用引导，
- * 不应让玩家之后无法查阅视角和出杆的基本操作。
+ * 首局内保留基础操作速查；完整打过一局后，出杆服从完局关闭规则，
+ * 两项视角说明继续可查。
  */
 export const PERSISTENT_CONTROL_TIP_IDS = ['view-overhead', 'view-manual', 'shoot'] as const;
 const persistentControlTipIdSet = new Set<ControlTipId>(PERSISTENT_CONTROL_TIP_IDS);
 
-export function shouldShowControlTip(id: ControlTipId, learned: boolean): boolean {
-  return !learned || persistentControlTipIdSet.has(id);
+export function shouldShowControlTip(id: ControlTipId, learned: boolean, completedMatch = false, touch = false): boolean {
+  if (completedMatch && MATCH_CONTROL_TIP_IDS.includes(id)) return false;
+  return touch || !learned || persistentControlTipIdSet.has(id);
 }
 
 export function isControlTipId(value: string | undefined): value is ControlTipId {
@@ -71,14 +74,27 @@ function readLearned(storage: LearningStorage | null): Set<ControlTipId> {
 /** 只有调用 mark 才学习；存储拒绝读写时保留本页内存态，不阻断产品动作。 */
 export function createControlLearningStore(getStorage: () => LearningStorage | null) {
   let learned: Set<ControlTipId> | null = null;
+  let completedMatch: boolean | null = null;
   let revision = 0;
   const listeners = new Set<() => void>();
   const storage = () => {
     try { return getStorage(); } catch { return null; }
   };
   const snapshot = () => learned ??= readLearned(storage());
+  const readCompleted = () => {
+    try { return storage()?.getItem(COMPLETED_MATCH_STORAGE_KEY) === 'done'; } catch { return false; }
+  };
+  const hasCompletedMatch = () => completedMatch ??= readCompleted();
   return {
     has: (id: ControlTipId) => snapshot().has(id),
+    hasCompletedMatch,
+    completeMatch() {
+      if (hasCompletedMatch()) return;
+      completedMatch = true;
+      try { storage()?.setItem(COMPLETED_MATCH_STORAGE_KEY, 'done'); } catch { /* 本页仍生效。 */ }
+      revision += 1;
+      listeners.forEach(listener => listener());
+    },
     getRevision: () => revision,
     subscribe(listener: () => void) {
       listeners.add(listener);
@@ -96,7 +112,9 @@ export function createControlLearningStore(getStorage: () => LearningStorage | n
     },
     refresh() {
       const next = new Set([...snapshot(), ...readLearned(storage())]);
-      if (next.size === snapshot().size) return;
+      const completed = hasCompletedMatch() || readCompleted();
+      if (next.size === snapshot().size && completed === completedMatch) return;
+      completedMatch = completed;
       learned = next;
       revision += 1;
       listeners.forEach(listener => listener());

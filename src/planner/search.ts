@@ -167,7 +167,7 @@ function erfScreen(world: BilliardsWorld, legal: number[], sigma: number, topK: 
 }
 
 /** 第 1 层：对每个 erf 候选展开力度/杆法变体，各跑 MC，保留最优变体 */
-function evalLayer1(world: BilliardsWorld, screened: ShotCandidate[], samples: number, ctx: SearchCtx): Layer1Result[] {
+function* evalLayer1(world: BilliardsWorld, screened: ShotCandidate[], samples: number, ctx: SearchCtx): Generator<void, Layer1Result[], void> {
   const results: Layer1Result[] = [];
   for (const base of screened) {
     let best: Layer1Result | null = null;
@@ -178,6 +178,7 @@ function evalLayer1(world: BilliardsWorld, screened: ShotCandidate[], samples: n
         power: clamp(base.power + variant.powerDelta, 1, 100),
       };
       const outcome = monteCarloShotDetailed(world, cand, samples, ctx.sigma, ctx.rng, ctx.legal, ctx.budget);
+      yield;
       if (!best || outcome.prob - outcome.foulRate > best.outcome.prob - best.outcome.foulRate) {
         best = { cand, outcome };
       }
@@ -399,6 +400,14 @@ function buildPlan(world: BilliardsWorld, l1: Layer1Result, ctx: SearchCtx): Pos
  * 返回当前最好结果，最坏情况有界。返回 top 1–3 条路线，按整链成功率降序。
  */
 export function planPosition(world: BilliardsWorld, legal: number[], opts: PlannerOptions = {}): PositionPlan[] {
+  const steps = planPositionSteps(world, legal, opts);
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+/** 共用同一搜索顺序；小工具可在候选/路线边界把主线程让回触控与绘制。 */
+export function* planPositionSteps(world: BilliardsWorld, legal: number[], opts: PlannerOptions = {}): Generator<void, PositionPlan[], void> {
   const cue = getCueBall(world);
   if (!cue || !cue.active || legal.length === 0) return [];
 
@@ -418,7 +427,7 @@ export function planPosition(world: BilliardsWorld, legal: number[], opts: Plann
   const screened = erfScreen(world, legal, ctx.sigma, ERF_TOP_K);
   if (screened.length === 0) return [];
 
-  const layer1 = evalLayer1(world, screened, samples, ctx);
+  const layer1 = yield* evalLayer1(world, screened, samples, ctx);
 
   // 首杆精确校验不通过的路线会被 buildPlan 丢弃，向后递补直到凑够
   // MAX_PLANS 条有效路线；至少尝试 LAYER1_EXPAND 条以保持择优空间
@@ -429,6 +438,7 @@ export function planPosition(world: BilliardsWorld, legal: number[], opts: Plann
     attempted += 1;
     const plan = buildPlan(world, l1, ctx);
     if (plan) plans.push(plan);
+    yield;
   }
   // 最终排序：整链成功率（连贯概率）降序——第一推荐必须是成功概率最高的路线；
   // 概率相同杆数多者优先（看得更远），再退化为内部评分

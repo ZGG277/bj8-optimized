@@ -127,6 +127,40 @@ describe('adaptive camera framing', () => {
     expect(thinCut.pocketIndex).toBe(1);
   });
 
+  it('像素安全区扩大手机全台且保留控件四像素间隔', () => {
+    const viewport = { left: 0, top: 46, right: 390, bottom: 844 };
+    const controls = [
+      { left: 328, top: 66, right: 382, bottom: 664, dockEdge: 'right' as const },
+      { id: 'aimDial', left: 70, top: 680, right: 320, bottom: 738, dockEdge: 'free' as const },
+    ];
+    const oldSafety = cameraSafetyFromControlRects(viewport, controls);
+    const safety = cameraSafetyFromControlRects(viewport, controls,
+      { left: 8 / 390, right: 8 / 390, top: 8 / 798, bottom: 8 / 798 }, 4);
+    const pose = (insets: typeof safety) => fullTableCameraPose({ aspect: 390 / 798,
+      azimuth: 0, halfWidth: .76, halfLength: 1.4, safety: insets });
+    const width = (result: ReturnType<typeof pose>) => {
+      const xs = [-.76, .76].flatMap(x => [-1.4, 1.4].map(z => threeProjection({ x, y: .04, z }, result.pose, 390 / 798).x));
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    expect(width(pose(safety)) / width(pose(oldSafety))).toBeGreaterThan(1.035);
+    const corners = [-.76, .76].flatMap(x => [-1.4, 1.4].map(z => threeProjection({ x, y: .04, z }, pose(safety).pose, 390 / 798)));
+    for (const p of corners) {
+      expect((p.x + 1) * 195).toBeGreaterThanOrEqual(8 - 1e-4);
+      expect((p.x + 1) * 195).toBeLessThanOrEqual(324 + 1e-4);
+      expect(46 + (1 - p.y) * 399).toBeLessThanOrEqual(676 + 1e-4);
+    }
+  });
+
+  it('横屏悬浮比分栏参与顶部避让，竖屏外部比分栏不重复占位', () => {
+    const scoreboard = { left: 0, top: 0, right: 844, bottom: 34, dockEdge: 'top' as const };
+    const safety = cameraSafetyFromControlRects({ left: 0, top: 0, right: 844, bottom: 390 },
+      [scoreboard], { top: 8 / 390 }, 4);
+    expect(safety.top * 390).toBeCloseTo(38);
+    const portrait = cameraSafetyFromControlRects({ left: 0, top: 46, right: 390, bottom: 844 },
+      [{ ...scoreboard, right: 390, bottom: 46 }], { top: 8 / 798 }, 4);
+    expect(portrait.top * 798).toBeCloseTo(8);
+  });
+
   it('右/底停靠控件只占用相应边缘，不因自由控件压缩全部视口', () => {
     const safety = cameraSafetyFromControlRects(
       { left: 0, top: 0, right: 390, bottom: 844 },

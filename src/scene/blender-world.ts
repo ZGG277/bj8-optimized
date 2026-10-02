@@ -4,8 +4,8 @@
 [POS]: 纯视觉资产适配层，不改桌体、灯光、相机、物理或时钟
 */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { WorldShell } from './world-shell';
+import { loadGlb } from './glb-loader';
 
 export type BlenderWorldAsset = Readonly<{ url: string; shellName: string; quietName: string }>;
 
@@ -37,7 +37,7 @@ export function attachBlenderWorld(shell: WorldShell, quiet: THREE.Group, asset:
   let worldRoot: THREE.Object3D | undefined;
   let quietRoot: THREE.Object3D | undefined;
   shell.root.userData.blenderAsset = 'loading';
-  const loaded = new GLTFLoader().loadAsync(asset.url).then(gltf => {
+  const loaded = loadGlb(asset.url).then(gltf => {
     if (disposed) { release(gltf.scene); return false; }
     const world = gltf.scene.getObjectByName(asset.shellName);
     const floor = gltf.scene.getObjectByName(asset.quietName);

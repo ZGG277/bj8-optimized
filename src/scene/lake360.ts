@@ -5,9 +5,9 @@
 [PROTOCOL]: Keep scene/CLAUDE.md and LAKE360_ACCEPTANCE.md aligned
 */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import assetUrl from './assets/lake360.glb?url';
 import { ownedWorldShell, type WorldShellContext, type WorldShell } from './world-shell';
+import { loadGlb } from './glb-loader';
 
 export const lake360Enabled = () => {
   if (typeof location === 'undefined') return false;
@@ -35,7 +35,7 @@ export function createLake360(context: WorldShellContext): WorldShell {
  const root=new THREE.Group(); root.name='world-shell-lake360';
  const owner=ownedWorldShell(root); let disposed=false;
  const time={value:0}; const born=performance.now();
- const ready=new GLTFLoader().loadAsync(assetUrl).then(gltf=>{
+ const ready=loadGlb(assetUrl).then(gltf=>{
    const model=gltf.scene;
    model.traverse(object=>{
      if (!(object instanceof THREE.Mesh)) return;

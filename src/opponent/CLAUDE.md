@@ -11,3 +11,5 @@
 `model.test.ts` / `tactical-shot.test.ts` / `tactical-async.test.ts`: 覆盖整局一次提交、单点训练总结优先级、辅助降权、0–100 边界、+3/+10、25/60/90 级执行与走位预算梯度、近袋安全中杆的真实进球/避洗袋、Worker 抢占/超时与 v1/v2 迁移。
 
 [PROTOCOL]: 变更成员时更新本文件，然后检查 `../CLAUDE.md`
+
+`tactical-shot.ts`: tacticalShotSteps 提供逐候选迭代，chooseTacticalShot 同步消费；小工具可中止旧计算，选杆顺序和预算不变。

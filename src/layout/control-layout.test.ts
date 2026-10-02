@@ -58,11 +58,11 @@ describe('control layout geometry', () => {
     const layout = createDefaultControlLayouts().layouts.desktop;
     const repositioned = placeDockedControl(layout, 'power', 'right', 0.23);
     expect(repositioned.power).toEqual({
-      mode: 'docked', edge: 'right', order: 1, position: 0.23,
+      mode: 'docked', edge: 'right', order: 2, position: 0.23,
     });
-    expect(repositioned.view).toMatchObject({ order: 0, position: 0.14 });
-    expect(repositioned.bulb).toMatchObject({ order: 2, position: 0.32 });
-    expect(repositioned.spin).toMatchObject({ order: 3, position: 0.42 });
+    expect(repositioned.view).toMatchObject({ order: 0, position: 0.04 });
+    expect(repositioned.bulb).toMatchObject({ order: 1, position: 0.12 });
+    expect(repositioned.spin).toMatchObject({ order: 3, position: 0.65 });
   });
 
   it('finds the nearest collision-free center instead of packing to the rail start', () => {
@@ -78,9 +78,9 @@ describe('control layout geometry', () => {
   it('swaps two controls already docked on the same edge', () => {
     const layout = createDefaultControlLayouts().layouts.portrait;
     const swapped = swapDockedControlPositions(layout, 'view', 'spin');
-    expect(swapped.view).toMatchObject({ edge: 'right', order: 2, position: 0.42 });
-    expect(swapped.spin).toMatchObject({ edge: 'right', order: 0, position: 0.14 });
-    expect(swapped.bulb).toMatchObject({ edge: 'right', order: 1, position: 0.32 });
+    expect(swapped.view).toMatchObject({ edge: 'right', order: 2, position: 0.65 });
+    expect(swapped.spin).toMatchObject({ edge: 'right', order: 0, position: 0.04 });
+    expect(swapped.bulb).toMatchObject({ edge: 'right', order: 1, position: 0.12 });
   });
 
   it('ignores a swap across different dock edges', () => {
@@ -119,7 +119,7 @@ describe('control layout persistence', () => {
       getItem: key => key === CONTROL_LAYOUT_STORAGE_KEY ? '{broken' : null,
     });
     expect(layouts.version).toBe(3);
-    expect(layouts.layouts.desktop.aimDial.mode).toBe('free');
+    expect(layouts.layouts.desktop.aimDial.mode).toBe('docked');
   });
 
   it('upgrades v3 dock order without position into distributed edge anchors', () => {
@@ -142,5 +142,29 @@ describe('control layout persistence', () => {
     });
     expect(layouts.layouts.portrait.bulb).toMatchObject({ order: 0, position: 0.14 });
     expect(layouts.layouts.portrait.view).toMatchObject({ order: 2, position: 0.42 });
+  });
+});
+
+
+describe('floating control defaults and saved layouts', () => {
+  it('docks the aim dial at the bottom when no legacy storage exists', () => {
+    const defaults = createDefaultControlLayouts();
+    expect(loadControlLayouts({ getItem: () => null })).toEqual(defaults);
+    for (const layout of Object.values(defaults.layouts)) {
+      expect(layout.aimDial).toEqual({ mode: 'docked', edge: 'bottom', order: 0, position: 0.5 });
+    }
+  });
+
+  it('only updates an entirely untouched legacy default profile', () => {
+    const oldProfile = {
+      ...Object.fromEntries(['view','bulb','spin','power'].map((id, order) =>
+        [id, { mode: 'docked', edge: 'right', order, position: [.14,.32,.42,.66][order] }])),
+      aimDial: { mode: 'free', x: .5, y: .84 },
+    };
+    const load = (profile: unknown) => loadControlLayouts({ getItem: key => key === CONTROL_LAYOUT_STORAGE_KEY
+      ? JSON.stringify({version: 3, layouts: {portrait: profile}}) : null }).layouts.portrait;
+    expect(load(oldProfile)).toEqual(createDefaultControlLayouts().layouts.portrait);
+    const custom = { ...oldProfile, aimDial: {mode: 'free', x: .43, y: .87} };
+    expect(load(custom)).toEqual(custom);
   });
 });
