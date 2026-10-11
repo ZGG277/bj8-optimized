@@ -4,6 +4,7 @@
 [POS]: HUD 偏好 Hook；不控制幽灵球、合法目标或走位规划
 [PROTOCOL]: 存储键或默认值变化时同步更新本文件测试与 hooks/CLAUDE.md
 */
+import { gameStorage } from '../minitool/persistent-storage';
 import { useCallback, useState } from 'react';
 
 export const AIM_ASSIST_STORAGE_KEY = 'guagua-billiards:aim-assist:v1';
@@ -33,10 +34,10 @@ export function saveAimAssistPreference(
   }
 }
 
-function browserStorage(): Storage | null {
+function browserStorage(): ReturnType<typeof gameStorage> {
   if (typeof window === 'undefined') return null;
   try {
-    return window.localStorage;
+    return gameStorage();
   } catch {
     return null;
   }

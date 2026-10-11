@@ -2,7 +2,7 @@
 [INPUT]: dist-minitool 静态构建、package.json 版本与当前 Git 基线
 [OUTPUT]: artifacts/guagua-billiards-xhs-minitool-v<version>.zip 及严格离线/CSP 自检回执
 [POS]: 小红书小工具产物打包边界；只读取构建目录，不修改产品源码
-[PROTOCOL]: 与 ~/.codex/skills/minitool-zip-builder 1.2.0 的三份 reference 保持一致
+[PROTOCOL]: 与 .codex/skills/minitool-zip-builder 1.7.0 及在线文档 保持一致
 */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -71,7 +71,10 @@ await writeFile(path.join(distDir, 'BUILD_PROVENANCE.json'), JSON.stringify({
   baselineTag: sourceTag,
   sourceState: sourceDirty ? 'working-tree' : 'committed',
   adaptation: sourceDirty ? 'local uncommitted Mini Tool optimization candidate' : 'committed Xiaohongshu Mini Tool build',
-  miniToolSkillVersion: '1.2.0',
+  miniToolSkillVersion: '1.7.0',
+  miniToolSkillMarkdownVersion: '1.6.0',
+  miniToolSkillArchiveSha256: '8bd0f4fde976ec3e9784bebc9fd8d16270769c129b39098698fc58572716c305',
+  miniToolOnlineDoc: 'https://miniapp-sandbox.xiaohongshu.com/minitool/doc',
   builtFileSha256,
 }, null, 2) + '\n');
 
@@ -89,6 +92,7 @@ const requiredHtml = [
   ['charset', /charset=["']?UTF-8/i], ['viewport-fit', /viewport-fit=cover/i],
 ];
 for (const [label, pattern] of requiredHtml) if (!pattern.test(html)) throw new Error(`index.html missing ${label}`);
+if (/type=["']module["']/i.test(html)) throw new Error('Module scripts are forbidden');
 if (/<script\b(?![^>]*\bsrc=)[^>]*>/i.test(html)) throw new Error('Inline script is forbidden');
 if (/\son[a-z]+\s*=|javascript:|<base\b|<iframe\b|<object\b|http:\/\/|https:\/\//i.test(html)) {
   throw new Error('index.html contains a forbidden inline handler, element, or external URL');
@@ -113,13 +117,26 @@ const forbidden = [
 ];
 for (const [label, pattern] of forbidden) if (pattern.test(text)) throw new Error(`Forbidden ${label} remains in package`);
 
+execFileSync(process.execPath, [path.join(projectDir, 'scripts/audit-minitool-compat.mjs'), distDir], { stdio: 'inherit' });
+// Keep package size auditing reproducible without a developer's private skill directory.
+const MiB = 1024 * 1024;
+let textBytes = 0;
+for (const file of files.filter(file => /\.(?:html|css|js|json)$/i.test(file))) {
+  const bytes = (await stat(path.join(distDir, file))).size;
+  textBytes += bytes;
+  if (bytes > 2 * MiB) console.warn(`WARN: ${file} exceeds 2 MiB; review parse and memory cost`);
+}
+if (textBytes > 5 * MiB) console.warn('WARN: uncompressed text exceeds 5 MiB');
 await mkdir(artifactDir, { recursive: true });
 await unlink(zipPath).catch(error => { if (error.code !== 'ENOENT') throw error; });
 execFileSync('zip', ['-q', '-r', zipPath, '.'], { cwd: distDir });
+execFileSync('unzip', ['-tq', zipPath], { stdio: 'pipe' });
 const zipEntries = execFileSync('unzip', ['-Z1', zipPath], { encoding: 'utf8' }).trim().split('\n');
 if (!zipEntries.includes('index.html')) throw new Error('ZIP root does not contain index.html');
 if (zipEntries.some(entry => entry.startsWith('dist-minitool/'))) throw new Error('ZIP contains an extra outer directory');
 
 const totalBytes = (await Promise.all(files.map(file => stat(path.join(distDir, file))))).reduce((sum, item) => sum + item.size, 0);
 const zipBytes = (await stat(zipPath)).size;
+if (zipBytes > 10 * MiB) throw new Error('Mini Tool ZIP exceeds the 10 MiB hard limit');
+if (zipBytes > 2 * MiB) console.warn('WARN: Mini Tool ZIP exceeds the recommended 2 MiB');
 console.log(JSON.stringify({ zipPath, sourceCommit, sourceTag, files, totalBytes, zipBytes, recommendedUnder2MiB: zipBytes < 2 * 1024 * 1024 }, null, 2));

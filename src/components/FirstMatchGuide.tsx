@@ -281,14 +281,14 @@ export function FirstMatchGuide({
       characterData: true,
       attributeFilter: ['class', 'style'],
     });
-    const resizeObserver = new ResizeObserver(schedule);
-    resizeObserver.observe(document.body);
+    const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+    resizeObserver?.observe(document.body);
     window.addEventListener('resize', schedule);
     schedule();
     return () => {
       if (timer) window.clearTimeout(timer);
       mutationObserver.disconnect();
-      resizeObserver.disconnect();
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', schedule);
     };
   }, [selectors, visible]);

@@ -4,6 +4,7 @@
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimControls·AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
+import { gameStorage } from '../minitool/persistent-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { markControlLearned } from '../control-onboarding';
@@ -306,10 +307,10 @@ interface ControlDeckProps {
   onTapShot: () => void;
 }
 
-function browserStorage(): Storage | null {
+function browserStorage(): ReturnType<typeof gameStorage> {
   if (typeof window === 'undefined') return null;
   try {
-    return window.localStorage;
+    return gameStorage();
   } catch {
     return null;
   }

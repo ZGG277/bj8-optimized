@@ -1,3 +1,5 @@
+> 2026-10-11 整合候选：此分支保全瓜瓜小工具源码与公主同源候选；正式 main 未替换。请先读 [版本比较](VERSION_MATRIX.md)。
+
 # 瓜瓜台球
 
 > 当前分支为小红书上传基线 `release/xhs-minitool-20261002`，源码标签 `xhs-minitool-20261002`，基于已验收的 v1.7.4 衍生；GitHub main 已到 v1.7.6，版本关系见 [PROJECT_BASELINE.md](PROJECT_BASELINE.md)。小红书尚未发布。上传回执见 [XHS_UPLOAD_20261002.md](XHS_UPLOAD_20261002.md)。

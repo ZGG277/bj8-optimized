@@ -39,3 +39,5 @@
 `table-details.ts` / `table-details.test.ts`: 针脚使用带迟滞的距离 LOD，远景隐藏 16,640 三角形，近景恢复原网格，包边和基础袋口始终保留。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+2026-10-02：湖面页面隐藏时显式清除 10Hz 定时器，恢复后重新开始，卸载时移除 visibility 监听。小工具通过 Scene3D 的预算门禁按需减少装饰，原 Blender 资产保留。

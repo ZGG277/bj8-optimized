@@ -137,9 +137,12 @@ export function createLake360(context: WorldShellContext): WorldShell {
  }).catch(error=>{root.userData.error=String(error); return false;});
  root.userData.assetState='loading'; root.userData.ripples=true; root.userData.clearWater=true;
  // Existing renderer coalesces requests; no new rAF/physics clock. Static preference stops ticks.
- const timer=setInterval(()=>{
+ let timer: ReturnType<typeof setInterval> | undefined;
+ const tick=()=>{
    if(disposed || document.hidden || !root.userData.ripples || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
    time.value=(performance.now()-born)/1000; context.requestRender();
- },100);
- return {root,ready,dispose(){disposed=true; clearInterval(timer); owner.dispose();}};
+ };
+ const visibility=()=>{clearInterval(timer); timer=undefined; if(!document.hidden && !disposed) timer=setInterval(tick,100);};
+ document.addEventListener('visibilitychange',visibility); visibility();
+ return {root,ready,dispose(){disposed=true; clearInterval(timer); document.removeEventListener('visibilitychange',visibility); owner.dispose();}};
 }

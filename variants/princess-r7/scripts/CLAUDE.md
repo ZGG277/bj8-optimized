@@ -1,0 +1,117 @@
+公主R2：tableFrameEnvelope由真实袋后缘求33mm扩展；export-table-craft-contract.ts导出新尺寸合同，Blender按6.3mm针距重建560段针脚，26640三角面不超R1。
+
+# scripts/
+
+`diagnose-lake360-resources.mjs`：定向记录所有HTTP错误URL并关闭Chrome。
+
+> L2 | 父级: `../CLAUDE.md`
+
+浏览器端验证脚本层：默认驱动 `:5199` 的真实页面。多数脚本经 puppeteer-core 连接无头 ego lite（远程调试 `:9333`），支持 `BROWSER_URL` / `GAME_URL` 覆盖；`verify-render-thermal.mjs` 与 `verify-control-intent.mjs` 则自行启动 Chrome，使用 `PUPPETEER_EXECUTABLE_PATH` / `GAME_URL`。
+
+## 成员清单
+
+`verify-post-match-feedback.mjs`: PM 授权时段内运行的局后反馈真实入口脚本；只访问包装 Vite 的独立 DEV 预览游戏，仅用 __bj8 摆结束前球位，出杆走真实鼠标/触控。记录真实 winner/messageKey/犯规/球袋/shot 事实，接受规则结算出的胜或负，并核对结束 UI 和每次 POST 的 outcome；不要求 fixture 必须赢，也不直接写 finished。覆盖桌面 1280×800、手机 390×844 的保存、跳过、网络失败/同键重试、登录失败不跳转与发送中继续，产出截图和无凭证 JSON 回执。真实写入要求 `ALLOW_FEEDBACK_WRITE=1`，并统一带 PM-FEEDBACK-20260910 前缀；数据库新会话回读及生产包真实入口另由 PM 验收。隔离构建必须显式设置 `VITE_BJ8_ACCEPTANCE=1`，正式构建不设置且不携带 __bj8。
+
+`inline-build.mjs` 的显式 `BJ8_BUILD_OUT_DIR` 可将同样的单文件转换用于隔离 DEV 候选；省略时仍只写产品 `dist`。DEV 预览不可作为正式 sync 或发布来源。
+
+`build-world-galaxy.py` / `build-world-bamboo.py` / `build-world-aurora.py`: 三套正式 Blender 场景的本地作者脚本，分别导出星系、竹林、冰湖的实体环境和暗静区；不导出相机、灯光或动画。
+
+`world_blender_common.py`: 固定米制/Y-up 转换、同材质合批、打包 PBR 微表面贴图、保存可编辑 `.blend`、导出 GLB 及离线预览/来源记录。离线预览不是游戏入口证据。
+
+`verify-world-assets.mjs`: 校验三套实际 GLB 的拓扑预算、命名根、内嵌贴图、Blender 来源哈希及最终 HTML 精确内嵌字节。
+
+`build-blender-table-craft.py`: 接收当前共享皮壳站点，用相对项目路径在Blender生成六袋针脚/细包边；R3为566段、两网格，独立导出并保存更新尺寸的V2 blend。
+
+`update-blender-table-preview.py`: 将游戏实际台呢/库边/球体网格、连续法线和 Canvas 贴图同步进 V2 制作参照；纹理打包进 blend，不改变 GLB。
+
+`table-craft-asset.test.ts`: Vitest 离线验证真实 GLB 的合同哈希、坐标、拓扑、两个网格预算、全部细节顶点承托，以及台面/皮壳/库边 UV 与连续法线。
+
+`verify-table-craft.mjs`: 桌面/手机实际出杆旋转和接触阴影、静止停帧、袋口微距及细节失败/卸载；PRODUCTION=1 检查最终入口字节、双视口和零外部 GLB。
+
+`build-blender-room.py`: Blender MCP 执行的原创视觉资产作者脚本；独立场景、米制锚点、同材质合批，只导出桌体/房间/灯具 GLB。
+
+`preview-blender-room.py`: 接收既有运行时参考网格，补上不导出的台面/袋口和预览相机，保存可编辑 blend。
+
+`verify-scene-asset.mjs`: 读取真实 GLB 字节，检查锚点世界坐标、法线/三角形、台面安全范围和 2 MiB/3万三角/24网格预算。
+
+`verify-blender-scene.mjs`: 桌面与手机主入口、真实视角/出杆、加载失败回退及卸载竞态；PRODUCTION=1 时检查单 HTML 入口不请求外部 GLB，所有页面串行并自动关闭浏览器。
+
+`verify-shot-camera-help.mjs`: 390×844 触屏专项；实际按住瞄准控件验证说明就地出现、松手自动收起且原手势不被阻断，检查 Pointer/contextmenu 默认行为取消，并构造共线直球验证击球后目标近景先于全台、回全台使用约 1.4 秒独立慢缓动。
+
+`optimization-snapshot.mjs`: 只读生成当前 HEAD、源码/脚本/构建配置指纹、用户保护文件哈希及现有构建哈希，供 Spark 与主 Session 冻结/复核验收输入。
+
+`optimization-browser.html`: 仅 Vite 开发服务器可用的可复现验收夹具；全尺寸 iframe 加载真实游戏入口，显式准备薄切/对手/六袋近景和落袋事件；F2 隐藏面板，瞄准/出杆/取消仍操作真实游戏控件，状态以 DOM 输出便于只读浏览器观察。不属于产品构建入口。
+
+`verify-render-thermal.mjs`: 启动真实 Chrome 验收桌面/手机介绍页零 WebGL，开始对局后的静止停帧、Retina DPR 上限、运动渲染帧上限、GPU 温控快照、warm/hot 毛玻璃关闭，以及 390×844@3x 手机采用真实 2× 绘制缓冲区。
+
+`verify-control-intent.mjs`: 启动 390×844 真实触摸 Chrome，验收慢速瞄准拨动跨过长按时限仍不触发布局拖位、蓄力横向移出取消/预览归零及正常出杆无回归。
+
+`inline-build.mjs`: 单 HTML 适配——把唯一 ESM/CSS 及三套正式世界 GLB 精确内嵌进 `dist/index.html`，拒绝残留模型相对 URL、assets 外链、意外分包和超过 10 MiB 的 HTML；本地构建不等于发布。
+
+`package-minitool.mjs`: 按小红书小工具 1.2.0 规范扫描 `dist-minitool`，拒绝内联脚本、联网/Worker/WASM/受限 API、外链、非法类型和多层目录，写入基线与构建文件哈希后生成可上传 ZIP。
+
+`verify-minitool-browser.mjs`: 自启并回收独立 production preview 与 Chrome，在 390×844 真实触控视口验证最终静态包首屏、开始对局、瞄准档触控、WebGL、无横向溢出、零外部请求与零页面错误，并输出截图。
+
+`verify-desktop-compact.mjs`: 1280×800 v1.4 桌面 HUD 门禁（15 断言）：双方名字下水平、无可见操作文字、四个开球控件右侧停靠、8px 安全边界、纯视觉蓄力与页面无溢出。
+
+`verify-interaction.mjs`: 真实指针回归门禁（41 断言）：桌面鼠标/竖屏触摸/横屏触摸三矩阵 + 瞄准映射 + 出杆动画同步；点击真值以当时 `cameraViewAzimuth` 目标位姿反算，兼容开球独立俯视方位；启动、纯视觉视角端点、蓄力、虚母球/自由球放置全部走真实事件，并通过隐藏 aria 数值验收无文字控件。
+
+`verify-precision-aim.mjs`: 默认瞄准线与拨轮/可选方向键出口门禁：开球白球在开球线中点标准位自动实体就位、点击或按住拖到合法开球区、越线保留最后合法位，灯泡四入口、方向键单击/长按、切回拨轮、非袋口与近袋保持粗档、轻点显式精瞄、固定低速横拨改世界杆向与页面无错误。
+
+`verify-break-group.mjs`: 开球→连续进球→分组端到端复测（17 断言）：经 `__bj8` 调试句柄摆球造几何，瞄准与出杆仍走真实鼠标输入；开局先完成 placing 放白球（网格扫描开球区屏幕点真实点击），摆球把白球放到 z>0 半台以兼容开球杆 clampAimToForwardHalf 前方半台钳制。
+
+`verify-aim-accuracy.mjs`: 预测辅助线与真实球路回归（19 断言）：清除偏好后先经灯泡图形面板显式开启辅助线，再对 15°/30°/45° 用例用真实鼠标验证预测线、碰撞方向和落袋一致。
+
+`verify-scoreboard-group.mjs`: 比分板分组图标回归：开球进 1 号再进 9 号，断言玩家分花色后玩家侧 mini-rack 渲染 9-15、对手侧 1-7，截图 shots/34。
+
+`verify-win8.mjs`: 8 号球胜负与训练结算回归：开球进 1 号→进 2 号分全色→清台进 8 号，断言玩家获胜、win-8、庆祝彩带，以及结算页恰有一个训练重点和下一局目标；截图目录可由 `SHOT_DIR` 覆盖。
+
+`verify-mobile-spinpad.mjs`: 移动端击球点与球杆兼容回归：竖屏断言右侧小预览可展开 ≥120px 大母球且不压出杆区、解说卡不存在，截图 shots/36/37。
+
+`verify-mobile-portrait-v12.mjs`: 390×844 v1.4 真实触控门禁（23 断言，保留旧文件名）：开球触摸落位、双方水平、辅助线首次开启/灯泡关闭/刷新持久化、10px 手抖下的长按接管与同边换位、五控件合成层逐帧拖动、拖动期存储节流、布局无数值偷跑、低/高压力同位移的紧度视觉与精细度、固定 0.5 普通触摸回退、拨轮沿边落点的右/底吸附与横竖原操作、三布局存储及无错误。
+
+`verify-spectator-camera.mjs`: 顾燃观战/玩家手动与杆向跟随门禁：真实验证 390×844 固定纵台俯视、观战横滑不旋转、1280×800 固定横台俯视、交棒恢复控件、玩家任意非俯视高度按瞄准方向调节视角、手动相机独立性、触屏瞄准短暂锁镜、玩家俯视端点冻结，以及全流程无错误。
+
+`verify-position-plan.mjs`: 💡 走位规划 + 复盘闭环集成回归：陪练/挑战均可主动点亮走位并显示可靠路线，无结果状态另由 UI 明示；真实出杆结算后复盘默认收起，从灯泡独立打开才以中性“复盘”文案显示，显式查看计划后可展开计划/实际场景对比；截图目录可由 `SHOT_DIR` 覆盖。
+
+`verify-themes.mjs`: 三主题集成回归（26 断言）：验证默认只显示小调色盘、展开三选项、URL/持久化，四个主要控件静置透明/按住实色/无框，并逐一在 1280×800、390×844、844×390 对局中验证五控件安全、无重叠/内容溢出，输出九张主题截图。
+
+`verify-pockets.mjs`: DEV 场景结构及四机位回归：同源木框裁口、六个一体护口/皮裙壳体、同站点缝边及既有网袋；检查装配后实际三角形有限、非退化和几何边成对，不再以独立皮裙数量或旧延伸常量冒充接合证明。承托与面域由最终几何单测约束；截图仍须目视验收。成功/失败均关闭本脚本标签，不关闭共享浏览器；生产 preview 无 DEV 句柄时不能用它替代真实入口验收。
+
+`shots-plan-chain.mjs`: 桌上整链直绘目检截图：同一三球局面打开提示条，桌面输出 shots/40-plan-on-table.png，`PORTRAIT=1` 输出 shots/41-plan-on-table-portrait.png；placing 点击前校验 elementFromPoint 命中 CANVAS（竖屏复盘卡片会遮挡下半台吃掉点击），用于人工核对三杆分色轨迹/袋口序号与提示条排版不破版。
+
+`shots-break-spread.mjs`: 开球散开目检截图：真实输入完成 placing → 网格反查瞄顶球 → 满力开球 → 停球后页内统计 spread/落袋并切俯视截图（shots/42-break-spread.png），用于人工核对叉路联立修复后的球堆散开程度。
+
+`verify-screens.mjs`: 视觉回归截图（shots/01–06）：介绍页、第一人称、蓄力、滚动、开球后、俯视六帧，附页面 JS 错误采集。
+
+`debug-break-physics.mjs`: 多种随机种子开球的离线速度/spread/落袋诊断。
+
+`debug-break-place.mjs`: 开球放置与瞄准阶段的真实页面状态诊断。
+
+`verify-world-shell.mjs`: 正式多世界入口的双世界、双视口真实交互与截图；开发模式增加核心指纹、空壳、固定步物理一致性、失败和卸载；生产模式核对单 HTML 字节及实际控件旅程。
+
+`verify-blender-scene.mjs` 的室内网格统计覆盖拆分后的桌体、静区和壳体，保持原 17 网格断言。
+
+`verify-spectator-camera.mjs` 读取真实 Blender 灯具有效可见性；确认幽灵球后的断言沿用 v1.6.0 的 16% 出杆位和杆向跟随。
+
+
+`package-minitool.mjs`: 本地候选支持 MINITOOL_DIST / MINITOOL_VARIANT，产物携带源码逐文件 SHA-256 与聚合指纹；无标签候选仍记录准确基线提交，不冒充已提交版本。
+
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+`verify-minitool-upgrade.mjs`: 在同一个 Ego 浏览器任务里复验旧包→候选的存档、横竖屏/桌面和模拟 SDK 分享；测试存档和胜负 fixture 与原生客户端验收明确分开。
+`serve-minitool-preview.py`: 仅绑定 127.0.0.1 的本地 CSP 验收/预览服务器，预览保留给用户。
+
+`verify-minitool-final.mjs`: 复用同一 CSP 预览服务，以项目既有 Puppeteer/Chrome 在隔离配置中采集最终页面和原生触控回执；关闭自建浏览器，不读取用户浏览器资料。
+
+`verify-floating-controls.mjs`：复用 5218 预览服务器，独立浏览器档案验证五种尺寸、默认停靠/不重叠、展开/收起、触控瞄准、按压透明度与出杆；结果在 artifacts/xhs-floating-controls-20261002。升级/胜局共享验收支持 MINITOOL_ACCEPTANCE_DIR 指定独立证据目录。
+
+`verify-controls-ui3.mjs`：隔离浏览器验证控件宽度/透明度、胜负结束状态驱动的提示关闭、再来一局/重载以及历史存档保留。实际完局以结束状态注入，不冒充完整物理对局。
+
+2026-10-02 上传门禁：package-minitool 支持 MINITOOL_REQUIRE_COMMITTED=1，拒绝未提交源码；BUILD_PROVENANCE 区分 committed 和 working-tree，记录精确源码标签。
+
+### 小工具 Skill 1.7.0 · 2026-10-02
+
+`minitool-css-compat.mjs`：小工具专用 PostCSS 基线回退（安全区、inset、gap、尺寸函数、颜色、选择器）；不更改普通网站 CSS。
+`audit-minitool-compat.mjs`：最终 JS AST 与 Base64 门禁，与下载 skill 的目录/ZIP 体积审计并用。
+`verify-minitool-skill170.mjs`：复用 5218 服务、独立临时浏览器进行回归诊断；模拟原生缓存、读取失败、无 ResizeObserver、触摸出杆和 WebGL 异常。不能作为创服模拟器或真机验收。

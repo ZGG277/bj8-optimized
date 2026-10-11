@@ -104,7 +104,8 @@ export async function shareScenarios(page) {
   await page.waitForSelector('.finish-mask');
   assert.equal(await page.evaluate(() => !!document.querySelector('.victory-share')), false);
   await page.evaluate(() => { window.__bj8.setMatch({ phase: 'finished', winner: 'player' }); });
-  await page.click('text="分享我的胜局"');
+  await page.waitForSelector('.victory-celebration');
+  await page.waitForFunction(() => !document.querySelector('.victory-celebration'));
   await page.waitForSelector('.victory-share img');
   const image = await page.evaluate(() => document.querySelector('.victory-share img').src);
   assert(image.startsWith('data:image/jpeg;base64,'));

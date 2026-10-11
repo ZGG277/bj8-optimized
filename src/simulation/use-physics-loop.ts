@@ -63,10 +63,14 @@ export function usePhysicsLoop({
       }
       raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
+    if (!document.hidden) raf = requestAnimationFrame(tick);
 
     // 页面隐藏时 rAF 暂停;恢复时重置时钟锚点,不补算隐藏期间
-    const onVisibility = () => runner.resetClock();
+    const onVisibility = () => {
+      runner.resetClock();
+      cancelAnimationFrame(raf);
+      if (!document.hidden && worldRef.current.moving) raf = requestAnimationFrame(tick);
+    };
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {

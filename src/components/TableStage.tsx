@@ -42,6 +42,7 @@ export function TableStage({
   onPointerCancel,
   onResetGame,
 }: TableStageProps) {
+  const showVictoryShare = import.meta.env.VITE_MINITOOL === '1' && match.winner === 'player';
   return (
     <section className="table-stage">
       <div
@@ -78,7 +79,7 @@ export function TableStage({
             onKeyDown={event => event.stopPropagation()}
             onContextMenu={event => event.stopPropagation()}
           >
-            {match.winner === 'player' && (
+            {match.winner === 'player' && import.meta.env.VITE_MINITOOL !== '1' && (
               <div className="confetti" aria-hidden="true">
                 {Array.from({ length: 28 }, (_, i) => (
                   <i key={i} style={{
@@ -92,8 +93,11 @@ export function TableStage({
               </div>
             )}
             <div className="finish-content">
-              <span>GAME OVER</span>
-              <h1>{match.winner === 'player' ? '你赢了！' : match.winner === 'opponent' ? '顾燃赢了' : '本局结束'}</h1>
+              {!showVictoryShare && <>
+                <span>GAME OVER</span>
+                <h1>{match.winner === 'player' ? '你赢了！' : match.winner === 'opponent' ? '顾燃赢了' : '本局结束'}</h1>
+              </>}
+              {showVictoryShare && <VictoryShare mode={gameMode} shots={trainingSummary?.shots} />}
               {trainingSummary && (
                 <section className="training-summary" aria-label="顾燃训练总结">
                   <small>{trainingSummary.headline}</small>
@@ -102,7 +106,6 @@ export function TableStage({
                   <em>{trainingSummary.nextGoal}</em>
                 </section>
               )}
-              {import.meta.env.VITE_MINITOOL === '1' && match.winner === 'player' && <VictoryShare mode={gameMode} />}
               {import.meta.env.VITE_MINITOOL === '1' ? (
                 <div className="finish-actions"><button type="button" data-control-tip="new-match" onClick={() => {
                   onResetGame(); markControlLearned('new-match');

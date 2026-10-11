@@ -5,6 +5,11 @@
 [PROTOCOL]: 阈值或预算变化时，同步更新本注释、render-policy.test.ts 与 src/CLAUDE.md
 */
 
+export function cappedPixelRatio(width: number, height: number, dpr: number, low: boolean) {
+  return Math.min(dpr, low ? 1 : 1.5, Math.sqrt((low ? 1000000 : 2000000) / Math.max(1, width * height)));
+}
+
+
 export type RenderBudget = {
   mobile: boolean;
   pixelRatio: number;
@@ -51,10 +56,10 @@ export function renderBudgetFor(environment: RenderEnvironment): RenderBudget {
 
   return {
     mobile,
-    pixelRatio: Math.min(dpr, mobile ? MOBILE_PIXEL_RATIO_CAP : DESKTOP_PIXEL_RATIO_CAP),
-    shadowMapSize: mobile ? 1024 : DESKTOP_SHADOW_MAP_SIZE,
+    pixelRatio: import.meta.env.VITE_MINITOOL === '1' ? cappedPixelRatio(width, height, dpr, false) : Math.min(dpr, mobile ? MOBILE_PIXEL_RATIO_CAP : DESKTOP_PIXEL_RATIO_CAP),
+    shadowMapSize: import.meta.env.VITE_MINITOOL === '1' ? 1024 : mobile ? 1024 : DESKTOP_SHADOW_MAP_SIZE,
     powerPreference: 'low-power',
-    movingPresentationFps: mobile
+    movingPresentationFps: import.meta.env.VITE_MINITOOL === '1' ? 30 : mobile
       ? MOBILE_MOVING_PRESENTATION_FPS
       : DESKTOP_MOVING_PRESENTATION_FPS,
   };
@@ -71,7 +76,7 @@ export function adaptiveRenderQualityFor(
   if (tier === 'hot') {
     return {
       tier,
-      pixelRatio: budget.mobile ? Math.min(budget.pixelRatio, 1.25) : 1,
+      pixelRatio: import.meta.env.VITE_MINITOOL === '1' ? Math.min(budget.pixelRatio, 1) : budget.mobile ? Math.min(budget.pixelRatio, 1.25) : 1,
       shadowMapSize: 512,
       movingPresentationFps: budget.mobile ? 24 : 20,
       backdropBlur: false,

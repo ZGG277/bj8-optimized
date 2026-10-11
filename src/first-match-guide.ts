@@ -30,7 +30,7 @@ export type FirstMatchGuideEvent =
   | 'layout-adjusted';
 
 export function shouldRunFirstMatchGuide(
-  storage: Storage | null,
+  storage: Pick<Storage, 'getItem' | 'setItem'> | null,
   recordedPlayerShots = 0,
 ): boolean {
   if (Number.isFinite(recordedPlayerShots) && recordedPlayerShots > 0) {
@@ -44,7 +44,7 @@ export function shouldRunFirstMatchGuide(
   }
 }
 
-export function saveFirstMatchGuideCompleted(storage: Storage | null): void {
+export function saveFirstMatchGuideCompleted(storage: Pick<Storage, 'getItem' | 'setItem'> | null): void {
   if (!storage) return;
   try {
     storage.setItem(FIRST_MATCH_GUIDE_STORAGE_KEY, 'done');

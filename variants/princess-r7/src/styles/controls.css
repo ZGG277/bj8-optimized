@@ -1,0 +1,2716 @@
+/*
+[INPUT]: base.css 的令牌与 layout.css 的壳层几何
+[OUTPUT]: 对外提供统一烟熏材质与仪表状态层级的视角推杆、手动相机入口、手动切档方向拨轮、右侧控制轨、击球点、力度出杆、首局上下文提示及规划/复盘浮层样式
+[POS]: 样式体系的控件层;HUD 控件层级高于球桌(z 9-10)、低于结束/介绍遮罩(z 15/20)
+[PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
+*/
+/* 长行程视角推杆：顶端俯视、底端第一人称，行程与出杆区同高。 */
+.view-switcher {
+  position: static;
+  width: var(--control-rail-width);
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+  background: var(--surface-control);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.view-switcher button {
+  width: 100%;
+  min-height: 28px;
+  flex: 0 0 28px;
+  padding: 2px 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.view-switcher button.active {
+  background: rgba(121, 215, 177, 0.14);
+  color: var(--green-bright);
+  box-shadow: inset 0 0 0 1px rgba(121, 215, 177, 0.14);
+}
+
+.view-slider-track {
+  position: relative;
+  min-height: 70px;
+  flex: 1 1 auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.view-slider-track::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  bottom: 12px;
+  width: 5px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.view-slider-fill {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 5px;
+  height: calc((100% - 24px) * var(--view-level));
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(0deg, rgba(112, 199, 165, 0.4), var(--green));
+  pointer-events: none;
+}
+
+.view-slider-thumb {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + (100% - 24px) * var(--view-level));
+  width: 36px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, 50%);
+  border: 1px solid rgba(121, 215, 177, 0.58);
+  border-radius: var(--radius-control);
+  background: linear-gradient(160deg, #34795e, var(--green-deep));
+  box-shadow: var(--shadow-raised), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+  transition: bottom 150ms ease-out;
+}
+
+.view-slider-track:active .view-slider-thumb {
+  transition: none;
+}
+
+.view-slider-thumb i {
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(234, 255, 245, 0.82);
+  box-shadow: 0 -5px rgba(234, 255, 245, 0.3), 0 5px rgba(234, 255, 245, 0.3);
+}
+
+.control-deck {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.control-rail {
+  --control-rail-width: 54px;
+  position: fixed;
+  top: calc(var(--scoreboard-h) + 10px);
+  right: 9px;
+  bottom: auto;
+  z-index: 13;
+  width: var(--control-rail-width);
+  height: min(720px, calc(100vh - var(--scoreboard-h) - 20px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: var(--surface-1);
+  box-shadow:
+    var(--shadow-raised),
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: var(--blur-surface);
+  pointer-events: auto;
+  transition:
+    border-color var(--duration-base) var(--ease-ui),
+    box-shadow var(--duration-base) var(--ease-ui);
+}
+
+.control-rail.is-editing {
+  outline: 1px solid rgba(121, 215, 177, 0.62);
+  outline-offset: 1px;
+  box-shadow:
+    inset 0 0 20px rgba(20, 54, 42, 0.5),
+    0 0 0 2px rgba(112, 199, 165, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.control-slot {
+  position: relative;
+  width: var(--control-rail-width);
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+  will-change: transform;
+}
+
+.control-rail.is-editing .control-slot {
+  cursor: grab;
+  touch-action: none;
+}
+
+.control-rail.is-editing .control-slot-body {
+  pointer-events: none;
+  animation: control-slot-wiggle 150ms ease-in-out infinite alternate;
+  transform-origin: 50% 50%;
+}
+
+.control-rail.is-editing .control-slot:nth-of-type(even) .control-slot-body {
+  animation-direction: alternate-reverse;
+  animation-delay: -70ms;
+}
+
+.control-rail.is-editing .spin-popover {
+  display: none;
+}
+
+.control-slot.is-dragging {
+  z-index: 15;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5));
+  cursor: grabbing;
+}
+
+.control-slot.is-dragging .control-slot-body {
+  animation: none;
+  transform: scale(1.035);
+}
+
+.control-slot-body {
+  width: var(--control-rail-width);
+  min-height: 0;
+}
+
+.control-slot-shoot .control-slot-body {
+  height: 240px;
+  display: flex;
+}
+
+.control-slot-view .control-slot-body {
+  height: 240px;
+  display: flex;
+}
+
+.control-layout-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes control-slot-wiggle {
+  from { transform: rotate(-0.7deg) translateY(-0.7px); }
+  to { transform: rotate(0.7deg) translateY(0.7px); }
+}
+
+.plan-button {
+  display: grid;
+  place-items: center;
+  width: var(--control-rail-width);
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+
+.plan-button span {
+  font-size: 21px;
+}
+
+.plan-button.is-open {
+  border-color: rgba(216, 170, 91, 0.78);
+  color: var(--warm);
+  background: rgba(216, 170, 91, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(216, 170, 91, 0.22), 0 0 12px rgba(216, 170, 91, 0.16);
+}
+
+.plan-button.is-off {
+  color: var(--text-tertiary);
+  border-color: var(--line);
+  filter: grayscale(1);
+  opacity: 0.52;
+  box-shadow: none;
+}
+
+.plan-button strong {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.aim-controls {
+  display: none;
+}
+
+.aim-controls button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+  color: #b8bfbb;
+  font-size: var(--fs-2xl);
+  cursor: pointer;
+}
+
+/* 禁用不只靠颜色:透明度 + 禁止光标 + 删除线 */
+.aim-controls button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.aim-controls div {
+  text-align: center;
+}
+
+.aim-controls strong {
+  display: block;
+  font-size: var(--fs-base);
+}
+
+.aim-controls small {
+  display: block;
+  color: var(--dim);
+  font-size: var(--fs-2xs);
+  margin-top: 2px;
+}
+
+/* 击球点（杆法）控制 */
+.spin-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+}
+
+.spin-control {
+  position: relative;
+  width: var(--control-rail-width);
+}
+
+.desktop-spin-pad {
+  display: none;
+}
+
+.spin-preview {
+  width: var(--control-rail-width);
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  color: var(--muted);
+}
+
+.spin-preview-ball {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #cfc8b8 70%, #a89f8c);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow:
+    inset -2px -3px 5px rgba(0,0,0,0.24),
+    0 0 0 2px rgba(121, 215, 177, 0.08);
+}
+
+.spin-preview-ball i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green-deep);
+  border: 1px solid var(--green-bright);
+  box-shadow: 0 0 8px rgba(121, 215, 177, 0.48);
+  transform: translate(-50%, -50%);
+}
+
+.spin-preview small {
+  font-size: 9px;
+}
+
+.spin-popover {
+  position: absolute;
+  right: calc(100% + 9px);
+  bottom: 0;
+  z-index: 13;
+  width: 152px;
+  display: block;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
+}
+
+.spin-popover-head {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.spin-popover-head button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+
+.mobile-spin-pad {
+  display: flex;
+  padding: 4px;
+}
+
+.mobile-spin-pad .spin-ball {
+  width: 124px;
+  height: 124px;
+}
+
+.mobile-spin-pad .spin-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.mobile-spin-pad small {
+  display: none;
+}
+
+.spin-ball {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #cfc8b8 70%, #a89f8c);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset -3px -4px 8px rgba(0,0,0,0.25), var(--shadow-raised);
+  pointer-events: none;
+}
+
+.spin-cross-h,
+.spin-cross-v {
+  position: absolute;
+  background: rgba(0,0,0,0.12);
+}
+
+.spin-cross-h {
+  left: 12%;
+  right: 12%;
+  top: 50%;
+  height: 1px;
+}
+
+.spin-cross-v {
+  top: 12%;
+  bottom: 12%;
+  left: 50%;
+  width: 1px;
+}
+
+.spin-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green-deep);
+  border: 1px solid var(--green-bright);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px rgba(121, 215, 177, 0.54);
+  transition: left 40ms, top 40ms;
+}
+
+.spin-pad small {
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.15em;
+}
+
+/* 力度与出杆合一：力度填充直接位于操作面内，不再并列第二根表。 */
+.shoot-zone {
+  width: var(--control-rail-width);
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  user-select: none;
+}
+
+.power-num {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xl);
+  color: #f1fff8;
+  font-variant-numeric: tabular-nums;
+}
+
+.shoot-pad {
+  position: relative;
+  width: var(--control-rail-width);
+  height: 100%;
+  min-height: 150px;
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: var(--radius-control);
+  background:
+    linear-gradient(180deg, rgba(121, 215, 177, 0.12), transparent 34%),
+    linear-gradient(160deg, #34795e, var(--green-deep));
+  border: 1px solid rgba(121, 215, 177, 0.46);
+  color: #eafff5;
+  text-align: center;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: var(--shadow-raised), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.shoot-pad strong {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.shoot-pad small {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  font-size: 9px;
+  opacity: 0.75;
+}
+
+.shoot-power-fill {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(121, 215, 177, 0.88), rgba(74, 133, 105, 0.58));
+  transition: height 40ms linear;
+  pointer-events: none;
+}
+
+.shoot-power-fill.hot {
+  background: linear-gradient(0deg, rgba(228, 127, 50, 0.92), rgba(198, 74, 58, 0.75));
+}
+
+.shoot-pull-mark {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 12px;
+  font-size: 26px;
+  opacity: 0.62;
+}
+
+.shoot-pad.charging {
+  background: linear-gradient(160deg, #c98642, #875020);
+  border-color: rgba(216, 170, 91, 0.72);
+  transform: scale(0.97);
+}
+
+/* 禁用不只靠颜色:透明度 + 斜体提示文案反转 */
+.shoot-pad.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(0.7);
+}
+
+.aim-dial {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 8;
+  width: min(310px, calc(100% - 32px));
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: aim-dial-in 140ms ease-out;
+}
+
+@keyframes aim-dial-in {
+  from { opacity: 0; transform: translate(-50%, 5px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.aim-dial:focus-visible {
+  outline: 2px solid rgba(112, 199, 165, 0.82);
+  outline-offset: 2px;
+}
+
+.aim-dial.active {
+  border-color: rgba(121, 215, 177, 0.38);
+}
+
+.aim-dial-label {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.aim-dial-label strong {
+  color: rgba(231, 242, 237, 0.92);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+}
+
+.aim-dial-label small {
+  overflow: hidden;
+  color: rgba(188, 204, 196, 0.7);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aim-dial-window {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background:
+    linear-gradient(90deg, rgba(6, 9, 8, 0.94), transparent 22%, transparent 78%, rgba(6, 9, 8, 0.94)),
+    var(--surface-control);
+}
+
+.aim-dial-pressure-ring {
+  position: absolute;
+  z-index: 2;
+  inset: calc(5px + var(--aim-dial-tightness, 0) * 4px);
+  border: calc(1px + var(--aim-dial-tightness, 0) * 1.5px) solid currentColor;
+  border-radius: calc(var(--radius-control) - 3px);
+  opacity: calc(var(--aim-dial-tightness, 0) * 0.72);
+  box-shadow:
+    inset 0 0 calc(3px + var(--aim-dial-tightness, 0) * 8px)
+      rgba(255, 255, 255, calc(var(--aim-dial-tightness, 0) * 0.12)),
+    0 0 calc(4px + var(--aim-dial-tightness, 0) * 10px)
+      rgba(121, 215, 177, calc(var(--aim-dial-tightness, 0) * 0.28));
+  transform: scale(calc(1 - var(--aim-dial-tightness, 0) * 0.045));
+  transition:
+    inset 60ms linear,
+    border-width 60ms linear,
+    opacity 60ms linear,
+    box-shadow 60ms linear,
+    transform 60ms linear;
+  pointer-events: none;
+}
+
+.aim-dial[data-pressure-active='true'] .aim-dial-ticks {
+  filter: brightness(calc(1 + var(--aim-dial-tightness, 0) * 0.34));
+}
+
+.aim-dial-ticks {
+  position: absolute;
+  inset: 8px -24px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(224, 232, 228, 0.58) 0 1px,
+    transparent 1px 12px
+  );
+  transition: opacity 120ms ease;
+}
+
+.aim-dial-ticks::after {
+  content: '';
+  position: absolute;
+  inset: 9px 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(224, 232, 228, 0.85) 0 2px,
+    transparent 2px 48px
+  );
+}
+
+.aim-dial-window b {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.09), 0 0 12px rgba(255, 255, 255, 0.45);
+}
+
+.aim-dial-window b::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+  background: rgba(8, 12, 10, 0.62);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.aim-dial.fine {
+  border-color: rgba(112, 199, 165, 0.66);
+}
+
+.aim-dial.fine .aim-dial-label strong {
+  color: var(--green);
+}
+
+.aim-dial.fine .aim-dial-window b {
+  background-color: var(--green);
+}
+
+.aim-dial.fine .aim-dial-window b::after {
+  border-color: currentColor;
+  background: rgba(112, 199, 165, 0.3);
+  transform: translate(-50%, -50%) scale(0.78);
+}
+
+.aim-dial.fine .aim-dial-ticks {
+  background-size: 8px 100%;
+}
+
+/* 走位规划提示条：顶部居中一条（高一行到两行），避开比分栏。 */
+.plan-bar {
+  position: fixed;
+  top: calc(var(--scoreboard-h) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: min(94vw, 760px);
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-raised);
+  backdrop-filter: var(--blur-overlay);
+}
+
+.plan-status-notice {
+  position: fixed;
+  top: calc(var(--scoreboard-h) + 4px);
+  left: 50%;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(94vw, 520px);
+  padding: 6px 8px 6px 11px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-raised);
+  color: var(--warm);
+  font-size: var(--fs-sm);
+  backdrop-filter: var(--blur-overlay);
+}
+
+.plan-status-pulse {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.plan-status-notice.computing .plan-status-pulse {
+  background: var(--green-bright);
+  animation: plan-status-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes plan-status-pulse {
+  to { opacity: 0.35; transform: scale(0.72); }
+}
+
+.overlay-drag-handle {
+  width: 24px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  border-radius: 6px;
+  color: var(--dim);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.overlay-drag-handle:active {
+  cursor: grabbing;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.plan-step-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.plan-step-tabs button {
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.plan-step-tabs button.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #09120e;
+}
+
+.plan-bar-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 压缩打法 chip：与桌上轨迹分色一致（暖橙/青/紫） */
+.plan-chip {
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.plan-chip-1 { color: #ffa03c; border: 1px solid rgba(255, 160, 60, 0.45); }
+.plan-chip-2 { color: #35d6d6; border: 1px solid rgba(53, 214, 214, 0.45); }
+.plan-chip-3 { color: #b478ff; border: 1px solid rgba(180, 120, 255, 0.45); }
+
+.plan-bar-prob {
+  color: var(--warm);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.plan-bar-play {
+  padding: 4px 10px;
+  border: 1px solid rgba(121, 215, 177, 0.45);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(160deg, #34795e, var(--green-deep));
+  color: #eafff5;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.plan-bar-close {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 击球复盘：折叠 chip 与展开条都放在提示条同一区域（顶部居中）；
+   与 plan-bar 互斥（Game 层保证 planOpen 时不渲染复盘 chip） */
+.review-float {
+  position: fixed;
+  top: calc(var(--scoreboard-h) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  max-width: min(94vw, 760px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-raised);
+  backdrop-filter: var(--blur-overlay);
+}
+
+.review-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  min-width: 0;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--warm);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.review-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+}
+
+.review-verdict {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.review-title {
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.review-verdict.perfect { color: #35d6a0; border: 1px solid rgba(53, 214, 160, 0.45); }
+.review-verdict.position-miss { color: #ffa03c; border: 1px solid rgba(255, 160, 60, 0.45); }
+.review-verdict.pot-miss { color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.45); }
+.review-verdict.foul { color: #ff7f50; border: 1px solid rgba(255, 127, 80, 0.5); }
+
+.review-verdict-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.review-verdict-dot.perfect { background: #35d6a0; }
+.review-verdict-dot.position-miss { background: #ffa03c; }
+.review-verdict-dot.pot-miss { background: #ff6b6b; }
+.review-verdict-dot.foul { background: #ff7f50; }
+
+.review-chip.coach-only {
+  cursor: default;
+}
+
+.review-bar-message {
+  color: var(--warm);
+  font-size: var(--fs-sm);
+}
+
+.review-bar-legend {
+  display: flex;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.review-bar-legend .legend-plan { color: #ffa03c; }
+.review-bar-legend .legend-actual { color: #e8ecea; }
+
+/* 横屏手机：提示条贴顶部安全区并压缩内边距 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .plan-bar {
+    top: calc(var(--hud-safe-top) + 4px);
+    padding: 4px 6px;
+    max-width: 96vw;
+  }
+
+  .review-float {
+    top: calc(var(--hud-safe-top) + 4px);
+    max-width: 96vw;
+  }
+}
+
+/*
+ * v1.4 五控件统一布局最终覆盖层。
+ * 控件由 DOM placement 决定自由/右停靠/底停靠，历史 control-rail 规则不再参与几何。
+ */
+.control-deck {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  padding: 0;
+  display: block;
+  z-index: 13;
+  pointer-events: none;
+}
+
+.viewport {
+  right: 0;
+}
+
+.dock-rail {
+  position: fixed;
+  z-index: 13;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.dock-rail-right {
+  top: calc(var(--scoreboard-h) + env(safe-area-inset-top, 0px) + 8px);
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  width: 54px;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.dock-rail-bottom {
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  left: max(8px, env(safe-area-inset-left));
+  height: 54px;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.control-free-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.control-slot {
+  width: auto;
+  display: block;
+  flex: 0 0 auto;
+  pointer-events: auto;
+  touch-action: none;
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  will-change: transform;
+}
+
+.control-slot.is-free {
+  position: absolute;
+  transform: translate3d(-50%, -50%, 0);
+}
+
+.control-slot.is-free.is-dragging {
+  transform:
+    translate3d(
+      calc(-50% + var(--layout-drag-x, 0px)),
+      calc(-50% + var(--layout-drag-y, 0px)),
+      0
+    );
+}
+
+.control-slot.is-docked {
+  position: absolute;
+}
+
+.dock-rail-right .control-slot.is-docked {
+  right: 0;
+  left: auto;
+  transform: translate3d(0, -50%, 0);
+}
+
+.dock-rail-right .control-slot.is-docked.is-dragging {
+  transform:
+    translate3d(
+      var(--layout-drag-x, 0px),
+      calc(-50% + var(--layout-drag-y, 0px)),
+      0
+    );
+}
+
+.dock-rail-bottom .control-slot.is-docked {
+  top: auto;
+  bottom: 0;
+  transform: translate3d(-50%, 0, 0);
+}
+
+.dock-rail-bottom .control-slot.is-docked.is-dragging {
+  transform:
+    translate3d(
+      calc(-50% + var(--layout-drag-x, 0px)),
+      var(--layout-drag-y, 0px),
+      0
+    );
+}
+
+.control-slot.is-dragging {
+  z-index: 30;
+  cursor: grabbing;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.58));
+}
+
+.control-slot.is-dragging .control-slot-body {
+  pointer-events: none;
+  transform: scale(1.035);
+}
+
+.control-slot-body {
+  width: auto;
+  min-width: 0;
+}
+
+.dock-rail-right .control-slot-view .control-slot-body,
+.dock-rail-right .control-slot-power .control-slot-body,
+.control-slot-view.is-free .control-slot-body,
+.control-slot-power.is-free .control-slot-body {
+  width: 54px;
+  height: clamp(132px, 25vh, 210px);
+}
+
+.dock-rail-bottom .control-slot-view .control-slot-body,
+.dock-rail-bottom .control-slot-power .control-slot-body {
+  width: clamp(150px, 25vw, 210px);
+  height: 54px;
+}
+
+.dock-rail-right .control-slot-aimDial .control-slot-body {
+  width: 54px;
+  height: 150px;
+}
+
+.dock-rail-bottom .control-slot-aimDial .control-slot-body,
+.control-slot-aimDial.is-free .control-slot-body {
+  width: min(250px, calc(100vw - 92px));
+  height: 58px;
+}
+
+.control-slot-aimDial.is-aim-buttons .control-slot-body {
+  width: 184px;
+  height: 62px;
+}
+
+.aim-controls {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 56px 40px 56px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  /* 参考拨轮的半透明表面，保留轮廓但不遮死下方球路。 */
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.aim-controls button {
+  width: 56px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-control);
+  color: var(--text-primary);
+  font-size: 18px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.aim-controls button:active {
+  border-color: rgba(121, 215, 177, 0.68);
+  color: var(--green-bright);
+  background: rgba(64, 143, 110, 0.22);
+  transform: scale(0.96);
+}
+
+.aim-controls button:disabled {
+  opacity: 0.3;
+}
+
+.aim-controls-cue {
+  position: relative;
+  width: 40px;
+  height: 48px;
+}
+
+.aim-controls-cue::before {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 3px;
+  height: 38px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(#d8aa5b, rgba(216, 170, 91, 0.2));
+  content: '';
+}
+
+.control-slot-bulb .control-slot-body,
+.control-slot-spin .control-slot-body {
+  width: 54px;
+}
+
+.dock-snap-preview {
+  position: fixed;
+  z-index: 12;
+  border: 1px dashed transparent;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 100ms ease, background 100ms ease;
+  pointer-events: none;
+}
+
+.dock-snap-preview.active {
+  border-color: rgba(121, 215, 177, 0.72);
+  background: rgba(69, 154, 119, 0.12);
+  opacity: 1;
+}
+
+.dock-snap-right {
+  top: var(--scoreboard-h);
+  right: 0;
+  bottom: 0;
+  width: 64px;
+}
+
+.dock-snap-bottom {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 64px;
+}
+
+/* 视角：图形端点 + 随停靠边转向的连续滑轨。 */
+.view-switcher {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 4px;
+}
+
+.view-switcher.is-vertical {
+  flex-direction: column;
+}
+
+.view-switcher.is-horizontal {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.view-switcher.is-horizontal .view-mode-first { order: 1; }
+.view-switcher.is-horizontal .view-slider-track { order: 2; }
+.view-switcher.is-horizontal .view-mode-overhead { order: 3; }
+
+.view-switcher button {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  flex: 0 0 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.view-switcher.is-vertical button {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  min-height: 28px;
+  flex-basis: 28px;
+}
+
+.view-icon {
+  position: relative;
+  width: 19px;
+  height: 14px;
+  display: block;
+  color: currentColor;
+}
+
+.view-icon-overhead {
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+}
+
+.view-icon-overhead::before,
+.view-icon-overhead::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+}
+
+.view-icon-overhead::before {
+  width: 5px;
+  height: 5px;
+  left: 3px;
+  top: 4px;
+  background: currentColor;
+}
+
+.view-icon-overhead::after {
+  width: 4px;
+  height: 4px;
+  right: 3px;
+  top: 2px;
+  border: 1px solid currentColor;
+}
+
+.view-icon-eye {
+  height: 10px;
+  margin-top: 2px;
+  border: 1.5px solid currentColor;
+  border-radius: 80% 12%;
+  transform: rotate(45deg);
+}
+
+.view-icon-eye i {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  top: 2px;
+  left: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.view-switcher.is-horizontal .view-slider-track {
+  min-width: 70px;
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  cursor: ew-resize;
+}
+
+.view-switcher.is-horizontal .view-slider-track::before {
+  top: 50%;
+  right: 12px;
+  bottom: auto;
+  left: 12px;
+  width: auto;
+  height: 5px;
+  transform: translateY(-50%);
+}
+
+.view-switcher.is-horizontal .view-slider-fill {
+  top: 50%;
+  bottom: auto;
+  left: 12px;
+  width: calc((100% - 24px) * var(--view-level));
+  height: 5px;
+  transform: translateY(-50%);
+}
+
+.view-switcher.is-horizontal .view-slider-thumb {
+  top: 50%;
+  bottom: auto;
+  left: calc(12px + (100% - 24px) * var(--view-level));
+  width: 44px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+}
+
+.view-switcher.is-horizontal .view-slider-thumb i {
+  width: 2px;
+  height: 16px;
+  box-shadow: -5px 0 rgba(234, 255, 245, 0.3), 5px 0 rgba(234, 255, 245, 0.3);
+}
+
+/* 灯泡面板：入口只发光，三个功能用轨迹/路线/拨轮图形表达。 */
+.assist-control {
+  position: relative;
+  width: 54px;
+}
+
+.plan-button {
+  position: relative;
+  width: 54px;
+  height: 50px;
+  min-height: 50px;
+}
+
+.bulb-icon {
+  position: relative;
+  width: 19px;
+  height: 22px;
+  display: block;
+}
+
+.bulb-icon::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50% 50% 46% 46%;
+  background: currentColor;
+  box-shadow: 0 0 12px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+.bulb-icon i,
+.bulb-icon::after {
+  position: absolute;
+  left: 6px;
+  width: 7px;
+  content: '';
+}
+
+.bulb-icon i {
+  top: 14px;
+  height: 5px;
+  border-radius: 0 0 3px 3px;
+  background: currentColor;
+}
+
+.bulb-icon::after {
+  top: 20px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.plan-button.is-off {
+  opacity: 0.66;
+  filter: grayscale(0.75);
+}
+
+.plan-button.has-aim-assist,
+.plan-button.is-open,
+.plan-button[aria-expanded='true'] {
+  color: var(--warm);
+  opacity: 1;
+  filter: none;
+}
+
+.assist-menu {
+  position: absolute;
+  z-index: 32;
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: var(--blur-overlay);
+}
+
+.assist-menu-vertical {
+  top: 50%;
+  right: calc(100% + 8px);
+  transform: translateY(-50%);
+  flex-direction: column;
+}
+
+.assist-menu-horizontal {
+  right: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(50%);
+}
+
+.assist-option {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-control);
+  color: var(--text-tertiary);
+}
+
+.assist-option.active {
+  border-color: rgba(121, 215, 177, 0.68);
+  color: var(--green-bright);
+  background: rgba(64, 143, 110, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(121, 215, 177, 0.12);
+}
+
+.assist-option:disabled {
+  opacity: 0.26;
+}
+
+.trajectory-icon {
+  position: relative;
+  width: 26px;
+  height: 18px;
+  display: block;
+  border-bottom: 2px dashed currentColor;
+  transform: rotate(-24deg);
+}
+
+.trajectory-icon::before,
+.trajectory-icon::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+}
+
+.trajectory-icon::before {
+  left: -2px;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+
+.trajectory-icon::after {
+  right: -2px;
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border: 2px solid currentColor;
+}
+
+.route-icon {
+  width: 27px;
+  height: 21px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.route-icon i {
+  width: 6px;
+  height: 6px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.route-icon i:nth-child(2) {
+  align-self: flex-start;
+}
+
+.review-icon {
+  position: relative;
+  width: 24px;
+  height: 22px;
+  display: block;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-left-color: transparent;
+}
+
+.review-icon::before {
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(-18deg);
+  content: '';
+}
+
+.review-icon i {
+  position: absolute;
+  top: 5px;
+  left: 8px;
+  width: 2px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 4px 4px 0 -0.5px currentColor;
+}
+
+.review-option.has-review:not(.active) {
+  border-color: color-mix(in srgb, var(--warm) 52%, var(--line));
+}
+
+.direction-keys-icon {
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.direction-keys-icon i {
+  width: 10px;
+  height: 10px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+
+.direction-keys-icon i:first-child { transform: rotate(45deg); }
+.direction-keys-icon i:last-child { transform: rotate(225deg); }
+
+.dial-icon {
+  position: relative;
+  width: 26px;
+  height: 18px;
+  display: block;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 4px,
+    currentColor 4px 5px
+  );
+  opacity: 0.92;
+}
+
+.dial-icon::after {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
+}
+
+/* 击球点只保留母球及撞击点。 */
+.spin-preview {
+  width: 54px;
+  height: 56px;
+  gap: 0;
+}
+
+.spin-preview small,
+.spin-pad small {
+  display: none;
+}
+
+.spin-popover-head {
+  justify-content: flex-end;
+}
+
+.spin-popover-ball {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* 蓄力：球杆回缩 + 能量填充，无文字与数字。 */
+.shoot-zone,
+.shoot-pad {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+}
+
+.shoot-pad {
+  padding: 0;
+  display: block;
+}
+
+.shoot-pad strong,
+.shoot-pad small,
+.power-num,
+.shoot-pull-mark {
+  display: none;
+}
+
+.shoot-power-fill {
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.shoot-pad.is-horizontal .shoot-power-fill {
+  top: 0;
+  right: auto;
+  bottom: 0;
+  height: 100% !important;
+}
+
+.shoot-cue-visual {
+  position: absolute;
+  z-index: 2;
+  inset: 10px;
+  display: block;
+  pointer-events: none;
+}
+
+.shoot-cue-visual i {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #73502e, #dfc28e 32%, #f4e4bd 62%, #6c4426);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.38);
+  transition: transform 40ms linear;
+}
+
+.shoot-pad.is-vertical .shoot-cue-visual i {
+  top: 4px;
+  left: 50%;
+  width: 7px;
+  height: 64%;
+  transform: translateX(-50%) translateY(calc(var(--power) * 0.42px));
+}
+
+.shoot-pad.is-horizontal .shoot-cue-visual i {
+  top: 50%;
+  left: 4px;
+  width: 64%;
+  height: 7px;
+  transform: translateY(-50%) translateX(calc(var(--power) * 0.55px));
+}
+
+.shoot-cue-visual b {
+  position: absolute;
+  border-radius: 50%;
+  background: #79d7b1;
+  box-shadow: 0 0 8px rgba(121, 215, 177, 0.72);
+}
+
+.shoot-pad.is-vertical .shoot-cue-visual b {
+  top: 0;
+  left: 50%;
+  width: 9px;
+  height: 5px;
+  transform: translateX(-50%) translateY(calc(var(--power) * 0.42px));
+}
+
+.shoot-pad.is-horizontal .shoot-cue-visual b {
+  top: 50%;
+  left: 0;
+  width: 5px;
+  height: 9px;
+  transform: translateY(-50%) translateX(calc(var(--power) * 0.55px));
+}
+
+.shoot-energy-ticks {
+  position: absolute;
+  z-index: 1;
+  inset: 8px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  opacity: 0.42;
+}
+
+.shoot-pad.is-vertical .shoot-energy-ticks {
+  flex-direction: column-reverse;
+  align-items: flex-start;
+}
+
+.shoot-pad.is-horizontal .shoot-energy-ticks {
+  align-items: flex-end;
+}
+
+.shoot-energy-ticks i {
+  display: block;
+  border-radius: 999px;
+  background: rgba(234, 255, 245, 0.72);
+}
+
+.shoot-pad.is-vertical .shoot-energy-ticks i {
+  width: 12px;
+  height: 1px;
+}
+
+.shoot-pad.is-horizontal .shoot-energy-ticks i {
+  width: 1px;
+  height: 12px;
+}
+
+/* 拨轮：纯刻度与中心标记，横竖方向跟随停靠边。 */
+.aim-dial {
+  position: relative;
+  left: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 6px;
+  display: block;
+  transform: none;
+  animation: aim-dial-in-docked 140ms ease-out;
+}
+
+@keyframes aim-dial-in-docked {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.aim-dial-label {
+  display: none;
+}
+
+.aim-dial-window {
+  width: 100%;
+  height: 100%;
+}
+
+.aim-dial.is-vertical .aim-dial-ticks {
+  inset: -24px 8px;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(224, 232, 228, 0.58) 0 1px,
+    transparent 1px 12px
+  );
+}
+
+.aim-dial.is-vertical .aim-dial-ticks::after {
+  inset: 0 9px;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(224, 232, 228, 0.85) 0 2px,
+    transparent 2px 48px
+  );
+}
+
+.aim-dial.is-vertical .aim-dial-window b {
+  top: 50%;
+  right: 3px;
+  bottom: auto;
+  left: 3px;
+  width: auto;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.aim-dial.fine {
+  box-shadow: 0 0 0 1px rgba(112, 199, 165, 0.28), 0 0 18px rgba(112, 199, 165, 0.14);
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .dock-rail-right {
+    top: calc(var(--scoreboard-h) + 4px);
+  }
+
+  .dock-rail-right .control-slot-view .control-slot-body,
+  .dock-rail-right .control-slot-power .control-slot-body,
+  .control-slot-view.is-free .control-slot-body,
+  .control-slot-power.is-free .control-slot-body {
+    height: clamp(124px, 23vh, 190px);
+  }
+
+  .dock-rail-bottom .control-slot-view .control-slot-body,
+  .dock-rail-bottom .control-slot-power .control-slot-body {
+    width: min(168px, 42vw);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .dock-rail-right {
+    top: calc(var(--hud-safe-top) + 5px);
+  }
+
+  .dock-rail-right .control-slot-view .control-slot-body,
+  .dock-rail-right .control-slot-power .control-slot-body,
+  .control-slot-view.is-free .control-slot-body,
+  .control-slot-power.is-free .control-slot-body {
+    height: clamp(100px, 28vh, 150px);
+  }
+
+  .dock-rail-bottom .control-slot-view .control-slot-body,
+  .dock-rail-bottom .control-slot-power .control-slot-body {
+    width: min(180px, 23vw);
+  }
+}
+
+/* 竖屏手机：所有主控沿右侧竖排；方向微调只在 viewport 内显示。 */
+@media (max-width: 640px) and (orientation: portrait) {
+  .view-switcher {
+    top: 8px;
+    left: auto;
+    right: 6px;
+    transform: none;
+    width: 62px;
+    flex-direction: column;
+    border-radius: 12px;
+    z-index: 10;
+  }
+
+  .control-deck {
+    position: fixed;
+    top: 146px;
+    right: 6px;
+    bottom: 8px;
+    z-index: 9;
+    width: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .control-deck > * {
+    pointer-events: auto;
+  }
+
+  .plan-button {
+    grid-column: auto;
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    align-self: flex-end;
+    padding: 0;
+    border-radius: var(--radius-control);
+    background: var(--surface-control);
+  }
+
+  .plan-button span {
+    font-size: 22px;
+  }
+
+  .plan-button strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .plan-button.guidance-off {
+    filter: grayscale(1);
+    opacity: 0.48;
+    box-shadow: none;
+  }
+
+  .spin-control {
+    margin-top: auto;
+    align-self: flex-end;
+  }
+
+  .desktop-spin-pad {
+    display: none;
+  }
+
+  .spin-preview {
+    width: 54px;
+    height: 58px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: var(--surface-control);
+    color: var(--muted);
+  }
+
+  .spin-preview-ball {
+    position: relative;
+    width: 31px;
+    height: 31px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #cfc8b8 70%, #a89f8c);
+    box-shadow: inset -2px -3px 5px rgba(0,0,0,0.24);
+  }
+
+  .spin-preview-ball i {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+    transform: translate(-50%, -50%);
+  }
+
+  .spin-preview small {
+    font-size: 9px;
+  }
+
+  .spin-popover {
+    position: fixed;
+    right: 76px;
+    bottom: 170px;
+    z-index: 13;
+    width: 152px;
+    display: block;
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-panel);
+    background: var(--surface-2);
+    box-shadow: var(--shadow-overlay);
+    backdrop-filter: var(--blur-overlay);
+  }
+
+  .spin-popover-head {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .spin-popover-head button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+  }
+
+  .mobile-spin-pad {
+    display: flex;
+    padding: 4px;
+  }
+
+  .mobile-spin-pad .spin-ball {
+    width: 124px;
+    height: 124px;
+  }
+
+  .mobile-spin-pad .spin-dot {
+    width: 12px;
+    height: 12px;
+  }
+
+  .mobile-spin-pad small {
+    display: none;
+  }
+
+  .shoot-zone {
+    width: 64px;
+    align-self: flex-end;
+    border-radius: var(--radius-panel);
+    background: var(--surface-control);
+  }
+
+  .shoot-pad {
+    width: 64px;
+    height: min(240px, 34vh);
+    min-height: 196px;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 20px 3px 8px;
+    border-radius: 16px;
+  }
+
+  .shoot-pad strong {
+    font-size: 17px;
+    letter-spacing: 0.08em;
+  }
+
+  .shoot-pad small {
+    margin-top: auto;
+    font-size: 9px;
+  }
+
+  .shoot-pad .power-num {
+    font-size: 18px;
+  }
+
+  .shoot-pull-mark {
+    position: relative;
+    z-index: 1;
+    display: block;
+    margin-top: 14px;
+    font-size: 28px;
+    opacity: 0.62;
+  }
+
+  .aim-dial {
+    position: absolute;
+    left: 50%;
+    bottom: 14%;
+    z-index: 8;
+    width: min(250px, calc(100% - 112px));
+    transform: translateX(-50%);
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .plan-bar,
+  .review-float {
+    top: 42px;
+    left: 8px;
+    transform: none;
+    max-width: calc(100vw - 92px);
+    padding: 5px;
+    justify-content: flex-start;
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    backdrop-filter: var(--blur-overlay);
+  }
+
+  .review-float {
+    padding: 0;
+  }
+
+  .plan-bar-routes,
+  .plan-bar-chips {
+    gap: 3px;
+  }
+
+  .plan-chip,
+  .plan-bar-routes button,
+  .plan-bar-prob,
+  .plan-bar-play,
+  .review-chip,
+  .review-bar,
+  .review-verdict,
+  .review-bar-message,
+  .review-bar-legend {
+    font-size: 10px;
+  }
+
+  .plan-chip {
+    padding: 2px 4px;
+  }
+
+  .plan-bar-play {
+    padding: 4px 7px;
+  }
+
+  .review-chip {
+    max-width: calc(100vw - 124px);
+    padding: 6px 7px;
+  }
+
+  .review-bar {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .overlay-drag-handle {
+    width: 28px;
+    height: 32px;
+    flex-basis: 28px;
+  }
+}
+
+@media (max-width: 400px) and (orientation: portrait) {
+  .shoot-pad {
+    height: min(228px, 32vh);
+  }
+}
+
+/* 横屏手机:控件悬浮右下/左下,层级高于球桌;视角工具条避开 hud-safe-top */
+@media (orientation: landscape) and (max-height: 560px) {
+  .view-switcher {
+    top: calc(var(--hud-safe-top) + 8px);
+    z-index: 10;
+  }
+
+  .control-deck {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 9;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  /* 横屏：方向微调不再钉在左下，与击球点盘一起收入右下控件组 */
+  .aim-controls {
+    background: color-mix(in srgb, var(--surface-1) 66%, transparent);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+  }
+
+  /* 横屏：💡 走位按钮与右下控件组同风格悬浮 */
+  .plan-button {
+    background: var(--surface-control);
+  }
+
+  /* 横屏：击球点盘钉在左下并加大，与右下控件组分离 */
+  .spin-pad {
+    position: fixed;
+    left: 10px;
+    bottom: 10px;
+    z-index: 9;
+    background: var(--surface-1);
+    border-radius: var(--radius-control);
+    padding: 6px;
+  }
+
+  .spin-ball {
+    width: 72px;
+    height: 72px;
+  }
+
+  .spin-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .shoot-zone {
+    background: var(--surface-control);
+    border-radius: var(--radius-control);
+    padding: 8px;
+  }
+
+  .shoot-pad {
+    width: 104px;
+    height: 84px;
+  }
+}
+
+/*
+ * 统一控制轨的最终响应式约束。
+ * 这一段刻意位于历史响应式规则之后，确保桌面/手机都使用相同的 54px 单列结构。
+ */
+@media (max-width: 640px) and (orientation: portrait) {
+  .control-rail {
+    top: 42px;
+    right: 6px;
+    bottom: auto;
+    width: var(--control-rail-width);
+    height: min(628px, calc(100vh - 50px));
+    gap: 6px;
+  }
+
+  .view-switcher,
+  .plan-button,
+  .spin-control,
+  .spin-preview,
+  .shoot-zone,
+  .shoot-pad {
+    width: var(--control-rail-width);
+  }
+
+  .view-switcher {
+    position: static;
+    transform: none;
+  }
+
+  .spin-control {
+    margin-top: 0;
+    align-self: stretch;
+  }
+
+  .spin-popover {
+    position: absolute;
+    right: calc(100% + 9px);
+    bottom: 0;
+  }
+
+  .shoot-zone {
+    align-self: stretch;
+    padding: 0;
+  }
+
+  .control-slot-shoot .control-slot-body {
+    height: min(228px, 32vh);
+  }
+
+  .control-slot-view .control-slot-body {
+    height: min(228px, 32vh);
+  }
+
+  .view-switcher {
+    height: 100%;
+  }
+
+  .shoot-pad {
+    height: 100%;
+    min-height: 174px;
+    max-height: min(228px, 32vh);
+    padding: 12px 2px 7px;
+  }
+
+  .aim-dial {
+    bottom: 13%;
+    max-width: calc(100% - 84px);
+    min-height: 56px;
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .plan-step-tabs,
+  .plan-bar-chips {
+    gap: 3px;
+  }
+
+  .plan-chip,
+  .plan-step-tabs button,
+  .plan-bar-prob,
+  .review-chip,
+  .review-bar,
+  .review-verdict,
+  .review-bar-message,
+  .review-bar-legend {
+    font-size: 10px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .control-rail {
+    top: calc(var(--hud-safe-top) + 8px);
+    right: 8px;
+    bottom: auto;
+    width: var(--control-rail-width);
+    height: calc(100vh - var(--hud-safe-top) - 16px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  .view-switcher,
+  .plan-button,
+  .spin-control,
+  .spin-preview,
+  .shoot-zone,
+  .shoot-pad {
+    width: var(--control-rail-width);
+  }
+
+  .view-switcher {
+    position: static;
+  }
+
+  .view-switcher button {
+    min-height: 22px;
+    flex-basis: 22px;
+    padding-block: 2px;
+  }
+
+  .plan-button {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .spin-control {
+    margin: 0;
+  }
+
+  .spin-preview {
+    height: 44px;
+  }
+
+  .spin-popover .spin-pad {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    padding: 4px;
+    background: transparent;
+  }
+
+  .shoot-zone {
+    padding: 0;
+  }
+
+  .control-slot-shoot .control-slot-body {
+    height: 92px;
+  }
+
+  .control-slot-view .control-slot-body {
+    height: 92px;
+  }
+
+  .view-switcher {
+    height: 100%;
+  }
+
+  .shoot-pad {
+    height: 100%;
+    min-height: 92px;
+    max-height: 150px;
+  }
+}
+
+/* 必须位于全部历史媒体查询之后：统一布局层的几何终值。 */
+.control-deck.control-deck {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  padding: 0;
+  display: block;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.control-deck > .dock-snap-preview,
+.control-deck > .dock-rail,
+.control-deck > .control-free-layer,
+.control-deck > .control-layout-status {
+  pointer-events: none;
+}
+
+.control-deck .control-slot {
+  pointer-events: auto;
+}
+
+.control-deck .view-switcher,
+.control-deck .shoot-zone,
+.control-deck .shoot-pad {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  transform: none;
+}
+
+.control-deck .spin-control {
+  width: 54px;
+  margin: 0;
+  align-self: auto;
+}
+
+.control-deck .spin-preview {
+  width: 54px;
+  height: 56px;
+}
+
+.control-deck .aim-dial {
+  position: relative;
+  left: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-width: none;
+  transform: none;
+  grid-template-columns: none;
+}
+
+.control-deck .plan-button {
+  width: 54px;
+  height: 50px;
+  min-height: 50px;
+}
+
+.control-deck .shoot-pad.is-horizontal .shoot-power-fill {
+  top: 0;
+  right: auto;
+  bottom: 0;
+  height: 100% !important;
+}
+
+/* 首局引导：跟随真实锚点的一行微提示；本体穿透，仅 × 保留 44px 热区。 */
+.first-match-guide {
+  position: fixed;
+  z-index: 14;
+  display: inline-flex;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  height: 44px;
+  align-items: center;
+  padding-left: 11px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 18%, transparent);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.first-match-guide::after {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--green) 22%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--green) 22%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  content: '';
+}
+
+.first-match-guide.is-left::after {
+  right: -4px;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.first-match-guide.is-right::after {
+  left: -4px;
+  transform: translateY(-50%) rotate(225deg);
+}
+
+.first-match-guide.is-above::after {
+  top: auto;
+  right: 20px;
+  bottom: -4px;
+  transform: rotate(135deg);
+}
+
+.first-match-guide.is-below::after {
+  top: -4px;
+  right: 20px;
+  transform: rotate(-45deg);
+}
+
+.first-match-guide.is-table::after,
+.first-match-guide.is-measuring::after {
+  display: none;
+}
+
+.first-match-guide > span {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+}
+
+.first-match-guide .guide-skip {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.52;
+  pointer-events: auto;
+}
+
+.first-match-guide .guide-skip i {
+  display: block;
+  font-size: 15px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.first-match-guide .guide-skip:focus-visible {
+  outline: 2px solid var(--green-bright);
+  outline-offset: -4px;
+}
+
+/*
+ * 手动相机与俯视端点共享原有按钮槽：竖控件左右分段，横控件上下分段。
+ * 规则位于最终覆盖层，避免历史媒体查询扩大按钮后挤压连续高度轨道。
+ */
+.view-mode-cluster {
+  display: flex;
+  flex: 0 0 34px;
+  min-width: 34px;
+  min-height: 34px;
+}
+
+.view-switcher.is-vertical .view-mode-cluster {
+  width: 100%;
+  height: 28px;
+  min-width: 0;
+  min-height: 28px;
+  flex-basis: 28px;
+  flex-direction: row;
+}
+
+.view-switcher.is-horizontal .view-mode-cluster {
+  order: 3;
+  width: 34px;
+  height: 100%;
+  flex-direction: column;
+}
+
+.view-switcher .view-mode-cluster button {
+  width: 100%;
+  height: 50%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 50%;
+  border-radius: 5px;
+}
+
+.view-switcher.is-vertical .view-mode-cluster button {
+  width: 50%;
+  height: 100%;
+}
+
+.view-switcher.is-horizontal .view-mode-first { order: 1; }
+.view-switcher.is-horizontal .view-slider-track { order: 2; }
+
+.view-mode-cluster .view-icon {
+  width: 15px;
+  height: 11px;
+}
+
+.view-mode-cluster .view-icon-overhead::before {
+  width: 4px;
+  height: 4px;
+  left: 2px;
+  top: 3px;
+}
+
+.view-mode-cluster .view-icon-overhead::after {
+  width: 3px;
+  height: 3px;
+  right: 2px;
+  top: 1px;
+}
+
+.manual-camera-icon {
+  position: relative;
+  display: block;
+  width: 17px;
+  height: 15px;
+  color: currentColor;
+}
+
+.manual-camera-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4px 3px 3px;
+  border: 1.4px solid currentColor;
+  border-radius: 3px;
+}
+
+.manual-camera-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.2px solid currentColor;
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-16deg);
+}
+
+.manual-camera-icon i {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 4px solid currentColor;
+  transform: rotate(-20deg);
+}
+
+/* 浮动控件：默认沿边停靠；像素锚点避免矮屏上的控件互相挤压。
+ * 自定义位置仍由 v3 布局管理，拖动后不套用默认锚点。 */
+.control-deck { --floating-power-height: clamp(132px, 25vh, 210px); }
+@media (max-width: 640px) and (orientation: portrait) {
+  .control-deck { --floating-power-height: clamp(124px, 23vh, 190px); }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .control-deck { --floating-power-height: clamp(100px, 28vh, 150px); }
+}
+.control-deck .dock-rail-right {
+  top: calc(var(--scoreboard-h) + env(safe-area-inset-top, 0px) + 8px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
+}
+.control-deck .dock-rail-bottom { bottom: env(safe-area-inset-bottom, 0px); }
+.control-deck .control-slot-view .control-slot-body {
+  width: 54px;
+  height: 50px;
+}
+.control-deck .dock-rail-right .is-default-anchor { transform: none; }
+.control-deck .dock-rail-right .control-slot-view.is-default-anchor { top: 0 !important; }
+.control-deck .dock-rail-right .control-slot-bulb.is-default-anchor { top: 58px !important; }
+.control-deck .dock-rail-right .control-slot-power.is-default-anchor { top: auto !important; bottom: 0; }
+.control-deck .dock-rail-right .control-slot-spin.is-default-anchor {
+  top: auto !important;
+  bottom: calc(var(--floating-power-height) + 8px);
+}
+.view-disclosure { position: relative; width: 54px; height: 50px; }
+.edge-control-tab {
+  width: 54px; height: 50px; padding: 0; border: 0;
+  background: transparent; color: var(--text-primary); cursor: pointer;
+  display: grid; place-items: center;
+}
+/* 视觉图标收进边缘，完整触控热区仍保留。 */
+.dock-rail-right .edge-control-tab > span,
+.dock-rail-right .assist-control > .plan-button > .bulb-icon { transform: translateX(16px); }
+.edge-control-tab > span { font-size: 25px; }
+.view-control-panel {
+  position: absolute; right: 58px; top: 0;
+  width: min(250px, calc(100vw - 74px)); height: 54px;
+  border-radius: 12px; background: var(--surface-2);
+}
+.dock-rail-bottom .view-control-panel { right: 0; top: auto; bottom: 58px; }
+.control-slot.is-expanded, .control-slot:has(.spin-control.expanded) { z-index: 20; }
+.control-deck .spin-popover { position: absolute; right: 62px; bottom: 0; }
+/* 窄屏为右侧出杆区保留独立热区，瞄准条仍保持居中。 */
+.control-deck .dock-rail-bottom .control-slot-aimDial .control-slot-body {
+  width: min(250px, calc(100vw - 124px));
+}
+
+.control-deck .dock-rail-right .assist-menu-vertical {
+  top: 0; right: 58px; transform: none; flex-direction: row;
+}
+
+.control-deck .dock-rail-right .control-slot.is-default-anchor.is-dragging {
+  transform: translate3d(var(--layout-drag-x, 0px), var(--layout-drag-y, 0px), 0);
+}
+
+/* 出杆和母球略收窄，保留大于 44px 的触控宽度。 */
+.control-deck .dock-rail-right .control-slot-power .control-slot-body,
+.control-deck .control-slot-power.is-free .control-slot-body,
+.control-deck .spin-control,
+.control-deck .spin-preview { width: 48px; }
+.control-deck .dock-rail-right .control-slot-power .control-slot-body,
+.control-deck .spin-control { margin-left: auto; }

@@ -4,6 +4,7 @@
 [POS]: HUD 工具组件；与 Game 并列挂载，只改 html[data-theme]，不接触游戏状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
+import { gameStorage } from '../minitool/persistent-storage';
 import { useEffect, useRef, useState } from 'react';
 import { markControlLearned } from '../control-onboarding';
 
@@ -36,7 +37,7 @@ export function nextThemeId(current: ThemeId, direction: 1 | -1): ThemeId {
 
 function readStoredTheme(): string | null {
   try {
-    return window.localStorage.getItem(THEME_STORAGE_KEY);
+    return gameStorage()?.getItem(THEME_STORAGE_KEY) ?? null;
   } catch {
     return null;
   }
@@ -44,7 +45,7 @@ function readStoredTheme(): string | null {
 
 function persistTheme(theme: ThemeId): void {
   try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    gameStorage()?.setItem(THEME_STORAGE_KEY, theme);
   } catch {
     // 存储不可用时仍允许当前页面切换主题。
   }

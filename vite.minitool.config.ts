@@ -6,6 +6,7 @@
 */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import miniToolCssCompatibility from './scripts/minitool-css-compat.mjs';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
@@ -43,12 +44,12 @@ function miniToolCompatibility(): Plugin {
       }
       return null;
     },
-    transformIndexHtml(html) {
-      return html.replace(
+    transformIndexHtml: { order: 'post', handler(html) {
+      return html.replace(/ type="module"/g, '').replace(/ crossorigin/g, '').replace(/<script src=/g, '<script defer src=').replace(
         'width=device-width, initial-scale=1.0',
         'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover',
       ).replace('</head>', '    <link rel="icon" href="./assets/favicon.svg" />\n  </head>');
-    },
+    } },
     generateBundle() {
       this.emitFile({
         type: 'asset',
@@ -62,14 +63,17 @@ function miniToolCompatibility(): Plugin {
 export default defineConfig({
   plugins: [miniToolCompatibility(), react()],
   base: './',
+  css: { postcss: { plugins: [miniToolCssCompatibility()] } },
   define: { 'import.meta.env.VITE_MINITOOL': JSON.stringify('1') },
   build: {
+    target: ['es2017', 'chrome61'],
+    cssTarget: 'chrome61',
     outDir: process.env.MINITOOL_DIST || 'dist-minitool',
     emptyOutDir: true,
     modulePreload: { polyfill: false },
     assetsInlineLimit: file => file.endsWith('.glb') ? true : false,
     cssCodeSplit: false,
-    rollupOptions: { output: { inlineDynamicImports: true } },
+    rollupOptions: { output: { format: 'iife', inlineDynamicImports: true } },
     chunkSizeWarningLimit: 1200,
   },
 });

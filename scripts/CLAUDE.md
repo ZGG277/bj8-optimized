@@ -107,3 +107,11 @@
 `verify-controls-ui3.mjs`：隔离浏览器验证控件宽度/透明度、胜负结束状态驱动的提示关闭、再来一局/重载以及历史存档保留。实际完局以结束状态注入，不冒充完整物理对局。
 
 2026-10-02 上传门禁：package-minitool 支持 MINITOOL_REQUIRE_COMMITTED=1，拒绝未提交源码；BUILD_PROVENANCE 区分 committed 和 working-tree，记录精确源码标签。
+
+### 小工具 Skill 1.7.0 · 2026-10-02
+
+`minitool-css-compat.mjs`：小工具专用 PostCSS 基线回退（安全区、inset、gap、尺寸函数、颜色、选择器）；不更改普通网站 CSS。
+`audit-minitool-compat.mjs`：最终 JS AST 与 Base64 门禁，与下载 skill 的目录/ZIP 体积审计并用。
+`verify-minitool-skill170.mjs`：复用 5218 服务、独立临时浏览器进行回归诊断；模拟原生缓存、读取失败、无 ResizeObserver、触摸出杆和 WebGL 异常。不能作为创服模拟器或真机验收。
+
+2026-10-11：package-minitool.mjs 内置文本/ZIP 体积审计与 ZIP CRC 检查，不再依赖本机 .codex Skill 文件。

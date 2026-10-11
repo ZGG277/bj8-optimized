@@ -1,0 +1,10 @@
+{
+  "name": "princess-pool-preview",
+  "version": "1.1.1",
+  "private": true,
+  "scripts": {
+    "build": "python3 scripts/build.py",
+    "preview": "python3 -m http.server 5239 --bind 127.0.0.1",
+    "check": "node --check src/royal-visuals.js && python3 scripts/check.py"
+  }
+}

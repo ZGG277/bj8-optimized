@@ -108,3 +108,12 @@
 2026-10-02 浮动构图：Game 的相机安全区只测比分栏与视口，透明控件不再压缩球桌。ResizeObserver 观察画布和比分栏，移除全页面 MutationObserver。
 
 2026-10-02 UI3：controlLearning 新增独立的 completed-match:v1 完局标记；Game 在实际 finished 或历史 matchesEvaluated > 0 时记录，瞄准/出杆/母球提示对触屏、鼠标、键盘一并停止；不覆盖旧画像、布局或学习列表。
+
+### 小红书 Skill 1.7.0 兼容候选 · 2026-10-02
+
+`minitool/persistent-storage.ts`：启动前读取原生 Storage（9.46+）；原键复制旧浏览器存档、保留原值，兼容 JSON 包装值与合法未包装的主题名/完局标记，结构化存档解析失败仍阻止默认值启动；写入串行并报告失败，保留未成功项供下一次操作重试。Game、主题、布局、引导和瞄准统一使用同一存储接口。
+`minitool/runtime-compat.ts`：在游戏依赖初始化前提供实际使用的 flatMap 回退；旧端 Flex gap 以实测分支使用子项 margin。ResizeObserver 缺失时沿用窗口/变更监听。
+`minitool/render-guard.ts`：小工具专用静态台体合批与可见资源预算；DPR ≤1.5、200 万像素、30 FPS 初始目标；超预算隐藏装饰，最低档仍超限或渲染失败进入 DOM 提示。暂停渲染时停止物理/对手推进。普通网页构建保留原档位。
+`main.tsx`：先兼容初始化，再异步存档准备，最后挂载；读档失败提供重试。真机/平台验收仍待执行，详见根目录 `XHS_SKILL170_AUDIT_20261002.md`。
+
+2026-10-02 胜局庆祝：`minitool/victory-motion.ts` 提供一次性金色弹道烟花与翻转彩屑绘制；`minitool/victory-art.ts` 提供庆祝卡版式与离线兜底场景；`share-note.ts` 在胜局后异步解码包内 `minitool/assets/victory-studio-v3.jpg` 写实底图，单次导出 JPEG，并封装官方临时文件/笔记接口。底图失败回退 Canvas 场景；不新增 WebGL。主题图不是实局截图，图中出杆数仅来自真实 MatchTrainingSummary，无数据时不展示数字；不新增持久化字段。

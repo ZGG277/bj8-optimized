@@ -5,6 +5,7 @@
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
+import { gameStorage } from '../minitool/persistent-storage';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   createInitialWorld,
@@ -32,10 +33,10 @@ import {
 import { createShotSettlementGuard } from './shot-settlement-guard';
 import { FIRST_PERSON_VIEW, OVERHEAD_VIEW } from '../camera-view';
 
-function browserStorage(): Storage | null {
+function browserStorage(): ReturnType<typeof gameStorage> {
   if (typeof window === 'undefined') return null;
   try {
-    return window.localStorage;
+    return gameStorage();
   } catch {
     return null;
   }

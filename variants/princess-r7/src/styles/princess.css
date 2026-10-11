@@ -1,0 +1,112 @@
+/* Product skin: gem HUD follows the actual ruby / whole yellow topaz / obsidian balls. */
+.scoreboard { position: relative; }
+.scoreboard .mini-ball {
+  position: relative; overflow: hidden;
+  color: #ffe5ac; border: 1px solid #dfb678;
+  background: radial-gradient(ellipse at 28% 23%, #fff7ea 0%, #f797ab 8%, #cc3057 23%, #84182f 51%, #ed4767 72%, #41091c 100%);
+  box-shadow: inset -2px -3px 4px #34061ba6, inset 1px 1px 3px #fff7d6aa, 0 1px 3px #0007;
+  text-shadow: 0 1px 1px #350819;
+  font-family: Georgia, serif;
+}
+.scoreboard .mini-ball::after {
+  content: ''; position: absolute; top:0; right:0; bottom:0; left:0; pointer-events: none;
+  background: linear-gradient(130deg, transparent 15%, #fff5 18%, transparent 23%, transparent 70%, #fff3 74%, transparent 80%);
+  border-radius: 50%;
+}
+.scoreboard .mini-ball.stripe {
+  color: #684316; text-shadow: 0 1px 0 #fff9;
+  background: radial-gradient(ellipse at 27% 20%, #fffbedb3 0%, #fffbed66 13%, transparent 37%), radial-gradient(ellipse at 40% 35%,#ffe7a0 0%,#efc348 32%,#bf851d 62%,#f1cd69 79%,#805118 100%);
+}
+.scoreboard .mini-ball.eight {
+  color: #efd7a4;
+  background: radial-gradient(ellipse at 28% 22%, #ebefff 0%, #69768f 9%, #141c2f 27%, #03050c 53%, #343953 75%, #060710 100%);
+}
+.scoreboard .mini-ball.down { opacity: .23; filter: grayscale(.85); }
+.princess-mode { position:absolute; top:calc(100% + 8px); left:50%; transform:translateX(-50%); z-index:15; display:flex; align-items:center; color:#fff0cb; font-size:11px; white-space:nowrap; padding:4px 9px; border-radius:16px; background:#102746aa; border:1px solid #e4c78155; }
+.princess-mode select { margin-left:8px; background:transparent; color:#fff2d4; font:inherit; border:0; padding:6px 2px; min-height:32px; }
+.princess-mode option { color:#152c45; background:#fff5df; }
+@media (max-width:600px) { .princess-mode { top:calc(100% + 5px); font-size:10px; padding:1px 7px; } }
+
+.victory-celebration-scene { display:grid; place-items:center; background:radial-gradient(ellipse at 50% 74%,#428da7 0%,#19486a 36%,#06172e 78%); }
+.victory-obsidian { width:56vw; height:56vw; max-width:360px; max-height:360px; margin-top:20vh; border-radius:50%; display:grid; place-items:center; color:#ead6a0; font:italic 100px Georgia,serif; border:1px solid #eed69f88; text-shadow:1px 2px 2px #050613; background:radial-gradient(ellipse at 27% 22%,#e8e9ff 0%,#8995bc 5%,#333f69 15%,#12172b 32%,#03050c 56%,#414660 79%,#090b19 100%); box-shadow:inset -15px -20px 36px #0009,0 45px 36px -18px #020916aa; }
+
+/* R2: larger legible gem targets, with bounded size on narrow phones. */
+.scoreboard .mini-ball { width:24px; height:24px; flex:0 0 24px; font-size:13px; }
+@media (max-width:380px) { .scoreboard .mini-ball { width:21px; height:21px; flex-basis:21px; font-size:12px; } }
+
+/* R4 royal jewelry interface. Controls retain their original gesture geometry. */
+:root[data-theme] {
+  --green:#e0c28a; --green-bright:#f5dfb0; --green-deep:#866831; --warm:#e0c28a;
+  --text-primary:#fff6e6; --text-secondary:#eee2c9d9; --text-tertiary:#ddceb0b8;
+  --line:#d8bd7d3b; --line-strong:#e3c98b70;
+  --surface-1:#243b34ed; --surface-2:#172b25f2; --panel:#21382fed;
+}
+:root[data-theme] .scoreboard {
+  background:linear-gradient(115deg,#fff9ebed,#e9e6e5e8 47%,#fff7e5ed);
+  border-bottom:1px solid #b49b62b3; box-shadow:0 2px 12px #243c3026,inset 0 1px #fff;
+}
+:root[data-theme] .scoreboard .identity strong,
+:root[data-theme] .scoreboard .mobile-identity strong { color:#44362b; letter-spacing:.08em; }
+:root[data-theme] .scoreboard .identity small,
+:root[data-theme] .scoreboard .mobile-ball-status strong { color:#725b34; }
+:root[data-theme] .scoreboard .skill-level,
+:root[data-theme] .scoreboard .score-center { color:#795b25; }
+:root[data-theme] .scoreboard .avatar { color:#8b6529; border:1px solid #c8ad71; background:radial-gradient(circle at 32% 22%,#fff,#e6daca 67%,#b9a278);box-shadow:inset 0 1px 3px #fff,0 1px 4px #51422324; }
+:root[data-theme] .princess-mode {color:#705633;background:linear-gradient(120deg,#fff9eced,#e8e1d6eb);border-color:#c6ab74a6;box-shadow:0 2px 6px #2633291c;}
+:root[data-theme] .princess-mode select {color:#654a21;}
+:root[data-theme] .turn-mask {background:#173329c9;color:#fff2d7;border:1px solid #ceb47770;border-radius:999px;box-shadow:inset 0 1px #fff2;}
+:root[data-theme] .spin-preview-ball,
+:root[data-theme] .spin-ball {background:radial-gradient(circle at 30% 24%,#fff 0%,#fff9ed 28%,#e8dce0 64%,#b9b3bd 92%);box-shadow:inset -3px -4px 8px #98869670,0 0 0 1px #e4c98699;}
+:root[data-theme] .shoot-pad,
+:root[data-theme] .aim-dial,
+:root[data-theme] .view-slider-track {border-color:#e6cd90a6;box-shadow:inset 0 1px #fff4,0 2px 8px #16302529;}
+:root[data-theme] .shoot-power-fill,
+:root[data-theme] .view-slider-fill {background:linear-gradient(180deg,#fff0bd,#cead60 60%,#9c742e);}
+:root[data-theme] .shoot-pad.charging {box-shadow:0 0 14px #e8c87855,inset 0 1px #fff7;}
+:root[data-theme] .royal-finish {background:radial-gradient(ellipse at 50% 40%,#325747c7,#172b25eb 78%);backdrop-filter:blur(5px);padding:20px 18px max(20px,env(safe-area-inset-bottom));}
+.royal-result-card {padding:28px 20px 22px;border:1px solid #e5ca8f99;border-radius:26px;background:linear-gradient(150deg,#fffaf0f5,#e8e1d7f0);box-shadow:0 16px 45px #001b1640,inset 0 1px 0 #fff;max-width:400px;}
+:root[data-theme] .royal-finish h1 {color:#715024;font-size:clamp(30px,7vw,42px);font-weight:600;letter-spacing:.12em;margin:12px 0 22px;text-shadow:0 1px #fff;animation:none;}
+.royal-victory-emblem {font:76px Georgia,serif;line-height:1.1;color:#b58a40;text-shadow:0 1px #fff,0 6px 20px #b68f4240;}
+.royal-prince-portrait {display:block;width:min(100%,320px);height:auto;max-height:46vh;object-fit:contain;margin:-10px auto 0;filter:drop-shadow(0 6px 9px #78613725);}
+:root[data-theme] .royal-finish .finish-actions button {min-height:48px;min-width:160px;padding:12px 28px;border:1px solid #a17c37;border-radius:999px;color:#533a16;background:linear-gradient(150deg,#fff0c6,#debd77);box-shadow:inset 0 1px #fff9,0 4px 10px #80622224;font-size:16px;font-weight:600;letter-spacing:.08em;}
+:root[data-theme] .royal-finish .royal-skip {display:block;margin:10px auto -8px;padding:10px 14px;min-height:44px;border:0;border-radius:8px;background:transparent;box-shadow:none;color:#766442;font-size:12px;}
+.royal-petals {position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.royal-petals i {position:absolute;left:var(--fall-x);top:-42px;display:block;width:26px;height:26px;color:var(--petal-color);opacity:0;animation:royal-flower-fall 2.6s var(--fall-delay) ease-in forwards;}
+.royal-petals svg {width:100%;height:100%;filter:drop-shadow(0 1px 1px #2a292733);}
+.royal-petals .royal-ribbon {width:8px;height:28px;border-radius:2px;background:linear-gradient(90deg,var(--petal-color),#fff6,var(--petal-color));}
+@keyframes royal-flower-fall {0%{opacity:0;transform:translate3d(0,0,0) rotate(0);}8%{opacity:.94;}82%{opacity:.85;}100%{opacity:0;transform:translate3d(28px,88vh,0) rotate(var(--fall-spin));}}
+@media(max-width:600px){
+  :root[data-theme] .mobile-ball-status {gap:3px;}
+  :root[data-theme] .mobile-ball-status strong {font-size:10px;letter-spacing:0;}
+  :root[data-theme] .mobile-ball-rack {gap:2px;}
+  :root[data-theme] .scoreboard .mini-ball {width:22px;height:22px;flex-basis:22px;font-size:11px;}
+}
+@media(max-width:380px){:root[data-theme] .scoreboard .mini-ball{width:19px;height:19px;flex-basis:19px;font-size:10px;}}
+@media(max-height:500px){.royal-result-card{padding:12px 18px;max-width:460px;}.royal-prince-portrait{max-height:35vh;}.royal-victory-emblem{font-size:46px;}:root[data-theme] .royal-finish h1{font-size:28px;margin:4px 0 12px;}}
+@media(prefers-reduced-motion:reduce){.royal-petals{display:none;}.royal-finish,.royal-finish *{animation:none!important;transition:none!important;}}
+
+/* R4 round2: flowers cross the card background; result/actions stay unobscured. */
+.royal-petals { z-index:2; }
+.royal-result-card { z-index:auto; }
+.royal-result-card h1, .royal-result-card .finish-actions,
+.royal-result-card .royal-skip, .royal-result-card .royal-victory-emblem { position:relative; z-index:3; }
+.game-shell[data-match-finished='true'] .control-deck { visibility:hidden; pointer-events:none; }
+
+/* Opening hides only HUD paint: measured control rectangles stay stable for camera fit. */
+.game-shell[data-opening='true'] > :not(.table-stage):not([role='alert']) { opacity: 0; pointer-events: none; }
+.game-shell[data-opening='true'] .viewport::after { content: '轻触跳过开场'; position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; color: #f9efd6; font-size: 12px; letter-spacing: .14em; pointer-events: none; text-shadow: 0 1px 5px #153b2f; }
+
+/* Private A/B strip stays in document flow; the table and its controls retain their sizing contract. */
+.follow-comparison { flex: 0 0 auto; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; padding: 4px 8px; background: #f7f1e6; color: #514439; font-size: 11px; }
+.follow-comparison select { font: inherit; min-height: 30px; border: 1px solid #c2af8d; border-radius: 7px; background: #fffaf0; color: #514439; padding: 3px 8px; }
+.follow-comparison select:disabled { opacity: .55; }
+
+.game-shell.follow-ab { grid-template-rows: auto var(--scoreboard-h) minmax(0, 1fr); }
+@media (max-width: 640px) and (orientation: portrait) {
+  .game-shell.follow-ab { grid-template-rows: auto 46px minmax(0, 1fr); }
+  .follow-comparison span { font-size: 10px; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .follow-comparison { position: fixed; top: var(--scoreboard-h); left: 50%; transform: translateX(-50%); max-width: calc(100% - 120px); border-radius: 0 0 8px 8px; }
+  .follow-comparison span { display: none; }
+}

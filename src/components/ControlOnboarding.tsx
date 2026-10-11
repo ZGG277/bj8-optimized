@@ -159,9 +159,9 @@ export function ControlOnboarding() {
       updateCopy();
     };
     update();
-    const resize = new ResizeObserver(update);
-    resize.observe(anchor);
-    if (hintRef.current) resize.observe(hintRef.current);
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+    resize?.observe(anchor);
+    if (hintRef.current) resize?.observe(hintRef.current);
     // 只在提示显示时观察，控件移动/菜单卸载后立即跟随或退出；不创建常驻帧循环。
     const mutation = new MutationObserver(update);
     mutation.observe(document.getElementById('root') ?? document.body, {
@@ -171,7 +171,7 @@ export function ControlOnboarding() {
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
     return () => {
-      resize.disconnect();
+      resize?.disconnect();
       mutation.disconnect();
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);

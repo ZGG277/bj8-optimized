@@ -149,7 +149,7 @@ const BALL_COLORS: Record<number, string> = {
 
 /** 球体贴图（等距柱状 2:1，双半球号码） */
 export function makeBallTexture(number: number, group: string): THREE.CanvasTexture {
-  const w = 1024, h = 512;
+  const w = import.meta.env.VITE_MINITOOL === '1' ? 512 : 1024, h = w / 2;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
@@ -194,7 +194,7 @@ export function makeBallTexture(number: number, group: string): THREE.CanvasText
 }
 
 export function makeCueBallTexture(): THREE.CanvasTexture {
-  const w = 1024, h = 512;
+  const w = import.meta.env.VITE_MINITOOL === '1' ? 512 : 1024, h = w / 2;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;

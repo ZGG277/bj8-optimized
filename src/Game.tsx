@@ -4,6 +4,7 @@
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
+import { gameStorage } from './minitool/persistent-storage';
 import {
   useRef,
   useCallback,
@@ -90,10 +91,10 @@ const TOUCH_AIM_CAMERA_RELEASE_MS = 650;
 const POCKETED_SHOT_CAMERA_HOLD_MS = 420;
 const STOPPED_SHOT_CAMERA_HOLD_MS = 260;
 
-function browserStorage(): Storage | null {
+function browserStorage(): ReturnType<typeof gameStorage> {
   if (typeof window === 'undefined') return null;
   try {
-    return window.localStorage;
+    return gameStorage();
   } catch {
     return null;
   }
@@ -119,6 +120,7 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 }
 
 export default function Game() {
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [selectedWorld, setSelectedWorld] = useState<PublicWorldId>(() =>
     resolveWorldSelection(window.location.search));
   const selectWorld = (worldId: PublicWorldId) => {
@@ -416,11 +418,11 @@ export default function Game() {
     if (spectatorActive && shotCameraTarget === null) showFullTable();
     else if (!isOverheadCameraView(viewLevel) || manualCameraActive || manualCameraPinned) return;
     orientFullTable();
-    const observer = new ResizeObserver(orientFullTable);
-    if (containerRef.current) observer.observe(containerRef.current);
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(orientFullTable) : null;
+    if (containerRef.current) observer?.observe(containerRef.current);
     window.addEventListener('resize', orientFullTable);
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       window.removeEventListener('resize', orientFullTable);
     };
   }, [spectatorActive, shotCameraTarget, viewLevel, manualCameraActive, manualCameraPinned, orientFullTable, showFullTable]);
@@ -474,7 +476,6 @@ export default function Game() {
   // 首碰目标与袋口身份只在抬手时冻结；横竖旋转、窗口大小和比分栏尺寸会改变
   // 可用屏幕区域。全台和瞄准共用这个实时 safety；仅在存在构图帧时复制 safety，绝不重选目标或口袋。
   useEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return;
     const viewport = containerRef.current;
     if (!viewport) return;
     const refreshSafety = () => {
@@ -485,14 +486,14 @@ export default function Game() {
         return { ...current, safety: nextSafety };
       });
     };
-    const resizeObserver = new ResizeObserver(refreshSafety);
-    resizeObserver.observe(viewport);
+    const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(refreshSafety) : null;
+    resizeObserver?.observe(viewport);
     const scoreboard = document.querySelector('.scoreboard');
-    if (scoreboard) resizeObserver.observe(scoreboard);
+    if (scoreboard) resizeObserver?.observe(scoreboard);
     window.addEventListener('resize', refreshSafety);
     refreshSafety();
     return () => {
-      resizeObserver.disconnect();
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', refreshSafety);
     };
   }, []);
@@ -917,7 +918,7 @@ export default function Game() {
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
-    active: match.phase === 'rolling',
+    active: match.phase === 'rolling' && !renderError,
     worldRef,
     onFrame: useCallback(() => {
       playPhysicsEvents(worldRef.current.events);
@@ -938,7 +939,7 @@ export default function Game() {
 
   // ── 对手 AI 回合 ──
   useOpponentAI({
-    active: match.phase === 'opponent',
+    active: match.phase === 'opponent' && !renderError,
     worldRef,
     matchRef,
     scene3DRef,
@@ -958,10 +959,18 @@ export default function Game() {
     const el = containerRef.current;
     if (!el) return;
 
-    const scene = new Scene3D(el, {
-      worldId: selectedWorld,
-      onThermalQualityChange: quality => handleThermalQualityChange(quality.movingPresentationFps),
-    });
+    let scene: Scene3D;
+    try {
+      scene = new Scene3D(el, {
+        worldId: selectedWorld,
+        onRenderUnavailable: setRenderError,
+        onThermalQualityChange: quality => handleThermalQualityChange(quality.movingPresentationFps),
+      });
+    } catch (error) {
+      if (import.meta.env.VITE_MINITOOL !== '1') throw error;
+      setRenderError('当前设备暂不支持此球桌画面。请更新客户端后重新进入；已有存档保留。');
+      return;
+    }
     scene3DRef.current = scene;
     scene.start();
 
@@ -1035,6 +1044,9 @@ export default function Game() {
   // ── 渲染 ──
   return (
     <div className="game-shell">
+      {renderError && <div role="alert" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 9998, background: '#10251b', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <p>{renderError}</p><button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 12 }}>重新进入</button>
+      </div>}
       <Scoreboard
         match={match}
         worldView={worldView}

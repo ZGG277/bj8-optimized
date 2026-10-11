@@ -5,6 +5,7 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
+import { batchStaticTable, sceneCost, withinSceneBudget } from './minitool/render-guard';
 import { lake360Enabled } from './scene/lake360';
 import type { WorldId } from './world-selection';
 import type { WorldShellFactory } from './scene/world-shell';
@@ -44,6 +45,7 @@ import {
   makeCueBallTexture,
 } from './textures';
 import {
+  cappedPixelRatio,
   adaptiveRenderQualityFor,
   renderBudgetFor,
   type AdaptiveRenderQuality,
@@ -139,6 +141,7 @@ type GpuTimerExtension = {
 
 export type Scene3DOptions = {
   worldId?: WorldId;
+  onRenderUnavailable?: (message: string) => void;
   /** 初始化注入；测试空壳/失败路径，不提供局内热切换。 */
   worldShellFactory?: WorldShellFactory;
   onThermalQualityChange?: (quality: AdaptiveRenderQuality, snapshot: ThermalSnapshot) => void;
@@ -281,12 +284,12 @@ export class Scene3D {
     this.virtualCam = new THREE.PerspectiveCamera(CAMERA_FOV_DEGREES, element.clientWidth / element.clientHeight, 0.01, 60);
 
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: import.meta.env.VITE_MINITOOL !== '1',
       powerPreference: renderBudget.powerPreference,
     });
     this.renderer.setSize(element.clientWidth, element.clientHeight);
     this.renderer.setPixelRatio(renderBudget.pixelRatio);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = import.meta.env.VITE_MINITOOL !== '1';
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // 阴影只在球/球杆/规划动画实际变化时刷新；静止镜头移动复用同一张光照图。
     this.renderer.shadowMap.autoUpdate = false;
@@ -294,6 +297,12 @@ export class Scene3D {
     this.renderer.toneMappingExposure = .98;
     element.appendChild(this.renderer.domElement);
 
+    if (import.meta.env.VITE_MINITOOL === '1') {
+      this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
+      this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
+      document.addEventListener('visibilitychange', this.onVisibility);
+      this.renderer.debug.onShaderError = () => this.unavailable('当前设备无法绘制球桌，请稍后重新进入。');
+    }
     const gl = this.renderer.getContext();
     if (gl instanceof WebGL2RenderingContext) {
       this.gpuTimerExtension = gl.getExtension('EXT_disjoint_timer_query_webgl2') as GpuTimerExtension | null;
@@ -318,6 +327,39 @@ export class Scene3D {
     this.camera.lookAt(this.smoothLookAt);
 
     window.addEventListener('resize', this.handleResize);
+  }
+
+  private overloadFrames = 0;
+  private miniToolBudgetDirty = true;
+  private unavailable(message: string) {
+    this.stop();
+    this.studioEnvironment?.dispose(); // Stops scenery timers; retry requires explicit user action.
+    this.environmentOptions.onRenderUnavailable?.(message);
+  }
+  private onContextLost = (event: Event) => {
+    event.preventDefault();
+    this.unavailable('画面资源暂时中断。请稍后重新进入；已保存进度保留。');
+  };
+  private onContextRestored = () => {
+    this.environmentOptions.onRenderUnavailable?.('画面资源已恢复，可点击重新进入。');
+  };
+  private onVisibility = () => {
+    if (document.hidden) {
+      if (this.animationId) cancelAnimationFrame(this.animationId);
+      this.animationId = 0; this.clearThermalIdleRecovery();
+    } else { this.clock.start(); this.lastRenderedAt = null; this.renderSlotMs = null; this.requestRender(); }
+  };
+  private enforceMiniToolBudget(): boolean {
+    if (!this.miniToolBudgetDirty) return true;
+    this.miniToolBudgetDirty = false;
+    const low = this.adaptiveQuality.tier === 'hot';
+    let cost = sceneCost(this.scene);
+    if (!withinSceneBudget(cost, low) && this.tableDetails?.root.visible) { this.tableDetails.root.visible = false; cost = sceneCost(this.scene); }
+    if (!withinSceneBudget(cost, low) && this.studioEnvironment?.root.visible) { this.studioEnvironment.root.visible = false; cost = sceneCost(this.scene); }
+    if (!withinSceneBudget(cost, low)) {
+      this.unavailable('当前画面超过设备绘制预算，已暂停画面。请稍后重新进入。'); return false;
+    }
+    return true;
   }
 
   private buildTable() {
@@ -729,6 +771,7 @@ export class Scene3D {
     }
 
     // Blender 独立视觉外壳；台面、库边与袋口继续使用上方共享几何。
+    if (import.meta.env.VITE_MINITOOL === '1') batchStaticTable(this.tableGroup);
     this.studioEnvironment = createStudioEnvironment(woodTex, () => this.requestRender(true),
       this.environmentOptions.worldId, this.environmentOptions.worldShellFactory);
     this.tableGroup.add(this.studioEnvironment.root);
@@ -737,7 +780,7 @@ export class Scene3D {
   }
 
   private buildBalls() {
-    const geometry = new THREE.SphereGeometry(R, 48, 32);
+    const geometry = new THREE.SphereGeometry(R, import.meta.env.VITE_MINITOOL === '1' ? 24 : 48, import.meta.env.VITE_MINITOOL === '1' ? 16 : 32);
     for (let i = 0; i <= 15; i++) {
       const tex = i === 0 ? makeCueBallTexture() : makeBallTexture(i, i >= 9 ? 'stripe' : 'solid');
       const mat = new THREE.MeshPhysicalMaterial({
@@ -1853,8 +1896,8 @@ export class Scene3D {
   }
 
   private requestRender(refreshShadows = false) {
-    if (refreshShadows) this.renderer.shadowMap.needsUpdate = true;
-    if (!this.running || this.animationId !== 0) return;
+    if (refreshShadows) { this.renderer.shadowMap.needsUpdate = true; this.miniToolBudgetDirty = true; }
+    if (!this.running || this.animationId !== 0 || document.hidden) return;
     this.animationId = requestAnimationFrame((nowMs) => {
       this.animationId = 0;
       if (!this.running) return;
@@ -1918,9 +1961,10 @@ export class Scene3D {
   private applyThermalTier(tier: RenderQualityTier) {
     const quality = adaptiveRenderQualityFor(this.renderBudget, tier);
     if (quality.tier === this.adaptiveQuality.tier) return;
+    this.miniToolBudgetDirty = true;
     this.adaptiveQuality = quality;
     this.shadowMapSize = quality.shadowMapSize;
-    this.renderer.setPixelRatio(quality.pixelRatio);
+    this.renderer.setPixelRatio(import.meta.env.VITE_MINITOOL === '1' ? cappedPixelRatio(this.element.clientWidth, this.element.clientHeight, quality.pixelRatio, tier === 'hot') : quality.pixelRatio);
     this.renderer.setSize(this.element.clientWidth, this.element.clientHeight);
     if (this.keyLight) {
       this.keyLight.shadow.map?.dispose();
@@ -1969,6 +2013,7 @@ export class Scene3D {
 
   /** 渲染一帧：推进落袋/球杆/规划动画；是否续帧由 requestRender 决定。 */
   render() {
+    if (import.meta.env.VITE_MINITOOL === '1' && (!this.running || document.hidden || !this.enforceMiniToolBudget())) return;
     const renderStartedAt = performance.now();
     const frameIntervalMs = this.lastRenderedAt === null
       ? null
@@ -2056,7 +2101,15 @@ export class Scene3D {
     this.updatePlanPlay(dt);
     this.ballContacts?.sync(this.ballMeshes);
 
-    this.renderer.render(this.scene, this.camera);
+    try { this.renderer.render(this.scene, this.camera); }
+    catch (error) {
+      if (import.meta.env.VITE_MINITOOL !== '1') throw error;
+      this.unavailable('球桌绘制暂时中断，请稍后重新进入。'); return;
+    }
+    if (import.meta.env.VITE_MINITOOL === '1' && this.adaptiveQuality.tier === 'hot') {
+      this.overloadFrames = continuousWork && frameIntervalMs !== null && frameIntervalMs > 80 ? this.overloadFrames + 1 : 0;
+      if (this.overloadFrames >= 60) { this.unavailable('设备当前负载较高，已暂停画面。请稍后重新进入。'); return; }
+    }
     this.finishGpuTimer(gpuQuery);
     if (continuousWork && !this.gpuTimerExtension) {
       const renderFinishedAt = performance.now();
@@ -2195,7 +2248,7 @@ export class Scene3D {
     if (budgetChanged) {
       this.adaptiveQuality = nextQuality;
       this.shadowMapSize = nextQuality.shadowMapSize;
-      this.renderer.setPixelRatio(nextQuality.pixelRatio);
+      this.renderer.setPixelRatio(import.meta.env.VITE_MINITOOL === '1' ? cappedPixelRatio(w, h, nextQuality.pixelRatio, nextQuality.tier === 'hot') : nextQuality.pixelRatio);
       this.thermalGovernor.setTargetFps(nextQuality.movingPresentationFps);
       if (this.keyLight) {
         this.keyLight.shadow.map?.dispose();
@@ -2212,6 +2265,9 @@ export class Scene3D {
   };
 
   dispose() {
+    this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
+    this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
+    document.removeEventListener('visibilitychange', this.onVisibility);
     this.stop();
     this.studioEnvironment?.dispose();
     this.tableDetails?.dispose();

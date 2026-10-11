@@ -19,3 +19,10 @@ shots/table-craft-v2/preview-state.json
 
 # Lake360 local install cache
 .npm-cache/
+
+# Local tooling and private configuration are not product source.
+.codex/
+.DS_Store
+.env
+.env.*
+!.env.example

@@ -4,6 +4,7 @@
 [POS]: 控件新手提示领域层；展示由 ControlOnboarding 订阅，成功事实由实际动作拥有者提交
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
+import { gameStorage } from './minitool/persistent-storage';
 export const CONTROL_TIPS = {
   'view-overhead': '俯视：俯视全台',
   'view-manual': '手动视角：拖动球桌旋转观察',
@@ -123,5 +124,5 @@ export function createControlLearningStore(getStorage: () => LearningStorage | n
 }
 
 export const controlLearning = createControlLearningStore(() =>
-  typeof window === 'undefined' ? null : window.localStorage);
+  typeof window === 'undefined' ? null : gameStorage());
 export const markControlLearned = controlLearning.mark;

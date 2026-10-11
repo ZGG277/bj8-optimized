@@ -1,0 +1,37 @@
+/* 正式局前世界选择；不改变已有 HUD 和触控几何。 */
+.world-choice {
+  border: 0;
+  padding: 0;
+  margin: 20px 0 18px;
+  text-align: left;
+}
+.world-choice legend {
+  color: #9daeb4;
+  font-size: 11px;
+  letter-spacing: .14em;
+  margin-bottom: 9px;
+}
+.world-choice-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.world-choice-option { position: relative; min-width: 0; cursor: pointer; }
+.world-choice-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.world-choice-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #52616a55;
+  border-radius: 12px;
+  background: #70839108;
+}
+.world-choice-option strong { color: #b6c5ca; font-size: 13px; font-weight: 500; }
+.world-choice-option small { color: #90a0a8; font-size: 10px; line-height: 1.4; }
+.world-choice-option input:checked + span { border-color: #93b2c5a6; background: #70839120; }
+.world-choice-option input:checked + span strong { color: #dfedf0; }
+.world-choice-option input:focus-visible + span { outline: 2px solid #b4d8e8; outline-offset: 3px; }
+@media (max-height: 650px) { .world-choice { margin: 10px 0; } .world-choice-option span { padding: 9px; } }
+@media (max-width: 540px) {
+  .world-choice { margin: 14px 0; }
+  .world-choice-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .world-choice-option span { padding: 9px 10px; gap: 3px; }
+  .world-choice-option small { font-size: 9px; }
+}

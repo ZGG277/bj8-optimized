@@ -28,6 +28,12 @@ function spinLabel(spin: CueSpin): string {
 /** 击球点盘:拖拽定位击球点;键盘 ↑↓←→ 微调,0/Backspace 回中杆 */
 export function SpinControl({ spin, disabled, onSpinChange }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const wrapper = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const slot = wrapper.current?.closest('.control-slot');
+    slot?.classList.toggle('is-spin-expanded', expanded);
+    return () => slot?.classList.remove('is-spin-expanded');
+  }, [expanded]);
   const pointerStartRef = useRef<{
     pointerId: number;
     x: number;
@@ -125,7 +131,7 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
   );
 
   return (
-    <div className={`spin-control ${expanded ? 'expanded' : ''}`}>
+    <div ref={wrapper} className={`spin-control ${expanded ? 'expanded' : ''}`}>
       {pad('desktop-spin-pad')}
       <button
         type="button"

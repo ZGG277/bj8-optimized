@@ -1,0 +1,191 @@
+/*
+[INPUT]: camera-view 连续视角、观战锁定、横竖屏俯视方向与全台适配纯几何
+[OUTPUT]: 锁定端点、稍高出杆位、玩家杆向跟随、双方横竖全台及六袋安全边界回归
+[POS]: 连续视角相机回归测试
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+import { describe, expect, it } from 'vitest';
+import { PerspectiveCamera, Vector3 } from 'three';
+import {POCKETS} from './physics';
+import {tableFrameEnvelope} from './pocket-render/frame-geometry';
+import {pocketSeamContract} from './pocket-render/seam-contract';
+import {pocketRenderProfile} from './pocket-render/profile';
+const envelope=tableFrameEnvelope(POCKETS.map(p=>pocketSeamContract(p,pocketRenderProfile(p))));
+const HX=envelope.halfWidth+.01,HZ=envelope.halfLength+.01;
+import {
+  CAMERA_FOV_DEGREES,
+  FIRST_PERSON_VIEW,
+  FULL_TABLE_AZIMUTH,
+  GLOBAL_CAMERA_VIEW_LEVEL,
+  LANDSCAPE_TABLE_AZIMUTH,
+  OVERHEAD_VIEW,
+  SHOT_AIM_VIEW,
+  cameraAzimuthAfterDrag,
+  cameraAzimuthAtView,
+  cameraInteractionMode,
+  cameraPoseAt,
+  clampViewLevel,
+  isGlobalCameraView,
+  isOverheadCameraView,
+  normalizeCameraAzimuth,
+  opponentOverheadAzimuth,
+  fullTableAzimuth,
+  viewLevelLabel,
+} from './camera-view';
+
+describe('continuous camera view', () => {
+  it('钳制任意输入并保留端点语义', () => {
+    expect(clampViewLevel(-1)).toBe(FIRST_PERSON_VIEW);
+    expect(clampViewLevel(0.43)).toBe(0.43);
+    expect(clampViewLevel(2)).toBe(OVERHEAD_VIEW);
+    expect(clampViewLevel(Number.NaN)).toBe(FIRST_PERSON_VIEW);
+    expect(viewLevelLabel(0)).toBe('第一人称');
+    expect(viewLevelLabel(0.43)).toBe('视角高度 43%');
+    expect(viewLevelLabel(1)).toBe('俯视');
+  });
+
+  it('全局高度从统一阈值开始冻结球台视觉方位', () => {
+    expect(isGlobalCameraView(GLOBAL_CAMERA_VIEW_LEVEL - 0.001)).toBe(false);
+    expect(isGlobalCameraView(GLOBAL_CAMERA_VIEW_LEVEL)).toBe(true);
+    expect(isGlobalCameraView(OVERHEAD_VIEW)).toBe(true);
+  });
+
+  it('谢不赢回合锁定球桌，玩家手动视角才把手势路由给相机', () => {
+    expect(cameraInteractionMode(false, true)).toBe('orbit');
+    expect(cameraInteractionMode(true, false)).toBe('locked');
+    expect(cameraInteractionMode(true, true)).toBe('locked');
+    expect(cameraInteractionMode(false, false)).toBe('aim');
+  });
+
+  it('谢不赢俯视方向按视口固定为竖台或横台', () => {
+    expect(opponentOverheadAzimuth(390, 844)).toBe(FULL_TABLE_AZIMUTH);
+    expect(opponentOverheadAzimuth(1280, 800)).toBe(LANDSCAPE_TABLE_AZIMUTH);
+  });
+
+  it('高度随推杆位置单调抬升且中间值不会吸附端点', () => {
+    const heights = [0, 0.2, 0.43, 0.75, 1].map(
+      level => cameraPoseAt(0.18, 0.62, 0.3, 0, level).position.y,
+    );
+    expect(heights).toEqual([...heights].sort((a, b) => a - b));
+    expect(heights[2]).toBeGreaterThan(heights[1]);
+    expect(heights[2]).toBeLessThan(heights[3]);
+  });
+
+  it('出杆位稍高于第一人称且仍沿杆向观察', () => {
+    const first = cameraPoseAt(0.1, 0.7, 0.3, 0, FIRST_PERSON_VIEW);
+    const shot = cameraPoseAt(0.1, 0.7, 0.3, 0, SHOT_AIM_VIEW);
+    expect(shot.position.y).toBeGreaterThan(first.position.y + 0.1);
+    expect(shot.position.y).toBeLessThan(first.position.y + 0.4);
+    expect(isGlobalCameraView(SHOT_AIM_VIEW)).toBe(false);
+    expect(cameraAzimuthAtView(Math.PI / 2, 0.3, SHOT_AIM_VIEW, false)).toBeCloseTo(0.3);
+  });
+
+  it.each([[1280, 800], [390, 844]])('全局视角在 %s×%s 显示完整横/竖台', (width, height) => {
+    const aspect = width / height;
+    const azimuth = fullTableAzimuth(width, height);
+    const pose = cameraPoseAt(0, 0.7, azimuth, 0, OVERHEAD_VIEW, aspect);
+    const camera = new PerspectiveCamera(CAMERA_FOV_DEGREES, aspect, 0.01, 60);
+    camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
+    camera.updateMatrixWorld(true);
+    const points = [-HX, HX].flatMap(x => [-HZ, HZ].map(z => new Vector3(x, 0, z).project(camera)));
+    for (const point of points) {
+      expect(Math.abs(point.x)).toBeLessThan(0.94);
+      expect(Math.abs(point.y)).toBeLessThan(0.94);
+    }
+    const longEnd = new Vector3(0, 0, HZ).project(camera);
+    const longStart = new Vector3(0, 0, -HZ).project(camera);
+    const horizontal = Math.abs(longEnd.x - longStart.x) * width;
+    const vertical = Math.abs(longEnd.y - longStart.y) * height;
+    expect(horizontal > vertical).toBe(width >= height);
+  });
+
+  it('全台位姿消费非对称 HUD 安全区并上移到可用矩形中心', () => {
+    const aspect = 1280 / 800;
+    const safety = { top: 0.045, right: 0.045, bottom: 0.22, left: 0.045 };
+    const pose = cameraPoseAt(0, 0, LANDSCAPE_TABLE_AZIMUTH, 0, OVERHEAD_VIEW, aspect, safety);
+    const camera = new PerspectiveCamera(CAMERA_FOV_DEGREES, aspect, 0.01, 60);
+    camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
+    camera.updateMatrixWorld(true);
+    const points = [-HX, HX].flatMap(x => [-HZ, HZ].map(z => new Vector3(x, 0.04, z).project(camera)));
+    const minY = Math.min(...points.map(point => point.y));
+    const maxY = Math.max(...points.map(point => point.y));
+    expect(minY).toBeGreaterThanOrEqual(-1 + safety.bottom * 2 - 1e-6);
+    expect(maxY).toBeLessThanOrEqual(1 - safety.top * 2 + 1e-6);
+    expect((minY + maxY) / 2).toBeCloseTo(safety.bottom - safety.top, 3);
+  });
+
+  it.each([0, 0.25, 0.6, 1])('在高度 %s 转向 180° 会环绕到球台另一侧', (level) => {
+    const forward = cameraPoseAt(0, 0, 0, 0, level);
+    const reverse = cameraPoseAt(0, 0, Math.PI, 0, level);
+    expect(forward.position.z * reverse.position.z).toBeLessThan(0);
+    expect(Math.abs(forward.position.y - reverse.position.y)).toBeLessThan(1e-10);
+  });
+
+  it('俯视端沿世界杆向绕球台中心旋转而不是锁死方向', () => {
+    const north = cameraPoseAt(0.3, 0.8, 0, 0, 1);
+    const east = cameraPoseAt(0.3, 0.8, Math.PI / 2, 0, 1);
+    expect(north.position.x).toBeCloseTo(0, 10);
+    expect(north.position.z).toBeCloseTo(0.85, 10);
+    expect(east.position.x).toBeCloseTo(-0.85, 10);
+    expect(east.position.z).toBeCloseTo(0, 10);
+  });
+
+  it('玩家手动环绕只换算视觉方位角，不需要也不会返回瞄准事实', () => {
+    const aimAngle = 0.37;
+    const cameraBefore = -0.8;
+    const cameraAfter = cameraAzimuthAfterDrag(cameraBefore, 120);
+    expect(cameraAfter).not.toBe(cameraBefore);
+    expect(aimAngle).toBe(0.37);
+    expect(normalizeCameraAzimuth(cameraAfter + Math.PI * 2)).toBeCloseTo(cameraAfter, 10);
+  });
+
+  it('玩家俯视端保持视觉方位，任意非俯视视角立即跟随瞄准角', () => {
+    const cameraAzimuth = Math.PI - 0.1;
+    const aimAngle = -Math.PI + 0.1;
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 1, true))
+      .toBeCloseTo(cameraAzimuth, 10);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.994, true))
+      .toBeCloseTo(aimAngle, 10);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0.82, true))
+      .toBeCloseTo(aimAngle, 10);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 0, true))
+      .toBeCloseTo(aimAngle, 10);
+    expect(cameraAzimuthAtView(cameraAzimuth, aimAngle, 1, false))
+      .toBeCloseTo(aimAngle, 10);
+    expect(isOverheadCameraView(0.994)).toBe(false);
+    expect(isOverheadCameraView(0.995)).toBe(true);
+  });
+
+  it.each([0, Math.PI / 2])(
+    '390×844 竖屏观战位姿在方位角 %s 下仍把木帮外缘留在安全边界内',
+    (cameraAzimuth) => {
+      const aspect = 324 / 810;
+      const pose = cameraPoseAt(
+        0,
+        0.55,
+        cameraAzimuth,
+        0,
+        OVERHEAD_VIEW,
+        aspect,
+      );
+      const camera = new PerspectiveCamera(CAMERA_FOV_DEGREES, aspect, 0.01, 60);
+      camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+      camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
+      camera.updateMatrixWorld(true);
+
+      const corners = [
+        [-HX, -HZ],
+        [HX, -HZ],
+        [-HX, HZ],
+        [HX, HZ],
+      ];
+      for (const [x, z] of corners) {
+        const projected = new Vector3(x, 0, z).project(camera);
+        expect(Math.abs(projected.x)).toBeLessThanOrEqual(0.94);
+        expect(Math.abs(projected.y)).toBeLessThanOrEqual(0.94);
+      }
+    },
+  );
+});
