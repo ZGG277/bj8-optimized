@@ -1,0 +1,144 @@
+/*
+[INPUT]: 设计令牌与全局重置约定
+[OUTPUT]: 对外提供“静谧球房”色彩/表面/圆角/阴影/动效与尺寸令牌、重置、焦点态和动画
+[POS]: 样式体系的基础层,只定义令牌与跨组件规则,不承载布局或控件样式
+[PROTOCOL]: 变更时更新此头部,然后检查 CLAUDE.md
+*/
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* 视觉语言：深绿黑环境承托球桌，薄荷绿只表达行动，暖金只表达关键结果。 */
+  --green: #79d7b1;
+  --green-bright: #9ae8c8;
+  --green-deep: #245b46;
+  --warm: #d8aa5b;
+  --danger: #df6c5f;
+  --panel: rgba(13, 21, 17, 0.82);
+  --surface-1: rgba(13, 21, 17, 0.78);
+  --surface-2: rgba(8, 14, 11, 0.92);
+  --surface-control: rgba(255, 255, 255, 0.035);
+  --line: rgba(236, 247, 241, 0.09);
+  --line-strong: rgba(236, 247, 241, 0.16);
+  --text-primary: #edf3ef;
+  --text-secondary: rgba(237, 243, 239, 0.7);
+  --text-tertiary: rgba(237, 243, 239, 0.45);
+  --dim: var(--text-tertiary);
+  --muted: var(--text-secondary);
+  --radius-sm: 8px;
+  --radius-control: 12px;
+  --radius-panel: 16px;
+  --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 14px 44px rgba(0, 0, 0, 0.5);
+  --blur-surface: blur(16px) saturate(112%);
+  --blur-overlay: blur(22px) saturate(116%);
+  --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  /* 响应式字号体系:在手机视口(375px)保持原样,在大屏桌面(1440px)自然放大 */
+  --fs-3xs: clamp(5px, 0.3vw + 3.9px, 9px);
+  --fs-2xs: clamp(6px, 0.4vw + 4.5px, 11px);
+  --fs-xs:  clamp(7px, 0.5vw + 5.1px, 13px);
+  --fs-sm:  clamp(8px, 0.6vw + 5.8px, 14px);
+  --fs-base: clamp(9px, 0.7vw + 6.4px, 15px);
+  --fs-md:  clamp(10px, 0.8vw + 7.0px, 16px);
+  --fs-lg:  clamp(11px, 0.9vw + 7.6px, 17px);
+  --fs-xl:  clamp(12px, 1.0vw + 8.3px, 18px);
+  --fs-2xl: clamp(14px, 1.2vw + 9.5px, 22px);
+  --fs-3xl: clamp(16px, 1.4vw + 10.8px, 26px);
+  --fs-4xl: clamp(18px, 1.6vw + 12.0px, 32px);
+  --fs-5xl: clamp(20px, 1.8vw + 13.3px, 38px);
+  --fs-6xl: clamp(32px, 2.8vw + 21.5px, 56px);
+  --fs-7xl: clamp(48px, 4.0vw + 33.0px, 72px);
+
+  /* 竖屏/桌面壳层尺寸;横屏在 media query 中重定义 */
+  --scoreboard-h: 48px;
+  --control-deck-h: 100px;
+  /* 横屏悬浮 HUD 的顶部安全区只需避让比分/球组状态行。 */
+  --hud-safe-top: 0px;
+}
+
+/* 温控降档时停用毛玻璃后处理，避免 WebGL 画布每次更新都触发额外 GPU 合成。 */
+:root[data-render-quality='warm'],
+:root[data-render-quality='hot'] {
+  --blur-surface: none;
+  --blur-overlay: none;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #080d0a;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 按钮与控件同样禁用长按菜单/文本选择，避免游戏过程中误触系统菜单 */
+button, [role="button"], .control, .hud, .icon-btn {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+button,
+[role="button"] {
+  transition:
+    border-color var(--duration-fast) var(--ease-ui),
+    background-color var(--duration-fast) var(--ease-ui),
+    color var(--duration-fast) var(--ease-ui),
+    opacity var(--duration-fast) var(--ease-ui),
+    transform var(--duration-fast) var(--ease-ui),
+    box-shadow var(--duration-base) var(--ease-ui);
+}
+
+#root {
+  height: 100%;
+  /* 画布延伸到底边；仅交互控件单独避开系统手势区，不留整条黑色底栏。 */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+}
+
+/* 焦点态:所有可聚焦控件有肉眼可见焦点环,不依赖颜色差异表达状态 */
+:focus-visible {
+  outline: 2px solid var(--green-bright);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.9); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 横屏手机：仅保留 34px 比分/球组状态行。 */
+@media (orientation: landscape) and (max-height: 560px) {
+  :root {
+    --scoreboard-h: 34px;
+    --hud-safe-top: 34px;
+  }
+}

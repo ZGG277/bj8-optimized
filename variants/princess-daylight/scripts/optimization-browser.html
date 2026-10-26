@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+[INPUT]: 本地 Vite 开发入口、DEV __bj8 句柄与明确可丢弃的测试球局
+[OUTPUT]: 同尺寸真实游戏 iframe、可人工复现的几何夹具和 DOM 可读验收状态
+[POS]: 仅开发验收页面，不纳入单 HTML 产品构建；瞄准、蓄力和取消必须操作 iframe 内真实控件
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+-->
+<html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>瓜瓜台球 · 优化验收夹具</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#panel{position:fixed;z-index:10;left:8px;top:50px;max-width:min(420px,95vw);padding:8px;background:#fff;color:#111;font:12px monospace;border:1px solid #777}#panel[hidden]{display:none}button,select{margin:2px;padding:5px}pre{max-height:190px;overflow:auto;white-space:pre-wrap}
+</style>
+<iframe id="game" title="瓜瓜台球实际游戏入口" src="/"></iframe>
+<section id="panel">
+  <strong>仅本地验收 · F2 隐藏/显示面板</strong><br>
+  <select id="fixture" aria-label="验收球局"><option value="thin">长台薄切</option><option value="spectator">暂停对手回合</option><option value="player">交回玩家</option><option value="corner">角袋近景</option><option value="middle">中袋近景</option><option value="drop-slow">角袋慢速落球</option><option value="drop-fast">角袋快速落球</option><option value="drop-middle">中袋落球</option></select>
+  <button id="apply">应用验收球局</button><button id="hide">隐藏面板（F2恢复）</button>
+  <pre id="status" aria-label="验收状态">请先在游戏内点击开始对局。</pre>
+</section>
+<script type="module">
+import { POCKETS, TABLE, pocketLocalToWorld } from '/src/physics.ts';
+import { aimSolutionForPocket } from '/src/aim/aim-solution.ts';
+import { Vector3 } from 'three';
+const frame=document.querySelector('#game'),panel=document.querySelector('#panel'),status=document.querySelector('#status');
+let expectedClick=null,dropSamples=[],errors=[],transitions=[],lastTransition='';
+const toggle=e=>{if(e.key==='F2'){e.preventDefault();panel.hidden=!panel.hidden;}};
+window.addEventListener('keydown',toggle);
+frame.addEventListener('load',()=>{frame.contentWindow.addEventListener('keydown',toggle);frame.contentWindow.addEventListener('error',e=>errors.push(e.message));});
+document.querySelector('#hide').onclick=()=>{panel.hidden=true;frame.contentWindow.focus();};
+const api=()=>frame.contentWindow.__bj8;
+function project(s,x,y,z){const p=new Vector3(x,y,z).project(s.camera),r=s.renderer.domElement.getBoundingClientRect();return {x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};}
+function nearView(s,index){const p=POCKETS[index],c=p.mouthCenter;s.camera.position.set(c.x-p.outward.x*.30,.28,c.z-p.outward.z*.30);s.targetCameraPos.copy(s.camera.position);s.targetLookAt.set(c.x,-.025,c.z);s.smoothLookAt.copy(s.targetLookAt);s.camera.lookAt(s.targetLookAt);s.camera.updateMatrixWorld(true);s.requestRender();}
+document.querySelector('#apply').onclick=()=>{
+  const d=api();if(!d)return;const s=d.scene.current,w=d.world.current,kind=document.querySelector('#fixture').value;expectedClick=null;
+  if(kind==='spectator'||kind==='player'){d.setMatch({actor:kind==='spectator'?'opponent':'player',phase:'aiming'});return;}
+  if(kind==='corner'||kind==='middle'){nearView(s,kind==='corner'?0:2);return;}
+  for(const b of w.balls){b.vx=b.vz=b.wx=b.wy=b.wz=0;b.active=false;}
+  w.moving=false;w.events=[];w.firstContact=null;
+  const cue=w.balls.find(b=>b.number===0),object=w.balls.find(b=>b.number===1);cue.active=true;cue.x=0;cue.z=.9;
+  d.setMatch({phase:'aiming',actor:'player',breaking:false,winner:null,playerGroup:null});
+  if(kind==='thin'){
+    object.active=true;object.x=-.4;object.z=-.8;d.sync();
+    const sol=aimSolutionForPocket(w,1,1,Math.atan2(-.4,1.7));
+    if(sol){const distance=Math.hypot(object.x-cue.x,object.z-cue.z);expectedClick={angle:sol.centerAngle,x:cue.x+Math.sin(sol.centerAngle)*distance,z:cue.z-Math.cos(sol.centerAngle)*distance};}
+    return;
+  }
+  const p=POCKETS[kind==='drop-middle'?2:0],speed=kind==='drop-fast'?4:.4,point=pocketLocalToWorld(p,0,0);
+  object.active=true;object.x=point.x;object.z=point.z;s.sync(w);nearView(s,p.index);
+  object.active=false;w.events=[{type:'pocket',ball:1,pocket:p.index,time:w.time,speed,entryX:point.x,entryZ:point.z,entryVx:p.outward.x*speed,entryVz:p.outward.z*speed,entryWx:0,entryWy:10,entryWz:0}];s.sync(w);d.sync();
+  dropSamples=[];const until=performance.now()+700;
+  const sample=()=>{const m=s.ballMeshes[1];dropSamples.push({time:performance.now(),visible:m.visible,scale:m.scale.toArray(),position:m.position.toArray()});if(performance.now()<until)frame.contentWindow.requestAnimationFrame(sample);};sample();
+};
+setInterval(()=>{
+  const d=api();if(!d)return;const s=d.scene.current,w=d.world.current,f=s.cameraFraming;
+  const cue=w.balls.find(b=>b.number===0);
+  const transition={shot:w.shot,phase:d.match.current.phase,actor:d.match.current.actor,view:s.viewLevel};
+  if(JSON.stringify(transition)!==lastTransition){lastTransition=JSON.stringify(transition);transitions.push({...transition,time:performance.now()});transitions=transitions.slice(-40);}
+  const value={viewport:[frame.clientWidth,frame.clientHeight],canvas:s.renderer.domElement.getBoundingClientRect().toJSON(),match:d.match.current,shot:w.shot,aim:d.aim.current,view:s.viewLevel,framing:f?{target:f.targetNumber,pocket:f.pocketIndex,safety:f.safety}:null,
+    camera:s.camera.position.toArray(),targetCamera:s.targetCameraPos.toArray(),frame:s.renderer.info.render.frame,render:s.renderer.info.render,errors,
+    expectedClick:expectedClick?{...expectedClick,pixel:s.tableToScreenAt(expectedClick.x,expectedClick.z,d.cameraViewAzimuth.current,s.viewLevel)}:null,
+    cue:cue?{x:cue.x,z:cue.z,active:cue.active,pixel:project(s,cue.x,TABLE.ballRadius,cue.z)}:null,
+    framingContours:f?[f.cue,f.object].flatMap(b=>[-1,1].flatMap(x=>[-1,1].flatMap(y=>[-1,1].map(z=>project(s,b.x+x*b.radius,b.y+y*b.radius,b.z+z*b.radius))))).concat([f.pocket.left,f.pocket.right,f.pocket.center].map(p=>project(s,p.x,p.y,p.z))):[],
+    pockets:POCKETS.map(p=>({index:p.index,pixel:project(s,p.mouthCenter.x,0,p.mouthCenter.z),mesh:s.scene.getObjectByName('pocket-net-'+p.index)?.isMesh})),
+    learnedControls:JSON.parse(frame.contentWindow.localStorage.getItem('guagua-billiards:learned-controls:v1')||'[]'),transitions,dropSamples};
+  const text=JSON.stringify(value);if(status.textContent!==text)status.textContent=text;
+},200);
+</script></html>

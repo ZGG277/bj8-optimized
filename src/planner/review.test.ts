@@ -1,14 +1,18 @@
 /*
 [INPUT]: 依赖 vitest、../physics 世界构造、./search 的 planPosition、./review 的 buildShotReview
 [OUTPUT]: 对外提供计划对比、自主意图复盘、犯规优先与开球建议的单元回归
-[POS]: 复盘层的可失败断言网；场景用种子化 planPosition 的真实首步，力度偏小用例只抬高计划参考力以隔离诊断分支
+[POS]: 同步规划用例显式设置 20 秒测试预算（不改变仿真预算或断言）； 复盘层的可失败断言网；场景用种子化 planPosition 的真实首步，力度偏小用例只抬高计划参考力以隔离诊断分支
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createInitialWorld, type BilliardsWorld } from '../physics';
 import { planPosition } from './search';
 import type { PlannedStep } from './search';
 import { buildShotReview, type ShotCapture } from './review';
+
+// Vitest 4 also enforces timeouts for synchronous work. These seeded physics
+// searches already took 5–9 seconds per case before the tooling upgrade.
+vi.setConfig({ testTimeout: 20_000 });
 
 /** 种子化伪随机数（确定性测试用，与 planner.test.ts 同款） */
 function mulberry32(seed: number): () => number {

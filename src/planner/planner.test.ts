@@ -1,10 +1,10 @@
 /*
 [INPUT]: 依赖 vitest、../physics 世界构造与 ./candidates、./evaluate、./search 的公开接口
 [OUTPUT]: 对外提供走位规划层单元测试（无导出）：杆向容错、几何候选、概率单调性、遮挡过滤、整链结构、清组转 8 号、预算截断
-[POS]: 规划层的可失败断言网；全部用种子化 mulberry32 保证确定性
+[POS]: 同步规划用例显式设置 20 秒测试预算（不改变仿真预算或断言）； 规划层的可失败断言网；全部用种子化 mulberry32 保证确定性
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   createInitialWorld,
   cloneWorld,
@@ -19,6 +19,10 @@ import {
 import { generateCandidates, POCKETS } from './candidates';
 import { POWER_JITTER, erfProb, gaussian, monteCarloShot } from './evaluate';
 import { nextLegalNumbers, planPosition, type PositionPlan } from './search';
+
+// Vitest 4 also enforces timeouts for synchronous work. These seeded physics
+// searches already took 5–9 seconds per case before the tooling upgrade.
+vi.setConfig({ testTimeout: 20_000 });
 
 /** 种子化伪随机数（确定性测试用） */
 function mulberry32(seed: number): () => number {

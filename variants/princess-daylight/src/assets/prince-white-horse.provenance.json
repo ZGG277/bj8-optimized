@@ -1,0 +1,10 @@
+{
+  "generation": "built-in image_gen",
+  "original_sha256": "1b658b8c5914eef51de0fa329e936aec175582dd4ce0da4d15c352529e04910a",
+  "project_asset": "prince-white-horse.webp",
+  "asset_sha256": "295dc52d8c9900abd351b6d54adb589a293ace1d6e04376ca05facc0aa1b946e",
+  "asset_bytes": 104534,
+  "alpha_preserved": true,
+  "encoding": "640px maximum side WebP quality85 method6, no visual repaint",
+  "review": "Creator and independent reviewer inspected pixels; no prominent anatomy issue; actual compositing in runtime UI remains unverified."
+}

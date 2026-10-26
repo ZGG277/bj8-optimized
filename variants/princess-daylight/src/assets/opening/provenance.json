@@ -1,0 +1,46 @@
+{
+  "asset": "arrival.webp",
+  "version": "seedance-opening-20261025-115pct",
+  "kind": "user-supplied-seedance-castle-approach",
+  "durationSeconds": 13.097,
+  "resolution": [
+    540,
+    960
+  ],
+  "fps": 18.4,
+  "audio": true,
+  "encoding": "Original 220 ANMF image chunks preserved byte-for-byte; cumulative timestamps retimed from 15062ms to 13097ms at 1.15x; one play",
+  "deliveryRepresentation": {
+    "format": "animated-webp",
+    "reason": "Current 1.8.0 platform file whitelist excludes MP4; complete user film adapted to offline animated WebP",
+    "source": "artifacts/seedance-release-20261017/castle_billiards_opening_15s.mp4",
+    "sourceResolution": [
+      720,
+      1280
+    ],
+    "sourceFps": 24,
+    "sourceDurationSeconds": 15.041667,
+    "loopCount": 1,
+    "bytes": 6579088
+  },
+  "credits": "Seedance video supplied by user on 2026-10-17; local media conversion only.",
+  "rawVideoSha256": "69219c16eb6849812a2866d3121053e8914ad30d5126f1b998a3d4f11d732063",
+  "edit": {
+    "retimed": true,
+    "trimmed": false,
+    "gameplayHandoff": "Last 350ms overlay dissolves into live authored game; game camera and gameplay preserved",
+    "audio": "Original soundtrack accelerated with ffmpeg atempo=1.15, pitch preserved; AAC mono 32kHz/48kbps. Existing gesture, mute and release behavior preserved.",
+    "playbackSpeed": 1.15,
+    "originalDurationSeconds": 15.062
+  },
+  "limitations": [
+    "AI-generated table and authored playable table differ; transition is a brief dissolve, not exact pixel match.",
+    "Platform delivery 540x960, original frames at 1.15x speed; original 720x1280@24fps preserved."
+  ],
+  "files": {
+    "arrival.webp": "a97780a95d650d644e3d61eecd2e2a76604b9fd80152432b42e107da486fee23",
+    "valley-poster.jpg": "11393fb131ab140dd20b4af346b9bd55ac0d66411235f23fa31ecb7259dda2db",
+    "soundtrack.json": "9335a025d08e8d6b4c31e6a117c42c33d52e0e2f90548464587e2feabe59bd4b"
+  },
+  "encodedFrames": 220
+}

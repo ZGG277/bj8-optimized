@@ -1,0 +1,56 @@
+{
+  "tool": "built-in imagegen",
+  "description": "Ten generated fictional companion portraits for this game. No real-person likeness claim.",
+  "assets": [
+    {
+      "id": "shen-yubai",
+      "asset": "src/assets/companions/shen-yubai.webp",
+      "sha256": "25e1e639727f59034e1ccb7ae4f4f0b003c24db16c356f791c52ab783c1da9e9"
+    },
+    {
+      "id": "lu-jingchen",
+      "asset": "src/assets/companions/lu-jingchen.webp",
+      "sha256": "c571f05657e9964121452e18b90d44f7f0b528f608fadfa267602f9e30a3d45d"
+    },
+    {
+      "id": "wen-xingye",
+      "asset": "src/assets/companions/wen-xingye.webp",
+      "sha256": "9e9cd3092537c9d38dbca715b1e6758b4a5d7f1e88b2e383316cc33f5d487eb7"
+    },
+    {
+      "id": "gu-yanchuan",
+      "asset": "src/assets/companions/gu-yanchuan.webp",
+      "sha256": "2f26941f22511d1c7834ebd91b1abd9769f8e4f87ed44a762fb5b9ef1cdab9d0"
+    },
+    {
+      "id": "jiang-yueheng",
+      "asset": "src/assets/companions/jiang-yueheng.webp",
+      "sha256": "3651f070f82cc75f1afaaf76df1ed85e1c53e5f95abeb71bc14eee610e39bc28"
+    },
+    {
+      "id": "zhou-mubai",
+      "asset": "src/assets/companions/zhou-mubai.webp",
+      "sha256": "a6bfddd84cbd40cacd0af0d5bd8b407853f8c6367ad4a7c702d1df72d3d9824d"
+    },
+    {
+      "id": "xie-linyu",
+      "asset": "src/assets/companions/xie-linyu.webp",
+      "sha256": "cb8e25c4e196133550cd84296863db3fa007e2c0a284060cf871e292559c7a41"
+    },
+    {
+      "id": "pei-zhixu",
+      "asset": "src/assets/companions/pei-zhixu.webp",
+      "sha256": "ffbf4487de122f3eb0a09e6bffcba1263ea89190b2337b6c383fec980b509601"
+    },
+    {
+      "id": "song-yucheng",
+      "asset": "src/assets/companions/song-yucheng.webp",
+      "sha256": "e9dff09b3c24a1f363477867234bd2dec3c22b07eeabd51b962c9be2e9083c34"
+    },
+    {
+      "id": "xu-qinghe",
+      "asset": "src/assets/companions/xu-qinghe.webp",
+      "sha256": "ddd7b49d49bd76995698ab0d5dff6a3abdfd9cfc2a86d97993871693a654c570"
+    }
+  ]
+}

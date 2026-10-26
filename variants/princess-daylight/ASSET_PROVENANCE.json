@@ -1,0 +1,20 @@
+{
+  "sourcePackage": "3795f98c544f113ab900e4cd981686fbbd031e828fe15ab68094befc314173ef",
+  "assets": [
+    {
+      "file": "table-original.glb",
+      "sha256": "5db1caacff1ab48a748216252892d8523f210dd832ae3636c64599dbd7501bb4",
+      "source": "02_table_asset_original/unpacked/模型/jewelry_full_final.glb"
+    },
+    {
+      "file": "balls-quality.glb",
+      "sha256": "704313f188eb896329ff83f237b177242b9e929463c52cc3ea78b8f497304581",
+      "source": "03_numbered_balls_v2/unpacked/princess-gem-balls-v2-numbered/exports/princess_gem_balls_v2_quality_mini.glb"
+    },
+    {
+      "file": "balls-hot.glb",
+      "sha256": "ac243e802429ae8ff838d7e4b8595c4f7b53cdf89b0a2874a2f4a7c4543bae13",
+      "source": "03_numbered_balls_v2/unpacked/princess-gem-balls-v2-numbered/exports/princess_gem_balls_v2_pbr_hot.glb"
+    }
+  ]
+}

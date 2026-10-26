@@ -1,0 +1,4 @@
+.follow-author-entry { margin-top: 12px; text-align: center; max-width: 100%; }
+.follow-author-entry button.follow-author-button { min-height: 44px; padding: 8px 14px; border: 1px solid currentColor; border-radius: 12px; background: transparent; color: inherit; font: inherit; font-size: 13px; box-shadow: none; }
+.follow-author-entry button.follow-author-button:disabled { opacity: .6; cursor: default; }
+.follow-author-entry p { margin: 6px 0 0; font-size: 12px; line-height: 1.5; overflow-wrap: break-word; }

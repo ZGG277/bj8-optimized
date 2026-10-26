@@ -26,3 +26,9 @@ shots/table-craft-v2/preview-state.json
 .env
 .env.*
 !.env.example
+
+# Generated outputs and local/private working material.
+dist*/
+verification/
+shots/
+*.log

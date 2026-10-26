@@ -1,0 +1,16 @@
+[
+  {
+    "tier": "balanced",
+    "ratio": 0.24,
+    "triangles": 20500,
+    "bytes": 1172428,
+    "maps": "Original shell and cloth maps omitted; runtime supplies replacements."
+  },
+  {
+    "tier": "hot",
+    "ratio": 0.12,
+    "triangles": 10250,
+    "bytes": 704656,
+    "maps": "Original shell and cloth maps omitted; runtime supplies replacements."
+  }
+]

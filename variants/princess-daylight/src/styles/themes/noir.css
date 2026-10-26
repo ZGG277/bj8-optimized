@@ -1,0 +1,264 @@
+/*
+[INPUT]: controls.css 全部控件选择器
+[OUTPUT]: 主题「决赛之夜 noir」——斯诺克决赛转播质感：深黑底、香槟金主色、发丝线、克制留白
+[POS]: 三主题层竞技方案，:root[data-theme='noir'] 作用域，仅覆盖视觉表达，不改交互几何
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+:root[data-theme='noir'] {
+  --green: #d8b26a;            /* 香槟金取代薄荷绿，成为唯一主 accent */
+  --warm: #d9b781;
+  --danger: #cf5a44;
+  --panel: #0b0d0e;
+  --line: rgba(255, 255, 255, 0.07);
+  --dim: #6d6a62;
+  --muted: #a09a8d;
+  --line-strong: rgba(216, 178, 106, 0.4);
+  --radius-sm: 8px;
+  --radius-control: 11px;
+  --radius-panel: 13px;
+  --surface-1: rgba(14, 16, 17, 0.82);
+  --surface-2: rgba(11, 13, 14, 0.92);
+  --surface-control: rgba(16, 18, 19, 0.78);
+  --shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.55);
+  --blur-overlay: blur(14px) saturate(1.1);
+}
+
+:root[data-theme='noir'] body {
+  background: #050607;
+  color: #e8e4da;
+}
+
+:root[data-theme='noir'] :focus-visible {
+  outline-color: var(--green);
+}
+
+/* ── 计分板：去底栏实色，改发丝线 + 上下呼吸空间 ── */
+:root[data-theme='noir'] .scoreboard {
+  background: linear-gradient(180deg, #0c0e0f, #090b0c);
+  border-bottom: 1px solid var(--line);
+}
+
+:root[data-theme='noir'] .avatar.me {
+  background: linear-gradient(150deg, #e3c37e, #b98f3f);
+  color: #17130a;
+  box-shadow: 0 0 0 1px rgba(216, 178, 106, 0.35);
+}
+
+:root[data-theme='noir'] .avatar.rival {
+  color: var(--warm);
+  border: 1px solid rgba(217, 183, 129, 0.4);
+  background: radial-gradient(circle at 35% 30%, #3d3423, #101112 72%);
+}
+
+:root[data-theme='noir'] .score-center {
+  letter-spacing: 0.12em;
+  color: #f0ead9;
+}
+
+:root[data-theme='noir'] .score-center i {
+  color: #57534a;
+}
+
+/* ── 桌面角标：细金线代替粗绿边 ── */
+:root[data-theme='noir'] .room-label {
+  color: rgba(232, 228, 218, 0.42);
+}
+
+:root[data-theme='noir'] .shot-target {
+  border-right: 1px solid rgba(216, 178, 106, 0.75);
+}
+
+:root[data-theme='noir'] .shot-target strong {
+  color: #f0ead9;
+}
+
+/* ── 右侧控制轨：压深色差，统一深黑面板 + 金发丝线 ── */
+:root[data-theme='noir'] .control-rail {
+  background: rgba(6, 7, 8, 0.82);
+  border: 0;
+  border-radius: var(--radius-panel);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme='noir'] .control-rail.is-editing {
+  outline: 1px solid rgba(216, 178, 106, 0.6);
+  box-shadow: 0 0 0 3px rgba(216, 178, 106, 0.1), 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* 视角推杆 */
+:root[data-theme='noir'] .view-switcher {
+  background: rgba(10, 12, 13, 0.85);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+}
+
+:root[data-theme='noir'] .view-switcher button {
+  color: #75716a;
+}
+
+:root[data-theme='noir'] .view-switcher button.active {
+  background: rgba(216, 178, 106, 0.14);
+  color: #eed9a8;
+}
+
+:root[data-theme='noir'] .view-slider-track::before {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme='noir'] .view-slider-fill {
+  background: linear-gradient(0deg, rgba(216, 178, 106, 0.35), var(--green));
+}
+
+:root[data-theme='noir'] .view-slider-thumb {
+  border: 1px solid rgba(216, 178, 106, 0.55);
+  border-radius: 9px;
+  background: linear-gradient(160deg, #8a6c33, #5c471f);
+  box-shadow: inset 0 1px 0 rgba(255, 235, 190, 0.25), 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='noir'] .view-slider-thumb i {
+  background: rgba(245, 230, 195, 0.85);
+  box-shadow: 0 -5px rgba(245, 230, 195, 0.28), 0 5px rgba(245, 230, 195, 0.28);
+}
+
+/* 走位按钮 */
+:root[data-theme='noir'] .plan-button {
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  color: #a8a396;
+}
+
+:root[data-theme='noir'] .plan-button.is-open {
+  border-color: rgba(216, 178, 106, 0.85);
+  color: #eed9a8;
+  box-shadow: inset 0 0 0 1px rgba(216, 178, 106, 0.35), 0 0 14px rgba(216, 178, 106, 0.18);
+}
+
+/* 击球点 */
+:root[data-theme='noir'] .spin-preview {
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+}
+
+:root[data-theme='noir'] .spin-popover {
+  border-radius: var(--radius-panel);
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 出杆：深青铜渐变 + 象牙字，蓄力转琥珀 */
+:root[data-theme='noir'] .shoot-zone {
+  background: rgba(10, 12, 13, 0.6);
+  border-radius: var(--radius-control);
+}
+
+:root[data-theme='noir'] .shoot-pad {
+  border-radius: var(--radius-control);
+  background: linear-gradient(165deg, #96742f, #63491c);
+  border: 1px solid rgba(216, 178, 106, 0.5);
+  color: #f7efd9;
+  box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.22), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme='noir'] .shoot-pad strong {
+  letter-spacing: 0.3em;
+}
+
+:root[data-theme='noir'] .shoot-power-fill {
+  background: linear-gradient(0deg, rgba(227, 195, 126, 0.85), rgba(150, 116, 47, 0.55));
+}
+
+:root[data-theme='noir'] .shoot-power-fill.hot {
+  background: linear-gradient(0deg, rgba(224, 120, 60, 0.95), rgba(207, 90, 68, 0.75));
+}
+
+:root[data-theme='noir'] .shoot-pad.charging {
+  background: linear-gradient(165deg, #c98f3e, #96601f);
+  border-color: rgba(238, 217, 168, 0.7);
+}
+
+:root[data-theme='noir'] .power-num {
+  color: #faf3e0;
+}
+
+/* 瞄准刻度盘：金标线 */
+:root[data-theme='noir'] .aim-dial {
+  border-radius: var(--radius-panel);
+  background: rgba(8, 10, 11, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme='noir'] .aim-dial.fine {
+  border-color: rgba(216, 178, 106, 0.6);
+}
+
+:root[data-theme='noir'] .aim-dial.fine .aim-dial-label strong {
+  color: var(--green);
+}
+
+:root[data-theme='noir'] .aim-dial.fine .aim-dial-window b {
+  background-color: var(--green);
+}
+
+/* 精准瞄准条 */
+:root[data-theme='noir'] .precision-aim {
+  background: rgba(8, 10, 11, 0.9);
+  border: 1px solid rgba(216, 178, 106, 0.45);
+  border-radius: var(--radius-control);
+}
+
+:root[data-theme='noir'] .precision-aim-track i {
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(216, 178, 106, 0.16);
+}
+
+/* 顶部提示条 */
+:root[data-theme='noir'] .plan-bar,
+:root[data-theme='noir'] .review-float {
+  background: rgba(10, 12, 13, 0.9);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+}
+
+:root[data-theme='noir'] .plan-step-tabs button.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #17130a;
+}
+
+:root[data-theme='noir'] .plan-bar-play {
+  background: linear-gradient(160deg, #96742f, #63491c);
+  border-color: rgba(216, 178, 106, 0.5);
+  color: #f7efd9;
+}
+
+/* 遮罩与开始界面 */
+:root[data-theme='noir'] .turn-mask strong,
+:root[data-theme='noir'] .finish-mask h1,
+:root[data-theme='noir'] .intro-card h1 {
+  color: #f0ead9;
+}
+
+:root[data-theme='noir'] .finish-mask button,
+:root[data-theme='noir'] .start-btn {
+  background: linear-gradient(150deg, #e3c37e, #b98f3f);
+  color: #17130a;
+  border-radius: 4px;
+  letter-spacing: 0.2em;
+}
+
+:root[data-theme='noir'] .intro-card {
+  background: linear-gradient(150deg, #141617, #0a0b0c);
+  border: 1px solid rgba(216, 178, 106, 0.22);
+  border-radius: 6px;
+}
+
+:root[data-theme='noir'] .intro-kicker,
+:root[data-theme='noir'] .finish-mask span {
+  color: var(--green);
+}
+
+:root[data-theme='noir'] .intro-tags span {
+  border-color: rgba(216, 178, 106, 0.25);
+  color: #8d8778;
+}

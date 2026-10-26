@@ -1,0 +1,39 @@
+{
+  "name": "princess-billiards",
+  "version": "1.1.0",
+  "private": true,
+  "packageManager": "npm@11.9.0",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build && node scripts/inline-build.mjs",
+    "build:minitool": "vite build --config vite.minitool.config.ts && node scripts/package-minitool.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "test:interaction": "node scripts/verify-interaction.mjs",
+    "test:mobile": "node scripts/verify-mobile-portrait-v12.mjs",
+    "test:spectator-camera": "node scripts/verify-spectator-camera.mjs",
+    "test:shot-camera-help": "node scripts/verify-shot-camera-help.mjs",
+    "test:render-thermal": "node scripts/verify-render-thermal.mjs",
+    "test:control-intent": "node scripts/verify-control-intent.mjs",
+    "test:minitool-browser": "node scripts/verify-minitool-browser.mjs",
+    "test:pockets-visual": "node scripts/verify-pockets.mjs",
+    "check": "npm run typecheck && npm run test:unit && npm run build"
+  },
+  "dependencies": {
+    "@types/three": "^0.185.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^5.2.0",
+    "puppeteer-core": "^25.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^7.3.7",
+    "vitest": "^4.1.11"
+  }
+}

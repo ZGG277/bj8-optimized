@@ -1,0 +1,11 @@
+{
+  "name": "Princess WenKai UI (subset of LXGW WenKai Lite)",
+  "version": "Version 1.522; March 17, 2026",
+  "license": "OFL-1.1",
+  "source": "https://github.com/lxgw/LxgwWenKai-Lite",
+  "sourceSha256": "140c99ba4e28e817cec49bf82a0c5fcdc4fe633fb9dfda16d0ee8d59a8545f15",
+  "subsetSha256": "b707fe6e5da06dda525e9fbe1118efb6541a5ddd32e54db705c9df00c008fe55",
+  "requestedCodepoints": 664,
+  "includedCodepoints": 662,
+  "bytes": 165952
+}
