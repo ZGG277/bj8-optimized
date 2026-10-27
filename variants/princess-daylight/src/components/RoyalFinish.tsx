@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { containRoyalDialogTab } from './royal-dialog-focus';
 import { companionFor } from '../opponent/companions';
+import { COMPANION_CARD_ART } from '../opponent/companion-card-art';
+import type { CompanionReward } from '../opponent/companion-collection';
 import { RoyalIcon } from './RoyalIcon';
 import type { GameMode } from '../opponent/model';
 import { miniToolApi, renderVictoryCard, postVictoryNote, shareFailure } from '../minitool/share-note';
@@ -9,7 +11,7 @@ import { startRoyalCelebration, ROYAL_CELEBRATION_PARTICLES } from './royal-cele
 export { ROYAL_CELEBRATION_MS, ROYAL_CELEBRATION_PARTICLES } from './royal-celebration';
 
 /** One finite celebration, unmounted on restart. It deliberately adds no sound. */
-export function RoyalFinish({ winner, onRestart, gameMode='practice', reason='', companionId }: { companionId?: string; winner: 'player' | 'opponent' | null; onRestart: () => void; gameMode?: GameMode; reason?: string }) {
+export function RoyalFinish({ winner, onRestart, gameMode='practice', reason='', companionId, collectionReward, collectionSaveFailed = false, onCollection }: { collectionSaveFailed?: boolean; collectionReward?: CompanionReward | null; onCollection?: () => void; companionId?: string; winner: 'player' | 'opponent' | null; onRestart: () => void; gameMode?: GameMode; reason?: string }) {
   const companion = companionFor(companionId);
   const [sharing, setSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
@@ -39,6 +41,7 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', reason='',
     return () => { run.cancel(); cancelCelebration.current = null; };
   }, [winner]);
   const won = winner === 'player';
+  const art = COMPANION_CARD_ART[companion.id];
   return <div className={`finish-mask royal-finish ${won ? 'won' : 'prince-finish'}`}
     role="dialog" aria-modal="true" aria-labelledby="royal-result-title"
     onPointerDown={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()}
@@ -52,13 +55,16 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', reason='',
       </i>)}
     </div>}
     <div className="finish-content royal-result-card" data-companion-id={companion.id}>
-      <img className="royal-companion-portrait" src={companion.avatar} alt={companion.name} width="224" height="224"/>
+      <img className="royal-companion-portrait" src={won ? art.src : companion.avatar} alt={won ? `${companion.name} · ${art.expression}` : companion.name} width="224" height="224"/>
       <p className="royal-companion-name">{companion.name}</p>
       <div className="royal-victory-emblem" aria-hidden="true"><RoyalIcon name={won ? 'crown' : 'restart'}/></div>
       <h1 id="royal-result-title">{won ? '公主赢了' : winner === 'opponent' ? '这一局惜败' : '本局结束'}</h1>
       <p className="royal-companion-greeting">{won ? companion.congratulations : winner === 'opponent' ? '差一点就赢了，公主。下一局，我继续陪你。' : '公主，下一局见。'}</p>
+      {won && collectionReward && <p className="royal-card-reward" role="status">{collectionReward.isNew ? (collectionSaveFailed ? '新赞美卡 · 本次已解锁' : '新赞美卡 · 已收入卡册') : `再次赢下 · 第 ${collectionReward.wins} 次`}</p>}
+      {won && collectionSaveFailed && <p className="companion-save-notice" role="status">卡片暂未保存，请保持页面打开。</p>}
       {reason && !won && <p className="royal-result-reason">{reason}</p>}
       <div className="finish-actions"><button type="button" ref={restartButton} autoFocus data-control-tip="new-match" onClick={() => { stopCelebration(); onRestart(); }}>再来一局</button></div>
+      {won && onCollection && <button className="royal-open-cardbook" onClick={() => { stopCelebration(); onCollection(); }}><RoyalIcon name="cards"/>查看赞美卡册</button>}
       {won && miniToolApi() && <button className="royal-share" disabled={sharing || celebrating} onClick={()=>void share()}>{sharing?'准备战绩卡…':'分享这一局'}</button>}
       {shareMessage && <p role="status">{shareMessage}</p>}
       {celebrating && <button className="royal-skip" type="button" aria-label="跳过庆祝" onClick={stopCelebration}><RoyalIcon name="skip"/></button>}

@@ -1,13 +1,14 @@
 import { positionAfterPot } from './opponent/position-observation';
 /*
 [INPUT]: 离线 H3 动画 WebP 开场；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供陪练/挑战、复盘/训练总结与局后可选留言、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球后目标近景→全台、双指回退视角与控件学习成功事实
+[OUTPUT]: 对外提供陪练/挑战、复盘/训练总结与局后可选留言、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球后目标近景→全台、双指回退视角、目标袋口自适应取景与逐陪练赞美卡册
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { gameStorage } from './minitool/persistent-storage';
 import { createShotLease } from './shot-lifecycle';
 import { PauseMenu } from './components/PauseMenu';
+import { CompanionCollectionBook } from './components/CompanionCollection';
 import { RoyalIcon } from './components/RoyalIcon';
 import { OpeningFilm } from './components/OpeningFilm';
 import openingMovie from './assets/opening/arrival.webp?url';
@@ -22,8 +23,6 @@ import {
 } from 'react';
 import {
   getCueBall,
-  getPocketAimWindow,
-  POCKETS,
   TABLE,
   strikeCueBall,
   cloneWorld,
@@ -53,12 +52,10 @@ import { Scene3D } from './Scene3D';
 import type { PlannedStep, PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
 import { findPrecisionAim } from './aim/aim-solution';
-import { inferCameraAimIntent } from './camera-aim-intent';
+import { cameraFramingForAim } from './camera-aim-intent';
 import {
   cameraSafetyFromControlRects,
-  createAimCameraFraming,
   DEFAULT_CAMERA_SAFETY,
-  framingForConfirmedAim,
   type CameraFraming,
   type CameraSafetyInsets,
 } from './camera-framing';
@@ -130,6 +127,8 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 
 export default function Game() {
   const [paused, setPaused] = useState(() => typeof document !== 'undefined' && document.hidden);
+  const [collectionOpen, setCollectionOpen] = useState(false);
+  const gamePaused = paused || collectionOpen;
   useEffect(() => {
     const hidden = () => { if (document.hidden) setPaused(true); };
     document.addEventListener('visibilitychange', hidden);
@@ -153,6 +152,7 @@ export default function Game() {
     match, matchRef, setMatch,
     viewLevel, setViewLevel,
     playerSkill, trainingSummary, gameMode, opponentProfile,
+    collection, collectionReward, collectionSaveFailed,
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
@@ -288,11 +288,11 @@ export default function Game() {
   const positionPlan = usePositionPlan({
     worldView,
     match,
-    enabled: guidanceEnabled && !paused && !renderError,
+    enabled: guidanceEnabled && !gamePaused && !renderError,
   });
   const planOpen = positionPlan.status === 'showing';
   // 规划视图打开期间禁用瞄准输入（最小侵入：只压低 canAim，不动交互层内部）
-  const canAim = !paused && !renderError && !openingActive && !followShotPending && canAimBase && !planOpen && !scenePickerOpen && shotCameraTarget === null;
+  const canAim = !gamePaused && !renderError && !openingActive && !followShotPending && canAimBase && !planOpen && !scenePickerOpen && shotCameraTarget === null;
   const planConsultedRef = useRef(false);
   /** 规划视图关闭会停用 Worker/清空 plans；另存用户真正看过的首杆直到本次出杆。 */
   const consultedPlanStepRef = useRef<PlannedStep | null>(null);
@@ -510,7 +510,7 @@ export default function Game() {
 
   // ── 音效 ──
   const { audioRef, playPhysicsEvents, playStrike, playVictory, resetEvents, muted, toggleMuted } = useAudioManager(
-    paused || !!renderError,
+    gamePaused || !!renderError,
     !openingActive && match.phase !== 'intro' && (selectedWorld === 'castle' || selectedWorld === 'lake'),
   );
 
@@ -541,35 +541,9 @@ export default function Game() {
   const handleGhostPlaced = useCallback(() => {
     advanceFirstMatchGuide('ghost-placed');
     const world = worldRef.current;
-    const cue = getCueBall(world);
     const legal = legalNumbers(world, 'player', matchRef.current.playerGroup);
-    const intent = inferCameraAimIntent(world, aimRef.current, legal);
-    const object = intent === null
-      ? null
-      : world.balls.find(ball => ball.active && ball.number === intent.target) ?? null;
-    const pocket = intent === null ? null : POCKETS[intent.pocket] ?? null;
-    if (cue && object && pocket) {
-      const mouth = getPocketAimWindow(pocket);
-      setAimCameraFraming(framingForConfirmedAim(createAimCameraFraming({
-        kind: 'aim',
-        targetNumber: object.number,
-        pocketIndex: pocket.index,
-        cue: { x: cue.x, y: TABLE.ballRadius, z: cue.z, radius: TABLE.ballRadius },
-        object: { x: object.x, y: TABLE.ballRadius, z: object.z, radius: TABLE.ballRadius },
-        pocket: {
-          index: pocket.index,
-          center: { x: mouth.center.x, y: 0.005, z: mouth.center.z },
-          left: { x: mouth.left.x, y: 0.005, z: mouth.left.z },
-          right: { x: mouth.right.x, y: 0.005, z: mouth.right.z },
-          depth: pocket.shelfDepth + pocket.captureInset,
-          outward: pocket.outward,
-        },
-        safety: containerRef.current ? aimCameraSafetyFor(containerRef.current) : DEFAULT_CAMERA_SAFETY,
-      })).framing);
-    } else {
-      // 未形成稳定首碰+袋口意图时保留既有稍高出杆位，绝不猜袋或改杆向。
-      setAimCameraFraming(framingForConfirmedAim(null).framing);
-    }
+    setAimCameraFraming(cameraFramingForAim(world, aimRef.current, legal,
+      containerRef.current ? aimCameraSafetyFor(containerRef.current) : DEFAULT_CAMERA_SAFETY));
     clearTouchAimCameraTimer();
     manualAimTransitionPointerRef.current = null;
     setTouchAimCameraLocked(false);
@@ -946,18 +920,27 @@ export default function Game() {
     viewLevel,
   ]);
 
+  // Update normal first-person aiming too, including button entry and dial adjustments.
+  // Manual orbit and active touch gestures retain their deliberate camera lock.
+  useEffect(() => {
+    if (!canAimBase || isOverheadCameraView(viewLevel) || manualCameraActive || manualCameraPinned || touchAimCameraLocked || openingActive) return;
+    const next = cameraFramingForAim(worldRef.current, aim, legalTargets, cameraSafety);
+    setAimCameraFraming(current => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+  }, [aim, canAimBase, worldView, viewLevel, manualCameraActive, manualCameraPinned, touchAimCameraLocked, openingActive, legalTargets, cameraSafety, worldRef]);
+
   const handleGuideViewLevel = useCallback((level: number) => {
     const adjusted = Math.abs(level - viewLevel) > 0.0005;
     if (isOverheadCameraView(level) && !manualCameraActive) showFullTable();
     else {
-      clearAimCameraFraming();
+      setAimCameraFraming(manualCameraActive ? null : cameraFramingForAim(worldRef.current, aimRef.current,
+        legalNumbers(worldRef.current, 'player', matchRef.current.playerGroup), cameraSafety));
       setViewLevel(level);
     }
     if (canAim && adjusted) advanceFirstMatchGuide('view-adjusted');
-  }, [advanceFirstMatchGuide, canAim, clearAimCameraFraming, setViewLevel, viewLevel, manualCameraActive, showFullTable]);
+  }, [advanceFirstMatchGuide, canAim, cameraSafety, setViewLevel, viewLevel, manualCameraActive, showFullTable, worldRef, matchRef]);
 
   const stageGesture = useStageGesture({
-    enabled: !paused && !renderError && !openingActive && !scenePickerOpen && !followShotPending && !spectatorActive && match.phase !== 'finished' && !charging && !worldRef.current.moving,
+    enabled: !gamePaused && !renderError && !openingActive && !scenePickerOpen && !followShotPending && !spectatorActive && match.phase !== 'finished' && !charging && !worldRef.current.moving,
     mode: stageInteractionMode, level: viewLevel,
     hitTable: (x,y) => scene3DRef.current?.hitVisibleTable(x,y) ?? true,
     onHeight: handleGuideViewLevel,
@@ -993,6 +976,7 @@ export default function Game() {
     resetEvents();
     followShotPendingRef.current = false;
     setFollowShotPending(false);
+    setCollectionOpen(false);
     resetGame(setAim, nextMode);
     markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
     setSpin({ x: 0, y: 0 });
@@ -1066,7 +1050,7 @@ export default function Game() {
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
-    active: match.phase === 'rolling' && !renderError && !paused,
+    active: match.phase === 'rolling' && !renderError && !gamePaused,
     worldRef,
     onFrame: useCallback(() => {
       playPhysicsEvents(worldRef.current.events);
@@ -1087,7 +1071,7 @@ export default function Game() {
 
   // ── 对手 AI 回合 ──
   useOpponentAI({
-    active: match.phase === 'opponent' && !renderError && !paused,
+    active: match.phase === 'opponent' && !renderError && !gamePaused,
     worldRef,
     matchRef,
     scene3DRef,
@@ -1155,7 +1139,7 @@ export default function Game() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneEnabled, selectedWorld]);
 
-  useEffect(() => { scene3DRef.current?.setPaused(paused || !!renderError); }, [paused, renderError, selectedWorld]);
+  useEffect(() => { scene3DRef.current?.setPaused(gamePaused || !!renderError); }, [gamePaused, renderError, selectedWorld]);
 
   // ── 同步世界状态到 3D 场景 ──
   useEffect(() => {
@@ -1220,17 +1204,18 @@ export default function Game() {
 
   // ── 渲染 ──
   return (
-    <div className="game-shell royal-game" data-paused={paused ? 'true' : undefined} data-guide={displayGuide ?? undefined} data-world={selectedWorld} data-match-finished={match.phase === 'finished' ? 'true' : undefined} data-opening={openingActive && !renderError ? 'true' : undefined}>
+    <div className={`game-shell royal-game${import.meta.env.DEV ? ' follow-ab' : ''}`} data-paused={gamePaused ? 'true' : undefined} data-guide={displayGuide ?? undefined} data-world={selectedWorld} data-match-finished={match.phase === 'finished' ? 'true' : undefined} data-opening={openingActive && !renderError ? 'true' : undefined}>
       {renderError && <div role="alert" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 9998, background: '#10251b', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <p>{renderError}</p><button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 12 }}>重新进入</button>
       </div>}
       {openingActive && !renderError && (selectedWorld === 'castle'
         ? <OpeningFilm src={openingMovie} muted={muted} onFinish={() => scene3DRef.current?.finishOpening()}/>
         : <div className="royal-opening"><button className="opening-skip" aria-label="跳过开场" onClick={() => scene3DRef.current?.finishOpening()}><RoyalIcon name="skip"/></button></div>)}
-      {paused && !renderError && <PauseMenu gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} muted={muted} onMute={toggleMuted} onResume={() => setPaused(false)} onRestart={() => { handleReplay(); setPaused(false); }} />}
+      {paused && !collectionOpen && !renderError && <PauseMenu onCollection={() => setCollectionOpen(true)} gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} muted={muted} onMute={toggleMuted} onResume={() => setPaused(false)} onRestart={() => { handleReplay(); setPaused(false); }} />}
+      {collectionOpen && <CompanionCollectionBook collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
       <div className="royal-entry" role="group" aria-label="场景、教学与暂停">
-        <button className="scene-entry" aria-label="场景" disabled={paused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>
-        <button className="help-entry" aria-label="再看操作教学" disabled={paused || openingActive || worldView.moving || match.phase === 'finished'} onClick={() => { setGuideDismissed(false); setManualGuide(true); showFullTable(); setFirstMatchGuideStep(match.phase === 'placing' ? 'free-place' : match.breaking ? 'first-power' : 'ghost-place'); }}><RoyalIcon name="help"/></button>
+        <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>
+        <button className="help-entry" aria-label="再看操作教学" disabled={gamePaused || openingActive || worldView.moving || match.phase === 'finished'} onClick={() => { setGuideDismissed(false); setManualGuide(true); showFullTable(); setFirstMatchGuideStep(match.phase === 'placing' ? 'free-place' : match.breaking ? 'first-power' : 'ghost-place'); }}><RoyalIcon name="help"/></button>
         <button className="pause-entry" aria-label="暂停与设置" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setPaused(true); }}><RoyalIcon name="pause"/></button>
       </div>
       {scenePickerOpen && <ScenePicker value={selectedWorld} disabled={(!canAimBase && match.phase !== 'finished') || openingActive || charging || followShotPending || worldView.moving} onClose={() => setScenePickerOpen(false)} onChange={next => { if ((!canAimBase && match.phase !== 'finished') || openingActive || charging || worldRef.current.moving || followShotPendingRef.current) return; try { browserStorage()?.setItem('princess-billiards:scene:v1', next); } catch { /* Current scene still switches. */ } const url = new URL(location.href); url.searchParams.set('world', next); url.searchParams.delete('lake360'); history.replaceState(null, '', url.href); setSelectedWorld(next); setScenePickerOpen(false); }} />}
@@ -1265,6 +1250,9 @@ export default function Game() {
         onModeChange={handleResetGame}
       />
       <TableStage
+        collectionReward={collectionReward}
+        collectionSaveFailed={collectionSaveFailed}
+        onCollection={() => setCollectionOpen(true)}
         eightReady={legalTargets.length === 1 && legalTargets[0] === 8}
         viewLevel={viewLevel}
         spectatorActive={spectatorActive}
@@ -1343,7 +1331,7 @@ export default function Game() {
           step={displayGuide}
           getTablePoint={getGuideTablePoint}
           visible={
-            !paused && !renderError && !openingActive && !charging &&
+            !gamePaused && !renderError && !openingActive && !charging &&
             !scenePickerOpen &&
             !planOpen &&
             !guidanceEnabled &&

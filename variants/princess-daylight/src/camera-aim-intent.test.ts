@@ -6,8 +6,9 @@
 */
 import { describe, expect, it } from 'vitest';
 import { TABLE, createInitialWorld, type BilliardsWorld } from './physics';
-import { inferCameraAimIntent } from './camera-aim-intent';
+import { cameraFramingForAim, inferCameraAimIntent } from './camera-aim-intent';
 import { findAimDialTarget } from './aim/aim-solution';
+import { DEFAULT_CAMERA_SAFETY } from './camera-framing';
 
 function thinCutWorld(): BilliardsWorld {
   const world = createInitialWorld();
@@ -25,9 +26,9 @@ function thinCutWorld(): BilliardsWorld {
 }
 
 describe('camera aim intent', () => {
-  // Preserve the original thin-cut impact fraction when the shared ball grows.
+  // Preserve this thin-cut counterexample when the shared ball size changes.
   const centerAngle = Math.atan2(-0.4, 1.7);
-  const angle = centerAngle + Math.asin(Math.sin(-0.263114966949942 - centerAngle) * TABLE.ballRadius / 0.028575);
+  const angle = centerAngle + Math.asin(Math.sin(-0.2787 - centerAngle) * TABLE.ballRadius / 0.041576625);
 
   it('薄切按目标球真实出射方向选择右上袋 1，而不是拨轮的不同候选袋', () => {
     const world = thinCutWorld();
@@ -46,4 +47,14 @@ describe('camera aim intent', () => {
     expect(inferCameraAimIntent(thinCutWorld(), angle, [2])).toBeNull();
     expect(inferCameraAimIntent(thinCutWorld(), angle + Math.PI, [1])).toBeNull();
   });
+  it('normal first-person aiming frames cue, object and the same forward pocket without ghost-ball placement', () => {
+    const world = thinCutWorld();
+    const frame = cameraFramingForAim(world, angle, [1], DEFAULT_CAMERA_SAFETY);
+    expect(frame).toMatchObject({ targetNumber: 1, pocketIndex: 1 });
+    expect(frame?.cue).toMatchObject({ x: 0, z: .9 });
+    expect(frame?.object).toMatchObject({ x: -.4, z: -.8 });
+    expect(frame?.pocket.left).not.toEqual(frame?.pocket.right);
+    expect(cameraFramingForAim(world, angle + Math.PI, [1], DEFAULT_CAMERA_SAFETY)).toBeNull();
+  });
+
 });

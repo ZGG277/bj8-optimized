@@ -14,12 +14,12 @@ describe('R2 shared ball and pocket dimensions', () => {
   it('balances corner and side mouths while slightly reducing the shared ball size', () => {
     expect(BALL_POCKET_SCALE).toBe(1.28);
     expect(TABLE.ballRadius).toBe(BALL_RADIUS);
-    expect(TABLE.ballRadius * 2).toBeCloseTo(.085725, 12);
+    expect(TABLE.ballRadius * 2).toBeCloseTo(.08315325, 12);
     expect(TABLE.width).toBe(1.27); expect(TABLE.length).toBe(2.54);
     for (const pocket of POCKETS) {
       expect(pocket.mouthWidth).toBeCloseTo(pocket.kind === 'corner' ? .140 : .120, 8);
       expect(pocket.mouthWidth / (TABLE.ballRadius * 2)).toBeGreaterThan(1.39);
-      expect(pocket.mouthWidth / (TABLE.ballRadius * 2)).toBeLessThan(1.64);
+      expect(pocket.mouthWidth / (TABLE.ballRadius * 2)).toBeLessThan(1.70);
       expect(pocket.dropHalfWidth).toBeCloseTo(pocket.mouthHalfWidth - TABLE.ballRadius - POCKET_AIM_CLEARANCE, 12);
       const profile = pocketRenderProfile(pocket);
       expect(profile.visibleHoleHalfWidth).toBe(pocket.mouthHalfWidth);

@@ -13,6 +13,7 @@ import {
   type BilliardsWorld,
 } from './physics';
 import { aimSolutionForPocket, firstObjectHit } from './aim/aim-solution';
+import { createAimCameraFraming, type CameraSafetyInsets, type CameraFraming } from './camera-framing';
 
 export type CameraAimIntent = {
   target: number;
@@ -22,6 +23,27 @@ export type CameraAimIntent = {
 };
 
 const R = TABLE.ballRadius;
+
+/** The same collision direction as the yellow guide supplies all three framing anchors. */
+export function cameraFramingForAim(world: BilliardsWorld, angle: number, legalTargets: readonly number[], safety: CameraSafetyInsets): CameraFraming | null {
+  const intent = inferCameraAimIntent(world, angle, legalTargets);
+  const cue = getCueBall(world);
+  const object = intent && world.balls.find(ball => ball.active && ball.number === intent.target);
+  const pocket = intent && POCKETS[intent.pocket];
+  if (!cue || !object || !pocket) return null;
+  const mouth = getPocketAimWindow(pocket);
+  return createAimCameraFraming({
+    kind: 'aim', targetNumber: object.number, pocketIndex: pocket.index,
+    cue: { x: cue.x, y: R, z: cue.z, radius: R },
+    object: { x: object.x, y: R, z: object.z, radius: R },
+    pocket: { index: pocket.index,
+      center: { x: mouth.center.x, y: .005, z: mouth.center.z },
+      left: { x: mouth.left.x, y: .005, z: mouth.left.z },
+      right: { x: mouth.right.x, y: .005, z: mouth.right.z },
+      depth: pocket.shelfDepth + pocket.captureInset, outward: pocket.outward },
+    safety,
+  });
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));

@@ -1,0 +1,37 @@
+{
+  "title": "Park ambiences",
+  "author": "Thimras",
+  "sourcePage": "https://opengameart.org/content/park-ambiences",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "recordedLocation": "Public park in Adelaide, South Australia, winter",
+  "recordingClaim": "Uploader describes real field recordings; not synthetic bird or water generation",
+  "retrievedDate": "2026-10-27",
+  "sourceExcerpts": [
+    {
+      "name": "birds",
+      "url": "https://opengameart.org/sites/default/files/park_ambience_birds.wav",
+      "retrievedByteRange": "0-8388607 inclusive; original WAV header preserved in local partial only",
+      "partialSha256": "fb8c6104293b7201a7c6506b68456163d0db5f72898f1a1bd3872f5420f60c34",
+      "excerptSeconds": [
+        1,
+        33
+      ]
+    },
+    {
+      "name": "river",
+      "url": "https://opengameart.org/sites/default/files/park_ambience_river.wav",
+      "retrievedByteRange": "0-8388607 inclusive; original WAV header preserved in local partial only",
+      "partialSha256": "1eebcb569e84745117ccd7b5b1d9703d7e5e5caf7f032df912c9d13e07a69bce",
+      "excerptSeconds": [
+        2,
+        34
+      ]
+    }
+  ],
+  "processing": "32-second excerpts, light band filtering, birds1.2 and river0.4 mix, loudness -23LUFS target / -3dBTP,1.5-second cyclic seam crossfade;24kHz mono40kbps MP3",
+  "outputBytes": 152996,
+  "outputSha256": "11d2111fff1e21845e9e213a65f5c45998e071c1f39dc419d8e63cef429d5772",
+  "durationSeconds": 30.5,
+  "originalMaterialRetainedLocally": true
+}

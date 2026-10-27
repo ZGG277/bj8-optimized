@@ -99,3 +99,5 @@ Scoreboard 显示本局姓名与小头像；RoyalFinish 使用同一头像和专
 `FollowAuthor.tsx`: 暂停菜单（公主）/小工具局后（瓜瓜）的次级关注入口，仅点击调用宿主确认；状态查询按需一次，旧版或无 SDK 隐藏。独立 follow-author 控制器处理取消、失败、超时和跨菜单防重复，不读写游戏存档。
 
 2026-10-25：OpeningFilm 继续消费 provenance.durationSeconds；离线画面与原声同步加速1.15倍，保留音高。跳过/后台/卸载停止逻辑保留。
+
+`CompanionCollection.tsx`: 每位陪练一张的赞美卡册，未解锁卡背、专属表情与赞美、重复胜局次数；左右滑动/方向键和翻页按钮，弹层隔离球桌输入。PauseMenu与RoyalFinish提供入口，结算失败保存提示保留。

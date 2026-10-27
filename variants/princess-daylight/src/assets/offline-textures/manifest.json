@@ -1,0 +1,585 @@
+{
+  "encoding": "lossless WebP, exact RGBA bytes verified",
+  "images": {
+    "058bd857897475a0c4b4a05a06a9933fd87fd7ffa5462d80ef60b7b428eee6f3": {
+      "file": "058bd857897475a0c4b4.webp",
+      "height": 128,
+      "originalBytes": 18841,
+      "packedBytes": 6138,
+      "rgbaSha256": "e9af671323980eabc51dde4adc27251ab569955066d5cf12d6b4868aba3d4717",
+      "sha256": "14170d7aadef6e8435092098a83908297b712d675ebbe5da8420860d7d4f034a",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 128
+    },
+    "0a6399e613334de8b72f2deb2e6b3903bb453d803180d635fb94c653fe74a053": {
+      "file": "0a6399e613334de8b72f.webp",
+      "height": 512,
+      "originalBytes": 127365,
+      "packedBytes": 72242,
+      "rgbaSha256": "84fc511777b6b6ac2956c7814d1461d51f8fb76cd869e54f1741d94d24c68bad",
+      "sha256": "f4cf2ac36c97739ada374a5ef9a8b5f70fc30b0efb5fe56c15b33109263335fa",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "0cc3c0b549bacd6296ce44fa9e0645d0526a4a3b21e7983d2db59f7c333644ab": {
+      "file": "0cc3c0b549bacd6296ce.webp",
+      "height": 128,
+      "originalBytes": 19333,
+      "packedBytes": 6664,
+      "rgbaSha256": "d96a22cef641ed6c387b3e4eb60d19d3158f7dff99c17dd0b39d1dbd9694ee81",
+      "sha256": "06fca9aa78f8bd6dd2aa3d4f6c521ecf24b73b87cfd7ea850b7e80edf0607f88",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    },
+    "10b6dcc7dc8bbe9a3641513359614c50eaf10fc699ed246a3e034d4c792a3186": {
+      "file": "10b6dcc7dc8bbe9a3641.webp",
+      "height": 512,
+      "originalBytes": 57005,
+      "packedBytes": 23810,
+      "rgbaSha256": "946bbd79fce8534d61bcac6770da95b899536a077405097c567d0b4f4a92c6c8",
+      "sha256": "ccfd66f77c7c995568ce6dba840911e8e10bfa22ed65ec6485af8dd342826912",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "15ede377712a57c9ed7b9fd6f48db14e2b68337dc4d38d91b574a7cddf6b41dc": {
+      "file": "15ede377712a57c9ed7b.webp",
+      "height": 512,
+      "originalBytes": 5282,
+      "packedBytes": 1036,
+      "rgbaSha256": "12d5ec4df842c256f43d72959a882d9068652214acd2d27d2595cc48d17e0ccc",
+      "sha256": "1eab4de408207983817e9c555fa237c69bf5bb7950e9fb670e144cdd8c79d971",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "160de5a98890cd35447b4556038287a391336a092cca464aa42f30b24c88ea77": {
+      "file": "160de5a98890cd35447b.webp",
+      "height": 128,
+      "originalBytes": 17242,
+      "packedBytes": 4858,
+      "rgbaSha256": "3df973a69ff0ab40c38c41da86651ebcf302843c2aed14ec093820731f8a7495",
+      "sha256": "14af4ef61de77411b37a5ff708dd0813def11730a0cbe6e84c2a9a78ffbc3f36",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    },
+    "1b63453af28ccc54295de543f0160680b2cb7e8d690a3a086ca3bc5036edb7cd": {
+      "file": "1b63453af28ccc54295d.webp",
+      "height": 512,
+      "originalBytes": 66405,
+      "packedBytes": 28474,
+      "rgbaSha256": "302b6e7589470ffb7e16bb2dff2b4fe6bc6004089e6d7abfedd5724de1fc16c4",
+      "sha256": "2a0ae75b04df58721e3f27d95b43251dc5687be96b5e8d941e4180277c154380",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "1d7371dea724bb1af77f8a3908abb6b735283abde3b23ceb751db07df7f274ae": {
+      "file": "1d7371dea724bb1af77f.webp",
+      "height": 512,
+      "originalBytes": 4134,
+      "packedBytes": 714,
+      "rgbaSha256": "18d8dab3784d7411547d2c8842a411e53c0ac130e43d3461a94c7ec619b188f5",
+      "sha256": "65153533858e9cc39377b10fde47b62289911f0ba25f8465ac8bd24a3d49814a",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "32687d7d083bd0639fed65857b759ce677f4d4c59bca1529f5ae284cf9afd9ed": {
+      "file": "32687d7d083bd0639fed.webp",
+      "height": 128,
+      "originalBytes": 18129,
+      "packedBytes": 5694,
+      "rgbaSha256": "4a17c407037ae0db2dfe2b7bbe1e710bfdb9200d5d48e77dfeda8795bfa7f116",
+      "sha256": "9b8451170f2a2abb384d7f84ef6a58c55288bd953186af3f02f678154688c570",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 128
+    },
+    "3b0c4de97cb9d75e515ac4f4e52585d293d6b03a755aa71fc5bded22a3c01ff2": {
+      "file": "3b0c4de97cb9d75e515a.webp",
+      "height": 512,
+      "originalBytes": 3156,
+      "packedBytes": 480,
+      "rgbaSha256": "e364d63ec6249321aa618fada33717f113e7fc85a81bbe7abadc0157ff1b868c",
+      "sha256": "a44145a6085835b217da0987b7a069551bd3c319810be1693fa0e83e45eeb23a",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "3ea99a7e5fdafb161906f3e7ea2bb8fd6e0b5ef4e8d8034557ba91fb744b0743": {
+      "file": "3ea99a7e5fdafb161906.webp",
+      "height": 512,
+      "originalBytes": 5223,
+      "packedBytes": 1066,
+      "rgbaSha256": "a2033bd1c721d932efbdefcdc915874e4bfe2d5af9f6e36699b22d7b4715599a",
+      "sha256": "5b119e7abc6d5868dfd25e55697586e40be8ed657c0e7256104af3b3bc6fe657",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "3fc8093220bdfd369d7d969a62f01df66bb00e42c5472b80684c60e8d004271b": {
+      "file": "3fc8093220bdfd369d7d.webp",
+      "height": 512,
+      "originalBytes": 3161,
+      "packedBytes": 422,
+      "rgbaSha256": "dc7d0f019250735654ba283ebb56bd03eddb9174ab864df096669346f4708a81",
+      "sha256": "cd14b5219c86776d9d20a5311aba6f8179912fccf8f055b26c4d5260f74ae72d",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "41da3cf66a6ba0ea3920fc56309f4d1f45cc50ad6b327b085177b164cfd57f25": {
+      "file": "41da3cf66a6ba0ea3920.webp",
+      "height": 512,
+      "originalBytes": 4550,
+      "packedBytes": 848,
+      "rgbaSha256": "b28c028f05659f8c4832019489f56c2dec74665dd788d41108e259ed568308d4",
+      "sha256": "25a4f5dae8811593143bdb2b9208114070ebdc7430350e44a694ebcb52826e0c",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "4847b439ed304d79ac23d25b57a20110638cd6582c80f94513efa794ad48a78b": {
+      "file": "4847b439ed304d79ac23.webp",
+      "height": 256,
+      "originalBytes": 8242,
+      "packedBytes": 3698,
+      "rgbaSha256": "117049c4881f5999122e1ba00903b9e7339783d685762559e90a5538cf4b8781",
+      "sha256": "90af382884bae39707cc77327c6789167e0ece9c0fd8642708d2fe8833386721",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 512
+    },
+    "4a6b243cdafda5b929667256cf7a78d9816d2369b2cebe0162c85b388dd85554": {
+      "file": "4a6b243cdafda5b92966.webp",
+      "height": 512,
+      "originalBytes": 66846,
+      "packedBytes": 28844,
+      "rgbaSha256": "9315d0376378f1d69dc79a1e8825099c477a936ecbf870ec25baec393c1dc897",
+      "sha256": "1d00f8519e680b819df810e9f66d25bba1b467bcb31c813e58356eaba0a13a87",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "55547ddd61bfdc6352c7babe6a220394946207f980407c5bd24eae112bf623d2": {
+      "file": "55547ddd61bfdc6352c7.webp",
+      "height": 512,
+      "originalBytes": 3537,
+      "packedBytes": 566,
+      "rgbaSha256": "da9af3cfe9073015c26207990fc1a1bb6e21b61ef75dd952520da8b6c451c8ef",
+      "sha256": "1d447a8e9526afd0b0845954190be2593b45384d762e6013367d70c07fb32a9a",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "56bb4437ac35dc50e01864c133b58e30278266646e83cd9289fb48a602ea4332": {
+      "file": "56bb4437ac35dc50e018.webp",
+      "height": 512,
+      "originalBytes": 58645,
+      "packedBytes": 25394,
+      "rgbaSha256": "59a4f53a4b0c62ab4ff83ec06a2d861dd8cc7fd2d63ae20879c8afa7f623d016",
+      "sha256": "99ab4e253197d3eadc3c11c91edaba152e33ecfda08000f22baae87014aaf5a5",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "6070dd2e4997031a15815830d6e3c663ea52943a84cf21ba78522b892766658a": {
+      "file": "6070dd2e4997031a1581.webp",
+      "height": 64,
+      "originalBytes": 10880,
+      "packedBytes": 3934,
+      "rgbaSha256": "b2daf1916b171c17053cc2025d7dc6f1fcc18d2858838a7462405ed40f2a8193",
+      "sha256": "c5487bcb191bb5fe90d8060a5bb5ffd1c1578d71c89ca78f9d9e5ba56ecb4570",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 256
+    },
+    "66fd683aa6a61472b345fa490549dbafcc1714b9d6fc5c5843d06638ade448af": {
+      "file": "66fd683aa6a61472b345.webp",
+      "height": 256,
+      "originalBytes": 3819,
+      "packedBytes": 1302,
+      "rgbaSha256": "c3ec441f00dc1daa25f51709963f798c4868ee1f5d161ae6cf9b7bc677a7a15a",
+      "sha256": "1f9a2a2978fe8d80ec900b05c6c532e691f9f17f31bc01833515665137222ed7",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 512
+    },
+    "6792e7abdfc4b861635da89acf74384eef57552cd091deead9eaf931800b92ad": {
+      "file": "6792e7abdfc4b861635d.webp",
+      "height": 512,
+      "originalBytes": 57867,
+      "packedBytes": 25026,
+      "rgbaSha256": "d343c3e285603b66fccf619d8c5e004760180c7ea4b8503602196b0f149d11c6",
+      "sha256": "ac1202a00a4e12b582f69714ab4cdeb1168fe5a7230c15f887ae4911fbc76369",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "687208a62beca0956c29c7afd3855001612803458ee2ea78d12194a4360d0289": {
+      "file": "687208a62beca0956c29.webp",
+      "height": 512,
+      "originalBytes": 58485,
+      "packedBytes": 25302,
+      "rgbaSha256": "531dd7c7077c6c8d05d676e619e6ae7060bc2a2f152f1676ec434369875e432c",
+      "sha256": "b501aca22dedd8b64abcbb87f0dba1e6a66db93de8d1efdf1158b89c275e67f0",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "69d6ca156ab4d046816c02fdc7570e5e4332c924632c8203f4c2db28265b9f3f": {
+      "file": "69d6ca156ab4d046816c.webp",
+      "height": 128,
+      "originalBytes": 22164,
+      "packedBytes": 9282,
+      "rgbaSha256": "d4430137252c0baec71cc3cdea860c2432717a4b9ba67ce215ed5a7126eb1bd6",
+      "sha256": "0d936d17e8bc54879f7b91634319a2c991272a15f8ccdcfd6bc51fe83b349ad6",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    },
+    "7781fd386141387aefb8f7d18ae5fa22f190e1fd699b6b4d8fa02b95438b0a58": {
+      "file": "7781fd386141387aefb8.webp",
+      "height": 128,
+      "originalBytes": 16959,
+      "packedBytes": 4710,
+      "rgbaSha256": "92b7291db29606c52a6fe01529f0c98e500d4d5bbe840f623ffda07952d949d1",
+      "sha256": "30efdb82ba5125f50a19f6cb7e9a323b0dfbe431219dd16d1a50298ced415071",
+      "sourceModel": "src/scene/assets/world-galaxy.glb",
+      "width": 128
+    },
+    "7aaabf170cce04e62c2d7350a7e4dcb75fb298860f71f45582a8a9d22aa744ea": {
+      "file": "7aaabf170cce04e62c2d.webp",
+      "height": 512,
+      "originalBytes": 4345,
+      "packedBytes": 762,
+      "rgbaSha256": "c991a2651ed745444a2d73e3a38de2296ebcc5a63fa2b1f61158ceefbe51b6a9",
+      "sha256": "dffbf6f7e07a1ec29e9e2fb243f20c35e93b412842c4e68da213cf623f22dca4",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "7ff969f3789be53777b30f436558b475730cc49721a3556c3a503dba25436372": {
+      "file": "7ff969f3789be53777b3.webp",
+      "height": 512,
+      "originalBytes": 4967,
+      "packedBytes": 944,
+      "rgbaSha256": "3261f8f4c0333894eb1d2d40f594e4599c9c4fc6d6cc1f79369362b63b62a156",
+      "sha256": "ace83aad1e52aadd43449a25d4026878f01be90923522b77d09c0d4a54ac4e2b",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "87257ecae8b9ffdac04903a0733bd74abbd3a5f3080407d52bf0997ee12a3e45": {
+      "file": "87257ecae8b9ffdac049.webp",
+      "height": 128,
+      "originalBytes": 12487,
+      "packedBytes": 2758,
+      "rgbaSha256": "7cca81dd12a43135989ddf3c4656ed56e81e1f5a68aee7924bbbf3d738bfb54c",
+      "sha256": "30371d3446c33da129ac006bdf6129177d948ca5779ccf1d147e72f45725be9b",
+      "sourceModel": "src/scene/assets/world-galaxy.glb",
+      "width": 128
+    },
+    "884219452353691462e2f47c588ba9a7d1bea41e5bce7a622bceb725c079bf46": {
+      "file": "884219452353691462e2.webp",
+      "height": 512,
+      "originalBytes": 56381,
+      "packedBytes": 23650,
+      "rgbaSha256": "ee355f4b6574587494e1e35f838f7f64a31b8546f3735c7cb35a949d015408e9",
+      "sha256": "1517488a81f16203b0582c2d85c3c1b2689a2481119998ba7a01c8f0d56516c5",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "88a1fbd856160881d2c9fbb956d254b99466e3025fc3be086c1e1bdc9e35e7eb": {
+      "file": "88a1fbd856160881d2c9.webp",
+      "height": 512,
+      "originalBytes": 185219,
+      "packedBytes": 110948,
+      "rgbaSha256": "efb297dacce6c51f3efe74f5fb62b1c8b8518e3f30add0558655632d9557d5cf",
+      "sha256": "189e4e5842ae9dbe07b5d806973ae39ed3b99eaefe4706d6f136c1cb84858737",
+      "sourceModel": "src/scene/assets/daylight/table-original.glb",
+      "width": 512
+    },
+    "89424ee6cf8bceb6116b435b38c626a4a8d8d3898c49674af0fa33bb4a7db65a": {
+      "file": "89424ee6cf8bceb6116b.webp",
+      "height": 128,
+      "originalBytes": 23450,
+      "packedBytes": 10486,
+      "rgbaSha256": "7b02699e91eb4ce73e12acad15d0302c46fc0e7e6d4c3910bfab9f20e606872c",
+      "sha256": "371ee476cdd87c839a3c2c5e0aee655457b2851187c3821661691612307f6849",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    },
+    "8b7cd70594826e5d3ee2cc937422ece747f33c6aac5a0e39c160b89330cfbe67": {
+      "file": "8b7cd70594826e5d3ee2.webp",
+      "height": 128,
+      "originalBytes": 26378,
+      "packedBytes": 12814,
+      "rgbaSha256": "67004c2789366f7f7b16da3f0b12ad3fb3e40bd1ea26ba3644b5e18048ac328d",
+      "sha256": "3d5d74e000694d41544fbdd15950bb18e54bee8024d329f84cf28359f63c375f",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 128
+    },
+    "8ddc2a6d5e1311ebda9a417599d3a8702ca94e9798d4119bcf8ffa26fbee5bcf": {
+      "file": "8ddc2a6d5e1311ebda9a.webp",
+      "height": 128,
+      "originalBytes": 19873,
+      "packedBytes": 6964,
+      "rgbaSha256": "968f6a506a69bab0e68f4b66a6150deb0cf1e97ea7708d2b7d299a6991194d3b",
+      "sha256": "38d414988b499cefe2c439ba8c7d172fda6ad4a86e1ba2c56de0bc0e8d437b90",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    },
+    "96dd1bae20ed3f630f2334116455328928945b8035abe8127e37354e486510fa": {
+      "file": "96dd1bae20ed3f630f23.webp",
+      "height": 512,
+      "originalBytes": 59905,
+      "packedBytes": 26044,
+      "rgbaSha256": "a90f2b232f577cd31e584304c65bf9887d7f2a658a3f480019fcd7ef7ef3e243",
+      "sha256": "6ee48f619c03802e01e7ce9a02e00ffc548a9a0f387ae6dd9d484857fd1a8342",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "9b1c26b9a0b51de2afd27cff940acafa4431604aa22d7359f6d564407bb45ff8": {
+      "file": "9b1c26b9a0b51de2afd2.webp",
+      "height": 512,
+      "originalBytes": 5203,
+      "packedBytes": 1010,
+      "rgbaSha256": "770345dbfef40404284856c2e734bf5fd34c004fd2c18607a6423f7e537b4882",
+      "sha256": "2b0dbb3c121c4e18c1b7ab6173d2457668e4051580fb834d3b9bfceafaaeb89b",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "a3bc27b7a345f4343090368198b2b4752e69d95b3f3cc6d882208b9fb2df8f89": {
+      "file": "a3bc27b7a345f4343090.webp",
+      "height": 1024,
+      "originalBytes": 228715,
+      "packedBytes": 142564,
+      "rgbaSha256": "d77f42b3fac633ca4f00d7e39e2b36b720b73283b1456d09fdb00973a1f1c0f4",
+      "sha256": "de213c6581af2065bbd990ad7284e6223e1bbc478ca51e677a5ce245532dad5c",
+      "sourceModel": "src/scene/assets/daylight/table-original.glb",
+      "width": 1024
+    },
+    "a3e6c8a39c9cd9cb40f9a9e1abe1816ee88517a418185251c97cd64dd07fe214": {
+      "file": "a3e6c8a39c9cd9cb40f9.webp",
+      "height": 512,
+      "originalBytes": 3979,
+      "packedBytes": 708,
+      "rgbaSha256": "8ed3394c2fa7f1485ab8a5c741ee8177b37b0a9f31a45a2bd91c029c03bb01d7",
+      "sha256": "e55ed9c5cb523a6b73b102e57e21bcf97fa7fab05d8509cfe7d2bef7339ecbb9",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "a73ebc76cfce91cb0f6edb6e9455bbebabec0ab4a588f92cdcd900f51d2c5777": {
+      "file": "a73ebc76cfce91cb0f6e.webp",
+      "height": 512,
+      "originalBytes": 4108,
+      "packedBytes": 694,
+      "rgbaSha256": "acf16327746e43bfad34a96771a5409904dbda4c13843d6ca605cec4699c1e28",
+      "sha256": "1a858f31f4f6f472acf116bb6b0999f863b6c90ec98a0234c1956df6a03374ba",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "a7dc4cb413501253db9aa957c56271cf97f5318e72a0ba870e750fe1bc978c38": {
+      "file": "a7dc4cb413501253db9a.webp",
+      "height": 128,
+      "originalBytes": 18366,
+      "packedBytes": 5950,
+      "rgbaSha256": "82492249449cf0b8c09f0d670d0a8d14b06c1885bd1b607174bf26693edaf264",
+      "sha256": "8e69ce3ce461fa293fc3087e192981192542d4457de57eeaff04d4ac646fdb78",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    },
+    "ac97e1491bd86a1e3a9e389f8d73dc75ee3957386eee788bbe16137f22495b0e": {
+      "file": "ac97e1491bd86a1e3a9e.webp",
+      "height": 512,
+      "originalBytes": 4759,
+      "packedBytes": 888,
+      "rgbaSha256": "d9b6f8403418e595b37d27499fabb23ad409134a49dd67d8a1017faf9e7a851c",
+      "sha256": "84799deebb0fbd2e7aba110b5f18a672c98bce88f6764cf20b81f21bfe3062af",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "aec0728d5d246a12a7697f6f8244997675feae00f375876f7ee19db5216fefab": {
+      "file": "aec0728d5d246a12a769.webp",
+      "height": 512,
+      "originalBytes": 5021,
+      "packedBytes": 942,
+      "rgbaSha256": "f208bc1ceca954a5086fe5667cd899256e7f15cf8329ba49e06c27f72fe17d08",
+      "sha256": "63893270a1b34114738a39a13d9d513ac26d14e32e17c43b262d4d19ee46964b",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "aff7bcb3b86e30b4dc80145d7a45b05bde215c62316e5b67dc030f49a9ff277f": {
+      "file": "aff7bcb3b86e30b4dc80.webp",
+      "height": 512,
+      "originalBytes": 4833,
+      "packedBytes": 910,
+      "rgbaSha256": "3a1e6731f3807437d63c4e9f9c8b7747f4b2c83a3dc631c3ccc28ff6ba238582",
+      "sha256": "f74cc4defe074277874fefc1f6b7102d13a1d93faf9278dc3e80a88e47c61b2a",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "b670c0841ffe769a3b40c1200caa7f580dd1364e94ea04cf3021e22cd84cb264": {
+      "file": "b670c0841ffe769a3b40.webp",
+      "height": 128,
+      "originalBytes": 21940,
+      "packedBytes": 8834,
+      "rgbaSha256": "880e04bdbf7713278673546bc7a8949644cb5264944591e98f94df988b171429",
+      "sha256": "c9d92ee40d723dced01c5897bdc0a86c401138ab43e0205fcdc9c76a0224f3bf",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    },
+    "b783e24b3124a9e4faa0fa60e46361e7a6d2a78941e08c91957e0404680558a1": {
+      "file": "b783e24b3124a9e4faa0.webp",
+      "height": 512,
+      "originalBytes": 63381,
+      "packedBytes": 27336,
+      "rgbaSha256": "a8bfca95fadc64f1e270a2fa410a7a8698f6825e0ee209c13a08d60da061f7f4",
+      "sha256": "998eebff6fb86efa1c06b776946ed139fbbc3c6db4b02c3eaf341a7c0a1f6df3",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "bced31c43f5e5f44cb5ea8297416b60dc654950366f8f7b66b945eb787cfc4c3": {
+      "file": "bced31c43f5e5f44cb5e.webp",
+      "height": 64,
+      "originalBytes": 10880,
+      "packedBytes": 3954,
+      "rgbaSha256": "30340049ed20f13b63786308670aa90df9434cabb68b66ba2b19af2e48319f7e",
+      "sha256": "98ad35b98119b167e0dc6c989941815b459bc9b9a257b5af5038332d3c540a4c",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 256
+    },
+    "bfa73b06ff840009111c87c18d92170f912f2458bed30e54ea8260fdf768f920": {
+      "file": "bfa73b06ff840009111c.webp",
+      "height": 512,
+      "originalBytes": 59938,
+      "packedBytes": 26174,
+      "rgbaSha256": "e40e14a455eb97503cad5ad831f7107856ce4ffa27f45ab747f17b6db08e7396",
+      "sha256": "7ad057afd67ef83ab7cf54f2fc5ed125c90f7128d6c356dd7abb11ce95a0d268",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "c27588abc6da63e475b8405a578bb4e6246c155549b5fa810acabc08b2915f7b": {
+      "file": "c27588abc6da63e475b8.webp",
+      "height": 128,
+      "originalBytes": 26968,
+      "packedBytes": 13196,
+      "rgbaSha256": "8a35b5c1ca8ffd2955dec336de54f946c3c94bd624e44e69d8da0f3ac53f6e49",
+      "sha256": "dac3df83bb9d2aabb38e1ef24ecfdd63b3ebb27e118da22a0013c0c5d2c13161",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 128
+    },
+    "c4d172f0bc2c40295564e3519980d6d3bd5dc5de5168e4445a6a425dffba832d": {
+      "file": "c4d172f0bc2c40295564.webp",
+      "height": 512,
+      "originalBytes": 65703,
+      "packedBytes": 28158,
+      "rgbaSha256": "abacb16b53ddc44a720b16357103cebd4dec32a54a39a0b28e06aac33f6f712b",
+      "sha256": "5990ddd461f9c72de1e1c9557636612f3bd419ca7b0d1e1d870bf3775d7f4c6e",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "d0740f67a36953a89f6e6299b68627a60023e5c68ca1cab19099478beafe25d6": {
+      "file": "d0740f67a36953a89f6e.webp",
+      "height": 128,
+      "originalBytes": 20253,
+      "packedBytes": 7304,
+      "rgbaSha256": "d843355042e9a08e284ea00fc3ce2b62d00d2efdadefe0142e3309d7957dc48f",
+      "sha256": "eab5b4d218b52c3195ef97ef6bad29cbdde96b786759a2dca2514d291b2eefdb",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 128
+    },
+    "d44b7fe651473700879a05ea6df5d4a79e9d6dab63eb8b407c7676079ae847be": {
+      "file": "d44b7fe651473700879a.webp",
+      "height": 512,
+      "originalBytes": 5898,
+      "packedBytes": 1718,
+      "rgbaSha256": "7b3d53d3e15022cdf2998189094d97bf1a5ca2f6621c0feb014405a4044ef8ab",
+      "sha256": "a704cb62c10c70d9347556cc5d502f7828dbafd42a3bcffef541c2dcf7a9deef",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "d8020cbcf7b67ab332f560573472223a1f25107cfcce0ed3bf50085b514e6bc6": {
+      "file": "d8020cbcf7b67ab332f5.webp",
+      "height": 512,
+      "originalBytes": 65799,
+      "packedBytes": 28180,
+      "rgbaSha256": "34e29c89c89075cc81d5dc479a034f64b285b7ceae2c06acd30f83b6d6540c34",
+      "sha256": "58ee6963b9bf85d0149fae35777b46aa2cb97c504617c9582924f5220827dda9",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "dd516ac4973e400fcc3ed8bc6130b4b2ff47a02718c16de2dc5e7a5934003ae5": {
+      "file": "dd516ac4973e400fcc3e.webp",
+      "height": 128,
+      "originalBytes": 19704,
+      "packedBytes": 6834,
+      "rgbaSha256": "5fd70af7727192dc1c94ba55d17d569ee5a4d9d225209f0015a008919f7d7211",
+      "sha256": "6ad904f82176aeb55c2d2741d639659f664b9e6eb4b63673b248818c8c2d0f2b",
+      "sourceModel": "src/scene/assets/world-galaxy.glb",
+      "width": 128
+    },
+    "e0bd56b0e23766fc732848c4e903effc2590f7a06542c69b7af5458544afd5b0": {
+      "file": "e0bd56b0e23766fc7328.webp",
+      "height": 64,
+      "originalBytes": 10889,
+      "packedBytes": 3964,
+      "rgbaSha256": "29b4e0c978d64185c63a49fa13cf5c72ed3a338158e7398ea683f9d192c68033",
+      "sha256": "d218109cfe902f142de5a781720a94c71a9ab09bee223036db5e6c0579eccddf",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 256
+    },
+    "ecb4958023ec24f8040ec7af03255e0f5608a9f6c0366a160418b67f91ce00e3": {
+      "file": "ecb4958023ec24f8040e.webp",
+      "height": 128,
+      "originalBytes": 13777,
+      "packedBytes": 3198,
+      "rgbaSha256": "20a6e921d2312652ab00cf0881091863873a05d08418f5b00e3f01f8a3b4d73c",
+      "sha256": "232391627e2d9c4a6e3738be8498bcdf77103bc8cc454bf5462fbc86ff81f828",
+      "sourceModel": "src/scene/assets/world-galaxy.glb",
+      "width": 128
+    },
+    "f0e04fd0edcec6190a356f7c06fd1385ff841cc868cbf9f1efd6163c79cb8a65": {
+      "file": "f0e04fd0edcec6190a35.webp",
+      "height": 512,
+      "originalBytes": 6037,
+      "packedBytes": 1900,
+      "rgbaSha256": "93e69c9ecd6f8490b8f16724a5cd68d3ec2caa9df3f003b1ba3dac848758c5f7",
+      "sha256": "8a08af2a4eead73a8d66d3ecdfa2f9f61ecd537caad9f2cf2d68d96957adcf86",
+      "sourceModel": "src/scene/assets/daylight/balls-quality.glb",
+      "width": 1024
+    },
+    "f1fc0fe072d0d651b99ce1c1c593dc977b10c0723802d54d275d97694fad15b5": {
+      "file": "f1fc0fe072d0d651b99c.webp",
+      "height": 512,
+      "originalBytes": 67051,
+      "packedBytes": 28686,
+      "rgbaSha256": "fa0b542398727aaf3cd58424a00df2d04e114d294b090fa5ed970d39675ee302",
+      "sha256": "4532210d4b7be5af268534ff733df15465599db71435be1cb029ca630b45b6c0",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "f2e7a6c5cc1e4671f608f48d8bb60c7ab1acf17d68b76f14cd49e389e73b13a5": {
+      "file": "f2e7a6c5cc1e4671f608.webp",
+      "height": 256,
+      "originalBytes": 3705,
+      "packedBytes": 1286,
+      "rgbaSha256": "0bed15bb653447ba1ed3735f8a84af3d02cae75630982ee1de9329204c5b3081",
+      "sha256": "070881723b2f60015acc5cf073717f79018e2f96dc9fd657064413c9d147a8ef",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 512
+    },
+    "fa02164df0d81fdca6726d0e02d18e6820c52eddbb40513c34457f02ff6ce22a": {
+      "file": "fa02164df0d81fdca672.webp",
+      "height": 128,
+      "originalBytes": 27580,
+      "packedBytes": 15370,
+      "rgbaSha256": "29bb5cd1e553d45b3da63c87cb89c31a581e373e7fb41a70c4014bb03f98a803",
+      "sha256": "c19d63d62166a87d8887651ecaf34c821318a95e10eaa66690f9fde0d5a91ed6",
+      "sourceModel": "src/scene/assets/world-aurora-lake.glb",
+      "width": 128
+    },
+    "fa605cac2ce8f80e24eb4a6482e25271f317070aad03339c9e5f05720641cf51": {
+      "file": "fa605cac2ce8f80e24eb.webp",
+      "height": 512,
+      "originalBytes": 64111,
+      "packedBytes": 27492,
+      "rgbaSha256": "57d1e0f073c4110906e3457b8b10ce3920bb1e7be5834a0360f2c9d83db38f75",
+      "sha256": "89e742896196f6045aba2c74951aa55fcf3e342c825661d8a95a87c5add8467d",
+      "sourceModel": "src/scene/assets/daylight/balls-hot.glb",
+      "width": 1024
+    },
+    "fb9b6b84e9f2a990d9f61fce54297de71cbcccdb8b10a2121a4eead7c620c5e3": {
+      "file": "fb9b6b84e9f2a990d9f6.webp",
+      "height": 128,
+      "originalBytes": 17574,
+      "packedBytes": 5090,
+      "rgbaSha256": "db5967eab53d7782032dcc66e5dfc77ed9bff4d5b7e78d9c45c825fe838be0e5",
+      "sha256": "0c75d03540d8a2ad35c50d29ccce7142358fa7cce849704e6bcd52f440611c72",
+      "sourceModel": "src/scene/assets/world-bamboo.glb",
+      "width": 128
+    }
+  }
+}

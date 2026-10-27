@@ -31,7 +31,7 @@ function mulberry32(seed: number) {
 }
 
 /** 瞄顶球满力开球，统计散开指标 */
-function breakStats(world: BilliardsWorld) {
+function breakStats(world: BilliardsWorld, power = 92) {
   const initial = world.balls.map((b) => ({ n: b.number, x: b.x, z: b.z }));
   const objects0 = initial.filter((b) => b.n !== 0);
   const cx0 = objects0.reduce((s, b) => s + b.x, 0) / objects0.length;
@@ -40,7 +40,7 @@ function breakStats(world: BilliardsWorld) {
 
   const cue = world.balls.find((b) => b.number === 0)!;
   const apex = world.balls.filter((b) => b.number !== 0).reduce((m, b) => (b.z > m.z ? b : m));
-  strikeCueBall(world, Math.atan2(apex.x - cue.x, -(apex.z - cue.z)), 92);
+  strikeCueBall(world, Math.atan2(apex.x - cue.x, -(apex.z - cue.z)), power);
 
   const peakSpeed = new Map<number, number>();
   let guard = 0;
@@ -71,10 +71,9 @@ function breakStats(world: BilliardsWorld) {
 describe('开球球堆散开回归', () => {
   it('固定摆法：球堆明显炸散', () => {
     const s = breakStats(createInitialWorld());
-    // Accepted V5 (85.725 mm balls, 140/120 mm pockets): fixed-rack spread .4340028 m.
-    // Keep a tight deterministic fingerprint plus the multi-seed health/energy guards below.
+    // Guard visible dispersion rather than an exact endpoint fingerprint: cloth tuning
+    // may change legal final positions while preserving determinism and energy bounds.
     expect(s.displaced).toBeGreaterThanOrEqual(12);
-    expect(s.spread1).toBeCloseTo(.43400280257892543, 5);
     expect(s.spread1).toBeGreaterThan(s.spread0 * 3);
   });
 
@@ -92,6 +91,15 @@ describe('开球球堆散开回归', () => {
     // 实测均值：位移 12.3、spread 0.537
     expect(displacedSum / 8).toBeGreaterThanOrEqual(10);
     expect(spreadSum / 8).toBeGreaterThan(0.45);
+  });
+
+  it('中低力度的碰后球堆仍能展开，不在传力后立即刹停', () => {
+    const seeds = [1, 2, 3];
+    const weak = seeds.map(seed => breakStats(createInitialWorld(mulberry32(seed)), 20));
+    const medium = seeds.map(seed => breakStats(createInitialWorld(mulberry32(seed)), 40));
+    // Former .6 m/s² cloth: low-power mean3.33 moved balls, medium spread .336m.
+    expect(weak.reduce((sum, s) => sum + s.displaced, 0) / seeds.length).toBeGreaterThanOrEqual(6);
+    expect(medium.reduce((sum, s) => sum + s.spread1, 0) / seeds.length).toBeGreaterThan(.40);
   });
 
   it('峰值速度分布：多球获得实质速度且无能量创生', () => {

@@ -1,0 +1,67 @@
+{
+  "tool": "built-in imagegen",
+  "created": "2026-10-26",
+  "purpose": "Victory expressions of existing fictional companions; match portraits unchanged",
+  "assets": [
+    {
+      "id": "shen-yubai",
+      "asset": "src/assets/companion-cards/shen-yubai.webp",
+      "bytes": 27986,
+      "sha256": "fbac2dd8f0785eb3498143cbaa385d60ef19f8cb197471f50316619f9302d6f0"
+    },
+    {
+      "id": "lu-jingchen",
+      "asset": "src/assets/companion-cards/lu-jingchen.webp",
+      "bytes": 29412,
+      "sha256": "afb29ea7e1903031da3f6d5852a56bd2e5f33d23fe61475db50b8c08f84fa8d3"
+    },
+    {
+      "id": "wen-xingye",
+      "asset": "src/assets/companion-cards/wen-xingye.webp",
+      "bytes": 26450,
+      "sha256": "736e29ace00bcb39633f6140421f3667c73373160df3fe6cf5128d27a042860d"
+    },
+    {
+      "id": "gu-yanchuan",
+      "asset": "src/assets/companion-cards/gu-yanchuan.webp",
+      "bytes": 31858,
+      "sha256": "4781b6e05eeb88b45b9e7906dd58e3a2fba473e087f51787bea811fddb1806e2"
+    },
+    {
+      "id": "jiang-yueheng",
+      "asset": "src/assets/companion-cards/jiang-yueheng.webp",
+      "bytes": 28124,
+      "sha256": "6969e584a27e80a058d974432c993cc33ad9484348819b9b73e0c312da66bce3"
+    },
+    {
+      "id": "zhou-mubai",
+      "asset": "src/assets/companion-cards/zhou-mubai.webp",
+      "bytes": 27410,
+      "sha256": "faa0e97c52a319ce19f2439e525ea0e521d0bc04104de82838b8fd245d483d47"
+    },
+    {
+      "id": "xie-linyu",
+      "asset": "src/assets/companion-cards/xie-linyu.webp",
+      "bytes": 31046,
+      "sha256": "8574751dc7c9cb2b5c20a38d2c10a5ee74f73b2470231b1f231a79aabb12d08b"
+    },
+    {
+      "id": "pei-zhixu",
+      "asset": "src/assets/companion-cards/pei-zhixu.webp",
+      "bytes": 29820,
+      "sha256": "f77e09b6a66f2601e08953e3a682e7e14dd7cffca37e2ad94131533356704eee"
+    },
+    {
+      "id": "song-yucheng",
+      "asset": "src/assets/companion-cards/song-yucheng.webp",
+      "bytes": 27892,
+      "sha256": "da7075f04a5ea3b9bd9648e19ba3c6df3eb918327404dbe3e188045e9f54fd76"
+    },
+    {
+      "id": "xu-qinghe",
+      "asset": "src/assets/companion-cards/xu-qinghe.webp",
+      "bytes": 29634,
+      "sha256": "c0a0588de1a770d4e40b7ce8f1c8dda10f1955145e2092b66fab9b3db5cbbf8b"
+    }
+  ]
+}

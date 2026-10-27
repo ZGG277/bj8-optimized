@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BilliardsAudio } from './audio';
-import { createNatureAmbience } from './nature-ambience';
+import { decodeNatureAmbience } from './nature-ambience';
 
 class Param {
   value = 0;
@@ -49,6 +49,10 @@ class Context {
     const n = new Buffer(frames, rate); this.buffers.push(n); return n;
   }
   createBufferSource() { const n = new Source(); this.sources.push(n); return n; }
+  decodeAudioData = vi.fn((_bytes: ArrayBuffer, resolve: (buffer: AudioBuffer) => void) => {
+    const decoded = new Buffer(24000 * 30.5, 24000);
+    void Promise.resolve().then(() => resolve(decoded as unknown as AudioBuffer));
+  });
 }
 let context: Context;
 let time = 1000;
@@ -208,11 +212,13 @@ describe('gem audio contract', () => {
 
 
 describe('audio pause and disposal', () => {
-  it('starts one ambient loop after unlock, reuses its buffer, and stops on mute/pause/disposal', () => {
+  it('starts one recorded ambient loop after unlock, reuses its buffer, and stops on mute/pause/disposal', async () => {
     const audio = new BilliardsAudio();
     audio.setAmbience(true);
     expect(AudioConstructor).not.toHaveBeenCalled();
     audio.unlock(); audio.unlock(); audio.setAmbience(true);
+    await vi.waitFor(() => expect(context.sources).toHaveLength(1));
+    expect(context.decodeAudioData).toHaveBeenCalledOnce();
     expect(context.sources).toHaveLength(1);
     const first = context.sources[0];
     expect(first.loop).toBe(true);
@@ -232,16 +238,25 @@ describe('audio pause and disposal', () => {
     audio.dispose(); audio.unlock();
     expect(context.sources).toHaveLength(3);
   });
-  it('keeps the generated nature loop finite, quiet and seamless without timers', () => {
-    vi.useFakeTimers();
-    const buffer = createNatureAmbience(context as unknown as AudioContext) as unknown as Buffer;
-    let peak = 0;
-    for (const sample of buffer.data) { expect(Number.isFinite(sample)).toBe(true); peak = Math.max(peak, Math.abs(sample)); }
-    expect(buffer.duration).toBe(32);
-    expect(peak).toBeGreaterThan(.3);
-    expect(peak).toBeLessThan(.8);
-    expect(buffer.data[0]).toBe(buffer.data[buffer.data.length - 1]);
-    expect(vi.getTimerCount()).toBe(0);
+  it('decodes an embedded MP3 recording without timers or a network request', async () => {
+    const fetchSpy = vi.fn();vi.stubGlobal('fetch', fetchSpy);
+    const buffer = await decodeNatureAmbience(context as unknown as AudioContext);
+    expect(buffer.duration).toBe(30.5);
+    const encoded = context.decodeAudioData.mock.calls[0][0];
+    expect(encoded.byteLength).toBeGreaterThan(100000);
+    expect(String.fromCharCode(...new Uint8Array(encoded).slice(0, 3))).toBe('ID3');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+  it.each(['mute', 'pause', 'dispose'])('does not start a late decoded recording after %s', async action => {
+    let complete: ((buffer: AudioBuffer) => void) | undefined;
+    context.decodeAudioData.mockImplementation((_bytes, resolve) => { complete = resolve; });
+    const audio = new BilliardsAudio();audio.setAmbience(true);audio.unlock();
+    if(action === 'mute')audio.setMuted(true);
+    if(action === 'pause')audio.setSuspended(true);
+    if(action === 'dispose')audio.dispose();
+    complete!(new Buffer(100, 100) as unknown as AudioBuffer);
+    await Promise.resolve();await Promise.resolve();
+    expect(context.sources).toHaveLength(0);
   });
   it('does not create or play sounds while muted or suspended', () => {
     const audio = new BilliardsAudio();

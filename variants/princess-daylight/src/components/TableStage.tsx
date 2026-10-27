@@ -9,9 +9,13 @@ import { markControlLearned } from '../control-onboarding';
 import type { MatchState } from '../match/types';
 import type { GameMode, MatchTrainingSummary } from '../opponent/model';
 import { RoyalFinish } from './RoyalFinish';
+import type { CompanionReward } from '../opponent/companion-collection';
 import { finishReason } from '../match/presentation';
 
 interface TableStageProps {
+  collectionReward?: CompanionReward | null;
+  collectionSaveFailed?: boolean;
+  onCollection?: () => void;
   viewLevel: number;
   spectatorActive: boolean;
   manualCameraActive: boolean;
@@ -29,6 +33,7 @@ interface TableStageProps {
 }
 
 export function TableStage({
+  collectionReward, collectionSaveFailed, onCollection,
   viewLevel,
   spectatorActive,
   manualCameraActive,
@@ -57,7 +62,7 @@ export function TableStage({
       >
         {match.phase === 'placing' && match.messageKey.startsWith('place-') && <div className="royal-turn-status" role="status">{match.messageKey === 'place-occupied' ? '这里有球' : match.messageKey === 'place-near-pocket' ? '离袋口远一点' : '放在开球区'}</div>}
 
-        {match.phase === 'finished' && <RoyalFinish companionId={match.companionId} winner={match.winner} reason={match.messageKey === 'win-8' ? '' : finishReason(match)} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
+        {match.phase === 'finished' && <RoyalFinish collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} reason={match.messageKey === 'win-8' ? '' : finishReason(match)} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
       </div>
 
     </section>

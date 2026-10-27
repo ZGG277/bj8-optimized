@@ -4,7 +4,8 @@ import type { GameMode } from '../opponent/model';
 import { FollowAuthor } from './FollowAuthor';
 import { RoyalIcon } from './RoyalIcon';
 
-export function PauseMenu({ muted, onMute, onResume, onRestart, gameMode, onModeChange }: {
+export function PauseMenu({ muted, onMute, onResume, onRestart, gameMode, onModeChange, onCollection }: {
+  onCollection?: () => void;
   gameMode?: GameMode; onModeChange?: (mode: GameMode) => void;
   muted: boolean; onMute: () => void; onResume: () => void; onRestart: () => void;
 }) {
@@ -26,6 +27,7 @@ export function PauseMenu({ muted, onMute, onResume, onRestart, gameMode, onMode
       <div className="pause-tools">
         <button className="pause-sound" aria-pressed={muted} aria-label={muted ? '开启音效' : '关闭音效'} onClick={onMute}><RoyalIcon name={muted ? 'muted' : 'sound'}/></button>
         <button className="pause-restart" aria-label="重新开局" onClick={() => setConfirmRestart(true)}><RoyalIcon name="restart"/></button>
+        {onCollection && <button aria-label="查看赞美卡册" onClick={onCollection}><RoyalIcon name="cards"/></button>}
       </div>
       {onModeChange && <label className="pause-mode"><select aria-label="本局模式" value={gameMode} onChange={event => onModeChange(event.target.value as GameMode)}><option value="practice">友好陪练</option><option value="challenge">轻松挑战</option></select></label>}
       <FollowAuthor />

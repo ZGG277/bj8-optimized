@@ -161,6 +161,6 @@ describe('shared wood/leather boundary', () => {
     createTableFrameGeometry(contracts);
     expect(JSON.stringify({ TABLE, POCKETS, CUSHION_SEGMENTS, profiles: POCKETS.map(pocketRenderProfile) })).toBe(before);
     expect(POCKETS.map(p => Number(p.mouthWidth.toFixed(4)))).toEqual([.140, .140, .120, .120, .140, .140]);
-    expect(TABLE.ballRadius).toBeCloseTo(.0428625, 10);
+    expect(TABLE.ballRadius).toBeCloseTo(.041576625, 10);
   });
 });

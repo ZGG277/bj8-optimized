@@ -1,4 +1,5 @@
 import { pickCompanion } from '../opponent/companions';
+import { collectCompanionWin, loadCompanionCollection, saveCompanionCollection, type CompanionReward } from '../opponent/companion-collection';
 import { createFriendlyOpponentProfile } from '../opponent/friendly-style';
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
@@ -70,6 +71,10 @@ export function useGameState() {
   );
   const [trainingSummary, setTrainingSummary] = useState<MatchTrainingSummary | null>(null);
   const assessmentDoneRef = useRef(false);
+  const [collection, setCollection] = useState(() => loadCompanionCollection(browserStorage()));
+  const collectionRef = useRef(collection);
+  const [collectionReward, setCollectionReward] = useState<CompanionReward | null>(null);
+  const [collectionSaveFailed, setCollectionSaveFailed] = useState(false);
   const matchObservationsRef = useRef<ShotSkillObservation[]>([]);
 
   // ── 派生 ──
@@ -91,6 +96,7 @@ export function useGameState() {
     settlementGuardRef.current.reset();
     matchObservationsRef.current = [];
     assessmentDoneRef.current = false;
+    setCollectionReward(null);
     setTrainingSummary(null);
     setWorldView(cloneWorld(fresh));
     const companion = pickCompanion(matchRef.current.companionId);
@@ -111,6 +117,15 @@ export function useGameState() {
   const completeMatchAssessment = useCallback((winner: MatchState['winner']) => {
     if (!winner || assessmentDoneRef.current) return playerSkillRef.current;
     assessmentDoneRef.current = true;
+    if (winner === 'player') {
+      const earned = collectCompanionWin(collectionRef.current, matchRef.current.companionId);
+      if (earned) {
+        collectionRef.current = earned.collection;
+        setCollection(earned.collection);
+        setCollectionReward(earned.reward);
+        setCollectionSaveFailed(!saveCompanionCollection(browserStorage(), earned.collection));
+      }
+    }
     const observations = matchObservationsRef.current;
     matchObservationsRef.current = [];
     const previous = playerSkillRef.current;
@@ -154,6 +169,9 @@ export function useGameState() {
     setViewLevel,
     playerSkill,
     trainingSummary,
+    collection,
+    collectionReward,
+    collectionSaveFailed,
     gameMode,
     opponentProfile,
     canAim,

@@ -76,7 +76,7 @@ const R = TABLE.ballRadius;
 
 // ---- 物理参数（经手感仿真调校） ----
 const SLIDE_FRICTION = 0.21;         // 滑动摩擦系数 μs（减速 ≈ 2.06 m/s²）
-const ROLL_DECEL = 0.6;              // 滚动阻力减速度 m/s²（手感调校：中力停球约 4 秒）
+const ROLL_DECEL = 0.28;             // 滚动阻力 m/s²：保留中低力碰后传动，球堆不在刚散开时急停
 const SPIN_DECEL = 2.2;              // 垂直轴侧旋衰减 rad/s²
 const SLIP_EPS = 0.004;              // 滑动→滚动切换阈值 (m/s)
 const STOP_SPEED = 0.008;            // 停止判定阈值（m/s）

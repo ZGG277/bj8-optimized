@@ -54,8 +54,8 @@ describe('公主请开球独立产品', () => {
     expect(source('./components/Scoreboard.tsx')).not.toContain('COLORS');
     const css=source('./styles/princess.css');expect(css).toContain('#cc3057');expect(css).toContain('#efc348'); expect(css).toContain('white belt identifies 9–15');expect(css).toContain('#03050c');
   });
-  it('preserves the accepted V5 ball diameter', () => {
-    expect(TABLE.ballRadius*2).toBeCloseTo(.085725,6);
+  it('preserves the accepted October 27 ball diameter (3 percent smaller)', () => {
+    expect(TABLE.ballRadius*2).toBeCloseTo(.08315325,8);
   });
   it('ivory cue remains visual-only and retains strike-tip coordinates', () => {
     const code=source('./Scene3D.ts');expect(code).toContain('warm-ivory-white-digital');expect(code).toContain('color: 0xfff3d9');

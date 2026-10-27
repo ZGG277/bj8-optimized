@@ -1,16 +1,16 @@
 /*
 [INPUT]: 依赖浏览器 Web Audio API 与物理事件传入的速度/类型
 [OUTPUT]: 对外提供 BilliardsAudio，合成带短促圆润石质共鸣与厚实中低频支撑的宝石球碰/落袋、出杆、碰库与克制胜局彩炮音效
-[POS]: 表现层音频适配器；无外部音频资源，不参与物理和规则判定
+[POS]: 表现层音频适配器；击球为合成音效、环境为包内真实录音，不参与物理和规则判定
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
- * WebAudio 合成音效：无外部资源
+ * WebAudio 音效与离线解码的CC0公园实录环境声
  * - 球球碰撞：145–190Hz 实心碰击 + 中频非谐波石质触点；自然环境声复用静音/暂停边界
  * - 落袋：156Hz 下坠落定 + 一次克制闪光，独立于胜局音效
  * - 宝石专用总线：6.2kHz 低通、软压缩、六声并发、有限波形缓存
  * - 出杆：皮革击打声
  */
-import { createNatureAmbience } from './nature-ambience';
+import { decodeNatureAmbience } from './nature-ambience';
 
 export class BilliardsAudio {
   private muted = false;
@@ -22,6 +22,7 @@ export class BilliardsAudio {
   private lastPlay = 0;
   private ambienceEnabled = false;
   private ambienceBuffer: AudioBuffer | null = null;
+  private ambienceLoading: Promise<void> | null = null;
   private ambience: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
   private gemBus: BiquadFilterNode | null = null;
   private gemBuffers = new Map<string, AudioBuffer>();
@@ -176,7 +177,18 @@ export class BilliardsAudio {
   private startAmbience() {
     if (!this.ambienceEnabled || this.ambience || this.muted || this.suspended || this.disposed || !this.ctx || !this.master) return;
     const ctx = this.ctx;
-    this.ambienceBuffer ??= createNatureAmbience(ctx);
+    if (!this.ambienceBuffer) {
+      if (!this.ambienceLoading) {
+        this.ambienceLoading = decodeNatureAmbience(ctx).then(buffer => {
+          if (this.disposed || this.ctx !== ctx) return;
+          this.ambienceBuffer = buffer;
+          // Recheck mute/pause/disposal after asynchronous decoding.
+          this.startAmbience();
+        }).catch(() => { /* Decoder failure does not block play or other effects. */ })
+          .then(() => { this.ambienceLoading = null; });
+      }
+      return;
+    }
     const source = ctx.createBufferSource(), gain = ctx.createGain();
     source.buffer = this.ambienceBuffer;
     source.loop = true;

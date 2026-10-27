@@ -1,5 +1,5 @@
 /** Shared outline icons keep controls independent of font glyphs. */
-export function RoyalIcon({ name }: { name: 'scene' | 'help' | 'pause' | 'play' | 'sound' | 'muted' | 'restart' | 'close' | 'skip' | 'crown' }) {
+export function RoyalIcon({ name }: { name: 'scene' | 'help' | 'pause' | 'play' | 'sound' | 'muted' | 'restart' | 'close' | 'skip' | 'crown' | 'cards' | 'left' | 'right' }) {
   return <svg className="royal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {name === 'scene' && <><path d="M3 19V5h18v14H3Z"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 3 3-4 4 6"/></>}
     {name === 'help' && <><path d="M8.5 8a3.5 3.5 0 0 1 7 0c0 2.5-3.5 2.5-3.5 5"/><circle cx="12" cy="17" r=".8" fill="currentColor" stroke="none"/></>}
@@ -10,5 +10,8 @@ export function RoyalIcon({ name }: { name: 'scene' | 'help' | 'pause' | 'play' 
     {name === 'close' && <path d="m6 6 12 12M18 6 6 18"/>}
     {name === 'skip' && <><path d="m5 6 9 6-9 6ZM18 6v12"/></>}
     {name === 'crown' && <><path d="m3 6 5 5 4-7 4 7 5-5-2 13H5ZM6 16h12"/></>}
+    {name === 'cards' && <><path d="m5 5 10-2 3 15-10 2Z"/><path d="m17 5 4 2-4 14-10-3"/><path d="m9 10 3-3 2 3-2 3Z"/></>}
+    {name === 'left' && <path d="m15 5-7 7 7 7"/>}
+    {name === 'right' && <path d="m9 5 7 7-7 7"/>}
   </svg>;
 }
