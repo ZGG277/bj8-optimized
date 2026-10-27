@@ -24,4 +24,4 @@ npm run dev -- --host 127.0.0.1
 
 公主先 `cd variants/princess-daylight`。`npm test` 执行工程测试；`npm run build:minitool` 生成离线包，但上传时必须重新核对平台当日规范，GitHub 同步不是平台发版。
 
-见 [项目基线](PROJECT_BASELINE.md)、[版本对应](VERSION_MATRIX.md) 与各工程 `PUBLIC_SOURCE_MANIFEST.json`。生成产物、私有证据、素材原包与依赖缓存不属于源码交付。素材来源与第三方许可见 [ASSET_SOURCES.md](ASSET_SOURCES.md)。
+先读[当前版本入口](VERSIONING.md)，另见[项目基线](PROJECT_BASELINE.md)、[版本对应](VERSION_MATRIX.md)与各工程 `PUBLIC_SOURCE_MANIFEST.json`。生成产物、私有证据、素材原包与依赖缓存不属于源码交付。素材来源与第三方许可见[ASSET_SOURCES.md](ASSET_SOURCES.md)。
