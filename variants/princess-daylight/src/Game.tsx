@@ -1,3 +1,4 @@
+import { ControlHelp } from './components/ControlHelp';
 import { positionAfterPot } from './opponent/position-observation';
 /*
 [INPUT]: 离线 H3 动画 WebP 开场；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
@@ -7,6 +8,7 @@ import { positionAfterPot } from './opponent/position-observation';
 */
 import { gameStorage } from './minitool/persistent-storage';
 import { createShotLease } from './shot-lifecycle';
+import { rewardForStoppedShot, type ShotReward } from './shot-reward';
 import { PauseMenu } from './components/PauseMenu';
 import { CompanionCollectionBook } from './components/CompanionCollection';
 import { RoyalIcon } from './components/RoyalIcon';
@@ -128,7 +130,8 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 export default function Game() {
   const [paused, setPaused] = useState(() => typeof document !== 'undefined' && document.hidden);
   const [collectionOpen, setCollectionOpen] = useState(false);
-  const gamePaused = paused || collectionOpen;
+  const [helpOpen, setHelpOpen] = useState(false);
+  const gamePaused = paused || collectionOpen || helpOpen;
   useEffect(() => {
     const hidden = () => { if (document.hidden) setPaused(true); };
     document.addEventListener('visibilitychange', hidden);
@@ -141,6 +144,14 @@ export default function Game() {
   const [followFeel, setFollowFeel] = useState<FollowFeel>('current');
   const [followShotPending, setFollowShotPending] = useState(false);
   const followShotPendingRef = useRef(false);
+  const [shotReward, setShotReward] = useState<ShotReward | null>(null);
+  useEffect(() => {
+    if (!shotReward) return;
+    const timer = window.setTimeout(() => {
+      setShotReward(current => current?.shotId === shotReward.shotId ? null : current);
+    }, 1600);
+    return () => window.clearTimeout(timer);
+  }, [shotReward]);
   const [selectedWorld, setSelectedWorld] = useState<'lake' | 'castle'>(() => {
     const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search).get('world');
     if (query === 'lake' || query === 'castle') return query;
@@ -152,7 +163,7 @@ export default function Game() {
     match, matchRef, setMatch,
     viewLevel, setViewLevel,
     playerSkill, trainingSummary, gameMode, opponentProfile,
-    collection, collectionReward, collectionSaveFailed,
+    collection, collectionReward, collectionSaveFailed, victoryPraise,
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
@@ -584,6 +595,7 @@ export default function Game() {
     if (followShotPendingRef.current) return;
     const lease = createShotLease(worldRef, matchRef, 'player');
     if (!lease.current()) return;
+    setShotReward(null);
     setTouchAimCameraLocked(false);
     const angle = aimRef.current;
     const cueBall = getCueBall(worldRef.current);
@@ -977,6 +989,7 @@ export default function Game() {
     followShotPendingRef.current = false;
     setFollowShotPending(false);
     setCollectionOpen(false);
+    setShotReward(null);
     resetGame(setAim, nextMode);
     markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
     setSpin({ x: 0, y: 0 });
@@ -995,6 +1008,7 @@ export default function Game() {
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
     const settlement = settleShotRaw(setViewLevel);
+    setShotReward(settlement ? rewardForStoppedShot(settlement.facts, settlement.resolution) : null);
     if (settlement && firstMatchGuideStepRef.current) {
       const next = guideAfterSettlement(firstMatchGuideStepRef.current, settlement.resolution.next, settlement.facts.pocketed);
       if (next === null) finishFirstMatchGuide();
@@ -1212,10 +1226,12 @@ export default function Game() {
         ? <OpeningFilm src={openingMovie} muted={muted} onFinish={() => scene3DRef.current?.finishOpening()}/>
         : <div className="royal-opening"><button className="opening-skip" aria-label="跳过开场" onClick={() => scene3DRef.current?.finishOpening()}><RoyalIcon name="skip"/></button></div>)}
       {paused && !collectionOpen && !renderError && <PauseMenu onCollection={() => setCollectionOpen(true)} gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} muted={muted} onMute={toggleMuted} onResume={() => setPaused(false)} onRestart={() => { handleReplay(); setPaused(false); }} />}
+      {helpOpen && <ControlHelp onClose={() => setHelpOpen(false)}/>}
       {collectionOpen && <CompanionCollectionBook collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
       <div className="royal-entry" role="group" aria-label="场景、教学与暂停">
         <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>
-        <button className="help-entry" aria-label="再看操作教学" disabled={gamePaused || openingActive || worldView.moving || match.phase === 'finished'} onClick={() => { setGuideDismissed(false); setManualGuide(true); showFullTable(); setFirstMatchGuideStep(match.phase === 'placing' ? 'free-place' : match.breaking ? 'first-power' : 'ghost-place'); }}><RoyalIcon name="help"/></button>
+        <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/></button>
+        {match.phase !== 'finished' && <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>}
         <button className="pause-entry" aria-label="暂停与设置" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setPaused(true); }}><RoyalIcon name="pause"/></button>
       </div>
       {scenePickerOpen && <ScenePicker value={selectedWorld} disabled={(!canAimBase && match.phase !== 'finished') || openingActive || charging || followShotPending || worldView.moving} onClose={() => setScenePickerOpen(false)} onChange={next => { if ((!canAimBase && match.phase !== 'finished') || openingActive || charging || worldRef.current.moving || followShotPendingRef.current) return; try { browserStorage()?.setItem('princess-billiards:scene:v1', next); } catch { /* Current scene still switches. */ } const url = new URL(location.href); url.searchParams.set('world', next); url.searchParams.delete('lake360'); history.replaceState(null, '', url.href); setSelectedWorld(next); setScenePickerOpen(false); }} />}
@@ -1248,8 +1264,11 @@ export default function Game() {
         opponentProfile={opponentProfile}
         gameMode={gameMode}
         onModeChange={handleResetGame}
+        shotReward={shotReward}
       />
       <TableStage
+        victoryPraise={victoryPraise}
+        shotReward={shotReward}
         collectionReward={collectionReward}
         collectionSaveFailed={collectionSaveFailed}
         onCollection={() => setCollectionOpen(true)}

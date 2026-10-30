@@ -5,10 +5,10 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { describe, expect, it } from 'vitest';
-import { TABLE, createInitialWorld, type BilliardsWorld } from './physics';
+import { TABLE, POCKETS, getPocketAimWindow, createInitialWorld, type BilliardsWorld } from './physics';
 import { cameraFramingForAim, inferCameraAimIntent } from './camera-aim-intent';
-import { findAimDialTarget } from './aim/aim-solution';
-import { DEFAULT_CAMERA_SAFETY } from './camera-framing';
+import { findAimDialTarget, aimAngleForPocketOffset, aimSolutionForPocket, firstObjectHit } from './aim/aim-solution';
+import { aimCameraPose, aimFramingPoints, projectFramingPoint, DEFAULT_CAMERA_SAFETY } from './camera-framing';
 
 function thinCutWorld(): BilliardsWorld {
   const world = createInitialWorld();
@@ -57,4 +57,41 @@ describe('camera aim intent', () => {
     expect(cameraFramingForAim(world, angle + Math.PI, [1], DEFAULT_CAMERA_SAFETY)).toBeNull();
   });
 
+});
+
+describe('six pocket framing at near/far mouth boundaries',()=>{
+ for(const pocket of POCKETS)for(const distance of [.16,.75])for(const offset of [-.95,0,.95]){
+  it(`pocket ${pocket.index}, distance ${distance}, mouth offset ${offset}`,()=>{
+   const world=thinCutWorld();const mouth=getPocketAimWindow(pocket);const cue=world.balls.find(b=>b.number===0)!,object=world.balls.find(b=>b.number===1)!;
+   object.x=mouth.center.x-pocket.outward.x*distance;object.z=mouth.center.z-pocket.outward.z*distance;
+   cue.x=object.x-pocket.outward.x*.28;cue.z=object.z-pocket.outward.z*.28;
+   const angle=aimAngleForPocketOffset(world,1,pocket.index,offset);expect(angle).not.toBeNull();
+   const frame=cameraFramingForAim(world,angle!,[1],DEFAULT_CAMERA_SAFETY);
+   expect(frame).toMatchObject({targetNumber:1,pocketIndex:pocket.index});
+   for(const aspect of [390/706,1280/662,844/296]) {
+    const pose=aimCameraPose(frame!,angle!,aspect).pose;
+    for(const point of aimFramingPoints(frame!)) {
+     const projected=projectFramingPoint(point,pose,aspect)!;
+     expect(projected.x).toBeGreaterThanOrEqual(-1+DEFAULT_CAMERA_SAFETY.left*2-.001);
+     expect(projected.x).toBeLessThanOrEqual(1-DEFAULT_CAMERA_SAFETY.right*2+.001);
+     expect(projected.y).toBeGreaterThanOrEqual(-1+DEFAULT_CAMERA_SAFETY.bottom*2-.001);
+     expect(projected.y).toBeLessThanOrEqual(1-DEFAULT_CAMERA_SAFETY.top*2+.001);
+    }
+   }
+  });
+ }
+});
+
+describe('actual outgoing route does not depend on a different ideal cue route',()=>{
+ it('keeps the indicated pocket when a blocker invalidates only the alternate ideal shot',()=>{
+  const world=thinCutWorld(),angle=-.2787;
+  const center=aimAngleForPocketOffset(world,1,1,0)!;
+  const cue=world.balls.find(b=>b.number===0)!,blocker=world.balls.find(b=>b.number===2)!;blocker.active=true;
+  const side=Math.sign(Math.sin(angle-center))||1;
+  blocker.x=cue.x+Math.sin(center)*.8-Math.cos(center)*side*(TABLE.ballRadius*2-.00001);
+  blocker.z=cue.z-Math.cos(center)*.8-Math.sin(center)*side*(TABLE.ballRadius*2-.00001);
+  expect(firstObjectHit(world,angle)).toBe(1);
+  expect(aimSolutionForPocket(world,1,1,angle)).toBeNull();
+  expect(cameraFramingForAim(world,angle,[1],DEFAULT_CAMERA_SAFETY)).toMatchObject({targetNumber:1,pocketIndex:1});
+ });
 });

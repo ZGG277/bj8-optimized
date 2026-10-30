@@ -83,7 +83,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-describe('gem audio contract', () => {
+describe('natural billiards audio contract', () => {
   it('keeps lazy initialization and resumes suspended audio on the same public event path', () => {
     const audio = new BilliardsAudio();
     expect(AudioConstructor).not.toHaveBeenCalled();
@@ -127,60 +127,54 @@ describe('gem audio contract', () => {
     audio.pocket(); const pocket = context.sources[context.sources.length - 1].buffer!;
     audio.pocket(); expect(context.sources[context.sources.length - 1].buffer).toBe(pocket);
     expect(context.buffers).toHaveLength(10);
-    expect(pocket.duration).toBeCloseTo(.28);
+    expect(pocket.duration).toBeCloseTo(.13);
   });
-  it('limits dense collisions to six voices and prioritizes pocket feedback with a 6ms fade', () => {
+  it('bounds crowded contacts and gives a pocket a short retiring fade', () => {
     const audio = new BilliardsAudio();
-    for (let i = 0; i < 7; i++) { audio.ballCollision(1); advance(25); }
-    expect(context.sources).toHaveLength(6);
-    audio.pocket();
-    expect(context.sources).toHaveLength(7);
-    // The first voice has already expired at 175ms, so no steal is needed here.
-    for (let i = 0; i < 7; i++) audio.pocket();
-    expect(context.sources.some(s => s.stop.mock.calls.length > 0)).toBe(true);
-    expect(context.sources[context.sources.length - 1].start).toHaveBeenCalledWith(context.currentTime + .006);
-    expect(sourceGain(context.sources[context.sources.length - 1]).gain.value).toBeLessThan(.2);
+    for(let i=0;i<8;i++) audio.pocket();
+    expect(context.sources).toHaveLength(8);
+    expect(context.sources.filter(s=>s.stop.mock.calls.length)).toHaveLength(2);
+    expect(context.sources[7].start).toHaveBeenCalledWith(context.currentTime+.006);
+    expect(sourceGain(context.sources[7]).gain.value).toBeLessThan(.08);
   });
   it('disconnects finished source and envelope nodes', () => {
     const audio = new BilliardsAudio(); audio.pocket();
     const s = context.sources[0]; s.onended!();
     expect(s.disconnect).toHaveBeenCalledOnce();
     expect(sourceGain(s).disconnect).toHaveBeenCalledOnce();
-    audio.pocket(); expect(sourceGain(context.sources[1]).gain.value).toBe(.47);
+    audio.pocket(); expect(sourceGain(context.sources[1]).gain.value).toBe(.16);
   });
-  it('uses the dedicated lowpass/compressor only for gem sounds', () => {
+  it('uses the dedicated lowpass/compressor for table contacts while keeping celebration separate', () => {
     const audio = new BilliardsAudio(); audio.pocket(); audio.strike(100);
     expect(context.compressors).toHaveLength(1);
-    expect(context.filters[0].frequency.value).toBe(6200);
-    expect(context.compressors[0].ratio.value).toBe(6);
-    const noiseGain = context.filters[1].targets[0] as Gain;
-    expect(noiseGain.targets[0]).toBe(context.gains[0]);
+    expect(context.filters[0].frequency.value).toBe(6800);
+    expect(context.compressors[0].ratio.value).toBe(3);
+    expect(context.sources.every(s=>sourceGain(s).targets[0]===context.filters[0])).toBe(true);
   });
-  it('keeps stone collisions dominated by low-mid weight with bounded upper detail at unchanged gain', () => {
+  it('uses short resin clicks and a quieter low cushion instead of pitched gem weight', () => {
     const audio = new BilliardsAudio();
-    for (const intensity of [.05, .5, 1]) {
+    for (const intensity of [.05,.5,1]) {
       audio.ballCollision(intensity);
-      const source = context.sources[context.sources.length - 1];
-      const data = source.buffer!.data;
-      const total = energy(data);
-      expect(lowpassEnergy(data, 700, context.sampleRate) / total).toBeGreaterThan(.70);
-      // Keep some upper contact detail while removing the sharp crystal ring.
-      expect(lowpassEnergy(data, 700, context.sampleRate) / total).toBeLessThan(.96);
-      expect(sourceGain(source).gain.value).toBeCloseTo(.18 + intensity ** .75 * .34);
+      const source=context.sources[context.sources.length-1]!;
+      expect(source.buffer!.duration).toBeLessThan(.06);
+      expect(sourceGain(source).gain.value).toBeCloseTo(.055+intensity**.85*.20);
+      expect(lowpassEnergy(source.buffer!.data,700,context.sampleRate)/energy(source.buffer!.data)).toBeLessThan(.55);
       advance(300);
     }
-    audio.pocket();
-    expect(sourceGain(context.sources[context.sources.length - 1]).gain.value).toBe(.47);
+    audio.cushion(1);
+    expect(sourceGain(context.sources[context.sources.length-1]!).gain.value).toBeCloseTo(.16);
+    expect(context.sources[context.sources.length-1]!.buffer!.duration).toBeLessThan(.09);
+    advance(300);audio.pocket();
+    expect(sourceGain(context.sources[context.sources.length-1]!).gain.value).toBe(.16);
     expect(context.gains[0].gain.value).toBe(.5);
-    expect(context.gains[1].gain.value).toBe(.82);
   });
   it('settles quickly after contact instead of adding a long metallic ring', () => {
     const audio = new BilliardsAudio(); audio.ballCollision(1);
     const collision = context.sources[0].buffer!.data;
-    expect(energy(collision, Math.floor(context.sampleRate * .100)) / energy(collision)).toBeLessThan(.007);
+    expect(energy(collision, Math.floor(context.sampleRate * .025)) / energy(collision)).toBeLessThan(.007);
     audio.pocket();
     const pocket = context.sources[1].buffer!.data;
-    expect(energy(pocket, Math.floor(context.sampleRate * .150)) / energy(pocket)).toBeLessThan(.003);
+    expect(energy(pocket, Math.floor(context.sampleRate * .100)) / energy(pocket)).toBeLessThan(.003);
   });
   it.each([8000, 22050, 44100, 96000])('renders bounded weighted transients at %iHz', rate => {
     context.sampleRate = rate;

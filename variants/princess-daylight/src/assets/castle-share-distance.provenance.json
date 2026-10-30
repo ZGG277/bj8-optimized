@@ -1,0 +1,23 @@
+{
+  "asset": "castle-share-distance.jpg",
+  "created": "2026-10-30",
+  "origin": "original existing princess-daylight Scene3D castle, independent author-time WebGL render; no generated AI media or external artwork",
+  "camera": {
+    "position": [
+      3.5,
+      2.8,
+      4.8
+    ],
+    "lookAt": [
+      0,
+      0.35,
+      0
+    ],
+    "resolution": [
+      1200,
+      900
+    ]
+  },
+  "usage": "second victory-note image; static castle wide shot, not a purported screenshot of the player's winning table",
+  "sha256": "65b38b0196ea82c48a2493d556acd0ade828a517feb82d4f23057eaa7b83ed3a"
+}

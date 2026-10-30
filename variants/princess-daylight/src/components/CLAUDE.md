@@ -101,3 +101,7 @@ Scoreboard 显示本局姓名与小头像；RoyalFinish 使用同一头像和专
 2026-10-25：OpeningFilm 继续消费 provenance.durationSeconds；离线画面与原声同步加速1.15倍，保留音高。跳过/后台/卸载停止逻辑保留。
 
 `CompanionCollection.tsx`: 每位陪练一张的赞美卡册，未解锁卡背、专属表情与赞美、重复胜局次数；左右滑动/方向键和翻页按钮，弹层隔离球桌输入。PauseMenu与RoyalFinish提供入口，结算失败保存提示保留。
+
+2026-10-30 R3：RoyalFinish所显示的本局陪练/鼓励语生成图即分享首图，第二图为既有城堡独立远景，预填#小红书小工具；取消保持文案且可重开。FollowAuthor隐藏作者本人入口。TableStage保留真实合法进球1.6秒文字提示，Scoreboard只协调一次播报，不添加HUD球号光圈/放大。ShootControl保持1.0.6字节。
+
+2026-10-30 用户直接修改：PraiseCard/皇家胜负/卡册共用同一完整金边卡体和≤10字原句；胜负不挂解释，黑八失手单句安慰。RoyalFinish底部左分享右重开，卡册移顶部。CompanionCollection按实际逐局history顺序展示，旧无逐局记录显示此前收藏，不再填未获得卡背。ControlHelp提供七项按常用程度排序的说明；ViewToolbar仅全局/第一且任意时刻一个选色。原规则与首局手势引导保留。

@@ -8,6 +8,7 @@ export const SAVE_KEYS = [
   'princess-billiards:muted:v1',
   'princess-billiards:guide-learning:v1',
   'princess-billiards:companion-collection:v1',
+  'princess-billiards:victory-praise:v1',
 ];
 export type SaveStore = Pick<Storage, 'getItem' | 'setItem'>;
 type NativeCache = {

@@ -13,9 +13,10 @@ export function FollowAuthor() {
     return unsubscribe;
   }, []);
   if (state.phase === 'idle' || state.phase === 'unsupported' || state.phase === 'querying') return null;
+  if (state.status === 2) return null;
   const retry = state.phase === 'error';
   const disabled = !retry && (state.phase !== 'ready' || state.status !== 0);
-  const label = retry ? '重试关注状态' : state.status === 1 ? '已关注作者' : state.status === 2 ? '作者本人' : state.phase === 'pending' ? '等待确认' : '关注作者';
+  const label = retry ? '重试关注状态' : state.status === 1 ? '已关注作者' : state.phase === 'pending' ? '等待确认' : '关注作者';
   return <div className="follow-author-entry">
     <button type="button" className="follow-author-button" disabled={disabled} onClick={() => {
       const controller = getFollowController();

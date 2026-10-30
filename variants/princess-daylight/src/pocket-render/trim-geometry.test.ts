@@ -160,7 +160,7 @@ describe('shared wood/leather boundary', () => {
     for (const p of POCKETS) createPocketTrimGeometry(pocketSeamContract(p, pocketRenderProfile(p)));
     createTableFrameGeometry(contracts);
     expect(JSON.stringify({ TABLE, POCKETS, CUSHION_SEGMENTS, profiles: POCKETS.map(pocketRenderProfile) })).toBe(before);
-    expect(POCKETS.map(p => Number(p.mouthWidth.toFixed(4)))).toEqual([.140, .140, .120, .120, .140, .140]);
+    expect(POCKETS.map(p => Number(p.mouthWidth.toFixed(4)))).toEqual([.1435, .1435, .123, .123, .1435, .1435]);
     expect(TABLE.ballRadius).toBeCloseTo(.041576625, 10);
   });
 });

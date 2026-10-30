@@ -12,7 +12,7 @@ import {
   predictBallCollisionDirections,
   type BilliardsWorld,
 } from './physics';
-import { aimSolutionForPocket, firstObjectHit } from './aim/aim-solution';
+import { firstObjectHit } from './aim/aim-solution';
 import { createAimCameraFraming, type CameraSafetyInsets, type CameraFraming } from './camera-framing';
 
 export type CameraAimIntent = {
@@ -77,7 +77,7 @@ function objectDirectionAtFirstContact(
 
 /**
  * 相机袋口只由“当前首碰后目标球将往哪里走”决定：
- * - 先复用 aimSolutionForPocket 过滤被挡的目标→袋口路线；
+ * - 过滤被挡的目标→袋口路线，不依赖另一条理想白球路径是否可解；
  * - 再以 physics 的碰撞出射方向最小化未归一化的实际夹角；
  * - dot<=0 的反向袋永不入选，避免薄切把画面带到目标球身后。
  */
@@ -94,13 +94,18 @@ export function inferCameraAimIntent(
 
   let best: CameraAimIntent | null = null;
   for (let index = 0; index < POCKETS.length; index += 1) {
-    // 复用既有的清路/袋口窗口几何；不要用它的 currentAngle 误差排名。
-    if (!aimSolutionForPocket(world, targetNumber, index, angle)) continue;
     const mouth = getPocketAimWindow(POCKETS[index]);
     const toPocketX = mouth.center.x - target.x;
     const toPocketZ = mouth.center.z - target.z;
     const distance = Math.hypot(toPocketX, toPocketZ);
     if (distance <= 1e-8) continue;
+    // Frame the actual outgoing ray. An ideal alternate cue path need not be solvable.
+    const blocked = world.balls.some(ball => {
+      if (!ball.active || ball.number === targetNumber) return false;
+      const t = ((ball.x - target.x) * toPocketX + (ball.z - target.z) * toPocketZ) / (distance * distance);
+      return t > 0 && t < 1 && Math.hypot(ball.x - target.x - t * toPocketX, ball.z - target.z - t * toPocketZ) < R * 2;
+    });
+    if (blocked) continue;
     const nx = toPocketX / distance;
     const nz = toPocketZ / distance;
     const dot = direction.x * nx + direction.z * nz;

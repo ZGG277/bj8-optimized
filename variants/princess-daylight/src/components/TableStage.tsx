@@ -11,8 +11,11 @@ import type { GameMode, MatchTrainingSummary } from '../opponent/model';
 import { RoyalFinish } from './RoyalFinish';
 import type { CompanionReward } from '../opponent/companion-collection';
 import { finishReason } from '../match/presentation';
+import type { ShotReward } from '../shot-reward';
 
 interface TableStageProps {
+  victoryPraise?: string;
+  shotReward?: ShotReward | null;
   collectionReward?: CompanionReward | null;
   collectionSaveFailed?: boolean;
   onCollection?: () => void;
@@ -33,6 +36,8 @@ interface TableStageProps {
 }
 
 export function TableStage({
+  victoryPraise,
+  shotReward,
   collectionReward, collectionSaveFailed, onCollection,
   viewLevel,
   spectatorActive,
@@ -61,8 +66,9 @@ export function TableStage({
         onLostPointerCapture={onPointerCancel}
       >
         {match.phase === 'placing' && match.messageKey.startsWith('place-') && <div className="royal-turn-status" role="status">{match.messageKey === 'place-occupied' ? '这里有球' : match.messageKey === 'place-near-pocket' ? '离袋口远一点' : '放在开球区'}</div>}
+        {shotReward && match.phase !== 'finished' && <div key={shotReward.shotId} className="royal-turn-status royal-shot-reward" role="status">{shotReward.text}</div>}
 
-        {match.phase === 'finished' && <RoyalFinish collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} reason={match.messageKey === 'win-8' ? '' : finishReason(match)} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
+        {match.phase === 'finished' && <RoyalFinish victoryPraise={victoryPraise} collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} messageKey={match.messageKey} reason={match.messageKey === 'win-8' ? '' : finishReason(match)} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
       </div>
 
     </section>

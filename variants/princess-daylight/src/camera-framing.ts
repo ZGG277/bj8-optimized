@@ -1,6 +1,6 @@
 /*
 [INPUT]: 已确认的白球/首碰目标球/袋口轮廓、当前视觉方位、视口比例与 HUD 安全边距
-[OUTPUT]: 固定 46° FOV 下的瞄准构图与全台构图位姿，以及可由 DOM 控件矩形导出的安全边距
+[OUTPUT]: 实验版34°偏好瞄准高度与固定46°FOV安全构图，全台位姿及HUD安全边距继续共用
 [POS]: 不依赖 React/Three.js/物理世界的纯投影拟合层；确认帧只冻结目标身份，pose 始终消费当前视觉方位
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -290,7 +290,7 @@ function projectedBounds(points: readonly FramingPoint[], pose: FramingPose, asp
   return { minX, maxX, minY, maxY };
 }
 
-export const AIM_CAMERA_ELEVATION_DEGREES = 28;
+export const AIM_CAMERA_ELEVATION_DEGREES = 34;
 
 function aimPoseAtDistance(
   framing: CameraFraming,
@@ -299,7 +299,7 @@ function aimPoseAtDistance(
 ): FramingPose {
   const sin = Math.sin(azimuth);
   const cos = Math.cos(azimuth);
-  // 幽灵球确认后使用轻微抬高的 28° 构图；保留第一人称方向感，同时更容易看清目标球与袋口。
+  // 仙境实验：28°→34°，同时覆盖实际第一人称瞄准构图，避免只抬高未确认目标时的回退镜头。
   const elevation = Math.tan(AIM_CAMERA_ELEVATION_DEGREES * Math.PI / 180);
   const height = Math.max(0.24, distance * elevation);
   const centerX = (framing.cue.x + framing.object.x + framing.pocket.center.x) / 3;

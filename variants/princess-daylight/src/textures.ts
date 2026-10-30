@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖浏览器 Canvas API 与 Three.js CanvasTexture
-[OUTPUT]: 对外提供支持原绿与深蓝染色的米制无缝台呢、细皮革、木纹、整红宝石/整黄玉球号与六点母球的程序化贴图工厂
+[OUTPUT]: 对外提供支持原绿、深蓝与实验清绿的米制无缝台呢、细皮革、木纹、整红宝石/整黄玉球号与六点母球的程序化贴图工厂
 [POS]: 渲染资源层；只生成纹理，不持有场景或对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
@@ -52,11 +52,11 @@ export function makeClothMaps(size = 512, palette: 'green' | 'royal-blue' | 'sof
     const i = (y * size + x) * 4;
     const velvet=palette==='royal-blue'||palette==='princess-blue';
     const soft=palette==='soft-green';
-    const base=palette==='princess-blue'?[16,43,92]:palette==='tiffany-blue'?[105,190,193]:velvet?[9,32,82]:soft?[48,105,79]:[10,91,60];
-    const colourTone=velvet?grain*19:soft?(grain*3.2+nap*.8+warp*.7+weft*.3):tone;
+    const base=palette==='princess-blue'?[16,43,92]:palette==='tiffany-blue'?[105,190,193]:velvet?[9,32,82]:soft?[45,117,91]:[10,91,60];
+    const colourTone=velvet?grain*19:soft?(grain*1.8+nap*.25+warp*.45+weft*.2):tone;
     data[0].data.set([clampByte(base[0] + colourTone * (velvet ? .38 : .6)), clampByte(base[1] + colourTone * (velvet ? .72 : 1)), clampByte(base[2] + colourTone * (velvet ? 1.2 : .7)), 255], i);
-    const normalX=velvet?128+(clothNoise(x,y,0x9187)-.5)*70:128+Math.cos(px*128)*9;
-    const normalY=velvet?128+(clothNoise(y,x+47,0x6129)-.5)*70:128+Math.cos(py*192)*13+nap*(soft?5:2);
+    const normalX=velvet?128+(clothNoise(x,y,0x9187)-.5)*70:128+Math.cos(px*128)*(soft?6:9);
+    const normalY=velvet?128+(clothNoise(y,x+47,0x6129)-.5)*70:128+Math.cos(py*192)*(soft?8:13)+nap*(soft?1.5:2);
     data[1].data.set([clampByte(normalX),clampByte(normalY),255,255],i);
     const rough=clampByte(velvet?245+grain*18:239+warp*3+grain*5+nap*2);
     data[2].data.set([rough, rough, rough, 255], i);

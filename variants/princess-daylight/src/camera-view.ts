@@ -1,6 +1,6 @@
 /*
 [INPUT]: 母球位置、独立相机方位角、力度预览、归一化视角高度与视口宽高比
-[OUTPUT]: 对外提供稍高出杆瞄准位、连续视角钳制、观战锁定路由、横竖屏全台方向、玩家非俯视杆向跟随与相机位姿
+[OUTPUT]: 实验版将第一人称基础高度抬至22cm，保留稍高出杆瞄准位、连续视角与全台位姿
 [POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式，全台投影拟合委托 camera-framing
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -20,7 +20,7 @@ export { CAMERA_FOV_DEGREES } from './camera-framing';
 
 const FP_CAM_DIST = 0.72;
 const FP_CAM_SIDE = 0.015;
-const FP_CAM_HEIGHT = 0.16;
+const FP_CAM_HEIGHT = 0.22;
 const FP_LOOK_AHEAD = 0.42;
 const OVERHEAD_ORBIT_RADIUS = 0.85;
 /** 木帮外缘的半尺寸，略留 1cm 给阴影和抗锯齿边缘。 */

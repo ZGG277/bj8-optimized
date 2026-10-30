@@ -8,12 +8,14 @@ import type { MatchState } from '../match/types';
 import type { OpponentProfile, PlayerSkillProfile, GameMode } from '../opponent/model';
 import { companionFor } from '../opponent/companions';
 import { turnDescription } from '../match/presentation';
+import type { ShotReward } from '../shot-reward';
 interface ScoreboardProps {
   match: MatchState; worldView: BilliardsWorld;
   playerSkill: PlayerSkillProfile; opponentProfile: OpponentProfile;
   gameMode?: GameMode; onModeChange?: (mode: GameMode) => void;
+  shotReward?: ShotReward | null;
 }
-export function Scoreboard({ match, worldView }: ScoreboardProps) {
+export function Scoreboard({ match, worldView, shotReward }: ScoreboardProps) {
   const companion = companionFor(match.companionId);
   const active = new Set(worldView.balls.filter(ball => ball.active).map(ball => ball.number));
   const solids = [1,2,3,4,5,6,7], stripes = [9,10,11,12,13,14,15];
@@ -33,6 +35,6 @@ export function Scoreboard({ match, worldView }: ScoreboardProps) {
     <div className="royal-player opponent" data-active={match.actor === 'opponent' && match.phase !== 'finished'}>
       {rack(opponent, companion.name)}<span className="player-name">{companion.name}</span><img className="royal-companion-avatar" src={companion.avatar} alt={`${companion.name}头像`} width="26" height="26"/>
     </div>
-    <span className="royal-sr-only" role="status">{turnDescription(match, ready)}</span>
+    <span className="royal-sr-only" role={shotReward ? undefined : 'status'} aria-hidden={shotReward ? true : undefined}>{turnDescription(match, ready)}</span>
   </section>;
 }

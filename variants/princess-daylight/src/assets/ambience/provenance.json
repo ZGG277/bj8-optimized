@@ -1,8 +1,8 @@
 {
-  "title": "Park ambiences",
+  "title": "Fairyland local experiment — bird chirps, river and airy music",
   "author": "Thimras",
   "sourcePage": "https://opengameart.org/content/park-ambiences",
-  "license": "CC0-1.0",
+  "license": "CC0-1.0 (field recordings only)",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "recordedLocation": "Public park in Adelaide, South Australia, winter",
   "recordingClaim": "Uploader describes real field recordings; not synthetic bird or water generation",
@@ -29,9 +29,25 @@
       ]
     }
   ],
-  "processing": "32-second excerpts, light band filtering, birds1.2 and river0.4 mix, loudness -23LUFS target / -3dBTP,1.5-second cyclic seam crossfade;24kHz mono40kbps MP3",
+  "processing": "Existing 32s excerpts only; bird band 2400–6200Hz at .026 RMS with .075 soft peak limit; river 160–6500Hz at .09 RMS; original synthesized open-fifth pads and eight softly shaped pentatonic flute-like notes at .065 RMS; 1.5s cyclic crossfade; -23LUFS/-3dBTP target; 24kHz mono40kbps MP3",
   "outputBytes": 152996,
-  "outputSha256": "11d2111fff1e21845e9e213a65f5c45998e071c1f39dc419d8e63cef429d5772",
+  "outputSha256": "cbb973f6c40addd814f42b7fe21ccd43ccd09f22f57c96a69a69a502254c3b4e",
   "durationSeconds": 30.5,
-  "originalMaterialRetainedLocally": true
+  "originalMaterialRetainedLocally": true,
+  "music": {
+    "origin": "Deterministic original synthesis; no external music sampled",
+    "script": "scripts/render-fairy-ambience.py",
+    "distribution": "Original procedural composition bundled by the author for this game"
+  },
+  "inputExcerpts": {
+    "birds": {
+      "fileName": "birds-excerpt.wav",
+      "sha256": "1ee114a31540176fa9c5afe1170502ac2d055f46cf4a24174757507977c78f05"
+    },
+    "river": {
+      "fileName": "river-excerpt.wav",
+      "sha256": "66767e219e9dd5ac8d0edd4139793973f14189f5d93419cfce00c1783cf337ad"
+    }
+  },
+  "reviewLimit": "Suppression of low intrusive calls; species and final listening quality require human review"
 }

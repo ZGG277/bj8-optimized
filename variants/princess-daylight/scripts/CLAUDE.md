@@ -10,6 +10,10 @@
 
 ## 成员清单
 
+`fairy-table-finish.test.ts`：独立实验的真实GLB组件与材质预算测试，使用Node文件API，按既有资产测试惯例放在scripts；未删除原基线测试。
+
+`render-fairy-ambience.py`：仅处理本机既有录音副本并程序合成轻音乐；输出独立实验的30.5秒离线环境声及处理来源，不下载或调用付费服务。
+
 `verify-post-match-feedback.mjs`: PM 授权时段内运行的局后反馈真实入口脚本；只访问包装 Vite 的独立 DEV 预览游戏，仅用 __bj8 摆结束前球位，出杆走真实鼠标/触控。记录真实 winner/messageKey/犯规/球袋/shot 事实，接受规则结算出的胜或负，并核对结束 UI 和每次 POST 的 outcome；不要求 fixture 必须赢，也不直接写 finished。覆盖桌面 1280×800、手机 390×844 的保存、跳过、网络失败/同键重试、登录失败不跳转与发送中继续，产出截图和无凭证 JSON 回执。真实写入要求 `ALLOW_FEEDBACK_WRITE=1`，并统一带 PM-FEEDBACK-20260910 前缀；数据库新会话回读及生产包真实入口另由 PM 验收。隔离构建必须显式设置 `VITE_BJ8_ACCEPTANCE=1`，正式构建不设置且不携带 __bj8。
 
 `inline-build.mjs` 的显式 `BJ8_BUILD_OUT_DIR` 可将同样的单文件转换用于隔离 DEV 候选；省略时仍只写产品 `dist`。DEV 预览不可作为正式 sync 或发布来源。

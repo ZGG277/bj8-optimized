@@ -71,7 +71,7 @@ function threeProjection(
 }
 
 describe('adaptive camera framing', () => {
-  it('幽灵球确认后的偏好机位轻微抬高到 28°', () => {
+  it('实验默认瞄准位抬高到34°，继续保留第一人称方向', () => {
     const input = framing();
     const result = aimCameraPose(input, 0.3, 1280 / 800);
     const horizontal = Math.hypot(
@@ -79,9 +79,9 @@ describe('adaptive camera framing', () => {
       result.pose.position.z - input.cue.z,
     );
     const elevation = Math.atan2(result.pose.position.y, horizontal) * 180 / Math.PI;
-    expect(AIM_CAMERA_ELEVATION_DEGREES).toBe(28);
-    expect(elevation).toBeGreaterThanOrEqual(27.9);
-    expect(elevation).toBeLessThan(34);
+    expect(AIM_CAMERA_ELEVATION_DEGREES).toBe(34);
+    expect(elevation).toBeGreaterThanOrEqual(33.9);
+    expect(elevation).toBeLessThan(40);
   });
 
   it('与 Three.js lookAt 的左右轴完全一致，避免右侧 HUD 安全区镜像', () => {

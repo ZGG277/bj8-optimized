@@ -42,23 +42,20 @@ describe('控件提示定位与锚点', () => {
     expect(controlTipCopy('view-manual', undefined)).toContain('手动视角');
   });
 
-  it('视角三个图标有独立 ID，移除推杆但保留禁用语义', () => {
+  it('两个视角有独立ID并保留禁用语义', () => {
     const markup = renderToStaticMarkup(<ViewToolbar viewLevel={1} manualCameraActive={false} disabled orientation="vertical" onViewLevel={() => {}} onToggleManualCamera={() => {}} />);
-    for (const id of ['view-overhead', 'view-manual', 'view-first-person']) {
+    for (const id of ['view-overhead', 'view-first-person']) {
       expect(markup).toContain(`data-control-tip="${id}"`);
     }
     expect(markup).toContain('aria-disabled="true"');
     expect(markup).not.toContain('role="slider"');
   });
 
-  it('俯视与手动视角提供状态准确的常驻速查文字，仍保留可聚焦按钮语义', () => {
-    const inactive = renderToStaticMarkup(<ViewToolbar viewLevel={0.5} manualCameraActive={false} disabled={false} orientation="vertical" onViewLevel={() => {}} onToggleManualCamera={() => {}} />);
-    const active = renderToStaticMarkup(<ViewToolbar viewLevel={0.5} manualCameraActive disabled={false} orientation="vertical" onViewLevel={() => {}} onToggleManualCamera={() => {}} />);
-    expect(inactive).toContain('data-control-tip-copy="俯视：俯视全台"');
-    expect(inactive).toContain('data-control-tip-copy="开启手动视角：拖动球桌旋转观察"');
-    expect(active).toContain('data-control-tip-copy="退出手动视角：保留当前观察角度"');
-    expect(inactive).toContain('aria-label="开启手动视角"');
-    expect(active).toContain('aria-label="退出手动视角"');
+  it('全局与第一视角互斥选中，移除手动视角按钮', () => {
+    const global=renderToStaticMarkup(<ViewToolbar viewLevel={1} manualCameraActive={false} disabled={false} orientation="vertical" onViewLevel={()=>{}} onToggleManualCamera={()=>{}}/>);
+    const first=renderToStaticMarkup(<ViewToolbar viewLevel={.16} manualCameraActive={false} disabled={false} orientation="vertical" onViewLevel={()=>{}} onToggleManualCamera={()=>{}}/>);
+    expect(global).toContain('aria-label="全局视角"');expect(first).toContain('aria-label="第一视角"');
+    for(const html of [global,first]){expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);expect(html).not.toContain('手动视角');}
   });
 
   it('左右微调、拨轮、击球点与出杆各有精确动作锚点', () => {

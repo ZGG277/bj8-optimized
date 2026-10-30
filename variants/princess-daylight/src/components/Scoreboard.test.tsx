@@ -31,3 +31,13 @@ describe('one-row ball progress',()=>{
     expect(html).not.toContain('data-ball-number="1"');
   });
 });
+
+describe('pot text announcement without HUD pulse',()=>{
+ it('keeps existing ball progress, avoids duplicate speech and adds no extra animation class',()=>{
+  const match={...createInitialMatchState(),playerGroup:'solid' as const,breaking:false};
+  const world=createInitialWorld(()=>.5),profile=createPlayerSkillProfile();world.balls.find(ball=>ball.number===3)!.active=false;
+  const html=renderToStaticMarkup(<Scoreboard match={match} worldView={world} playerSkill={profile} opponentProfile={createOpponentProfile(profile,'practice')} shotReward={{shotId:2,ballNumbers:[3],text:'漂亮进球 · 继续'}}/>);
+  expect(html).toContain('class="mini-ball solid down"');expect(html).not.toContain('is-rewarded');
+  expect(html).toContain('class="royal-sr-only" aria-hidden="true"');
+ });
+});

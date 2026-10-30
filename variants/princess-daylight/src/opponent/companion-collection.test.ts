@@ -39,4 +39,24 @@ describe('companion victory collection', () => {
     expect(saveCompanionCollection(null, emptyCompanionCollection())).toBe(false);
     expect(saveCompanionCollection({getItem:()=>null,setItem:()=>{throw Error('quota');}},emptyCompanionCollection())).toBe(false);
   });
+  it('archives every real win in settlement order, retaining the exact line across reloads', () => {
+    const store=memoryStore();
+    const first=collectCompanionWin(emptyCompanionCollection(),COMPANIONS[3].id,300,'这一杆真漂亮')!;
+    const second=collectCompanionWin(first.collection,COMPANIONS[0].id,200,'这份准头我服了')!;
+    const third=collectCompanionWin(second.collection,COMPANIONS[3].id,400,'这一局为你鼓掌')!;
+    expect(third.collection.history?.map(c=>c.praise)).toEqual(['这一杆真漂亮','这份准头我服了','这一局为你鼓掌']);
+    expect(third.collection.history?.map(c=>c.ordinal)).toEqual([1,2,3]);
+    expect(third.collection.cards[COMPANIONS[3].id].wins).toBe(2);
+    saveCompanionCollection(store,third.collection);
+    expect(loadCompanionCollection(store)).toEqual(third.collection);
+  });
+  it('keeps old totals without inventing lost praise or dropping the new history on a bad record', () => {
+    const old=collectCompanionWin(emptyCompanionCollection(),COMPANIONS[0].id,10)!;
+    const next=collectCompanionWin(old.collection,COMPANIONS[1].id,20,'出手就是好球')!;
+    expect(next.collection.history?.[0].ordinal).toBe(2);
+    const store=memoryStore(JSON.stringify({...next.collection,history:[...next.collection.history!,{id:'bad',praise:'a'.repeat(40)}]}));
+    expect(loadCompanionCollection(store).history).toHaveLength(1);
+    expect(loadCompanionCollection(store).cards).toEqual(next.collection.cards);
+  });
+
 });

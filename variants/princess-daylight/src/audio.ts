@@ -1,16 +1,11 @@
 /*
-[INPUT]: 依赖浏览器 Web Audio API 与物理事件传入的速度/类型
-[OUTPUT]: 对外提供 BilliardsAudio，合成带短促圆润石质共鸣与厚实中低频支撑的宝石球碰/落袋、出杆、碰库与克制胜局彩炮音效
-[POS]: 表现层音频适配器；击球为合成音效、环境为包内真实录音，不参与物理和规则判定
-[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
-
- * WebAudio 音效与离线解码的CC0公园实录环境声
- * - 球球碰撞：145–190Hz 实心碰击 + 中频非谐波石质触点；自然环境声复用静音/暂停边界
- * - 落袋：156Hz 下坠落定 + 一次克制闪光，独立于胜局音效
- * - 宝石专用总线：6.2kHz 低通、软压缩、六声并发、有限波形缓存
- * - 出杆：皮革击打声
- */
+[INPUT]: 浏览器Web Audio和物理事件强度
+[OUTPUT]: 干净短促的树脂球接触、柔和橡胶库边与皮袋落球模拟，保留环境音/轻音乐及静音暂停边界
+[POS]: 表现层音频适配器，不修改碰撞或规则；声效为程序模拟而非真实录音
+[PROTOCOL]: 变更时检查CLAUDE.md
+*/
 import { decodeNatureAmbience } from './nature-ambience';
+import { billiardContact, type ContactKind } from './billiard-contact';
 
 export class BilliardsAudio {
   private muted = false;
@@ -24,107 +19,62 @@ export class BilliardsAudio {
   private ambienceBuffer: AudioBuffer | null = null;
   private ambienceLoading: Promise<void> | null = null;
   private ambience: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
-  private gemBus: BiquadFilterNode | null = null;
-  private gemBuffers = new Map<string, AudioBuffer>();
-  private gemVoices: {
+  private contactBus: BiquadFilterNode | null = null;
+  private contactBuffers = new Map<string, AudioBuffer>();
+  private contactVoices: {
     source: AudioBufferSourceNode;
     gain: GainNode;
     end: number;
-    kind: 'collision' | 'pocket';
+    kind: ContactKind;
   }[] = [];
 
-  /** Kept separate so cushion, strike and victory retain their original signal path. */
-  private ensureGemBus(): boolean {
+  /** All table contacts share bounded headroom; celebration remains separate. */
+  private ensureContactBus(): boolean {
     if (!this.ensure() || !this.ctx || !this.master) return false;
-    if (!this.gemBus) {
-      this.gemBus = this.ctx.createBiquadFilter();
-      this.gemBus.type = 'lowpass';
-      this.gemBus.frequency.value = Math.min(6200, this.ctx.sampleRate * 0.42);
-      this.gemBus.Q.value = 0.5;
+    if (!this.contactBus) {
+      this.contactBus = this.ctx.createBiquadFilter();
+      this.contactBus.type = 'lowpass';
+      this.contactBus.frequency.value = Math.min(6800, this.ctx.sampleRate * 0.42);
+      this.contactBus.Q.value = 0.5;
       const compressor = this.ctx.createDynamicsCompressor();
       compressor.threshold.value = -16;
       compressor.knee.value = 12;
-      compressor.ratio.value = 6;
+      compressor.ratio.value = 3;
       compressor.attack.value = 0.002;
-      compressor.release.value = 0.075;
+      compressor.release.value = 0.04;
       const headroom = this.ctx.createGain();
       headroom.gain.value = 0.82;
-      this.gemBus.connect(compressor);
+      this.contactBus.connect(compressor);
       compressor.connect(headroom);
       headroom.connect(this.master);
     }
     return true;
   }
 
-  /** Nine collision timbres plus one pocket timbre; no file, fetch or timer. */
-  private gemBuffer(kind: 'collision' | 'pocket', intensity: number): AudioBuffer {
-    const ctx = this.ctx!;
-    const level = Math.round(intensity * 8);
-    const key = kind === 'pocket' ? kind : `collision-${level}`;
-    const cached = this.gemBuffers.get(key);
+  /** Short cached resin/rubber/leather contacts, with no delayed glint or ring. */
+  private contactBuffer(kind: ContactKind, intensity: number): AudioBuffer {
+    const ctx = this.ctx!, level = Math.round(intensity * 8);
+    const key = kind === 'pocket' ? kind : `${kind}-${level}`;
+    const cached = this.contactBuffers.get(key);
     if (cached) return cached;
-    const v = level / 8;
-    const duration = kind === 'pocket' ? 0.28 : 0.14 + v * 0.045;
-    const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * duration), ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    const pocket = kind === 'pocket';
-    // A compact low-mid body makes the gem feel solid, with enough upper body
-    // to remain audible on phone speakers. Inharmonic modes avoid a drum note.
-    const bodyHz = pocket ? 156 : 145 + Math.sqrt(v) * 45;
-    const bodyRatios = pocket ? [1, 1.77, 2.71] : [1, 1.83, 2.79];
-    const bodyWeights = pocket ? [0.80, 0.34, 0.10] : [1.0, 0.52, 0.22];
-    const bodyDecay = pocket ? 0.041 : 0.031 + v * 0.009;
-    const crystalHz = pocket ? 830.6 : 800 + Math.sqrt(v) * 160;
-    const crystalRatios = pocket ? [1, 1.5, 2.393, 3.49] : [1, 1.47, 2.13, 3.05];
-    const crystalWeights = pocket ? [0.62, 0.27, 0.092, 0.026] : [0.26, 0.08, 0.018, 0.004];
-    // A soft stone contact sits above the solid body; upper modes decay before they ring.
-    const crystalDecay = pocket ? 0.032 : 0.012 + v * 0.004;
-    const usefulHz = Math.min(5500, ctx.sampleRate * 0.42);
-    let peak = 0;
-    for (let i = 0; i < data.length; i++) {
-      const t = i / ctx.sampleRate;
-      const attack = 1 - Math.exp(-t / (pocket ? 0.0007 : 0.0012));
-      let sample = 0;
-      for (let mode = 0; mode < bodyRatios.length; mode++) {
-        const hz = bodyHz * bodyRatios[mode];
-        if (hz >= usefulHz) continue;
-        sample += bodyWeights[mode] * Math.sin(2 * Math.PI * hz * t)
-          * Math.exp(-t / (bodyDecay / (1 + mode * 0.48)));
-      }
-      for (let mode = 0; mode < crystalRatios.length; mode++) {
-        const hz = crystalHz * crystalRatios[mode];
-        if (hz >= usefulHz) continue;
-        sample += crystalWeights[mode] * Math.sin(2 * Math.PI * hz * t)
-          * Math.exp(-t / (crystalDecay / (1 + mode * 0.62)));
-      }
-      sample *= attack;
-      if (pocket) {
-        const glintTime = t - 0.047;
-        if (glintTime > 0 && 1245.9 < usefulHz) {
-          sample += 0.14 * Math.sin(2 * Math.PI * 1245.9 * glintTime)
-            * (1 - Math.exp(-glintTime / 0.0012)) * Math.exp(-glintTime / 0.022);
-        }
-      }
-      const tail = Math.max(0, Math.min(1, (data.length - 1 - i) / (ctx.sampleRate * 0.008)));
-      data[i] = sample * tail;
-      peak = Math.max(peak, Math.abs(data[i]));
-    }
-    if (peak > 0) for (let i = 0; i < data.length; i++) data[i] *= 0.92 / peak;
-    this.gemBuffers.set(key, buffer);
+    const samples = billiardContact(kind, level / 8, ctx.sampleRate);
+    const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+    buffer.getChannelData(0).set(samples);
+    this.contactBuffers.set(key, buffer);
     return buffer;
   }
 
-  private playGem(kind: 'collision' | 'pocket', intensity: number) {
-    if (!this.ensureGemBus() || !this.ctx || !this.gemBus) return;
+  private playContact(kind: ContactKind, intensity: number) {
+    if (!this.ensureContactBus() || !this.ctx || !this.contactBus) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
-    this.gemVoices = this.gemVoices.filter(voice => voice.end > now);
+    this.contactVoices = this.contactVoices.filter(voice => voice.end > now);
     let start = now;
-    if (this.gemVoices.length >= 6) {
-      if (kind === 'collision') return;
+    if (this.contactVoices.length >= 6) {
+      if (kind === 'collision' || kind === 'cushion') return;
       // A pocket takes priority. Fade one old voice before its replacement starts.
-      const index = Math.max(0, this.gemVoices.findIndex(voice => voice.kind === 'collision'));
-      const retired = this.gemVoices.splice(index, 1)[0];
+      const index = Math.max(0, this.contactVoices.findIndex(voice => voice.kind === 'collision'));
+      const retired = this.contactVoices.splice(index, 1)[0];
       retired.gain.gain.cancelScheduledValues(now);
       retired.gain.gain.setValueAtTime(retired.gain.gain.value, now);
       retired.gain.gain.linearRampToValueAtTime(0, now + 0.006);
@@ -132,19 +82,19 @@ export class BilliardsAudio {
       start += 0.006;
     }
     const source = ctx.createBufferSource();
-    source.buffer = this.gemBuffer(kind, intensity);
+    source.buffer = this.contactBuffer(kind, intensity);
     const gain = ctx.createGain();
-    const strength = kind === 'pocket' ? 0.47 : 0.18 + Math.pow(intensity, 0.75) * 0.34;
-    gain.gain.value = strength / Math.sqrt(1 + this.gemVoices.length);
+    const strength = kind === 'pocket' ? .16 * (.5 + .5 * Math.sqrt(Math.min(1, intensity / .65))) : kind === 'cushion' ? .04 + Math.pow(intensity, .8) * .12 : kind === 'strike' ? .08 + Math.pow(intensity, .7) * .20 : .055 + Math.pow(intensity, .85) * .20;
+    gain.gain.value = strength / Math.sqrt(1 + this.contactVoices.length);
     source.connect(gain);
-    gain.connect(this.gemBus);
+    gain.connect(this.contactBus);
     const voice = { source, gain, end: start + source.buffer.duration, kind };
-    this.gemVoices.push(voice);
+    this.contactVoices.push(voice);
     source.onended = () => {
       source.disconnect();
       gain.disconnect();
-      const index = this.gemVoices.indexOf(voice);
-      if (index >= 0) this.gemVoices.splice(index, 1);
+      const index = this.contactVoices.indexOf(voice);
+      if (index >= 0) this.contactVoices.splice(index, 1);
     };
     source.start(start);
   }
@@ -232,8 +182,8 @@ export class BilliardsAudio {
     this.stopAmbience(); this.ambienceBuffer = null;
     this.clearVictoryTimers();
     if (this.ctx && this.ctx.state !== 'closed') void this.ctx.close().catch(() => {});
-    this.ctx = null; this.master = null; this.gemBus = null;
-    this.gemBuffers.clear(); this.gemVoices = [];
+    this.ctx = null; this.master = null; this.contactBus = null;
+    this.contactBuffers.clear(); this.contactVoices = [];
   }
 
   private noiseBurst(duration: number, filterFreq: number, gain: number, type: BiquadFilterType = 'bandpass') {
@@ -260,14 +210,14 @@ export class BilliardsAudio {
     src.start();
   }
 
-  /** 厚实而清脆的宝石碰撞，intensity 0-1；力度改变响度、音高与短衰减。 */
+  /** 短促树脂球接触，力度改变响度和干脆程度。 */
   ballCollision(intensity: number) {
     // 节流：同一帧多个碰撞只播一次
     const now = performance.now();
     if (now - this.lastPlay < 25) return;
     this.lastPlay = now;
     const v = Number.isFinite(intensity) ? Math.min(1, Math.max(0.05, intensity)) : 0.05;
-    this.playGem('collision', v);
+    this.playContact('collision', v);
   }
 
   /** 兼容旧的首碰调用名。 */
@@ -280,19 +230,19 @@ export class BilliardsAudio {
     const now = performance.now();
     if (now - this.lastPlay < 25) return;
     this.lastPlay = now;
-    const v = Math.min(1, Math.max(0.05, intensity));
-    this.noiseBurst(0.05 + v * 0.06, 500 + v * 500, 0.10 + v * 0.35, 'lowpass');
+    const v = Number.isFinite(intensity) ? Math.min(1, Math.max(0.05, intensity)) : .05;
+    this.playContact('cushion', v);
   }
 
-  /** 落袋：更低的落定碰击和单次轻亮尾音，保留与球碰不同的听觉反馈。 */
-  pocket() {
-    this.playGem('pocket', 0.65);
+  /** 皮袋落球的柔和双触点；没有提示音或闪光尾音。 */
+  pocket(intensity = .65) {
+    this.playContact('pocket', Number.isFinite(intensity) ? Math.max(.05, Math.min(1, intensity)) : .65);
   }
 
   /** 出杆击打 */
   strike(power: number) {
-    const v = Math.min(1, Math.max(0.1, power / 100));
-    this.noiseBurst(0.04 + v * 0.04, 1600 + v * 1200, 0.2 + v * 0.45);
+    const v = Number.isFinite(power) ? Math.min(1, Math.max(0.1, power / 100)) : .1;
+    this.playContact('strike', v);
   }
 
   /** 胜局彩炮：两声轻爆点加一层短促闪光，不铺满声场。 */

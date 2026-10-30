@@ -18,22 +18,25 @@ export function miniToolApi(): MiniToolApi | undefined {
   return typeof api?.postNote === 'function' ? api : undefined;
 }
 
-export function victoryNote(image: string, mode: GameMode, opponentName = '对手'): NoteDraft {
+export function victoryNote(image: string, mode: GameMode, opponentName = '对手', sceneImage?: string, won = true): NoteDraft {
   if (!/^data:image\/(png|jpeg);base64,/.test(image)) throw new Error('战绩卡生成失败，请重试。');
+  if (sceneImage !== undefined && !/^data:image\/(png|jpeg);base64,/.test(sceneImage)) throw new Error('城堡图片生成失败，请重试。');
   return {
-    title: '这一局，我赢了！',
-    content: `在公主请开球${mode === 'challenge' ? '挑战' : '陪练'}模式赢下${opponentName}。\n从瞄准到落袋，认真打好每一杆。\n#公主请开球 #台球`,
-    mediaInfo: { image_resources: [{ url: image }] },
+    title: won ? '这一局，我赢了！' : '公主的赞美卡',
+    content: won ? `在公主请开球${mode === 'challenge' ? '挑战' : '陪练'}模式赢下${opponentName}。\n从瞄准到落袋，认真打好每一杆。\n#小红书小工具 #公主请开球 #台球` : `在公主请开球和${opponentName}打了一局。\n#小红书小工具 #公主请开球 #台球`,
+    mediaInfo: { image_resources: [image, ...(sceneImage ? [sceneImage] : [])].map(url => ({ url })) },
   };
 }
 
 /** Prefer the documented temporary-file bridge for larger generated cards. */
-export async function postVictoryNote(api: MiniToolApi, image: string, mode: GameMode, opponentName = '对手') {
-  const draft = victoryNote(image, mode, opponentName);
+export async function postVictoryNote(api: MiniToolApi, image: string, mode: GameMode, opponentName = '对手', sceneImage?: string, won = true) {
+  const draft = victoryNote(image, mode, opponentName, sceneImage, won);
   if (typeof api.writeTempFile === 'function') {
-    const { filePath } = await api.writeTempFile({ data: image });
-    if (!filePath || /^https?:/i.test(filePath)) throw new Error('战绩卡暂时无法传递，请重试。');
-    draft.mediaInfo.image_resources[0].url = filePath;
+    for (const resource of draft.mediaInfo.image_resources) {
+      const { filePath } = await api.writeTempFile({ data: resource.url });
+      if (!filePath || /^https?:/i.test(filePath)) throw new Error('战绩卡暂时无法传递，请重试。');
+      resource.url = filePath;
+    }
   }
   return api.postNote(draft);
 }

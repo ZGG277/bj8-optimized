@@ -1,4 +1,4 @@
-/** Real CC0 field recordings, embedded offline like the opening soundtrack. */
+/** Local experiment: CC0 birds/water plus a quiet original synthesized music bed. */
 import recording from './assets/ambience/park-birds-stream.json';
 
 export function decodeNatureAmbience(ctx: AudioContext): Promise<AudioBuffer> {

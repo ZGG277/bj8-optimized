@@ -40,3 +40,5 @@ useGameState.ts 采用友好风格局前档案；useOpponentAI.ts 传递玩家�
 useGameState 在开局抽选十位陪练，胜负后幂等评估准度/走位及最近六局结果；useOpponentAI 在领先或连进时增加留球机会，回退杆也执行一次真实误差，不改变物理/比分。
 
 2026-10-25：useAudioManager 使自然声在城堡/湖面且开场结束后进入，统一跟随静音、暂停、切后台及卸载停止。原声开场继续由OpeningFilm独占管理。
+
+2026-10-30 R3：useGameState在既有assessmentDone胜局守卫内抽取一次鼓励语，重开清本局文案，分享不抽取；useAudioManager保持1.0.6字节，不加入10/28批次音效增量。

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 原始桌球 GLB、共享物理尺寸及宝石光学。
- * [OUTPUT]: 暖哑光象牙桌体、柔和金线与预算内宝石球。
- * [POS]: 视觉资产适配层；仅结构材质降白，不更改已认可的球光学或照明。
+ * [OUTPUT]: 独立实验的清透宝石上缘、象牙下架、细圆弧护口与预算内宝石球。
+ * [POS]: 实际 daylight GLB 视觉适配；消费共享袋口尺寸，不改球光学或照明。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import * as THREE from 'three';
@@ -12,6 +12,7 @@ import { batchStaticTable } from '../minitool/render-guard';
 import { loadGlb } from './glb-loader';
 import { createDaylightEnvironment } from './daylight-environment';
 import { TABLE, POCKETS } from '../physics';
+import { splitFairyTableParts } from './fairy-table-finish';
 import tableUrl from './assets/daylight/table-refined.glb?url';
 import tableHotUrl from './assets/daylight/table-hot.glb?url';
 import ballsUrl from './assets/daylight/balls-quality.glb?url';
@@ -36,12 +37,12 @@ export function setupDaylight(scene:THREE.Scene,renderer:THREE.WebGLRenderer,key
     Object.assign(key.shadow.camera,{left:-6,right:6,top:6,bottom:-6,far:24});key.shadow.camera.updateProjectionMatrix();
     scene.fog=new THREE.Fog(0xcfe2e5,50,230);scene.background=new THREE.Color(0xcfe2e5);
   }
-  renderer.domElement.dataset.visualVersion='marble-nature-polish-20261025';
+  renderer.domElement.dataset.visualVersion='fairy-gem-rails-experiment-20261030';
 }
 function styleCloth(table:THREE.Group){
   table.traverse(o=>{if(!(o instanceof THREE.Mesh)||!(o.name==='table-cloth'||o.name.startsWith('cushion-')))return;
     o.castShadow=true;
-    for(const m of Array.isArray(o.material)?o.material:[o.material])if(m instanceof THREE.MeshPhysicalMaterial){m.color.set(0xd0d6cc);m.roughness=.96;m.metalness=0;m.clearcoat=0;m.sheen=.48;m.sheenColor.set(0x629579);m.sheenRoughness=.88;m.specularIntensity=.09;m.normalScale.set(.27,.27);m.envMapIntensity=.12;}
+    for(const m of Array.isArray(o.material)?o.material:[o.material])if(m instanceof THREE.MeshPhysicalMaterial){m.color.set(0xf4fff9);m.roughness=.9;m.metalness=0;m.clearcoat=0;m.sheen=.18;m.sheenColor.set(0x5a9d85);m.sheenRoughness=.94;m.specularIntensity=.12;m.normalScale.set(.16,.16);m.envMapIntensity=.14;}
   });
 }
 function ivoryMap(){
@@ -61,11 +62,16 @@ function styleTable(root:THREE.Group,hot=false){
   const shell=ivoryMap(),replaced=new Set<THREE.Texture>();
   root.rotation.y=-Math.PI/2;root.position.set(-.81006,-.718,-1.44506);
   root.updateMatrixWorld(true);
+  splitFairyTableParts(root,hot);
+  root.updateMatrixWorld(true);
   root.traverse(o=>{if(!(o instanceof THREE.Mesh))return;o.castShadow=!hot;o.receiveShadow=true;
     // Compress only the outer apron; retain the exact playing rectangle. Both LODs use this same deformation.
     const position=o.geometry.getAttribute('position'),point=new THREE.Vector3(),inverse=o.matrixWorld.clone().invert();
     for(let i=0;i<position.count;i++){
       point.fromBufferAttribute(position,i).applyMatrix4(o.matrixWorld);
+      // Thin only the rolled crown cross-section vertically; its rounded mouth
+      // contour and shared aperture deformation are retained in both LODs.
+      if(o.userData.fairyRole==='pocket-crown')point.y=.065+(point.y-.065)*.82;
       for(const p of POCKETS){
         const dx=point.x-p.x,dz=point.z-p.z,d=Math.hypot(dx,dz);
         if(d<.30 && point.y>-.35){
@@ -81,7 +87,7 @@ function styleTable(root:THREE.Group,hot=false){
     position.needsUpdate=true;
     // Rejoin normal seams after deformation, while preserving edges sharper than 45 degrees.
     // The restored crown curves remain smooth rather than inheriting triangulated highlights.
-    const oldGeometry=o.geometry;o.geometry=toCreasedNormals(oldGeometry,Math.PI/4);
+    const oldGeometry=o.geometry;o.geometry=toCreasedNormals(oldGeometry,o.userData.fairyRole==='pocket-crown'?Math.PI/3:Math.PI/4);
     if(o.geometry!==oldGeometry)oldGeometry.dispose();
     o.geometry.computeBoundingSphere();o.geometry.computeBoundingBox();
     const list=Array.isArray(o.material)?o.material:[o.material];
@@ -92,13 +98,13 @@ function styleTable(root:THREE.Group,hot=false){
       const m=base instanceof THREE.MeshPhysicalMaterial?base:new THREE.MeshPhysicalMaterial().copy(base as THREE.MeshPhysicalMaterial);
       if(m!==base){o.material=m;base.dispose();}
       if(/gold/i.test(m.name)){m.color.setRGB(.73,.49,.20);m.metalness=1;m.roughness=.46;m.clearcoat=0;m.clearcoatRoughness=.4;m.envMapIntensity=.78;}
-      // Authored Crystal/Pearl names identify geometry only; the entire structural body is ivory.
+      // Upper shell-inlay rails were extracted above; lower Crystal/Pearl structure remains ivory.
       if(/Pearl|shell|inlay|Crystal/i.test(m.name)){
         if(m.map)replaced.add(m.map);m.map=shell;m.bumpMap=shell;m.bumpScale=.00008;
         m.color.set(0xe0cfac);m.metalness=0;m.roughness=.78;m.clearcoat=0;m.clearcoatRoughness=.65;
         m.transmission=0;m.transparent=false;m.opacity=1;m.iridescence=0;m.specularIntensity=.16;m.ior=1.48;m.envMapIntensity=.22;
       }
-      if(/Pocket/i.test(m.name)){m.color.set(0x304336);m.roughness=.72;m.metalness=0;m.clearcoat=.02;m.envMapIntensity=.35;}
+      if(/^Pocket/i.test(m.name)){m.color.set(0x244b42);m.roughness=.86;m.metalness=0;m.clearcoat=0;m.envMapIntensity=.28;}
       if(m.map)m.map.anisotropy=4;
     }
   });

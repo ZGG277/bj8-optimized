@@ -11,15 +11,20 @@ import { pocketRenderProfile } from '../pocket-render/profile';
 import { CUSHION_NOSE_HEIGHT, TABLE_RENDER } from '../pocket-render/cushion-geometry';
 
 describe('R2 shared ball and pocket dimensions', () => {
-  it('balances corner and side mouths while slightly reducing the shared ball size', () => {
+  it('widens corner and side mouths by only 2.5% while preserving ball size and capture depth', () => {
     expect(BALL_POCKET_SCALE).toBe(1.28);
     expect(TABLE.ballRadius).toBe(BALL_RADIUS);
     expect(TABLE.ballRadius * 2).toBeCloseTo(.08315325, 12);
     expect(TABLE.width).toBe(1.27); expect(TABLE.length).toBe(2.54);
     for (const pocket of POCKETS) {
-      expect(pocket.mouthWidth).toBeCloseTo(pocket.kind === 'corner' ? .140 : .120, 8);
+      expect(pocket.mouthWidth).toBeCloseTo(pocket.kind === 'corner' ? .1435 : .123, 8);
       expect(pocket.mouthWidth / (TABLE.ballRadius * 2)).toBeGreaterThan(1.39);
-      expect(pocket.mouthWidth / (TABLE.ballRadius * 2)).toBeLessThan(1.70);
+      expect(pocket.mouthWidth / (TABLE.ballRadius * 2)).toBeLessThan(1.73);
+      const previousMouth = pocket.kind === 'corner' ? .140 : .120;
+      expect(pocket.mouthWidth / previousMouth).toBeCloseTo(1.025, 12);
+      expect(pocket.jawRadius).toBeCloseTo((pocket.kind === 'corner' ? .102 : .064) * 1.28, 12);
+      expect(pocket.captureInset).toBeCloseTo((pocket.kind === 'corner' ? .008 : .007) * 1.28, 12);
+      expect(pocket.shelfDepth).toBeCloseTo((pocket.kind === 'corner' ? .036 : .024) * 1.28, 12);
       expect(pocket.dropHalfWidth).toBeCloseTo(pocket.mouthHalfWidth - TABLE.ballRadius - POCKET_AIM_CLEARANCE, 12);
       const profile = pocketRenderProfile(pocket);
       expect(profile.visibleHoleHalfWidth).toBe(pocket.mouthHalfWidth);

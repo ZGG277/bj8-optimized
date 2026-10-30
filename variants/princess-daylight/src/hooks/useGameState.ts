@@ -1,3 +1,4 @@
+import { nextVictoryPraise } from '../opponent/victory-praise';
 import { pickCompanion } from '../opponent/companions';
 import { collectCompanionWin, loadCompanionCollection, saveCompanionCollection, type CompanionReward } from '../opponent/companion-collection';
 import { createFriendlyOpponentProfile } from '../opponent/friendly-style';
@@ -73,6 +74,7 @@ export function useGameState() {
   const assessmentDoneRef = useRef(false);
   const [collection, setCollection] = useState(() => loadCompanionCollection(browserStorage()));
   const collectionRef = useRef(collection);
+  const [victoryPraise, setVictoryPraise] = useState('');
   const [collectionReward, setCollectionReward] = useState<CompanionReward | null>(null);
   const [collectionSaveFailed, setCollectionSaveFailed] = useState(false);
   const matchObservationsRef = useRef<ShotSkillObservation[]>([]);
@@ -97,6 +99,7 @@ export function useGameState() {
     matchObservationsRef.current = [];
     assessmentDoneRef.current = false;
     setCollectionReward(null);
+    setVictoryPraise('');
     setTrainingSummary(null);
     setWorldView(cloneWorld(fresh));
     const companion = pickCompanion(matchRef.current.companionId);
@@ -118,7 +121,9 @@ export function useGameState() {
     if (!winner || assessmentDoneRef.current) return playerSkillRef.current;
     assessmentDoneRef.current = true;
     if (winner === 'player') {
-      const earned = collectCompanionWin(collectionRef.current, matchRef.current.companionId);
+      const praise = nextVictoryPraise(browserStorage());
+      setVictoryPraise(praise);
+      const earned = collectCompanionWin(collectionRef.current, matchRef.current.companionId, Date.now(), praise);
       if (earned) {
         collectionRef.current = earned.collection;
         setCollection(earned.collection);
@@ -171,6 +176,7 @@ export function useGameState() {
     trainingSummary,
     collection,
     collectionReward,
+    victoryPraise,
     collectionSaveFailed,
     gameMode,
     opponentProfile,
