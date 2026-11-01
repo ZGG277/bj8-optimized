@@ -1,3 +1,20 @@
+# 当前源码与发布对应 · 2026-11-01
+
+## 公主请开球 · D2正式整合版
+
+- 产品代码基线：`e85346d9b7958100bd95296bab7b9068a49117b3`；[固定源码](https://github.com/ZGG277/bj8-optimized/tree/e85346d9b7958100bd95296bab7b9068a49117b3/variants/princess-daylight)。
+- 分支：`release/princess-xhs-v1.0.8-d2-20261101`；唯一维护源：`bj8-main-integration/variants/princess-daylight`。本地维护分支/旧HEAD和17项无关WIP保留；发布在隔离副本完成，未合并默认main。
+- 本次包含D2球桌精修、主维护源现有碰撞反馈，以及手机默认控件遮袋的必要修正；C2短开场/头像选择未合入，开场保留当前正式源12551ms。
+- 内部package1.1.0；平台新表单1.0.8，原卡实核1.0.7已发布。1.0.8同包上传一次、部署成功；本次协议待用户确认，尚未提审/发布，不写已上线。
+- 466项构建源指纹：`7e917947a084f0103c26fdaec511b5876ca8c302d3907d773870137dcc7893bd`。逐项公开清单见产品PUBLIC_SOURCE_MANIFEST.json，与产品提交和部署ZIP匹配。
+- ZIP：`princess-billiards-xhs-minitool-v1.1.0-integrated-d2-r4-20261101.zip`，10,261,413字节，SHA256 `05349d546e26136410d78d26e56e7bd60e3f01ed6f5eb2baee7b8b4d8220f68b`；66运行文件与实际本机5274/ZIP逐项一致。
+- 类型/构建/静态审计、相关82项、390×844和320×640及桌面真实入口通过；35秒持续第一视角和43秒真实触摸出杆记录未复现30秒停顿。全量首次824项中821通过，3项旧断言修正后相关9项通过；未把聚焦结果虚记为再次全量通过。
+- 合法22cm六袋近景使用同源独立诊断包；正式包没有测试句柄。旧存档用隔离合成夹具核3键字节保持并还原，不访问真实玩家存档。
+- Android/iOS扫码、Chrome61运行/性能、真实宿主分享仍未验；平台模拟器结果另见最终回执，普通浏览器通过不替代原生宿主与手机验收。
+- Git源与平台状态独立记录。正式发布前不创建已发布tag。前次透明R4源码c3f8fca和ZIP保留。
+
+## 历史基线记录
+
 # 当前源码与发布对应 · 2026-10-30
 
 ## 公主请开球 · 透明工作版R4
@@ -20,3 +37,11 @@
 ## 中八与仓库历史
 
 中八247项源指纹保持`f1136f01190f7fd83faa4c3f44196ec307c064b65806c0d9d3b8d5418adbeced`；本次未改其运行源。10/26基线`10ef15aee95f732a6ae84692fc243caf00a10e5b`和原main `125b59adcec028a00e0aa795ef8f00c13fed417a`保留，未合并main。
+
+## 本机维护与恢复
+
+唯一维护根为bj8-main-integration/variants/princess-daylight；维护Git分支candidate/board-integration-20261011、HEAD f9318dc9fbd45f59e82afb88ddc198bd9a958624和无关WIP继续保留，不能将该旧HEAD冒作公主基线。精确公开R4在pm/baselines/PRINCESS-TRANSPARENT-R4-20261030/publication，已推送到上述R4分支；其他候选和旧R3保留。GitHub远端1428个blob及mode与本地一致，455构建源与部署ZIP映射不变。文档commit为68331c6f939405a5255610f6e8b8505ef465c772；平台最终提交由用户负责，尚无本次提交/审核/上线回执。
+
+## 本地源码整合 · 2026-11-01 D2球桌
+
+用户直接授权将球桌D2合入唯一维护根 `variants/princess-daylight`。本地源码合并完成，保留主线碰撞反馈等已有改动；类型与108项定向测试通过。夜间未完整构建/运行验收，现有预览和发布包未更新；R4远端/平台基线不变，无提交推送发布。详情见 [合并记录](variants/princess-daylight/TABLE_DETAIL_INTEGRATION_20261101.md)。C2短开场/头像仍为独立候选，本次不代为晋升。

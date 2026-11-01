@@ -1,3 +1,5 @@
+公主请开球当前D2整合产品源码：[`e85346d9b795`](https://github.com/ZGG277/bj8-optimized/tree/e85346d9b7958100bd95296bab7b9068a49117b3/variants/princess-daylight)。平台1.0.8已部署、协议与提审待用户；版本、ZIP指纹及未验项见[VERSIONING.md](VERSIONING.md)。独立C2头像候选不在本包。
+
 # 台球产品源码
 
 本分支保存两款独立游戏工程。公主源码更新于2026-10-30；中八保持2026-10-26基线。
