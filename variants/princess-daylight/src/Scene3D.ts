@@ -6,9 +6,10 @@ import { batchOverlayRings } from './scene/overlay-batching';
 import { createBallRenderGeometry } from './scene/princess-geometry';
 import { createTargetRingBatch } from './scene/target-rings';
 import { createCrystalLighting, updateCrystalCeilingVisibility } from './scene/crystal-lighting';
+import { createImpactFeedback } from './scene/impact-feedback';
 /*
 [INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图、scene Blender 视觉资产与 Three.js
-[OUTPUT]: 按初始化 worldId 装配抗锯齿球桌与外围世界，0.05m近裁面保留薄金饰深度精度；提供按需渲染、GPU 自适应温控、目标球运动近景与完整资源回收
+[OUTPUT]: 按初始化 worldId 装配抗锯齿球桌与外围世界，0.05m近裁面保留薄金饰深度精度；daylight/fallback 共用真实碰撞/落袋反馈；提供按需渲染、GPU 自适应温控、目标球运动近景与完整资源回收
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -68,6 +69,7 @@ import {
 import { createPocketDropTrajectory, type PocketDropTrajectory } from './pocket-drop';
 import { createMergedRopeGeometry, type RopeSegment } from './pocket-render/rope-net';
 import { pocketRenderProfile } from './pocket-render/profile';
+import { createWellLining } from './pocket-render/well-lining';
 import { pocketSeamContract } from './pocket-render/seam-contract';
 import { createPocketTrimGeometry, createPocketWeltGeometry } from './pocket-render/trim-geometry';
 import { makeCushionGeometry, CUSHION_PROFILE, CUSHION_NOSE_HEIGHT, TABLE_RENDER } from './pocket-render/cushion-geometry';
@@ -175,6 +177,7 @@ export class Scene3D {
   private ballQuats: THREE.Quaternion[] = [];
   private crystalLighting = createCrystalLighting();
   private crystalDetails?: ReturnType<typeof createCrystalBallDetails>;
+  private impactFeedback?: ReturnType<typeof createImpactFeedback>;
   private ballContacts?: ReturnType<typeof createBallContacts>;
   private tableDetails?: TableDetails;
   private dropAnims = new Map<number, DropAnim>();
@@ -220,7 +223,11 @@ export class Scene3D {
   private disposeMotionPreference: (() => void) | null = null;
   private strikeTimer: ReturnType<typeof setTimeout> | null = null;
   private paused = false;
-  private onMotionPreference = () => { if (this.motionPreference?.matches) this.finishOpening(); };
+  private onMotionPreference = () => {
+    this.impactFeedback?.setReducedMotion(this.motionPreference?.matches ?? false);
+    if (this.motionPreference?.matches) this.finishOpening();
+    this.requestRender();
+  };
   /** Explicit new games may replay; ordinary state sync and render start never do. */
   beginOpening() {
     this.shotCameraReturn = null;
@@ -426,11 +433,12 @@ export class Scene3D {
     this.miniToolBudgetDirty = false;
     const low = this.adaptiveQuality.tier === 'hot';
     this.setBallGeometryQuality(low);
+    this.impactFeedback?.setHot(low);
     setCrystalOpticsQuality(this.scene,low);
     if (['lake', 'castle'].includes(this.environmentOptions.worldId ?? '') && this.studioEnvironment) this.studioEnvironment.root.visible = true;
     let cost = sceneCost(this.scene);
     const requestedCost = { ...cost };
-    const optionalGlints = this.crystalDetails?.root.getObjectByName('crystal-eight-point-glints');
+    const optionalGlints = this.impactFeedback?.root.getObjectByName('crystal-eight-point-glints');
     if (!withinSceneBudget(cost, low) && optionalGlints?.visible) { optionalGlints.visible = false; cost = sceneCost(this.scene); }
     if (!withinSceneBudget(cost, low) && this.tableDetails?.root.visible) { this.tableDetails.root.visible = false; cost = sceneCost(this.scene); }
     // Both selected environments are core visuals: never discard them to meet a budget.
@@ -506,8 +514,9 @@ export class Scene3D {
       clothShape.lineTo(point.x, -point.z);
     }
     clothShape.closePath();
-    const clothGeo = new THREE.ShapeGeometry(clothShape, 24);
-    clothGeo.rotateX(-Math.PI / 2);
+    // The same unchanged XY outline now has a 3 mm turned-under cut edge.
+    const clothGeo = new THREE.ExtrudeGeometry(clothShape, { depth: .003, bevelEnabled: false, steps: 1, curveSegments: 24 });
+    clothGeo.rotateX(-Math.PI / 2); clothGeo.translate(0, -.003, 0);
     applyClothUV(clothGeo);
     const clothMat = new THREE.MeshPhysicalMaterial({
       map: clothMaps.map,
@@ -613,9 +622,9 @@ export class Scene3D {
     const pocketWallMat = new THREE.MeshStandardMaterial({
       map: leatherTex,
       bumpMap: leatherTex,
-      bumpScale: 0.00018,
-      color: 0x38271b,
-      roughness: 0.96,
+      bumpScale: 0.00016,
+      color: 0x40372b,
+      roughness: 0.91,
       side: THREE.DoubleSide,
     });
     const pocketBottomMat = new THREE.MeshStandardMaterial({
@@ -643,42 +652,17 @@ export class Scene3D {
       const bottomDepthRadius = profile.bottomDepthRadius;
       const bottomCenterDepth = profile.bottomCenterDepth;
       const radialSteps = profile.wellRadialSteps;
-      const wallPositions: number[] = [];
-      const wallIndices: number[] = [];
       const bottomPoints: Point2[] = [];
       for (let step = 0; step < radialSteps; step += 1) {
         const angle = (step / radialSteps) * Math.PI * 2;
-        const top = pocketLocalToWorld(
-          pocket,
-          centerDepth + Math.sin(angle) * depthRadius,
-          Math.cos(angle) * topHalfWidth,
-        );
         const lower = pocketLocalToWorld(
           pocket,
           bottomCenterDepth + Math.sin(angle) * bottomDepthRadius,
           Math.cos(angle) * bottomHalfWidth,
         );
-        wallPositions.push(top.x, profile.wellTopY, top.z, lower.x, profile.wellBottomY, lower.z);
         bottomPoints.push(lower);
-        const next = (step + 1) % radialSteps;
-        wallIndices.push(
-          step * 2,
-          next * 2,
-          step * 2 + 1,
-          next * 2,
-          next * 2 + 1,
-          step * 2 + 1,
-        );
       }
-      const wallGeometry = new THREE.BufferGeometry();
-      wallGeometry.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(wallPositions, 3),
-      );
-      wallGeometry.setIndex(wallIndices);
-      wallGeometry.computeVertexNormals();
-      applyLeatherUV(wallGeometry);
-      const wall = new THREE.Mesh(wallGeometry, pocketWallMat);
+      const wall = new THREE.Mesh(createWellLining(pocket, profile), pocketWallMat);
       wall.name = `pocket-well-${pocket.index}`;
       wall.receiveShadow = true;
       this.tableGroup.add(wall);
@@ -826,6 +810,8 @@ export class Scene3D {
     }
     if(!daylightEnabled()){this.crystalDetails = createCrystalBallDetails(R);
     this.scene.add(this.crystalDetails.root);}
+    this.impactFeedback = createImpactFeedback(R, this.motionPreference?.matches ?? false);
+    this.scene.add(this.impactFeedback.root);
     this.ballContacts = createBallContacts(R);
     this.ballContacts.sync(this.ballMeshes);
     this.scene.add(this.ballContacts.mesh);
@@ -1632,7 +1618,7 @@ export class Scene3D {
 
   sync(world: BilliardsWorld) {
     this.lastWorld = world;
-    this.crystalDetails?.observe(world);
+    this.impactFeedback?.observe(world);
     const now = performance.now();
     this.syncDt = this.lastSyncTime ? Math.min(0.05, (now - this.lastSyncTime) / 1000) : 1 / 60;
     this.lastSyncTime = now;
@@ -1939,7 +1925,7 @@ export class Scene3D {
       this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
       this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8;
     return (this.openingElapsed !== null && !this.environmentOptions.openingFilm) || cameraMoving || this.shotCameraReturn !== null || this.strikeAnim !== null ||
-      this.dropAnims.size > 0 || this.planPlayAnim !== null || Boolean(this.crystalDetails?.active);
+      this.dropAnims.size > 0 || this.planPlayAnim !== null || Boolean(this.impactFeedback?.active);
   }
 
   private requestRender(refreshShadows = false) {
@@ -2011,6 +1997,7 @@ export class Scene3D {
     this.miniToolBudgetDirty = true;
     this.adaptiveQuality = quality;
     this.setBallGeometryQuality(tier === 'hot');
+    this.impactFeedback?.setHot(tier === 'hot');
     this.shadowMapSize = quality.shadowMapSize;
     this.renderer.setPixelRatio(import.meta.env.VITE_MINITOOL === '1' ? cappedPixelRatio(this.element.clientWidth, this.element.clientHeight, quality.pixelRatio, tier === 'hot') : quality.pixelRatio);
     this.renderer.setSize(this.element.clientWidth, this.element.clientHeight);
@@ -2169,7 +2156,8 @@ export class Scene3D {
 
     this.updatePlanPlay(dt);
     this.ballContacts?.sync(this.ballMeshes);
-    this.crystalDetails?.sync(this.ballMeshes, this.camera, dt);
+    this.crystalDetails?.sync(this.ballMeshes);
+    this.impactFeedback?.sync(this.ballMeshes, this.camera, dt);
 
     this.daylight?.sync();
     try { this.renderer.render(this.scene, this.camera); }
@@ -2377,6 +2365,7 @@ export class Scene3D {
     this.ballContacts?.mesh.dispose();
     this.targetRings?.mesh.dispose();
     this.crystalDetails?.root.traverse(o => { if (o instanceof THREE.InstancedMesh) o.dispose(); });
+    this.impactFeedback?.dispose();
     window.removeEventListener('resize', this.handleResize);
     const gl = this.renderer.getContext();
     if (gl instanceof WebGL2RenderingContext) {

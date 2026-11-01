@@ -44,7 +44,7 @@ export type ShotInputApi = {
   beginCharge: (clientY: number, availableTravel: number) => void;
   updateCharge: (clientY: number) => void;
   cancelCharge: () => void;
-  releaseCharge: () => void;
+  releaseCharge: (finalClientY?: number) => void;
   commitShot: (intent: ShotIntent) => void;
 };
 
@@ -165,9 +165,12 @@ export function useShotInput({ canShoot, onCommit, worldRef, breaking }: Options
     onCommitRef.current(intent);
   }, []);
 
-  const releaseCharge = useCallback(() => {
+  const releaseCharge = useCallback((finalClientY?: number) => {
     const s = sessionRef.current;
     if (!s) return;
+    if (s.kind === 'drag' && finalClientY !== undefined && Number.isFinite(finalClientY)) {
+      s.currentY = finalClientY;
+    }
     stopPreview();
     sessionRef.current = null;
     setCharging(false);

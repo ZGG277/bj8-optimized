@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import sceneSource from '../Scene3D.ts?raw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cloneWorld, createInitialWorld, TABLE, POCKETS, type BilliardsWorld } from '../physics';
+import { TABLE, POCKETS } from '../physics';
 import { setCrystalOpticsQuality } from './gem-optics';
 import { pocketRenderProfile } from '../pocket-render/profile';
 import { CLOTH_TILE_METRES, makeClothMaps } from '../textures';
@@ -35,22 +35,7 @@ function setup() {
     ball.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i / 10);
     return ball;
   });
-  const camera = new THREE.PerspectiveCamera(); camera.position.set(0, 2, 3); camera.lookAt(0, 0, 0);
-  const stars = details.root.getObjectByName('crystal-eight-point-glints') as THREE.InstancedMesh;
-  return { details, balls, camera, stars };
-}
-function collisionWorld(shot = 1) {
-  const world = createInitialWorld(); world.shot = shot;
-  world.events = [{ type: 'ball-collision', first: 0, second: 1, time: .125, speed: 1 }];
-  return world;
-}
-function frozen(world: BilliardsWorld) {
-  world.balls.forEach(Object.freeze); world.events.forEach(Object.freeze);
-  Object.freeze(world.balls); Object.freeze(world.events); Object.freeze(world);
-  return world;
-}
-function matrixOf(mesh: THREE.InstancedMesh, index: number) {
-  const matrix = new THREE.Matrix4(); mesh.getMatrixAt(index, matrix); return matrix;
+  return { details, balls };
 }
 
 describe('crystal visual-only geometry contract', () => {
@@ -65,11 +50,11 @@ describe('crystal visual-only geometry contract', () => {
     expect(source).toContain('this.ballQuats[i] = new THREE.Quaternion()');
   });
 
-  it('uses whole-gem surfaces with no enclosed diamond/core geometry', () => {
-    const {details,balls,camera,stars}=setup();
+  it('uses whole-gem surfaces with no enclosed diamond/core geometry or event overlay', () => {
+    const {details,balls}=setup();
     expect(details.root.getObjectByName('crystal-diamond-cores')).toBeUndefined();
-    details.sync(balls,camera,.01);
-    for(let i=0;i<16;i++)expect(matrixOf(stars,i).getMaxScaleOnAxis()).toBe(0);
+    expect(details.root.getObjectByName('crystal-eight-point-glints')).toBeUndefined();
+    details.sync(balls);
   });
 
   it('uses numbered whole-gem textures and bounded optical depth without duplicate shell geometry', () => {
@@ -109,63 +94,19 @@ describe('crystal visual-only geometry contract', () => {
     expect(numbered.roughness).toBe(.115);
   });
 
-  it('does not mutate physics snapshots, mesh positions, orientations, scale, or visibility', () => {
-    const { details, balls, camera } = setup();
-    const world = frozen(collisionWorld()), before = JSON.stringify(world);
+  it('does not mutate mesh positions, orientations, scale, or visibility', () => {
+    const { details, balls } = setup();
     const transforms = balls.map(ball => ({ position: ball.position.toArray(), quaternion: ball.quaternion.toArray(), scale: ball.scale.toArray(), visible: ball.visible }));
-    details.observe(world); details.sync(balls, camera, 1 / 30);
-    expect(JSON.stringify(world)).toBe(before);
+    details.sync(balls);
     expect(balls.map(ball => ({ position: ball.position.toArray(), quaternion: ball.quaternion.toArray(), scale: ball.scale.toArray(), visible: ball.visible }))).toEqual(transforms);
   });
 
-  it('shows only bounded event glints and hides them with the source ball', () => {
-    const { details, balls, camera, stars } = setup();
-    balls[1].visible=false;
-    details.observe(collisionWorld());details.sync(balls,camera,.01);
-    expect(matrixOf(stars,0).getMaxScaleOnAxis()).toBeGreaterThan(0);
-    expect(matrixOf(stars,1).getMaxScaleOnAxis()).toBe(0);
-    for(let i=2;i<16;i++)expect(matrixOf(stars,i).getMaxScaleOnAxis()).toBe(0);
-    details.sync(balls,camera,.23);
-    for(let i=0;i<16;i++)expect(matrixOf(stars,i).getMaxScaleOnAxis()).toBe(0);
-  });
-
-  it('collision and pocket pulses expire without another event or an independent clock', () => {
-    const { details, balls, camera } = setup();
-    expect(details.active).toBe(false);
-    details.observe(collisionWorld()); expect(details.active).toBe(true);
-    details.sync(balls, camera, .17); expect(details.active).toBe(false);
-    const world = createInitialWorld(); world.events = [{ type: 'pocket', ball: 2, pocket: 0, time: 1, speed: 1, entryX: 0, entryZ: 0, entryVx: 0, entryVz: 1 }];
-    details.observe(world); expect(details.active).toBe(true);
-    details.sync(balls, camera, .23); expect(details.active).toBe(false);
-    for (let i = 0; i < 12; i++) details.sync(balls, camera, 1 / 30);
-    expect(details.active).toBe(false);
-  });
-
-  it('does not replay a consumed event when cloneWorld changes only object identities', () => {
-    const { details, balls, camera } = setup(), world = collisionWorld();
-    details.observe(world); details.sync(balls, camera, .23);
-    expect(details.active).toBe(false);
-    details.observe(cloneWorld(world));
-    expect(details.active).toBe(false);
-  });
-
-  it('can animate the same collision coordinates in a later shot', () => {
-    const { details, balls, camera } = setup();
-    details.observe(collisionWorld(1)); details.sync(balls, camera, .23);
-    details.observe(collisionWorld(2)); expect(details.active).toBe(true);
-  });
-
-  it('ignores low-speed contacts instead of leaving the renderer continuously active', () => {
-    const { details } = setup(), world = collisionWorld();
-    world.events[0].speed = .1; details.observe(world); expect(details.active).toBe(false);
-  });
-
-  it('keeps volume microstructure in two instance batches plus one bounded glint batch and stays within the low-tier geometry budget', () => {
+  it('keeps volume microstructure and emissive cores in four instance batches within the low-tier geometry budget', () => {
     const { details } = setup(), scene = new THREE.Scene(); scene.add(details.root);
-    expect(details.root.children).toHaveLength(5);
+    expect(details.root.children).toHaveLength(4);
     expect(details.root.children.every(object => object instanceof THREE.InstancedMesh)).toBe(true);
     const cost = sceneCost(scene);
-    expect(cost.calls).toBe(5);
+    expect(cost.calls).toBe(4);
     expect(cost.triangles).toBeLessThanOrEqual(6000);
     expect(cost.textureBytes).toBe(0);
     expect(withinSceneBudget(cost, true)).toBe(true);
@@ -459,7 +400,7 @@ describe('R6 internal gemstone lamp contract',()=>{
   const cores=details.root.children.filter(o=>o.userData.internalLamp) as THREE.InstancedMesh[];
   expect(cores).toHaveLength(2);expect(details.root.children.some(o=>o instanceof THREE.Light)).toBe(false);
   const balls=Array.from({length:16},(_,i)=>{const b=new THREE.Mesh();b.position.set(i*.1,R,.3);return b;});
-  balls[9].visible=false;details.sync(balls,new THREE.PerspectiveCamera(),0);
+  balls[9].visible=false;details.sync(balls);
   for(const core of cores){
    const mat=core.material as THREE.MeshStandardMaterial;expect(mat.transparent).toBe(false);expect(mat.emissiveIntensity).toBeGreaterThan(2);
    core.geometry.computeBoundingSphere();expect(core.geometry.boundingSphere!.radius).toBeCloseTo(R*.24,6);
@@ -469,7 +410,7 @@ describe('R6 internal gemstone lamp contract',()=>{
   }
   const scene=new THREE.Scene();scene.add(details.root);setCrystalOpticsQuality(scene,true);expect(cores.every(c=>!c.visible)).toBe(true);
   setCrystalOpticsQuality(scene,false);expect(cores.every(c=>c.visible)).toBe(true);
-  balls[9].visible=true;balls[9].position.set(.2,-.03,.4);balls[9].scale.setScalar(.6);details.sync(balls,new THREE.PerspectiveCamera(),0);
+  balls[9].visible=true;balls[9].position.set(.2,-.03,.4);balls[9].scale.setScalar(.6);details.sync(balls);
   const core=cores.find(c=>c.name.startsWith('topaz'))!,matrix=new THREE.Matrix4();core.getMatrixAt(0,matrix);
   expect(matrix.getMaxScaleOnAxis()).toBeCloseTo(.6);expect(new THREE.Vector3().setFromMatrixPosition(matrix).y).toBeCloseTo(-.03);
  });

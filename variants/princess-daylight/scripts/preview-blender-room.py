@@ -4,7 +4,6 @@
 [POS]: 美术审阅辅助；参考几何不属于运行时 GLB 导出
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
-from pathlib import Path
 import bpy
 import math
 from mathutils import Vector
@@ -100,5 +99,5 @@ for area in bpy.context.screen.areas:
         area.spaces.active.overlay.show_overlays=False
         area.spaces.active.region_3d.view_perspective='CAMERA'
         area.spaces.active.shading.type='MATERIAL'
-bpy.ops.wm.save_as_mainfile(filepath=str(Path(__file__).resolve().parent.parent / 'assets/blender/billiards-room-v1/quiet-room-v1.blend'))
+bpy.ops.wm.save_as_mainfile(filepath='/Users/zgg/Projects/游戏/bl8-3D台球/bj8-main-integration/assets/blender/billiards-room-v1/quiet-room-v1.blend')
 print('BJ8_BLEND_SAVED', len(scene.objects))

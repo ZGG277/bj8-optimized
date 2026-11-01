@@ -57,7 +57,7 @@ describe('final pocket leather assembly', () => {
     expect(metrics.volume).toBeGreaterThan(0);
     // The larger ball lifts the jaw above the rear rail. Select actual top
     // vertices, since a global height cutoff would also count apron side faces.
-    const topVertices = new Set(c.stations.flatMap(s => [s.inner, s.outer]
+    const topVertices = new Set(c.stations.flatMap(s => [s.inner, { x:s.outer.x-s.outward.x*Math.min(.0008,Math.abs(s.topY-s.seatY)*.25), z:s.outer.z-s.outward.z*Math.min(.0008,Math.abs(s.topY-s.seatY)*.25) }]
       .map(p => key(new THREE.Vector3(Math.fround(p.x), Math.fround(s.topY), Math.fround(p.z))))));
     const top = triangles(g).filter(t => t.every(v => topVertices.has(key(v))));
     expect(top).toHaveLength((c.stations.length - 1) * 2);

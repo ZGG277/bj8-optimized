@@ -22,7 +22,7 @@ React 自定义 Hook 层，将从 Game.tsx 提取的职责按单一职责原则�
 
 `useOpponentAI.ts`: AI 调度层，match.phase === 'opponent' 时消费本局锁定档案；500ms 自然停顿后调用专用战术 Worker，陪练/挑战分别以 750/1200ms 截止，超时回退轻量选杆；候选仍经一次真实执行误差，验证不保证最终结果；友好中心接触杆使用较小误差。
 
-`useAudioManager.ts`: 音效协调层，管理 BilliardsAudio 初始化、球碰/碰库/落袋物理事件与胜局彩炮播放，暴露 audioRef/playStrike/playPhysicsEvents/playVictory/resetEvents。
+`useAudioManager.ts`: 音效协调层，管理 BilliardsAudio 初始化、球碰/碰库/落袋物理事件与胜局彩炮播放；每个展示批次分别选取最强球碰与碰库，保留全部落袋及其实际速度，事件下标防重复，暴露 audioRef/playStrike/playPhysicsEvents/playVictory/resetEvents。
 
 `usePositionPlan.ts`: 走位规划集成层——状态机 idle→computing→ready→showing（failed 兜底）；仅在灯泡显式点亮且进入玩家静止瞄准态时经可抢占 Worker 执行 320 次、两层、2.5 秒截止搜索，熄灭、出杆或对手回合取消陈旧结果，showing 期间不重算；暴露 status/plans/error/open/close。
 
@@ -41,4 +41,4 @@ useGameState 在开局抽选十位陪练，胜负后幂等评估准度/走位及
 
 2026-10-25：useAudioManager 使自然声在城堡/湖面且开场结束后进入，统一跟随静音、暂停、切后台及卸载停止。原声开场继续由OpeningFilm独占管理。
 
-2026-10-30 R3：useGameState在既有assessmentDone胜局守卫内抽取一次鼓励语，重开清本局文案，分享不抽取；useAudioManager保持1.0.6字节，不加入10/28批次音效增量。
+2026-10-30：useGameState在既有assessmentDone守卫内抽取一次胜局鼓励语，和卡册奖励共同保存；重开清空本局文案，渲染/分享不抽取。

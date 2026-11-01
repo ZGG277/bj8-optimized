@@ -4,12 +4,11 @@
 [POS]: 离线资产作者脚本；不产生碰撞体、不修改物理或已存在的用户场景
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
-from pathlib import Path
 import bpy
 import math
 from mathutils import Vector
 
-OUTPUT_ROOT = str(Path(__file__).resolve().parent.parent)
+OUTPUT_ROOT = '/Users/zgg/Projects/游戏/bl8-3D台球/bj8-main-integration'
 SCENE_NAME = 'BJ8_Quiet_Room_V1'
 W, L = 1.27, 2.54
 

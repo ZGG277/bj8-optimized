@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 audio 合成音效与 physics PhysicsEvent 类型
-[OUTPUT]: 对外提供 audioRef / playStrike / playPhysicsEvents / playVictory / resetEvents
+[OUTPUT]: 对外提供 selectPhysicsAudioEvents 与 audioRef / playStrike / playPhysicsEvents / playVictory / resetEvents
 [POS]: 音效协调层，只消费物理事件与出杆动作；不关心对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -8,6 +8,18 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 import { BilliardsAudio } from '../audio';
 import { gameStorage } from '../minitool/persistent-storage';
 import type { PhysicsEvent } from '../physics';
+
+export function selectPhysicsAudioEvents(events: PhysicsEvent[]): PhysicsEvent[] {
+  let collision: Extract<PhysicsEvent, { type: 'ball-collision' }> | null = null;
+  let cushion: Extract<PhysicsEvent, { type: 'cushion' }> | null = null;
+  const pockets: PhysicsEvent[] = [];
+  for (const event of events) {
+    if (event.type === 'ball-collision' && (!collision || event.speed > collision.speed)) collision = event;
+    else if (event.type === 'cushion' && (!cushion || event.speed > cushion.speed)) cushion = event;
+    else if (event.type === 'pocket') pockets.push(event);
+  }
+  return [...(collision ? [collision] : []), ...(cushion ? [cushion] : []), ...pockets];
+}
 
 export function useAudioManager(paused = false, ambience = false) {
   const [muted, setMuted] = useState(() => { try { return gameStorage()?.getItem('princess-billiards:muted:v1') === 'true'; } catch { return false; } });
@@ -39,13 +51,13 @@ export function useAudioManager(paused = false, ambience = false) {
     try { gameStorage()?.setItem('princess-billiards:muted:v1', String(next)); } catch { /* This page still respects the choice. */ }
   }, [muted]);
 
-  /** 播放物理事件音效（按事件顺序，不重复不漏） */
+  /** 每个展示批次保留最强球碰/碰库，落袋逐个播放；事件下标保证不重复消费。 */
   const playPhysicsEvents = useCallback((events: PhysicsEvent[]) => {
-    for (let i = playedEventsRef.current; i < events.length; i++) {
-      const ev = events[i];
+    const pending = events.slice(playedEventsRef.current);
+    for (const ev of selectPhysicsAudioEvents(pending)) {
       if (ev.type === 'ball-collision') audioRef.current?.ballCollision(Math.min(1, ev.speed / 5));
       else if (ev.type === 'cushion') audioRef.current?.cushion(Math.min(1, ev.speed / 5));
-      else if (ev.type === 'pocket') audioRef.current?.pocket();
+      else if (ev.type === 'pocket') audioRef.current?.pocket(Math.min(1, ev.speed / 4));
     }
     playedEventsRef.current = events.length;
   }, []);

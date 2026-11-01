@@ -125,3 +125,5 @@
 2026-10-15：refine-pocket-crowns.py从保留的table-original恢复六袋内沿和皮衬，其他沿balanced，派生table-refined并输出来源/结果SHA；去除运行时重算的法线和未使用UV2、使用16位索引，原源只读。daylight-assets.test覆盖派生几何上限。
 
 2026-10-25：inline-build在移动JS/CSS入HTML时保留外置头像、WebP开场、海报及字体的assets相对基址；静态预览与源码同资源，缺文件直接拒绝构建。
+
+2026-11-01整合发布QA：table-craft-asset.test按连续米制UV跨度及同一物理接头的对应剖面站点验收D2，保留位置/法线连续要求，避免把已裁合的不同站点误判为同一接头。

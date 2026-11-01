@@ -1,20 +1,17 @@
 /** Crystal R3: original visual-only geometry/materials. Metres, y-up.
  * Physics, pocket apertures, saved data and control semantics are not inputs to mutation.
  * Alpha/Fresnel-like clearcoat is intentionally cheaper than screen-space refraction.
+ * Event glints and pocket bursts are owned by impact-feedback.ts.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { TABLE, POCKETS, pocketLocalToWorld, type BilliardsWorld } from '../physics';
+import { TABLE, POCKETS, pocketLocalToWorld } from '../physics';
 import { createTableUnderlapGeometry } from '../pocket-render/cushion-geometry';
 import { pocketRenderProfile } from '../pocket-render/profile';
 import { pocketSeamContract } from '../pocket-render/seam-contract';
 import { tableFrameEnvelope } from '../pocket-render/frame-geometry';
 import { applyGemOptics, applyFrameOptics, createGemVolumeFacets } from './gem-optics';
 import { GEM_BODY_COLORS } from '../textures';
-
-function starGeometry(radius:number){
-  const shape=new THREE.Shape();for(let i=0;i<16;i++){const a=i*Math.PI/8,r=i%2?radius*.12:radius*(i%4===0?1:.62);const x=Math.cos(a)*r,y=Math.sin(a)*r;i?shape.lineTo(x,y):shape.moveTo(x,y);}shape.closePath();return new THREE.ShapeGeometry(shape);
-}
 /** Selected B: one smooth whole-gem surface; never an outer shell enclosing a diamond. */
 export function crystalShellMaterial(number:number){
   const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d')!;
@@ -318,26 +315,11 @@ export function createCrystalBallDetails(radius:number){
   const topazVolume=new THREE.InstancedMesh(facetGeometry,new THREE.MeshPhysicalMaterial({color:0xffd56b,metalness:.72,roughness:.14,envMapIntensity:1.6,side:THREE.DoubleSide}),7);
   rubyVolume.name='ruby-volume-microfacets';topazVolume.name='topaz-volume-microfacets';
   for(const mesh of [rubyVolume,topazVolume]){mesh.frustumCulled=false;mesh.userData.optionalGemOptics=true;root.add(mesh);}
-  // The only overlaid sparkle is bounded by real impact events.
-  const stars=new THREE.InstancedMesh(starGeometry(radius*.22),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.86,depthWrite:false,side:THREE.FrontSide}),16);stars.name='crystal-eight-point-glints';stars.frustumCulled=false;stars.renderOrder=5;root.add(stars);
-  const m=new THREE.Matrix4(),s=new THREE.Vector3(),p=new THREE.Vector3();
-  let flash=0;let recent=new Set<string>();let lastShot=-1;let lastTime=-1;const flashes=new Float32Array(16);
-  return {root,get active(){return flash>0;},observe(world:BilliardsWorld){
-    if(world.shot!==lastShot || world.time<lastTime){recent.clear();flashes.fill(0);flash=0;}
-    lastShot=world.shot;lastTime=world.time;
-    const next=new Set<string>();for(const [index,event] of world.events.entries()){const key=JSON.stringify([world.shot,index,event]);next.add(key);if(recent.has(key))continue;
-      if(event.type==='ball-collision'&&event.speed>.2){flashes[event.first]=.16;flashes[event.second]=.16;flash=.16;}
-      if(event.type==='pocket'){flashes[event.ball]=.22;flash=.22;}
-    }recent=next;
-  },sync(balls:readonly THREE.Mesh[],camera:THREE.Camera,dt:number){
-    flash=Math.max(0,flash-dt);
+  const m=new THREE.Matrix4(),s=new THREE.Vector3();
+  return {root,sync(balls:readonly THREE.Mesh[]){
     for(let index=0;index<7;index++)for(const [volume,number] of [[rubyVolume,index+1],[topazVolume,index+9],[rubyCore,index+1],[topazCore,index+9]] as const){
       const ball=balls[number],k=ball?.visible?ball.scale.x:0;s.setScalar(k);m.compose(ball?.position??new THREE.Vector3(),ball?.quaternion??new THREE.Quaternion(),s);volume.setMatrixAt(index,m);
     }
     for(const mesh of [rubyVolume,topazVolume,rubyCore,topazCore])mesh.instanceMatrix.needsUpdate=true;
-    for(let i=0;i<16;i++){const b=balls[i];flashes[i]=Math.max(0,flashes[i]-dt);const k=b?.visible?b.scale.x:0;p.copy(b?.position??new THREE.Vector3());
-      // A restrained glint lives on the visible sphere, with a <=220 ms collision/pocket pulse.
-      p.add(new THREE.Vector3(0,0,radius*.8*k).applyQuaternion(camera.quaternion));s.setScalar(flashes[i]>0?k*(1+flashes[i]*2):0);m.compose(p,camera.quaternion,s);stars.setMatrixAt(i,m);
-    }stars.instanceMatrix.needsUpdate=true;
   }};
 }

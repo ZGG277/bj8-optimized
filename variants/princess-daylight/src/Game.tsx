@@ -108,15 +108,31 @@ function browserStorage(): ReturnType<typeof gameStorage> {
   }
 }
 
-/** 控件透明悬浮在球桌上，仅避开比分栏和屏幕边界。 */
+/** 避开比分栏与手机默认顶部工具行；自由拖动控件不扩大构图边距。 */
 function aimCameraSafetyFor(viewport: HTMLElement) {
   const bounds = viewport.getBoundingClientRect();
-  const controls: Array<{ left: number; top: number; right: number; bottom: number; dockEdge: 'top' }> = [];
+  const controls: Array<{ left: number; top: number; right: number; bottom: number; dockEdge: 'top' | 'right' | 'bottom' }> = [];
   // 横屏比分栏悬浮在画布上；竖屏比分栏在画布外，由重叠检查自然跳过。
   const scoreboard = document.querySelector<HTMLElement>('.scoreboard');
   if (scoreboard) {
     const { left, top, right, bottom } = scoreboard.getBoundingClientRect();
     controls.push({ left, top, right, bottom, dockEdge: 'top' });
+  }
+  if (bounds.height >= bounds.width && bounds.width <= 640) {
+    for (const element of document.querySelectorAll<HTMLElement>(
+      '.royal-entry, .control-slot-view.is-default-anchor, .control-slot-bulb.is-default-anchor',
+    )) {
+      const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+      if (width > 0 && height > 0) controls.push({ left, top, right, bottom, dockEdge: 'top' });
+    }
+    for (const element of document.querySelectorAll<HTMLElement>(
+      '.control-slot-power.is-default-anchor, .control-slot-spin.is-default-anchor, .control-slot-aimDial.is-default-anchor',
+    )) {
+      const dockEdge = element.dataset.dockEdge;
+      if (dockEdge !== 'right' && dockEdge !== 'bottom') continue;
+      const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+      if (width > 0 && height > 0) controls.push({ left, top, right, bottom, dockEdge });
+    }
   }
   const x = 4 / Math.max(1, bounds.width);
   const y = 4 / Math.max(1, bounds.height);
@@ -582,13 +598,16 @@ export default function Game() {
     resizeObserver?.observe(viewport);
     const scoreboard = document.querySelector('.scoreboard');
     if (scoreboard) resizeObserver?.observe(scoreboard);
+    for (const control of document.querySelectorAll('.royal-entry, [data-control-slot]')) {
+      resizeObserver?.observe(control);
+    }
     window.addEventListener('resize', refreshSafety);
     refreshSafety();
     return () => {
       resizeObserver?.disconnect();
       window.removeEventListener('resize', refreshSafety);
     };
-  }, []);
+  }, [canAim, openingActive]);
 
   // ── 出杆提交：输入层只给 ShotIntent，这里负责球杆动画与物理击球 ──
   const handleCommit = useCallback((intent: ShotIntent) => {

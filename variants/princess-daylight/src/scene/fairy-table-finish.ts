@@ -12,15 +12,15 @@ export function fairyRailMaterial(hot: boolean) {
     name: 'Fairy gem | upper rails',
     color: hot ? 0x8cc9c8 : 0xe0f8f5,
     metalness: 0,
-    roughness: hot ? .22 : .075,
+    roughness: hot ? .22 : .105,
     transmission: hot ? 0 : .88,
     thickness: .032,
     ior: 1.49,
     attenuationColor: new THREE.Color(0x82d6d2),
     attenuationDistance: .42,
-    clearcoat: .36,
-    clearcoatRoughness: .075,
-    envMapIntensity: .78,
+    clearcoat: .16,
+    clearcoatRoughness: .12,
+    envMapIntensity: .72,
     specularIntensity: .85,
     transparent: false,
     opacity: 1,
@@ -46,7 +46,7 @@ function splitGeometry(geometry: THREE.BufferGeometry, selected: Set<number>) {
 }
 
 /** Classify complete authored components, never slice a closed rail through its sidewall. */
-function selectParts(mesh: THREE.Mesh, crown: boolean) {
+function selectParts(mesh: THREE.Mesh, crown: boolean, pocketAssembly = false) {
   const geometry = mesh.geometry, position = geometry.getAttribute('position');
   const count = geometry.index?.count ?? position.count;
   const point = new THREE.Vector3();
@@ -84,11 +84,27 @@ function selectParts(mesh: THREE.Mesh, crown: boolean) {
     const isRail = box.min.y >= .030 && box.max.y <= .080;
     const isCrown = box.min.y >= .060 && box.max.y <= .071 && size.x < .31 && size.z < .31
       && Math.abs(center.x) > .59 && (Math.abs(center.z) > 1.17 || Math.abs(center.z) < .04);
-    if (crown ? isCrown : isRail) {
+    const isPocketAssembly = box.min.y > -.20 && box.max.y < .09 && size.x < .32 && size.z < .32
+      && Math.abs(center.x) > .59 && (Math.abs(center.z) > 1.17 || Math.abs(center.z) < .15);
+    if (pocketAssembly ? isPocketAssembly : crown ? isCrown : isRail) {
       for (const triangle of triangles) selected.add(triangle);
     }
   }
   return selected;
+}
+
+/** Remove complete old pocket furniture components, including hidden gold ribs.
+ * They are replaced by continuous collars; rails, inlays and lower legs stay intact.
+ */
+export function retireAuthoredPocketAssembly(root: THREE.Group) {
+  root.updateMatrixWorld(true);
+  root.traverse(o => {
+    if (!(o instanceof THREE.Mesh) || Array.isArray(o.material) || !/gold|Crystal|Pearl/i.test(o.material.name)) return;
+    const selected = selectParts(o, true, true);
+    if (!selected.size) return;
+    const old = o.geometry, parts = splitGeometry(old, selected);
+    o.geometry = parts.kept; parts.extracted.dispose(); old.dispose();
+  });
 }
 
 /** Run before the existing shared pocket deformation and crease-normal rebuild. */

@@ -1,3 +1,5 @@
+2026-10-28：`impact-feedback.ts` 独立拥有真实碰撞/落袋 glint 与袋口反馈，Scene3D 在 daylight 和 fallback 均挂载；crystal-style 只保留宝石内部结构。三个实例批次提供 160ms 碰撞 glint、220ms 落袋 glint、440ms entryX/entryZ 光圈和 520ms 粒子；每次落袋 8 枚金色/珠光粒子，热档 4 枚，减少动态仅保留 glint，白球落袋使用中性珠光色。事件按杆/索引/内容去重，跨杆或时间回退清空；active 到期停止续帧，dispose 释放组件几何、材质与实例缓冲。
+
 V4（2026-10-12）：jewel-ball-finish 从同一七色表派生全色球与半色球，后者以不透明珠光白色腰带遮罩透射；保留编号 UV。hot 源没有 transmissionMap，显式借用 quality 原号码遮罩，不伪造空白号码。三张图复用通道承载色彩、透射/发光遮罩、粗糙度/珠光。
 
 V3（2026-10-11）：袋口共享倍率收至 1.28，profile 底部半轴仍容纳完整球体；装饰袋口沿两轴同步收缩。daylight-environment 管理城堡天空/日光反射；castShadow 在质量档开启家具与台面，hot 家具不投影。宝石弦长吸收和内部环境反射为低成本近似，原始 GLB 保持不变。
@@ -91,3 +93,5 @@ castle-platform 按用户最终选择恢复已核哈希的暖灰石板候选，�
 2026-10-30 独立 fairy-gems 实验（不替换冻结 R3）：daylight-jewelry 调用 fairy-table-finish 从实际 GLB 分离上缘完整组件，浅青透射88%/厚32mm，仅一个 FrontSide 材质且复用宝石球折射目标；象牙下架、金线与球光学保留。hot 上缘不透射。六袋原圆弧护口另分离，纵向厚度收至82%、60度折角法线、缎面香槟金；不切掉原轮廓、不增三角面。台呢使用更干净的青绿细呢，减少乘色灰雾、sheen 和法线起伏。共享口宽由140/120mm温和增至143.5/123mm（+2.5%），球径83.15325mm、jaw半径、台阶、捕获深度、摩擦与规则不变；可见开口/碰撞/瞄准继续同源。当前实现待主PM测试与真实入口截图，未声称视觉验收。
 
 `fairy-table-finish.ts`：隔离实验实际GLB上缘/六护口的完整组件分离、单材质和hot回退；对应宿主文件测试在 `../../scripts/fairy-table-finish.test.ts`，读取实际两档GLB，验证三角总数守恒、上下结构隔离及有界材质批次。
+
+2026-11-01 用户授权D2球桌合入主线：cloth-fibres.ts提供周期随机细绒；pocket-collars.ts生成同源六袋金属盖与薄皮裙；table-deck.ts替换y>-0.10m旧上部碎件，保留下体，以同轮廓象牙/1.5mm垫片/透明层接合。fairy-table-finish.ts补充旧袋口组件退休；不再使用D1独立table-refinements玻璃条。daylight视觉标识为princess-table-detail-d2-integrated-20261101。主线现有impact-feedback、控制、开场等保留，验证与范围见../../TABLE_DETAIL_INTEGRATION_20261101.md；实验D2记录不代替集成后运行验收。

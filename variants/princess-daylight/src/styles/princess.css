@@ -354,12 +354,21 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 @media(orientation:landscape) and (max-height:560px){.companion-book-mask {padding:10px 20px;}.companion-book-header {position:absolute;left:24px;top:18px;width:calc(50% - 175px);min-width:150px;gap:8px;flex-wrap:wrap;}.companion-book-header h2{font-size:17px;}.companion-card-stack{width:205px;height:min(80vh,310px);margin:0 0 4px;}.companion-card-copy{padding:5px 2px 0;}.companion-card-copy h3{font-size:16px;}.companion-card-copy p{font-size:11px;line-height:1.5;margin:4px 0;}.companion-card-copy span,.companion-card-copy small{font-size:10px;}.companion-book-nav{position:absolute;right:28px;bottom:25px;gap:12px;}.companion-book-nav button{width:40px;height:40px;}.companion-save-notice{max-width:170px;position:absolute;left:18px;bottom:24px;}}
 @media(prefers-reduced-motion:reduce){.companion-playing-card{transition:none;}}
 
-/* Flomo: the existing pot text has a separate row below the top-left actions. */
+.royal-game .royal-shot-reward {padding:7px 16px;border:1px solid #e3c78199;border-radius:22px;background:#fff7e8ed;box-shadow:0 5px 22px #5c461f24;color:#72501f;text-shadow:none;font-size:14px!important;animation:royal-shot-reward 1.6s ease-out both;}
+@keyframes royal-shot-reward {0%{opacity:0;transform:translate(-50%,6px) scale(.96);}18%,72%{opacity:1;transform:translate(-50%,0) scale(1);}100%{opacity:0;transform:translate(-50%,-4px) scale(1);}}
+.royal-scoreboard .mini-ball.is-rewarded {position:relative;z-index:2;animation:royal-ball-reward .72s ease-out both;}
+@keyframes royal-ball-reward {0%{opacity:.2;transform:scale(.78);}38%{opacity:1;filter:none;transform:scale(1.38);box-shadow:0 0 0 5px #f5d78c44,0 0 16px #f4c85d;}100%{opacity:.2;transform:scale(1);box-shadow:none;}}
+@media(prefers-reduced-motion:reduce){.royal-game .royal-shot-reward{animation:none;}.royal-scoreboard .mini-ball.is-rewarded{animation:none;opacity:1;filter:none;box-shadow:0 0 0 3px #d7b66c88;}}
+
+/* Feedback occupies its own row below the three top-left actions, including wrapped text. */
 .royal-game .royal-turn-status {top:64px;left:12px;right:64px;transform:none;max-width:none;white-space:normal;text-align:left;}
-.royal-game .royal-shot-reward {display:table;width:auto;max-width:calc(100% - 88px);padding:7px 16px;border:1px solid #e3c78199;border-radius:22px;background:#fff7e8ed;color:#72501f;text-shadow:none;font-size:14px!important;}
+.royal-game .royal-shot-reward {display:table;width:auto;max-width:calc(100% - 88px);animation:royal-shot-feedback 1.6s ease-out both;}
+@keyframes royal-shot-feedback {0%{opacity:0;transform:translateY(6px);}18%,72%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-4px);}}
+@media(prefers-reduced-motion:reduce){.royal-game .royal-shot-reward{animation:none;}}
 .royal-match-card {display:block;width:280px;max-width:100%;height:auto;margin:0 auto 10px;border-radius:14px;}
 @media(max-height:560px){.royal-match-card{width:145px;}}
-/* The viewport-positioned toolbar includes the inset already applied to the score. */
+
+/* The toolbar is viewport-positioned; include the host inset that already offsets the score. */
 .royal-game .royal-entry {top:calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--royal-host-gap) + var(--scoreboard-h) + 8px);}
 @media(max-width:640px) and (orientation:portrait){.royal-game .royal-entry{top:calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--royal-host-gap) + 54px);}}
 
@@ -389,3 +398,31 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .royal-game .control-deck .view-shortcuts.is-horizontal .view-mode-button {flex-basis:88px;}
 @media(orientation:landscape) and (max-height:560px){.royal-game .control-deck .control-slot-view .control-slot-body {width:181px;height:44px;}.royal-game .control-deck .dock-rail-right .control-slot-view {width:181px;}}
 :root[data-theme] .royal-game .royal-card-actions {width:auto;box-sizing:border-box;}
+
+/* Release QA: keep default phone controls on one row, clear of all six pockets.
+ * Explicit user-dragged placements continue using their saved positions. */
+@media(max-width:640px) and (orientation:portrait) {
+  .royal-game .royal-entry {gap:0;}
+  .royal-game .control-deck .dock-rail-right .control-slot-view.is-default-anchor,
+  .royal-game .control-deck .dock-rail-right .control-slot-bulb.is-default-anchor {
+    position:fixed;top:calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--royal-host-gap) + 54px)!important;
+    transform:none;
+  }
+  .royal-game .control-deck .dock-rail-right .control-slot-view.is-default-anchor {right:8px;width:152px;height:44px;}
+  .royal-game .control-deck .control-slot-view.is-default-anchor .control-slot-body {width:152px;height:44px;}
+  .royal-game .control-deck .control-slot-view.is-default-anchor .view-shortcuts {flex-direction:row;}
+  .royal-game .control-deck .control-slot-view.is-default-anchor .view-mode-button {flex:1 1 0;width:76px;padding:5px 3px;gap:3px;}
+  .royal-game .control-deck .dock-rail-right .control-slot-bulb.is-default-anchor {left:156px;right:auto;width:44px;height:44px;}
+  .royal-game .control-slot-bulb.is-default-anchor .control-slot-body,
+  .royal-game .control-slot-bulb.is-default-anchor .plan-button {width:44px;height:44px;min-width:44px;}
+  .royal-game .control-slot-bulb.is-default-anchor .plan-button > .bulb-icon {transform:none;}
+}
+@media(max-width:380px) and (orientation:portrait) {
+  .royal-game .royal-entry {left:4px;}
+  .royal-game .control-deck .dock-rail-right .control-slot-view.is-default-anchor {right:4px;width:120px;}
+  .royal-game .control-deck .control-slot-view.is-default-anchor .control-slot-body {width:120px;}
+  .royal-game .control-deck .control-slot-view.is-default-anchor .view-mode-button {width:60px;}
+  .royal-game .control-slot-view.is-default-anchor .view-mode-button svg,
+  .royal-game .control-slot-view.is-default-anchor .view-mode-button .view-icon {display:none;}
+  .royal-game .control-deck .dock-rail-right .control-slot-bulb.is-default-anchor {left:148px;}
+}

@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { CUSHION_SEGMENTS, pocketLocalToWorld, worldToPocketLocal, type Point2, type PocketGeometry, type CushionSegment } from '../physics';
 import type { PocketRenderProfile } from './profile';
 import { cushionJoinOutward } from './cushion-join';
+import { cushionOffsetPoint } from './cushion-offset';
 import { TABLE_RENDER } from './cushion-geometry';
 
 export type PocketSurfaceStation = {
@@ -54,8 +55,8 @@ export function pocketSeamContract(pocket: PocketGeometry, profile: PocketRender
       const offset = offsets[i + first];
       const n = Math.hypot(offset.x, offset.z);
       return {
-        inner: add(p, offset, TABLE_RENDER.cushionTopInset),
-        outer: add(p, offset, TABLE_RENDER.cushionTopInset + width),
+        inner: cushionOffsetPoint(segments[Math.min(i + first, segments.length - 1)], p, TABLE_RENDER.cushionTopInset, CUSHION_SEGMENTS),
+        outer: cushionOffsetPoint(segments[Math.min(i + first, segments.length - 1)], p, TABLE_RENDER.cushionTopInset + width, CUSHION_SEGMENTS),
         outward: { x: offset.x / n, z: offset.z / n },
         seatY: TABLE_RENDER.cushionHeight,
         topY: TABLE_RENDER.cushionHeight + thickness,
@@ -63,7 +64,7 @@ export function pocketSeamContract(pocket: PocketGeometry, profile: PocketRender
         supported: true,
       };
     });
-    return { seat, back: nodes.map((p, i) => add(p, offsets[i], TABLE_RENDER.cushionWidth)), segments: segments.slice(first) };
+    return { seat, back: nodes.map((p, i) => cushionOffsetPoint(segments[Math.min(i, segments.length - 1)], p, TABLE_RENDER.cushionWidth, CUSHION_SEGMENTS)), segments: segments.slice(first) };
   });
   const rear = jawData.map(({ seat }) => {
     const end = seat[seat.length - 1];

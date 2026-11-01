@@ -29,7 +29,7 @@ describe('companion identity across a match', () => {
    const won=renderToStaticMarkup(<RoyalFinish winner="player" companionId={p.id} onRestart={()=>{}}/>);
    expect(won).toContain(COMPANION_CARD_ART[p.id].src);expect(won).toContain(p.name);expect(won).toContain(VICTORY_PRAISES[0]);expect(won).not.toContain(p.congratulations);
    const lost=renderToStaticMarkup(<RoyalFinish winner="opponent" companionId={p.id} onRestart={()=>{}}/>);
-   expect(lost).toContain(p.avatar);expect(lost).toContain('这一局惜败');expect(lost).not.toContain(p.congratulations);
+   expect(lost).toContain(p.avatar);expect(lost).toContain('下局再赢回来');expect(lost).not.toContain('这一局惜败');expect(lost).not.toContain(p.congratulations);
    expect(victoryNote('data:image/jpeg;base64,eA==','practice',p.name).content).toContain(p.name);
   }
  });

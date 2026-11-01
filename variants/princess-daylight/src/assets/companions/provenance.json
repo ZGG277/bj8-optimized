@@ -1,54 +1,74 @@
 {
   "tool": "built-in imagegen",
-  "description": "Ten generated fictional companion portraits for this game. No real-person likeness claim.",
+  "direction": "Same youthful fair prince style; face proportion variations only. Mature/rugged alternatives rejected and not integrated.",
   "assets": [
     {
       "id": "shen-yubai",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-6e5ba014-c8a5-4505-bf19-b15b5711dbd0.png",
+      "prompt": "Initial prince portrait, built-in imagegen",
       "asset": "src/assets/companions/shen-yubai.webp",
       "sha256": "25e1e639727f59034e1ccb7ae4f4f0b003c24db16c356f791c52ab783c1da9e9"
     },
     {
       "id": "lu-jingchen",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-220e2f2b-2485-4f69-8965-64bf65491c7a.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A slightly longer oval face and softer rounded chin; narrow serene eyes with straight lower eyelids; gently arched fine eyebrows; a long slim straight nose; a thin upper lip and small closed smile. Neatly side-parted black hair, fine gold glasses, forest green formal jacket. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/lu-jingchen.webp",
       "sha256": "c571f05657e9964121452e18b90d44f7f0b528f608fadfa267602f9e30a3d45d"
     },
     {
       "id": "wen-xingye",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-9fda0a9a-4959-4913-8a55-1ef8d307a8fb.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A shorter oval face with softly fuller cheeks and a rounded chin; wider bright eyes, straight thicker eyebrows, a shorter subtly upturned nose, fuller smiling lips with a small cheek dimple. Soft chestnut tousled fringe, ivory shirt and champagne waistcoat. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/wen-xingye.webp",
       "sha256": "9e9cd3092537c9d38dbca715b1e6758b4a5d7f1e88b2e383316cc33f5d487eb7"
     },
     {
       "id": "gu-yanchuan",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-9f9c3b6c-a8d9-4c40-8089-b924e0a96b9b.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A balanced youthful face with a mildly broader lower jaw, straighter chin line, slightly deeper-set almond eyes and strong clean brows; straight high nose bridge; defined cupid's bow and a restrained smile. Swept black hair, midnight-blue formal jacket with silver detail. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/gu-yanchuan.webp",
       "sha256": "2f26941f22511d1c7834ebd91b1abd9769f8e4f87ed44a762fb5b9ef1cdab9d0"
     },
     {
       "id": "jiang-yueheng",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-239f43f0-f881-4341-8763-bd6b3db5d4c5.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A slender heart-shaped youthful face, delicate pointed chin, long gently upturned eyes, fine curved eyebrows, slim straight nose and soft small lips. Silver-white shoulder-length hair, ice-blue embroidered coat with pearl detail. Keep youthful skin smooth and fair, no mature face. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/jiang-yueheng.webp",
       "sha256": "3651f070f82cc75f1afaaf76df1ed85e1c53e5f95abeb71bc14eee610e39bc28"
     },
     {
       "id": "zhou-mubai",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-7dabc69a-616d-4220-894b-4516c2a41ff9.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A soft oval face with gently rounded jaw; slightly downturned tender eyes with visible eyelid folds, low gently arched eyebrows, medium rounded nose tip, fuller lower lip, relaxed friendly smile. Dark-brown soft wavy hair, ivory shirt and sage formal jacket. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/zhou-mubai.webp",
       "sha256": "a6bfddd84cbd40cacd0af0d5bd8b407853f8c6367ad4a7c702d1df72d3d9824d"
     },
     {
       "id": "xie-linyu",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-209b6d74-9fd0-4931-b634-5cfe6619d192.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A youthful diamond-shaped face, subtly defined high cheekbones, narrow chin; longer catlike eyes with gently lifted outer corners, expressive slightly angled brows, straight small nose, asymmetrical charming half-smile. Auburn side-swept fringe, burgundy velvet formal coat. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/xie-linyu.webp",
       "sha256": "cb8e25c4e196133550cd84296863db3fa007e2c0a284060cf871e292559c7a41"
     },
     {
       "id": "pei-zhixu",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-ed250b17-8949-40a8-aa6a-7acef548b3bd.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A longer balanced youthful oval face with a neat softly squared chin; horizontal narrow eyes with monolid-like eyelids, straight elegant eyebrows, a slightly wider straight nose bridge and slim composed smiling lips. Black hair neatly swept back into a small low ponytail, warm-grey princely formal jacket. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/pei-zhixu.webp",
       "sha256": "ffbf4487de122f3eb0a09e6bffcba1263ea89190b2337b6c383fec980b509601"
     },
     {
       "id": "song-yucheng",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-1baa63b4-ae95-4288-b7f8-c59745fa534c.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A gently broad youthful oval face and rounded lower cheeks, large luminous round-almond eyes set slightly wider apart, softly curved eyebrows, small straight nose with rounded tip, wide warm smile and shallow dimples. Honey-brown short wavy hair, champagne coat and sky-blue cravat. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/song-yucheng.webp",
       "sha256": "e9dff09b3c24a1f363477867234bd2dec3c22b07eeabd51b962c9be2e9083c34"
     },
     {
       "id": "xu-qinghe",
+      "path": "/Users/zgg/.codex/generated_images/01a167a8-ebaa-7ff2-a77f-023cc60880c8/exec-1b54dc3f-bedb-41d3-a2c6-8fc38f2404f0.png",
+      "prompt": "Use the attached portrait ONLY as a reference for its polished romantic fantasy game rendering style, fair skin tone, apparent age (young ADULT 25-27), gentle elegant beauty, framing and warm ivory castle backdrop. Create a DIFFERENT handsome fictional young adult East Asian male character, not the same face in new clothes. Maintain exactly that youthful fair clean-shaven princess-game aesthetic. Face differences must be tasteful and clearly recognizable, not exaggerated. This new character's specific anatomy and styling: A slim youthful oval face with a delicate jaw and softly rounded chin; gentle slightly downturned almond eyes closer-set than the reference, defined eyelid crease, neat straight brows, fine high straight nose, softly curved fuller lips. Straight black middle-parted hair, pale celadon embroidered princely coat. Square head-and-shoulders avatar, entire head in frame, welcoming gaze, same warm soft daylight. Preserve the reference's skin tone and age impression. NO older men, wrinkles, beard, stubble, tanning, ethnicity changes, ruggedness, sportswear, dramatic realism, text or logo. Facial identity needs to change through proportions of eyes/nose/mouth/jaw while retaining the SAME coherent attractive prince style.",
       "asset": "src/assets/companions/xu-qinghe.webp",
       "sha256": "ddd7b49d49bd76995698ab0d5dff6a3abdfd9cfc2a86d97993871693a654c570"
     }

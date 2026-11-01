@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 原始桌球 GLB、共享物理尺寸及宝石光学。
- * [OUTPUT]: 独立实验的清透宝石上缘、象牙下架、细圆弧护口与预算内宝石球。
+ * [OUTPUT]: 独立实验的清透宝石上缘、象牙下架、共享边界的连续圆弧护口/薄皮裙与预算内宝石球。
  * [POS]: 实际 daylight GLB 视觉适配；消费共享袋口尺寸，不改球光学或照明。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -12,7 +12,9 @@ import { batchStaticTable } from '../minitool/render-guard';
 import { loadGlb } from './glb-loader';
 import { createDaylightEnvironment } from './daylight-environment';
 import { TABLE, POCKETS } from '../physics';
-import { splitFairyTableParts } from './fairy-table-finish';
+import { splitFairyTableParts, retireAuthoredPocketAssembly } from './fairy-table-finish';
+import { addContinuousTableDeck, clipAuthoredUpperDeck } from './table-deck';
+import { createPocketCollars } from './pocket-collars';
 import tableUrl from './assets/daylight/table-refined.glb?url';
 import tableHotUrl from './assets/daylight/table-hot.glb?url';
 import ballsUrl from './assets/daylight/balls-quality.glb?url';
@@ -37,12 +39,12 @@ export function setupDaylight(scene:THREE.Scene,renderer:THREE.WebGLRenderer,key
     Object.assign(key.shadow.camera,{left:-6,right:6,top:6,bottom:-6,far:24});key.shadow.camera.updateProjectionMatrix();
     scene.fog=new THREE.Fog(0xcfe2e5,50,230);scene.background=new THREE.Color(0xcfe2e5);
   }
-  renderer.domElement.dataset.visualVersion='fairy-gem-rails-experiment-20261030';
+  renderer.domElement.dataset.visualVersion='princess-table-detail-d2-integrated-20261101';
 }
 function styleCloth(table:THREE.Group){
   table.traverse(o=>{if(!(o instanceof THREE.Mesh)||!(o.name==='table-cloth'||o.name.startsWith('cushion-')))return;
     o.castShadow=true;
-    for(const m of Array.isArray(o.material)?o.material:[o.material])if(m instanceof THREE.MeshPhysicalMaterial){m.color.set(0xf4fff9);m.roughness=.9;m.metalness=0;m.clearcoat=0;m.sheen=.18;m.sheenColor.set(0x5a9d85);m.sheenRoughness=.94;m.specularIntensity=.12;m.normalScale.set(.16,.16);m.envMapIntensity=.14;}
+    for(const m of Array.isArray(o.material)?o.material:[o.material])if(m instanceof THREE.MeshPhysicalMaterial){m.color.set(0xf4fff9);m.roughness=.96;m.metalness=0;m.clearcoat=0;m.sheen=.34;m.sheenColor.set(0x5a9d85);m.sheenRoughness=.94;m.specularIntensity=.12;m.normalScale.set(.42,.34);m.envMapIntensity=.12;}
   });
 }
 function ivoryMap(){
@@ -63,6 +65,7 @@ function styleTable(root:THREE.Group,hot=false){
   root.rotation.y=-Math.PI/2;root.position.set(-.81006,-.718,-1.44506);
   root.updateMatrixWorld(true);
   splitFairyTableParts(root,hot);
+  retireAuthoredPocketAssembly(root);
   root.updateMatrixWorld(true);
   root.traverse(o=>{if(!(o instanceof THREE.Mesh))return;o.castShadow=!hot;o.receiveShadow=true;
     // Compress only the outer apron; retain the exact playing rectangle. Both LODs use this same deformation.
@@ -108,6 +111,15 @@ function styleTable(root:THREE.Group,hot=false){
       if(m.map)m.map.anisotropy=4;
     }
   });
+  const ivory = new THREE.MeshPhysicalMaterial({name:'Ivory | continuous support', map:shell,
+    bumpMap:shell,bumpScale:.00008,color:0xe0cfac,roughness:.78,metalness:0,
+    clearcoat:0,specularIntensity:.16,envMapIntensity:.22});
+  clipAuthoredUpperDeck(root);
+  addContinuousTableDeck(root,hot,ivory);
+  // Retire only the authored pocket cap/insert. Its disjoint triangles expose
+  // the gold underside at close range after the C1 aperture deformation.
+  root.traverse(o=>{if(o instanceof THREE.Mesh && !Array.isArray(o.material)
+    && (o.userData.fairyRole==='pocket-crown' || /^Pocket/.test(o.material.name))) o.visible=false;});
   replaced.forEach(t=>t.dispose());
 }
 
@@ -169,6 +181,8 @@ export function createDaylightJewelry(scene:THREE.Scene,table:THREE.Group,balls:
    const preserve=o.name==='table-cloth'||o.name.startsWith('cushion-')||o.name.startsWith('pocket-well-')||o.name.startsWith('pocket-bottom-');
    if(!preserve)o.visible=false;
   });
+  const lining = table.getObjectByName('pocket-well-0') as THREE.Mesh;
+  table.add(createPocketCollars(lining.material as THREE.Material));
   batchStaticTable(table);
   ready=true;state.status='ready';apply();
  }).catch(error=>{owned.splice(0).forEach(r=>{r.removeFromParent();release(r);});state.status='fallback';state.error=String(error);redraw();});

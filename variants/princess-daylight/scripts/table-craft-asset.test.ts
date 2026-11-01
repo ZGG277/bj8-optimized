@@ -13,7 +13,7 @@ import { TABLE, POCKETS, CUSHION_SEGMENTS } from '../src/physics';
 import { pocketSeamContract } from '../src/pocket-render/seam-contract';
 import { pocketRenderProfile } from '../src/pocket-render/profile';
 import { createPocketTrimGeometry } from '../src/pocket-render/trim-geometry';
-import { makeCushionGeometry } from '../src/pocket-render/cushion-geometry';
+import { makeCushionGeometry, CUSHION_PROFILE } from '../src/pocket-render/cushion-geometry';
 import { applyClothUV, applyLeatherUV } from '../src/scene/table-surfaces';
 
 const source = readFileSync(new URL('../assets/blender/table-craft-v2/surface-contract.json', import.meta.url));
@@ -104,7 +104,9 @@ it('台面、库边和皮裙有有限且有面积的 UV；设置 UV 不改变几
     const g = makeCushionGeometry(segment);
     expect(g.getAttribute('uv').count).toBe(g.getAttribute('position').count);
     expect(Array.from(g.getAttribute('uv').array).every(Number.isFinite)).toBe(true);
-    expect(g.getAttribute('uv').getX(1)).toBeGreaterThan(0);
+    // D2 uses continuous arc length: a connected run can legitimately end at U=0.
+    expect(Math.abs(g.getAttribute('uv').getX(1) - g.getAttribute('uv').getX(0)))
+      .toBeCloseTo(Math.hypot(segment.b.x-segment.a.x, segment.b.z-segment.a.z), 6);
     expect(g.getAttribute('uv').getY(4)).toBeGreaterThan(0);
     g.dispose();
   }
@@ -117,17 +119,23 @@ it('台面、库边和皮裙有有限且有面积的 UV；设置 UV 不改变几
 });
 
 it('相邻库边鼻尖与内凹面的同一剖面站点具有连续法线', () => {
-  const stationNormals = new Map<string, THREE.Vector3>();
+  const stationNormals = new Map<string, { normal: THREE.Vector3; position: THREE.Vector3 }>();
   let joined = 0;
   for (const segment of CUSHION_SEGMENTS) {
     const g = makeCushionGeometry(segment);
     const p = g.getAttribute('position'), n = g.getAttribute('normal');
-    for (let i = 6; i < 16; i++) {
-      const key = [p.getX(i), p.getY(i), p.getZ(i)].map(v => v.toFixed(6)).join(',');
+    for (let i = 6; i < (CUSHION_PROFILE.length - 1) * 2; i++) {
+      // D2 clips distinct physical stations onto one rendered position. Compare
+      // the two sides of each actual physical join, not unrelated clipped nodes.
+      const endpoint = i % 2 ? segment.b : segment.a;
+      const key = `${Math.floor(i/2)}:${endpoint.x.toFixed(8)},${endpoint.z.toFixed(8)}`;
       const normal = new THREE.Vector3().fromBufferAttribute(n, i);
+      const position = new THREE.Vector3().fromBufferAttribute(p, i);
       const other = stationNormals.get(key);
-      if (other) { expect(other.distanceTo(normal)).toBeLessThan(1e-5); joined++; }
-      else stationNormals.set(key, normal);
+      if (other) {
+        expect(other.normal.distanceTo(normal)).toBeLessThan(1e-5);
+        expect(other.position.distanceTo(position)).toBeLessThan(1e-6); joined++;
+      } else stationNormals.set(key, { normal, position });
     }
     g.dispose();
   }

@@ -45,9 +45,11 @@ export function createPocketTrimGeometry(contract: PocketSurfaceContract): THREE
   const buffer = surfaceBuffer();
   const rings = contract.stations.map(s => {
     const knee = { x: s.inner.x + s.outward.x * TABLE_RENDER.apronThickness, z: s.inner.z + s.outward.z * TABLE_RENDER.apronThickness };
+    const bevel = Math.min(.0008, Math.abs(s.topY-s.seatY)*.25);
     return [
       new THREE.Vector3(s.inner.x, s.topY, s.inner.z),
-      new THREE.Vector3(s.outer.x, s.topY, s.outer.z),
+      new THREE.Vector3(s.outer.x-s.outward.x*bevel, s.topY, s.outer.z-s.outward.z*bevel),
+      new THREE.Vector3(s.outer.x, s.topY-bevel, s.outer.z),
       new THREE.Vector3(s.outer.x, s.seatY, s.outer.z),
       new THREE.Vector3(knee.x, s.seatY, knee.z),
       new THREE.Vector3(knee.x, s.apronBottomY, knee.z),
@@ -57,9 +59,9 @@ export function createPocketTrimGeometry(contract: PocketSurfaceContract): THREE
   for (let i = 1; i < rings.length; i++) {
     const n = contract.stations[i].outward;
     const out = new THREE.Vector3(n.x, 0, n.z);
-    const normals = [new THREE.Vector3(0, 1, 0), out, new THREE.Vector3(0, -1, 0), out, new THREE.Vector3(0, -1, 0), out.clone().negate()];
-    for (let j = 0; j < 6; j++) {
-      const next = (j + 1) % 6;
+    const normals = [new THREE.Vector3(0, 1, 0), out.clone().add(new THREE.Vector3(0,1,0)).normalize(), out, new THREE.Vector3(0, -1, 0), out, new THREE.Vector3(0, -1, 0), out.clone().negate()];
+    for (let j = 0; j < 7; j++) {
+      const next = (j + 1) % 7;
       buffer.triangle(rings[i - 1][j], rings[i][j], rings[i - 1][next], normals[j], j);
       buffer.triangle(rings[i][j], rings[i][next], rings[i - 1][next], normals[j], j);
     }
@@ -73,7 +75,7 @@ export function createPocketTrimGeometry(contract: PocketSurfaceContract): THREE
     const axis = ring[1].clone().sub(ring[0]).normalize();
     const points = unique.map(p => new THREE.Vector2(p.clone().sub(ring[0]).dot(axis), p.y));
     const faces = THREE.ShapeUtils.triangulateShape(points, []);
-    for (const [a, b, c] of faces) buffer.triangle(unique[a], unique[b], unique[c], direction, 6 + endpoint);
+    for (const [a, b, c] of faces) buffer.triangle(unique[a], unique[b], unique[c], direction, 7 + endpoint);
   }
   return buffer.finish();
 }

@@ -46,7 +46,7 @@ type Props = {
   orientation: 'horizontal' | 'vertical';
   onBegin: (clientY: number, availableTravel: number) => void;
   onUpdate: (clientY: number) => void;
-  onRelease: () => void;
+  onRelease: (clientY: number) => void;
   onCancel: () => void;
   /** 键盘轻杆:Enter 直接以保底力度出杆;空格按住蓄力由全局键盘通道处理 */
   onTap: () => void;
@@ -90,7 +90,8 @@ export function ShootControl({
         onPointerDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (disabled) return;
+          if (disabled || gestureRef.current || e.isPrimary === false
+            || (e.pointerType === 'mouse' && e.button !== 0)) return;
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
           const rect = e.currentTarget.getBoundingClientRect();
           gestureRef.current = {
@@ -125,8 +126,8 @@ export function ShootControl({
         onPointerUp={(e) => {
           e.preventDefault();
           const gesture = gestureRef.current;
-          gestureRef.current = null;
           if (!gesture || gesture.pointerId !== e.pointerId) return;
+          gestureRef.current = null;
           const escaped = gesture.cancelled || !isChargePointerInCommitCorridor(
             gesture,
             orientation,
@@ -140,7 +141,7 @@ export function ShootControl({
             if (!gesture.cancelled) onCancel();
             return;
           }
-          onRelease();
+          onRelease(coordinate(e));
         }}
         onPointerCancel={(e) => {
           const gesture = gestureRef.current;
@@ -150,7 +151,7 @@ export function ShootControl({
         }}
         onKeyDown={(e) => {
           if (disabled) return;
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !e.repeat) {
             e.preventDefault();
             onTap();
           }

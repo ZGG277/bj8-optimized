@@ -30,3 +30,5 @@
 `size-assembly.test.ts`: 实际动态承托在六袋中心/捕获窗口不遮挡、每段库边都有承托、圆润木框保持原包络与同源袋口顶点。
 
 2026-10-30 独立实验：既有可见孔洞/皮壳/袋腔继续逐字消费共享143.5/123mm新口宽；不另扩捕获区。真实 daylight 护口由 scene/fairy-table-finish 处理，原曲线保留，三角预算不增加。
+
+2026-11-01 用户授权将D2球桌合入主线：cushion-offset.ts消除短库边偏移回折，物理nose=0保持原位；连续UV见cloth-coordinates.ts，well-lining.ts在原袋腔外生成闭合薄皮衬。完整库边2336三角、承托904三角，替代上文旧1800三角记录。库边/承托取消内部端盖与退化面；frame-geometry.ts支持同轮廓象牙/垫片/玻璃层，trim-geometry.ts补入D2依赖的外侧0.8mm护口倒角，内部有效袋口不动。table-detail.test.ts及scripts/table-detail-geometry.test.ts为便携定向测试，不引用实验目录。类型/定向测试与夜间未执行的构建/浏览器验收分别记录于../../TABLE_DETAIL_INTEGRATION_20261101.md。

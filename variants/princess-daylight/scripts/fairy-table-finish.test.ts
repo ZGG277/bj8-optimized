@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { fairyRailMaterial, splitFairyTableParts } from '../src/scene/fairy-table-finish';
+import { fairyRailMaterial, splitFairyTableParts, retireAuthoredPocketAssembly } from '../src/scene/fairy-table-finish';
 import { sceneCost } from '../src/minitool/render-guard';
 
 /** Parse only the actual GLB position/index data; no browser, images or renderer. */
@@ -52,6 +52,25 @@ function dispose(root: THREE.Object3D) {
 }
 
 describe('actual daylight fairy-gem rail experiment', () => {
+  it('retires pocket-only components while keeping the actual lower frame and rail geometry', () => {
+    const root = tableFixture(false); splitFairyTableParts(root, false);
+    const lower = () => {
+      const result: string[] = [], v = new THREE.Vector3();
+      root.traverse(o => { if (!(o instanceof THREE.Mesh)) return;
+        const g = o.geometry, p = g.getAttribute('position');
+        for (let i = 0; i < (g.index?.count ?? p.count); i++) {
+          v.fromBufferAttribute(p, g.index?.getX(i) ?? i).applyMatrix4(o.matrixWorld);
+          if (v.y <= -.2) result.push(v.toArray().map(x => x.toFixed(6)).join(','));
+        }
+      }); return result;
+    };
+    const before = lower(), rails = root.getObjectByName('fairy-gem-rails') as THREE.Mesh;
+    const railIndices = Array.from(rails.geometry.index!.array);
+    retireAuthoredPocketAssembly(root);
+    expect(lower()).toEqual(before);
+    expect(Array.from(rails.geometry.index!.array)).toEqual(railIndices);
+    dispose(root);
+  });
   for (const hot of [false, true]) it(`splits real ${hot ? 'hot' : 'refined'} geometry without duplicate surfaces or a second transparent shell`, () => {
     const root = tableFixture(hot), before = triangles(root);
     splitFairyTableParts(root, hot); root.updateMatrixWorld(true);

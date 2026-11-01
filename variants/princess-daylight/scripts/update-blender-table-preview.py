@@ -4,10 +4,9 @@
 [POS]: 制作源同步；仅更新 V2 参考集合，不重新导出或修改运行时 GLB
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
-from pathlib import Path
 import bpy
 from mathutils import Vector, Matrix
-ROOT = str(Path(__file__).resolve().parent.parent / 'assets/blender/table-craft-v2') + '/'
+ROOT = '/Users/zgg/Projects/游戏/bl8-3D台球/bj8-main-integration/assets/blender/table-craft-v2/'
 scene = bpy.data.scenes['BJ8_Table_Craft_V2']
 bpy.context.window.scene = scene
 collection = next(c for c in scene.collection.children if c.name.startswith('Craft_Reference_NotExported'))

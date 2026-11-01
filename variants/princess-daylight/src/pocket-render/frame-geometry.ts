@@ -31,7 +31,7 @@ export function tableFrameOpening(contracts: readonly PocketSurfaceContract[]): 
   return result;
 }
 
-function frameContours(contracts: readonly PocketSurfaceContract[]) {
+export function frameContours(contracts: readonly PocketSurfaceContract[]) {
   const halfW = TABLE.width / 2 + TABLE_RENDER.cushionWidth + TABLE_RENDER.railWidth;
   const halfL = TABLE.length / 2 + TABLE_RENDER.cushionWidth + TABLE_RENDER.railWidth;
   const radius = TABLE_RENDER.cushionWidth + TABLE_RENDER.railWidth - TABLE_RENDER.bevelSize;
@@ -50,7 +50,7 @@ function frameContours(contracts: readonly PocketSurfaceContract[]) {
   corner({ x: -halfW + radius, z: -halfL }, { x: -halfW, z: -halfL }, { x: -halfW, z: -halfL + radius });
   corner({ x: -halfW, z: halfL - radius }, { x: -halfW, z: halfL }, { x: -halfW + radius, z: halfL });
   outer.pop(); // Closing point is already the first station.
-  const hole = tableFrameOpening(contracts);
+  const hole = tableFrameOpening(contracts).filter((p, i, a) => i === 0 || distance(p, a[i - 1]) > 1e-8);
   const outerSign = Math.sign(area(outer));
   const directions = outer.map((p, i) => {
     const before = outer[(i + outer.length - 1) % outer.length], after = outer[(i + 1) % outer.length];
@@ -84,19 +84,20 @@ export function tableFrameEnvelope(contracts: readonly PocketSurfaceContract[]) 
     halfLength: halfL + TABLE_RENDER.bevelSize + expansion, expansion };
 }
 
-export function createTableFrameGeometry(contracts: readonly PocketSurfaceContract[]): THREE.BufferGeometry {
+export function createTableFrameGeometry(contracts: readonly PocketSurfaceContract[], vertical?: { bottom: number; top: number; radius: number }): THREE.BufferGeometry {
   const { outer, hole, directions, expansion } = frameContours(contracts);
   // Six-segment 8×6mm roundover. Heights and the full leather interface stay fixed.
   const b = TABLE_RENDER.bevelSize, h = TABLE_RENDER.bevelHeight, top = TABLE_RENDER.railHeight;
-  const roundWidth = ROUND_WIDTH, roundHeight = 0.006, roundSteps = 6;
+  const roundWidth = vertical?.radius ?? ROUND_WIDTH, roundHeight = vertical?.radius ?? 0.006, roundSteps = 6;
+  const bottomY = vertical?.bottom ?? -h, topY = vertical?.top ?? top + h;
   const layers: number[][] = [];
   for (let i = 0; i <= roundSteps; i++) {
     const angle = i / roundSteps * Math.PI / 2;
-    layers.push([-h + roundHeight * (1 - Math.cos(angle)), b - roundWidth + roundWidth * Math.sin(angle)]);
+    layers.push([bottomY + roundHeight * (1 - Math.cos(angle)), b - roundWidth + roundWidth * Math.sin(angle)]);
   }
   for (let i = 0; i <= roundSteps; i++) {
     const angle = i / roundSteps * Math.PI / 2;
-    layers.push([top + h - roundHeight + roundHeight * Math.sin(angle), b - roundWidth + roundWidth * Math.cos(angle)]);
+    layers.push([topY - roundHeight + roundHeight * Math.sin(angle), b - roundWidth + roundWidth * Math.cos(angle)]);
   }
   const positions: number[] = [], uvs: number[] = [];
   let outerVertexCount = 0;
@@ -119,18 +120,18 @@ export function createTableFrameGeometry(contracts: readonly PocketSurfaceContra
   const flatHole = hole.map(p => new THREE.Vector2(p.x, -p.z));
   const faces = THREE.ShapeUtils.triangulateShape(flatOuter, [flatHole]);
   const points = [...capOuter, ...hole];
-  for (const y of [-h, top + h]) {
+  for (const y of [bottomY, topY]) {
     for (const face of faces) {
       const v = face.map(i => new THREE.Vector3(points[i].x, y, points[i].z));
-      triangle(v[0], v[1], v[2], new THREE.Vector3(0, y < 0 ? -1 : 1, 0));
+      triangle(v[0], v[1], v[2], new THREE.Vector3(0, y === bottomY ? -1 : 1, 0));
     }
   }
   const holeSign = Math.sign(area(hole));
   for (let i = 0; i < hole.length; i++) {
     const a = hole[i], b = hole[(i + 1) % hole.length];
     const n = new THREE.Vector3(-(b.z - a.z) * holeSign, 0, (b.x - a.x) * holeSign);
-    const loA = new THREE.Vector3(a.x, -h, a.z), hiA = new THREE.Vector3(a.x, top + h, a.z);
-    const loB = new THREE.Vector3(b.x, -h, b.z), hiB = new THREE.Vector3(b.x, top + h, b.z);
+    const loA = new THREE.Vector3(a.x, bottomY, a.z), hiA = new THREE.Vector3(a.x, topY, a.z);
+    const loB = new THREE.Vector3(b.x, bottomY, b.z), hiB = new THREE.Vector3(b.x, topY, b.z);
     triangle(loA, hiA, loB, n); triangle(hiA, hiB, loB, n);
   }
   const geometry = new THREE.BufferGeometry();

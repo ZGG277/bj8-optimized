@@ -25,7 +25,7 @@ export function Scoreboard({ match, worldView, shotReward }: ScoreboardProps) {
   const rack = (numbers: number[], owner: string) => <div className="royal-ball-rack" aria-label={match.playerGroup ? `${owner}的球，淡色为已进` : `${owner}尚未分组`}>
     {numbers.map(n => <span key={n} data-ball-number={match.playerGroup ? n : undefined}
       aria-label={match.playerGroup ? `${n}号${active.has(n) ? '待进' : '已进'}` : '待分组'}
-      className={match.playerGroup ? `mini-ball ${n < 8 ? 'solid' : 'stripe'} ${active.has(n) ? '' : 'down'}` : 'mini-ball unassigned'} />)}
+      className={match.playerGroup ? `mini-ball ${n < 8 ? 'solid' : 'stripe'} ${active.has(n) ? '' : 'down'}${shotReward?.ballNumbers.includes(n) ? ' is-rewarded' : ''}` : 'mini-ball unassigned'} />)}
   </div>;
   return <section className="scoreboard royal-scoreboard" aria-label="公主请开球 · 对局比分">
     <div className="royal-player player" data-active={match.actor === 'player' && match.phase !== 'finished'}>
