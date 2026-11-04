@@ -4,7 +4,7 @@ import { collectCompanionWin, loadCompanionCollection, saveCompanionCollection, 
 import { createFriendlyOpponentProfile } from '../opponent/friendly-style';
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
-[OUTPUT]: 对外提供对局状态（worldView / match / viewLevel）、整局结束才提交的双方能力档案与单点训练总结、
+[OUTPUT]: 对外提供每次初始化默认第一视角的对局状态、整局结束才提交的双方能力档案与单点训练总结、
           resetGame / settleShot / recordPlayerShot / completeMatchAssessment 等编排动作
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -34,7 +34,7 @@ import {
   type ShotSkillObservation,
 } from '../opponent/model';
 import { createShotSettlementGuard } from './shot-settlement-guard';
-import { OVERHEAD_VIEW } from '../camera-view';
+import { FIRST_PERSON_VIEW, OVERHEAD_VIEW } from '../camera-view';
 
 function browserStorage(): ReturnType<typeof gameStorage> {
   if (typeof window === 'undefined') return null;
@@ -57,7 +57,7 @@ export function useGameState() {
   useEffect(() => { matchRef.current = match; }, [match]);
 
   // ── 视图状态 ──
-  const [viewLevel, setViewLevel] = useState(OVERHEAD_VIEW);
+  const [viewLevel, setViewLevel] = useState(FIRST_PERSON_VIEW);
 
   // ── 玩家能力与对手档案（整局中锁定，结束后一次性更新）──
   const [playerSkill, setPlayerSkill] = useState(() =>

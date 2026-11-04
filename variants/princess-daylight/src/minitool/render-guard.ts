@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 可见场景几何、材质、环境与背景纹理。
+ * [OUTPUT]: 保守显存/绘制预算和合批工具，天空纹理与共享纹理一并计量。
+ * [POS]: 小工具渲染资源门禁，不改场景内容或球局。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 /** Conservative visible-scene budget; optional scenery is removed before core geometry. */
@@ -21,6 +27,7 @@ export function sceneCost(scene: THREE.Scene) {
     materials.forEach(material => Object.values(material).forEach(value => { if (value instanceof THREE.Texture) textures.add(value); }));
   });
   if (scene.environment) textures.add(scene.environment);
+  if (scene.background instanceof THREE.Texture) textures.add(scene.background);
   textures.forEach(texture => {
     const images = Array.isArray(texture.image) ? texture.image : [texture.image];
     images.forEach(image => {

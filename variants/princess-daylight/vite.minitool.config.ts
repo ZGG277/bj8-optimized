@@ -1,6 +1,6 @@
 /*
 [INPUT]: 当前主线产品源码、本地 GLB 与小红书离线 H5/CSP 约束
-[OUTPUT]: dist-minitool 下外置脚本、无 Worker、无 fetch 路径的纯本地静态包
+[OUTPUT]: 外置脚本、无 Worker/fetch/OffscreenCanvas 路径的纯本地静态包
 [POS]: 小红书小工具专用构建入口；不改变 vite.config.ts 的本地单 HTML 预览
 [PROTOCOL]: 变更时同步运行 npm run build:minitool 与包内静态扫描
 */
@@ -32,6 +32,12 @@ function miniToolCompatibility(): Plugin {
       return null;
     },
     transform(code, id) {
+      if (id.endsWith('/three/build/three.module.js') || id.endsWith('/three/src/renderers/webgl/WebGLTextures.js')) {
+        // The container uses DOM Canvas for texture resizing, including on low texture-limit devices.
+        // Remove both the capability probe and the alternate constructor from the shipped bundle.
+        return code.replace("typeof OffscreenCanvas !== 'undefined'", 'false')
+          .replace("new OffscreenCanvas( width, height )", "createElementNS( 'canvas' )");
+      }
       if (id.endsWith('/three/examples/jsm/loaders/GLTFLoader.js')) {
         return code.replace(
           "if ( typeof createImageBitmap === 'undefined' || ( isSafari && safariVersion < 17 ) || ( isFirefox && firefoxVersion < 98 ) )",

@@ -1,6 +1,6 @@
 /*
-[INPUT]: 依赖浏览器 Canvas API 与 Three.js CanvasTexture
-[OUTPUT]: 对外提供支持原绿、深蓝与实验清绿的米制周期随机细绒台呢（mip/各向异性过滤）、细皮革、木纹、整红宝石/整黄玉球号与六点母球的程序化贴图工厂
+[INPUT]: 依赖浏览器Canvas、Three.js CanvasTexture与统一霞鹜文楷
+[OUTPUT]: 对外提供支持原绿、深蓝与深翡翠的米制周期随机细绒台呢（深翡翠按末帧压红补绿蓝，采用低对比细绒，保留 mip/各向异性过滤）、细皮革、木纹、整红宝石/整黄玉球号与六点母球的程序化贴图工厂
 [POS]: 渲染资源层；只生成纹理，不持有场景或对局状态
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
@@ -9,6 +9,7 @@
  */
 import * as THREE from 'three';
 import { clothFibreField } from './scene/cloth-fibres';
+import { canvasFont } from './typography';
 
 const clampByte = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
 
@@ -55,8 +56,8 @@ export function makeClothMaps(size = 512, palette: 'green' | 'royal-blue' | 'sof
     const i = (y * size + x) * 4;
     const velvet=palette==='royal-blue'||palette==='princess-blue';
     const soft=palette==='soft-green';
-    const base=palette==='princess-blue'?[16,43,92]:palette==='tiffany-blue'?[105,190,193]:velvet?[9,32,82]:soft?[45,117,91]:[10,91,60];
-    const colourTone=velvet?grain*19:soft?fibre(x,y)*8:tone;
+    const base=palette==='princess-blue'?[16,43,92]:palette==='tiffany-blue'?[105,190,193]:velvet?[9,32,82]:soft?[10,94,63]:[10,91,60];
+    const colourTone=velvet?grain*19:soft?fibre(x,y)*9:tone;
     data[0].data.set([clampByte(base[0] + colourTone * (velvet ? .38 : .6)), clampByte(base[1] + colourTone * (velvet ? .72 : 1)), clampByte(base[2] + colourTone * (velvet ? 1.2 : .7)), 255], i);
     const normalX=soft?128+(fibre(x-1,y)-fibre(x+1,y))*40:velvet?128+(clothNoise(x,y,0x9187)-.5)*70:128+Math.cos(px*128)*9;
     const normalY=soft?128+(fibre(x,y-1)-fibre(x,y+1))*40:velvet?128+(clothNoise(y,x+47,0x6129)-.5)*70:128+Math.cos(py*192)*13+nap*2;
@@ -186,7 +187,7 @@ export function makeBallTexture(number: number, _group: string): THREE.CanvasTex
     ctx.arc(cx, h * 0.5, badgeR, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#151515';
-    ctx.font = `700 ${badgeR * 1.15}px Arial`;
+    ctx.font = canvasFont(badgeR * 1.15,700);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(number), cx, h * 0.52);

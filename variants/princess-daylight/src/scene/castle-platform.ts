@@ -1,6 +1,6 @@
 /**
  * [INPUT]: THREE、合并几何与独占资源壳体。
- * [OUTPUT]: 暖灰大理石平台、细石纹/细拼缝与柔和磨光、哑光柱廊；不含远景城堡。
+ * [OUTPUT]: 暖米黄大理石平台、非条带细云纹/窄拼缝与柔和磨光、哑光柱廊；不含远景城堡。
  * [POS]: 可玩露台渲染壳体；与开场暖石材衔接，不影响碰撞。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -8,35 +8,50 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ownedWorldShell } from './world-shell';
 
-/** 大块暖灰大理石：色纹、细缝高度与柔和磨光分别编码，仍只有一批地面。 */
+/** 周期值噪声：自然云纹不使用等间距正弦脉络，避免地面出现巨大重复波浪。 */
+function stoneNoise(u:number,v:number,nx:number,ny:number,seed:number) {
+  const x=u*nx,y=v*ny,ix=Math.floor(x),iy=Math.floor(y);
+  const smooth=(t:number)=>t*t*t*(t*(t*6-15)+10);
+  const hash=(a:number,b:number)=>{
+    let h=Math.imul(((a%nx+nx)%nx)^seed,374761393)^Math.imul((b%ny+ny)%ny,668265263);
+    h=Math.imul(h^(h>>>13),1274126177);
+    return ((h^(h>>>16))>>>0)/4294967295*2-1;
+  };
+  const sx=smooth(x-ix),sy=smooth(y-iy);
+  return (hash(ix,iy)*(1-sx)+hash(ix+1,iy)*sx)*(1-sy)
+    +(hash(ix,iy+1)*(1-sx)+hash(ix+1,iy+1)*sx)*sy;
+}
+
+/** 一张512²图内四乘四暖石板；约0.68×0.78m/块，窄缝和低对比云纹分通道。 */
 function stoneMaps() {
   const size=512;
   const canvases=Array.from({length:3},()=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=size;return canvas;});
   const contexts=canvases.map(canvas=>canvas.getContext('2d')!);
   const images=contexts.map(c=>c.createImageData(size,size));
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-    const u=x/size*Math.PI*2,v=y/size*Math.PI*2;
-    const row=Math.floor(y/256),offset=row%2*128,col=Math.floor((x+offset)/256);
-    const localX=(x+offset)%256,localY=y%256;
-    const edge=Math.min(localX,256-localX,localY,256-localY);
-    const warp=.8*Math.sin(u+2*v)+.32*Math.sin(3*u-2*v)+.13*Math.sin(7*u+5*v);
-    const vein=Math.exp(-Math.abs(Math.sin(2*u+3*v+warp))*29);
-    const branch=Math.exp(-Math.abs(Math.sin(3*u+5*v+warp*.7+.8))*48);
-    const cloud=3.5*Math.sin(u+v)+2.5*Math.cos(2*u-v);
-    const grain=Math.sin(x*1.7+y*.93)*.7+Math.sin(x*.21-y*.37)*.5;
-    const tile=Math.sin((col%2)*31.7+row*17.3)*2.8;
-    const seam=1-Math.min(1,edge/1.35),bevel=1-Math.min(1,edge/3);
-    const shade=cloud+grain+tile-vein*23-branch*8-seam*24-bevel*3;
+    const u=x/size,v=y/size,row=Math.floor(y/128),col=Math.floor(x/128);
+    const localX=x%128,localY=y%128;
+    const edge=Math.min(localX,128-localX,localY,128-localY);
+    const cloud=stoneNoise(u,v,11,13,17);
+    const mineral=stoneNoise(u+cloud*.015,v-cloud*.012,37,43,39);
+    const fine=stoneNoise(u,v,83,91,71);
+    const grain=stoneNoise(u,v,173,181,103);
+    const tile=Math.sin(col*31.7+row*17.3)*1.3;
+    // Sparse soft mineral edges; no continuous striped vein running across slabs.
+    const vein=Math.max(0,.16-Math.abs(mineral+cloud*.22))/.16*(.35+.65*Math.max(0,fine));
+    const seam=1-Math.min(1,edge/.65),bevel=1-Math.min(1,edge/1.4);
+    const shade=cloud*4.8+mineral*3.3+fine*1.4+grain*.65+tile-vein*3.6-seam*13-bevel*1.4;
     const i=(y*size+x)*4;
-    images[0].data.set([194+shade,190+shade,180+shade,255],i);
-    const height=184-seam*90-bevel*12+grain*.5;
+    images[0].data.set([203+shade,188+shade*.94,162+shade*.85,255],i);
+    const height=184-seam*65-bevel*6+fine*.7;
     images[1].data.set([height,height,height,255],i);
-    const rough=210+cloud*1.5+vein*18+seam*28;
+    const rough=218+cloud*4+mineral*4+vein*5+seam*20;
     images[2].data.set([rough,rough,rough,255],i);
   }
   const maps=canvases.map((canvas,i)=>{
     contexts[i].putImageData(images[i],0,0);
     const map=new THREE.CanvasTexture(canvas);
+    map.name=['Terrace | warm cream mineral cloud','Terrace | narrow stone joints','Terrace | honed mineral roughness'][i];
     if(i===0)map.colorSpace=THREE.SRGBColorSpace;
     map.wrapS=map.wrapT=THREE.RepeatWrapping;map.repeat.set(3,3);map.anisotropy=4;
     return map;
@@ -47,7 +62,7 @@ export function createCastlePlatform(){
   const root=new THREE.Group();root.name='world-shell-castle';
   const stone=stoneMaps(),time={value:0};
   const materials={
-    stone:new THREE.MeshPhysicalMaterial({color:0xf4f1e9,map:stone.color,bumpMap:stone.height,bumpScale:.003,roughnessMap:stone.roughness,roughness:.60,metalness:0,clearcoat:.10,clearcoatRoughness:.44,specularIntensity:.32,envMapIntensity:.38}),
+    stone:new THREE.MeshPhysicalMaterial({color:0xf4f1e9,map:stone.color,bumpMap:stone.height,bumpScale:.0012,roughnessMap:stone.roughness,roughness:.67,metalness:0,clearcoat:.045,clearcoatRoughness:.50,specularIntensity:.28,envMapIntensity:.32}),
     ivory:new THREE.MeshStandardMaterial({color:0xc9bea4,roughness:.82}),
     edge:new THREE.MeshStandardMaterial({color:0x94866a,roughness:.67,metalness:.12}),
     sage:new THREE.MeshStandardMaterial({color:0x719181,roughness:.75,side:THREE.DoubleSide}),

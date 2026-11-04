@@ -1,4 +1,10 @@
-/** Shared, offline Canvas artwork: a short burst on screen and its frozen celebration on the card. */
+/**
+ * [INPUT]: 离线场景图、真实局后数据与统一Canvas字体。
+ * [OUTPUT]: 确定性庆祝绘图与旧卡面兼容路径，中文及数字都用霞鹜文楷。
+ * [POS]: 纯Canvas视觉层，不产生胜负或写入收藏。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
+ */
+import { canvasFont } from '../typography';
 const TAU = Math.PI * 2;
 export const CELEBRATION_COLORS = ['#ffe1a0', '#ffd074', '#9de9ce', '#ff9d89'];
 export type Spark = { angle: number; reach: number; tail: number; color: string };
@@ -47,7 +53,7 @@ function ball(ctx: CanvasRenderingContext2D, x: number, y: number, radius: numbe
   ctx.beginPath();ctx.arc(x,y,radius-1,Math.PI*1.12,Math.PI*1.87);ctx.stroke();ctx.globalAlpha=1;
   if (eight) {
     ctx.save();ctx.translate(x+radius*.19,y-radius*.03);ctx.rotate(-.2);ctx.scale(.86,1);
-    ctx.fillStyle='#f1d497';ctx.font=`600 ${radius*.72}px Arial, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('8',0,radius*.045);ctx.restore();
+    ctx.fillStyle='#f1d497';ctx.font=canvasFont(radius*.72,600);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('8',0,radius*.045);ctx.restore();
   }
   ctx.save();ctx.translate(x-radius*.29,y-radius*.52);ctx.rotate(-.5);
   const shine=ctx.createRadialGradient(0,0,0,0,0,radius*.42);shine.addColorStop(0,'rgba(255,255,230,.72)');shine.addColorStop(1,'rgba(255,255,230,0)');
@@ -100,20 +106,20 @@ export function paintVictoryCard(ctx: CanvasRenderingContext2D, mode: 'practice'
   footer.addColorStop(1, 'rgba(7,20,46,.96)');
   ctx.fillStyle = footer; ctx.fillRect(0, 1130, 1080, 310);
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
-  ctx.fillStyle = '#f5e8cc'; ctx.font = '500 29px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.fillStyle = '#f5e8cc'; ctx.font = canvasFont(29);
   ctx.fillText('公主请开球', 72, 92);
   ctx.textAlign = 'center';
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 6;
-  ctx.font = '600 145px "Songti SC", "STSong", "Noto Serif CJK SC", serif';
+  ctx.font = canvasFont(145);
   const title = ctx.createLinearGradient(0, 322, 0, 452);
   title.addColorStop(0, '#fff5dd'); title.addColorStop(.5, '#f2d8a5'); title.addColorStop(1, '#c59b57');
   ctx.fillStyle = title; ctx.fillText('赢得漂亮', 540, 451);
   ctx.restore();
-  ctx.fillStyle = '#f6ead1'; ctx.font = '500 36px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#f6ead1'; ctx.font = canvasFont(36);
   ctx.fillText(`${mode === 'challenge' ? '挑战' : '陪练'}模式 · 战胜${opponentName}`, 540, 1288);
   if (typeof shots === 'number' && Number.isInteger(shots) && shots > 0) {
-    ctx.fillStyle = '#c9bb9f'; ctx.font = '22px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#c9bb9f'; ctx.font = canvasFont(22);
     ctx.fillText(`本局出杆 ${shots} 杆`, 540, 1336);
   }
 }

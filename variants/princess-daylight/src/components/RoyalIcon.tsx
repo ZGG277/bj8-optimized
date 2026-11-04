@@ -1,5 +1,10 @@
-/** Shared outline icons keep controls independent of font glyphs. */
-export function RoyalIcon({ name }: { name: 'scene' | 'help' | 'pause' | 'play' | 'sound' | 'muted' | 'restart' | 'close' | 'skip' | 'crown' | 'cards' | 'left' | 'right' }) {
+/**
+ * [INPUT]: 控件图标名。
+ * [OUTPUT]: 共用SVG图形，含拖动手柄/关闭/花火，消除字体缺失符号的回退。
+ * [POS]: 纯展示层，不处理控件事件或字体加载。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
+ */
+export function RoyalIcon({ name }: { name: 'scene' | 'help' | 'pause' | 'play' | 'sound' | 'muted' | 'restart' | 'close' | 'skip' | 'crown' | 'cards' | 'left' | 'right' | 'grip' | 'sparkle' }) {
   return <svg className="royal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {name === 'scene' && <><path d="M3 19V5h18v14H3Z"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 3 3-4 4 6"/></>}
     {name === 'help' && <><path d="M8.5 8a3.5 3.5 0 0 1 7 0c0 2.5-3.5 2.5-3.5 5"/><circle cx="12" cy="17" r=".8" fill="currentColor" stroke="none"/></>}
@@ -8,6 +13,8 @@ export function RoyalIcon({ name }: { name: 'scene' | 'help' | 'pause' | 'play' 
     {(name === 'sound' || name === 'muted') && <><path d="M3 9h4l5-4v14l-5-4H3Z"/>{name === 'sound' ? <><path d="M16 8a6 6 0 0 1 0 8M19 5a10 10 0 0 1 0 14"/></> : <path d="m17 9 5 6m0-6-5 6"/>}</>}
     {name === 'restart' && <><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></>}
     {name === 'close' && <path d="m6 6 12 12M18 6 6 18"/>}
+    {name === 'grip' && <>{[6,12,18].map(y=><g key={y}><circle cx="8" cy={y} r="1"/><circle cx="16" cy={y} r="1"/></g>)}</>}
+    {name === 'sparkle' && <path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8Z"/>}
     {name === 'skip' && <><path d="m5 6 9 6-9 6ZM18 6v12"/></>}
     {name === 'crown' && <><path d="m3 6 5 5 4-7 4 7 5-5-2 13H5ZM6 16h12"/></>}
     {name === 'cards' && <><path d="m5 5 10-2 3 15-10 2Z"/><path d="m17 5 4 2-4 14-10-3"/><path d="m9 10 3-3 2 3-2 3Z"/></>}

@@ -1,32 +1,15 @@
 /**
  * [INPUT]: Authored daylight table geometry and its world transform.
- * [OUTPUT]: Six complete transmissive rail panels and six satin rolled pocket crowns.
- * [POS]: User-accepted transparent upper rails; retains ivory legs/apron, topology and pocket apertures.
+ * [OUTPUT]: 独立暖象牙上缘候选和六个缎面护口；骨纹单层不透明，不增实体壳。
+ * [POS]: Same upper-rail topology and pocket apertures; material-only experiment.
  * [PROTOCOL]: When changing, update scene/CLAUDE.md.
  */
 import * as THREE from 'three';
+import { warmIvoryMaterial, type WarmIvoryMaps } from './warm-ivory';
 
-/** One FrontSide transmission pass, sharing the existing gem-ball refraction target. */
-export function fairyRailMaterial(hot: boolean) {
-  const material = new THREE.MeshPhysicalMaterial({
-    name: 'Fairy gem | upper rails',
-    color: hot ? 0x8cc9c8 : 0xe0f8f5,
-    metalness: 0,
-    roughness: hot ? .22 : .105,
-    transmission: hot ? 0 : .88,
-    thickness: .032,
-    ior: 1.49,
-    attenuationColor: new THREE.Color(0x82d6d2),
-    attenuationDistance: .42,
-    clearcoat: .16,
-    clearcoatRoughness: .12,
-    envMapIntensity: .72,
-    specularIntensity: .85,
-    transparent: false,
-    opacity: 1,
-    side: THREE.FrontSide,
-    depthWrite: true,
-  });
+/** Single opaque surface; same geometry, no added transmission pass. */
+export function fairyRailMaterial(hot: boolean, maps?: WarmIvoryMaps) {
+  const material = warmIvoryMaterial(hot,maps);
   material.userData.fairyRole = 'upper-rail';
   return material;
 }
@@ -108,7 +91,7 @@ export function retireAuthoredPocketAssembly(root: THREE.Group) {
 }
 
 /** Run before the existing shared pocket deformation and crease-normal rebuild. */
-export function splitFairyTableParts(root: THREE.Group, hot: boolean) {
+export function splitFairyTableParts(root: THREE.Group, hot: boolean, maps?: WarmIvoryMaps) {
   const additions: Array<{ parent: THREE.Object3D; mesh: THREE.Mesh }> = [];
   let railMaterial: THREE.MeshPhysicalMaterial | undefined;
   let crownMaterial: THREE.MeshPhysicalMaterial | undefined;
@@ -129,7 +112,7 @@ export function splitFairyTableParts(root: THREE.Group, hot: boolean) {
       mesh.material = crownMaterial; mesh.name = 'fairy-pocket-crowns';
       mesh.userData.fairyRole = 'pocket-crown';
     } else {
-      railMaterial ??= fairyRailMaterial(hot);
+      railMaterial ??= fairyRailMaterial(hot,maps);
       mesh.material = railMaterial; mesh.name = 'fairy-gem-rails';
       mesh.userData.fairyRole = 'upper-rail';
     }

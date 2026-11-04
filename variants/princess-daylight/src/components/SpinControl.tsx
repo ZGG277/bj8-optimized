@@ -8,6 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { CueSpin } from '../physics';
 import { clampSpin } from '../input/shot-input';
 import { markControlLearned } from '../control-onboarding';
+import { RoyalIcon } from './RoyalIcon';
 
 type Props = {
   spin: CueSpin;
@@ -157,7 +158,7 @@ export function SpinControl({ spin, disabled, onSpinChange }: Props) {
             <button type="button" data-control-tip="spin-close" aria-label="收起击球点调节" onClick={() => {
               setExpanded(false);
               markControlLearned('spin-close');
-            }}>✕</button>
+            }}><RoyalIcon name="close"/></button>
           </div>
           {pad('mobile-spin-pad')}
         </div>

@@ -1,19 +1,20 @@
 import { createDaylightJewelry, daylightEnabled, setupDaylight } from './scene/daylight-jewelry';
 import { openingInputGate } from './opening-input';
 import { observeMediaQuery } from './media-query';
-import { openingCameraPose, openingHidesFixtures, OPENING_DURATION } from './opening-camera';
+import { openingCameraPose, openingHidesFixtures, OPENING_DURATION, filmLastFramePose, filmHandoffPose, FILM_HANDOFF_DURATION } from './opening-camera';
 import { batchOverlayRings } from './scene/overlay-batching';
 import { createBallRenderGeometry } from './scene/princess-geometry';
 import { createTargetRingBatch } from './scene/target-rings';
 import { createCrystalLighting, updateCrystalCeilingVisibility } from './scene/crystal-lighting';
 import { createImpactFeedback } from './scene/impact-feedback';
 /*
-[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、独立瞄准/相机方位与击球跟随目标、textures 程序化贴图、scene Blender 视觉资产与 Three.js
-[OUTPUT]: 按初始化 worldId 装配抗锯齿球桌与外围世界，0.05m近裁面保留薄金饰深度精度；daylight/fallback 共用真实碰撞/落袋反馈；提供按需渲染、GPU 自适应温控、目标球运动近景与完整资源回收
+[INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、相机方位与目标、textures/统一Canvas字体、scene Blender 视觉资产与 Three.js
+[OUTPUT]: 装配球桌与世界，影片末帧同位连续推进第一视角；统一字体、真实反馈、按需渲染与温控，几何/环境/天空纹理完整回收
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import * as THREE from 'three';
+import { canvasFont } from './typography';
 import { setCrystalOpticsQuality } from './scene/gem-optics';
 import { crystalShellMaterial, styleCrystalTable, styleCrystalEnvironment, createCrystalBallDetails } from './scene/crystal-style';
 import { batchStaticTable, sceneCost, withinSceneBudget } from './minitool/render-guard';
@@ -110,10 +111,12 @@ function disposeSceneResources(scene: THREE.Scene) {
     }
   });
   if (scene.environment instanceof THREE.Texture) textures.add(scene.environment);
+  if (scene.background instanceof THREE.Texture) textures.add(scene.background);
   for (const texture of textures) texture.dispose();
   for (const material of materials) material.dispose();
   for (const geometry of geometries) geometry.dispose();
   scene.environment = null;
+  scene.background = null;
 }
 
 /** 整链规划的分杆配色（台呢绿底可读：暖橙/青/紫），轨迹/高亮环/序号标记同色 */
@@ -130,7 +133,7 @@ function mkStepBadge(n: number, color: number, x: number, z: number): THREE.Spri
   ctx.arc(64, 64, 56, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 72px system-ui, sans-serif';
+  ctx.font = canvasFont(72,700);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(String(n), 64, 68);
@@ -218,6 +221,7 @@ export class Scene3D {
   } | null = null;
   private openingElapsed: number | null = 0;
   private openingStartedAt: number | null = null;
+  private filmHandoffStartedAt: number | null = null;
   private motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   private disposeOpeningInput: (() => void) | null = null;
   private disposeMotionPreference: (() => void) | null = null;
@@ -231,6 +235,7 @@ export class Scene3D {
   /** Explicit new games may replay; ordinary state sync and render start never do. */
   beginOpening() {
     this.shotCameraReturn = null;
+    this.filmHandoffStartedAt = null;
     this.openingElapsed = 0;
     this.environmentOptions.onOpeningChange?.(true);
     this.openingStartedAt = null;
@@ -239,12 +244,20 @@ export class Scene3D {
   }
   finishOpening() {
     if (this.openingElapsed === null) return;
+    this.filmHandoffStartedAt = null;
     this.openingElapsed = null;
     this.environmentOptions.onOpeningChange?.(false);
     this.updateCameraTarget();
     this.camera.position.copy(this.targetCameraPos);
     this.smoothLookAt.copy(this.targetLookAt);
     this.camera.lookAt(this.smoothLookAt);
+    this.requestRender();
+  }
+  /** 影片自然结束才推进；跳过/后台仍走finishOpening立即到达可击球机位。 */
+  beginFilmHandoff() {
+    if (this.openingElapsed === null) return;
+    if (this.motionPreference?.matches || this.adaptiveQuality.tier === 'hot') { this.finishOpening(); return; }
+    this.filmHandoffStartedAt = performance.now();
     this.requestRender();
   }
   private cuePull = 0;
@@ -1921,10 +1934,11 @@ export class Scene3D {
 
   /** 相机或显式动画仍未收敛时才需要下一帧；静止球桌不维持空转 rAF。 */
   private hasFrameWork(): boolean {
+    const filmWaiting = this.openingElapsed !== null && this.environmentOptions.openingFilm && this.filmHandoffStartedAt === null;
     const cameraMoving =
-      this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
-      this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8;
-    return (this.openingElapsed !== null && !this.environmentOptions.openingFilm) || cameraMoving || this.shotCameraReturn !== null || this.strikeAnim !== null ||
+      !filmWaiting && (this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
+      this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8);
+    return (this.openingElapsed !== null && !this.environmentOptions.openingFilm) || this.filmHandoffStartedAt !== null || cameraMoving || this.shotCameraReturn !== null || this.strikeAnim !== null ||
       this.dropAnims.size > 0 || this.planPlayAnim !== null || Boolean(this.impactFeedback?.active);
   }
 
@@ -2073,8 +2087,15 @@ export class Scene3D {
     // 拖拽/点击瞄准后即使 React 不再渲染,相机也能滑行就位
     if (this.openingElapsed !== null && (this.motionPreference?.matches || this.adaptiveQuality.tier === 'hot')) this.finishOpening();
     if (this.openingElapsed !== null && this.environmentOptions.openingFilm) {
-      this.camera.position.copy(this.targetCameraPos);
-      this.smoothLookAt.copy(this.targetLookAt);
+      const elapsed = this.filmHandoffStartedAt === null ? 0 : Math.max(0, (renderStartedAt-this.filmHandoffStartedAt)/1000);
+      const canvasRect = this.element.getBoundingClientRect();
+      const filmRect = this.element.closest('.game-shell')?.getBoundingClientRect() ?? canvasRect;
+      const layout = {frameAspect:filmRect.width/Math.max(1,filmRect.height),centerY:(filmRect.top+filmRect.height/2-canvasRect.top)/Math.max(1,canvasRect.height)};
+      const pose = this.filmHandoffStartedAt === null ? filmLastFramePose(this.camera.aspect,layout)
+        : filmHandoffPose(elapsed,this.camera.aspect,{position:this.targetCameraPos,lookAt:this.targetLookAt},layout);
+      this.camera.position.set(pose.position.x,pose.position.y,pose.position.z);
+      this.smoothLookAt.set(pose.lookAt.x,pose.lookAt.y,pose.lookAt.z);
+      if (this.filmHandoffStartedAt !== null && elapsed >= FILM_HANDOFF_DURATION) this.finishOpening();
     } else if (this.openingElapsed !== null) {
       if (this.openingStartedAt === null) this.openingStartedAt = renderStartedAt;
       this.openingElapsed = Math.max(0, (renderStartedAt - this.openingStartedAt) / 1000);

@@ -2,6 +2,14 @@
 
 # components/
 
+2026-11-04：OpeningFilm完整220帧改为8秒，原片音乐同速延长3秒；加载兜底只管加载，开播后按完整时长播放。自然结束交Game隐藏影片并开始1.2秒连续推镜，跳过/错误/后台直接交还第一视角；推镜期间仍由openingActive隔离击球。默认音乐/临时静音/跳过手势不变。
+
+2026-11-03最新：OpeningFilm每次独立默认开启5秒音乐，不读写游戏静音记录；可临时关闭。浏览器拦截时显示“轻触有声”，不把限制显示成默认关闭；该手势不跳过影片。退出停止音源。OpeningFilm.test.tsx锁定首帧默认开启且没有播放选择。PraiseCard/RoyalFinish共用已等待霞鹜文楷的卡面。
+
+RoyalIcon的关闭/拖动手柄/花火采用SVG，PlanOverlay、ReviewOverlay、PlanStatusNotice、SpinControl、RoyalFinish不再依赖缺失字体符号；事件与可访问名称保持。
+
+2026-11-02 R2：OpeningFilm 自动播放完整220帧、只加速至5秒的 WebP，5200ms加载兜底及可见“跳过”，音频不阻塞。FirstMatchGuide 显示短文案，本体穿透；ControlHelp 顶部提供“再看操作引导”，保留已完成记录。FirstPersonViewHint.tsx 首次指向全局视角按钮，6秒后消失并存档。RoyalFinish 在无 SDK 的浏览器预览同一张卡，支持关闭与焦点归还；真实 SDK 路径保持。
+
 > L2 | 父级: `../CLAUDE.md`
 
 HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不持有对局或物理状态。
@@ -24,7 +32,7 @@ HUD 控制组件层：只渲染控件并把事件转发给 Game/input 层，不�
 
 `PostMatchFeedback.tsx` / `PostMatchFeedback.test.tsx`: 局后可选 500 字留言；同一局首条请求保留原正文和幂等键，发送中、保存成功、网络/登录失败有明确提示，继续按钮始终可用。只消费 post-match-feedback 的窄通信层；草稿不写入浏览器持久存储。
 
-`FirstMatchGuide.tsx`: 首局非模态一行微提示；按步骤寻找球桌、瞄准微调槽、视角、击球点或蓄力控件真实 DOM 锚点，以标签自身实测宽高随控件出现/移动/视口变化立即避让定位；精瞄阶段默认提示拨动瞄准轮，提示本体穿透交互，只保留 44px 弱化 ×，具备跳过新手引导的 aria 名称与 live 语义，不提供手动“下一步”。
+`FirstMatchGuide.tsx`: 首局非模态提示；小手/箭头以真实 .shoot-pad 或 .aim-dial 内部触点独立定位，48px手势跟随控件停靠方向；文字按自身尺寸在控件旁避让，移动文字不带走指尖。球桌步骤仍跟随投影，提示穿透交互，仅44px跳过入口接收触控，不提供手动“下一步”。
 
 `FirstMatchGuide.test.tsx`: 服务端静态结构回归，锁定短文案、具名跳过入口，并拒绝“下一步/完成”按钮回潮。
 

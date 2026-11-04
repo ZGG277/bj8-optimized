@@ -1,20 +1,21 @@
 /**
- * [INPUT]: 原始桌球 GLB、共享物理尺寸及宝石光学。
- * [OUTPUT]: 独立实验的清透宝石上缘、象牙下架、共享边界的连续圆弧护口/薄皮裙与预算内宝石球。
- * [POS]: 实际 daylight GLB 视觉适配；消费共享袋口尺寸，不改球光学或照明。
+ * [INPUT]: 原始桌球GLB、共享物理尺寸、宝石光学与已就绪的统一字体、独立暖天空背景。
+ * [OUTPUT]: 帮面卷草金丝、暖象牙上缘与下架、末帧深翡翠细绒台呢与同源护口；正常/热档宝石球号统一霞鹜文楷。
+ * [POS]: 实际 daylight GLB 视觉适配；消费共享袋口尺寸，不改球光学或曝光；城堡仅暖化既有日光/半球光。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { applyJewelFinish } from './jewel-ball-finish';
+import { applyJewelFinish, applyObsidianNumberFont } from './jewel-ball-finish';
 import { createGemCaustics } from './gem-caustics';
 import { batchStaticTable } from '../minitool/render-guard';
 import { loadGlb } from './glb-loader';
-import { createDaylightEnvironment } from './daylight-environment';
+import { createDaylightEnvironment, createCastleSkyBackground } from './daylight-environment';
 import { TABLE, POCKETS } from '../physics';
 import { splitFairyTableParts, retireAuthoredPocketAssembly } from './fairy-table-finish';
 import { addContinuousTableDeck, clipAuthoredUpperDeck } from './table-deck';
 import { createPocketCollars } from './pocket-collars';
+import { createWarmIvoryMaps, warmIvoryMaterial } from './warm-ivory';
 import tableUrl from './assets/daylight/table-refined.glb?url';
 import tableHotUrl from './assets/daylight/table-hot.glb?url';
 import ballsUrl from './assets/daylight/balls-quality.glb?url';
@@ -34,37 +35,26 @@ export function setupDaylight(scene:THREE.Scene,renderer:THREE.WebGLRenderer,key
   if(castle){
     scene.environment?.dispose();scene.environment=createDaylightEnvironment(renderer);scene.environmentIntensity=.62;scene.environmentRotation.set(0,0,0);
     renderer.toneMappingExposure=.94;
-    key.position.set(-3.8,5.8,-4.5);key.intensity=2.2;key.color.set(0xfff4e2);key.shadow.radius=3;
-    scene.traverse(o=>{if(o instanceof THREE.AmbientLight)o.intensity=.10;if(o instanceof THREE.HemisphereLight){o.color.set(0xdceaff);o.groundColor.set(0x839479);o.intensity=.32;}});
+    key.position.set(-3.8,5.8,-4.5);key.intensity=2.2;key.color.set(0xffecd0);key.shadow.radius=3;
+    scene.traverse(o=>{if(o instanceof THREE.AmbientLight)o.intensity=.10;if(o instanceof THREE.HemisphereLight){o.color.set(0xe4edf1);o.groundColor.set(0xa39878);o.intensity=.32;}});
     Object.assign(key.shadow.camera,{left:-6,right:6,top:6,bottom:-6,far:24});key.shadow.camera.updateProjectionMatrix();
-    scene.fog=new THREE.Fog(0xcfe2e5,50,230);scene.background=new THREE.Color(0xcfe2e5);
+    scene.fog=new THREE.Fog(0xded8bf,50,230);
+    if(scene.background instanceof THREE.Texture)scene.background.dispose();
+    scene.background=createCastleSkyBackground();
   }
-  renderer.domElement.dataset.visualVersion='princess-table-detail-d2-integrated-20261101';
+  renderer.domElement.dataset.visualVersion='princess-scene-r2-ball-clarity-20261104';
 }
 function styleCloth(table:THREE.Group){
   table.traverse(o=>{if(!(o instanceof THREE.Mesh)||!(o.name==='table-cloth'||o.name.startsWith('cushion-')))return;
     o.castShadow=true;
-    for(const m of Array.isArray(o.material)?o.material:[o.material])if(m instanceof THREE.MeshPhysicalMaterial){m.color.set(0xf4fff9);m.roughness=.96;m.metalness=0;m.clearcoat=0;m.sheen=.34;m.sheenColor.set(0x5a9d85);m.sheenRoughness=.94;m.specularIntensity=.12;m.normalScale.set(.42,.34);m.envMapIntensity=.12;}
+    for(const m of Array.isArray(o.material)?o.material:[o.material])if(m instanceof THREE.MeshPhysicalMaterial){m.color.set(0xf4fff9);m.roughness=.96;m.metalness=0;m.clearcoat=0;m.sheen=.42;m.sheenColor.set(0x38764d);m.sheenRoughness=.88;m.specularIntensity=.08;m.normalScale.set(.35,.28);m.envMapIntensity=.10;}
   });
 }
-function ivoryMap(){
-  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;
-  const context=canvas.getContext('2d')!,image=context.createImageData(512,256);
-  for(let y=0;y<256;y++)for(let x=0;x<512;x++){
-    const u=x/512,v=y/256;
-    // Low-contrast longitudinal grain, without the old broad nacre swirls or blue/pink shimmer.
-    const grain=Math.sin(u*230+Math.sin(v*12)*1.2)*1.2+Math.sin(u*490+v*18)*.65;
-    const growth=Math.sin(u*36+Math.sin(v*5)*.6)*1.8;
-    image.data.set([232+grain+growth,222+grain+growth,199+grain+growth,255],(y*512+x)*4);
-  }
-  context.putImageData(image,0,0);const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=4;return texture;
-}
 function styleTable(root:THREE.Group,hot=false){
-  const shell=ivoryMap(),replaced=new Set<THREE.Texture>();
+  const maps=createWarmIvoryMaps(hot),ivory=warmIvoryMaterial(hot,maps,true),replaced=new Set<THREE.Texture>();
   root.rotation.y=-Math.PI/2;root.position.set(-.81006,-.718,-1.44506);
   root.updateMatrixWorld(true);
-  splitFairyTableParts(root,hot);
+  splitFairyTableParts(root,hot,maps);
   retireAuthoredPocketAssembly(root);
   root.updateMatrixWorld(true);
   root.traverse(o=>{if(!(o instanceof THREE.Mesh))return;o.castShadow=!hot;o.receiveShadow=true;
@@ -101,21 +91,17 @@ function styleTable(root:THREE.Group,hot=false){
       const m=base instanceof THREE.MeshPhysicalMaterial?base:new THREE.MeshPhysicalMaterial().copy(base as THREE.MeshPhysicalMaterial);
       if(m!==base){o.material=m;base.dispose();}
       if(/gold/i.test(m.name)){m.color.setRGB(.73,.49,.20);m.metalness=1;m.roughness=.46;m.clearcoat=0;m.clearcoatRoughness=.4;m.envMapIntensity=.78;}
-      // Upper shell-inlay rails were extracted above; lower Crystal/Pearl structure remains ivory.
+      // Upper rails and lower structure share one bone grain family, with a softer lower polish.
       if(/Pearl|shell|inlay|Crystal/i.test(m.name)){
-        if(m.map)replaced.add(m.map);m.map=shell;m.bumpMap=shell;m.bumpScale=.00008;
-        m.color.set(0xe0cfac);m.metalness=0;m.roughness=.78;m.clearcoat=0;m.clearcoatRoughness=.65;
-        m.transmission=0;m.transparent=false;m.opacity=1;m.iridescence=0;m.specularIntensity=.16;m.ior=1.48;m.envMapIntensity=.22;
+        if(m.map)replaced.add(m.map);
+        m.copy(ivory);
       }
       if(/^Pocket/i.test(m.name)){m.color.set(0x244b42);m.roughness=.86;m.metalness=0;m.clearcoat=0;m.envMapIntensity=.28;}
       if(m.map)m.map.anisotropy=4;
     }
   });
-  const ivory = new THREE.MeshPhysicalMaterial({name:'Ivory | continuous support', map:shell,
-    bumpMap:shell,bumpScale:.00008,color:0xe0cfac,roughness:.78,metalness:0,
-    clearcoat:0,specularIntensity:.16,envMapIntensity:.22});
   clipAuthoredUpperDeck(root);
-  addContinuousTableDeck(root,hot,ivory);
+  addContinuousTableDeck(root,hot,ivory,maps);
   // Retire only the authored pocket cap/insert. Its disjoint triangles expose
   // the gold underside at close range after the C1 aperture deformation.
   root.traverse(o=>{if(o instanceof THREE.Mesh && !Array.isArray(o.material)
@@ -133,7 +119,7 @@ function boundTextures(root:THREE.Group,maxSide:number){
   if(typeof ImageBitmap!=='undefined'&&image instanceof ImageBitmap)images.add(image);
  }});images.forEach(i=>i.close());
 }
-function prepareBalls(root:THREE.Group,hot:boolean,numberMasks?:Array<THREE.Texture|undefined>){
+function prepareBalls(root:THREE.Group,hot:boolean){
  boundTextures(root,hot?256:512);
  const result:THREE.Mesh[]=[];
  for(let n=0;n<16;n++){
@@ -150,9 +136,9 @@ function prepareBalls(root:THREE.Group,hot:boolean,numberMasks?:Array<THREE.Text
     m.transmission=hot||n===8?0:.94;m.dispersion=hot?0:.035;
     m.attenuationColor.set(n<8?0xf24467:0xffc93e);m.attenuationDistance=.08;
     m.envMapIntensity=n===8?.6:.8;
-    if(n===8){m.color.setRGB(.16,.18,.23);m.roughness=.18;m.clearcoat=.35;}else if(n>=9)m.color.setRGB(1,.83,.42);
+    if(n===8){m.color.setRGB(.16,.18,.23);m.roughness=.18;m.clearcoat=.35;applyObsidianNumberFont(m);}else if(n>=9)m.color.setRGB(1,.83,.42);
     m.emissive.set(n===8?0x000000:n<8?0xff1545:0xffa719);m.emissiveIntensity=n===8?0:.065;
-    if(n!==8 && m.map)applyJewelFinish(m,n,hot,numberMasks?.[n]);
+    if(n!==8 && m.map)applyJewelFinish(m,n,hot);
   }
   m.userData.crystalOptics={transmission:m.transmission,dispersion:m.dispersion};
   result[n]=object;
@@ -174,8 +160,7 @@ export function createDaylightJewelry(scene:THREE.Scene,table:THREE.Group,balls:
  Promise.all([tableUrl,tableHotUrl,ballsUrl,ballsHotUrl].map(async url=>{try{return {status:'fulfilled' as const,value:await loadGlb(url)};}catch(reason){return {status:'rejected' as const,reason};}})).then(results=>{
   const roots=results.flatMap(r=>r.status==='fulfilled'?[r.value.scene]:[]);
   const failure=results.find(r=>r.status==='rejected');if(failure){roots.forEach(release);throw Error(String(failure.reason));}if(disposed){roots.forEach(release);return;}owned.push(...roots);
-  const numberMasks=Array.from({length:16},(_,n)=>((roots[2].getObjectByName(`ball-${n}`) as THREE.Mesh).material as THREE.MeshPhysicalMaterial).transmissionMap??undefined);
-  sets=[prepareBalls(roots[2],false),prepareBalls(roots[3],true,numberMasks)];tables=roots.slice(0,2);tables.forEach((t,i)=>styleTable(t,i===1));tables.forEach(t=>table.add(t));
+  sets=[prepareBalls(roots[2],false),prepareBalls(roots[3],true)];tables=roots.slice(0,2);tables.forEach((t,i)=>styleTable(t,i===1));tables.forEach(t=>table.add(t));
   // Replace the old furniture only; cloth, cushion noses and pocket interiors retain the physics-derived shape.
   table.children.forEach(o=>{if(tables.includes(o as THREE.Group)||o.name==='studio-environment')return;
    const preserve=o.name==='table-cloth'||o.name.startsWith('cushion-')||o.name.startsWith('pocket-well-')||o.name.startsWith('pocket-bottom-');

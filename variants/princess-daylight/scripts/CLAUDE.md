@@ -2,6 +2,10 @@
 
 # scripts/
 
+2026-11-04：opening-film-assets.test.ts读取真实ANMF容器，校验220帧与8秒总时长；fairy-table-finish.test.ts增加视觉倒角不动六袋孔边和三角数、天空确定性与纹理上界门禁。
+
+2026-11-03：fairy-table-finish.test.ts 同时验证暖象牙上沿不透明、细纹理有界且总三角数不变；保留实际两档GLB的分离检查。
+
 `diagnose-lake360-resources.mjs`：定向记录所有HTTP错误URL并关闭Chrome。
 
 > L2 | 父级: `../CLAUDE.md`
@@ -9,6 +13,10 @@
 浏览器端验证脚本层：默认驱动 `:5199` 的真实页面。多数脚本经 puppeteer-core 连接无头 ego lite（远程调试 `:9333`），支持 `BROWSER_URL` / `GAME_URL` 覆盖；`verify-render-thermal.mjs` 与 `verify-control-intent.mjs` 则自行启动 Chrome，使用 `PUPPETEER_EXECUTABLE_PATH` / `GAME_URL`。
 
 ## 成员清单
+
+`ui-font-characters.mjs`：使用已安装TypeScript解析正式UI/Canvas字符串与JSX文字，收集CSS内容和标题；忽略测试与注释，输出稳定码点清单。
+
+`subset-ui-font.py`：本地OFL字体按上述码点精简并改名，输出字体来源/哈希/覆盖回执；实际汉字缺字即失败，不联网。
 
 `fairy-table-finish.test.ts`：独立实验的真实GLB组件与材质预算测试，使用Node文件API，按既有资产测试惯例放在scripts；未删除原基线测试。
 

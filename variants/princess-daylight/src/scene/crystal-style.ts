@@ -1,9 +1,11 @@
-/** Crystal R3: original visual-only geometry/materials. Metres, y-up.
- * Physics, pocket apertures, saved data and control semantics are not inputs to mutation.
- * Alpha/Fresnel-like clearcoat is intentionally cheaper than screen-space refraction.
- * Event glints and pocket bursts are owned by impact-feedback.ts.
+/**
+ * [INPUT]: 共享球台尺寸、宝石光学、包内纹理与统一霞鹜文楷。
+ * [OUTPUT]: 纯视觉水晶桌/球与同字体编号；事件光效由impact-feedback拥有。
+ * [POS]: 渲染装配层，米制y-up，不改变物理、袋口、存档或操作语义。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
  */
 import * as THREE from 'three';
+import { canvasFont } from '../typography';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TABLE, POCKETS, pocketLocalToWorld } from '../physics';
 import { createTableUnderlapGeometry } from '../pocket-render/cushion-geometry';
@@ -17,7 +19,7 @@ export function crystalShellMaterial(number:number){
   const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d')!;
   const pearl=number===0,obsidian=number===8,topaz=number>=9;
   ctx.fillStyle=pearl?'#fff5e4':obsidian?'#151b29':topaz?GEM_BODY_COLORS.topaz:GEM_BODY_COLORS.ruby;ctx.fillRect(0,0,512,256);
-  if(number){ctx.font='bold 46px Georgia, serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  if(number){ctx.font=canvasFont(46,700);ctx.textAlign='center';ctx.textBaseline='middle';
     for(const x of [128,384]){ctx.fillStyle=topaz?'#755015':'#291703';ctx.fillText(String(number),x+1,130);ctx.fillStyle=topaz?'#593710':obsidian?'#fff0cc':'#f8dfac';ctx.fillText(String(number),x,128);}
   }
   const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;
@@ -28,7 +30,7 @@ export function crystalShellMaterial(number:number){
     // Small numeral-only inlays preserve the IDs without a badge or equatorial belt.
     const labelMask=document.createElement('canvas');labelMask.width=256;labelMask.height=128;
     const labelCtx=labelMask.getContext('2d')!;labelCtx.fillStyle='#ffffff';labelCtx.fillRect(0,0,256,128);
-    labelCtx.fillStyle='#000000';labelCtx.font='bold 23px Georgia, serif';labelCtx.textAlign='center';labelCtx.textBaseline='middle';
+    labelCtx.fillStyle='#000000';labelCtx.font=canvasFont(23,700);labelCtx.textAlign='center';labelCtx.textBaseline='middle';
     labelCtx.fillText(String(number),64,64);labelCtx.fillText(String(number),192,64);
     material.transmissionMap=new THREE.CanvasTexture(labelMask);
   }

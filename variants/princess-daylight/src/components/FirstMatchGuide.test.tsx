@@ -6,9 +6,24 @@
 */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { FirstMatchGuide } from './FirstMatchGuide';
+import { FirstMatchGuide, gestureForControl } from './FirstMatchGuide';
 
 describe('FirstMatchGuide 微提示结构', () => {
+  it('蓄力指尖落在球杆热区内，文字如何避让都不改变它', () => {
+    const anchor = { left: 344, right: 388, top: 670, bottom: 790, width: 44, height: 120 };
+    const hand = gestureForControl(anchor, false, true);
+    expect(hand.left + 29 * .6).toBe(366);
+    expect(hand.top + 26 * .6).toBeCloseTo(715.6);
+    expect(hand.rotation).toBe(0);
+  });
+  it('横向拨轮的手和箭头以轮盘中心为旋转原点', () => {
+    const anchor = { left: 70, right: 330, top: 784, bottom: 836, width: 260, height: 52 };
+    const hand = gestureForControl(anchor, true, false);
+    expect(hand.left + 29 * .6).toBe(200);
+    expect(hand.top + 26 * .6).toBe(810);
+    expect(hand.rotation).toBe(-90);
+    expect(gestureForControl({ ...anchor, width: 52, height: 260 }, false, false).rotation).toBe(0);
+  });
   it('没有下一步或完成按钮，只保留具名跳过入口', () => {
     const markup = renderToStaticMarkup(
       <FirstMatchGuide
@@ -19,7 +34,7 @@ describe('FirstMatchGuide 微提示结构', () => {
     );
 
     expect(markup).toContain('放好白球');
-    expect(markup.replace(/<[^>]*>/g, '')).toBe('');
+    expect(markup.replace(/<[^>]*>/g, '')).toBe('放好白球');
     expect(markup).toContain('gesture-place');
     expect(markup).toContain('aria-label="跳过新手引导"');
     expect(markup).not.toContain('下一步');

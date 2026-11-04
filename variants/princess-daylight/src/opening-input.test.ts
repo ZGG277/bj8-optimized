@@ -32,6 +32,16 @@ describe('opening skip input lifecycle',()=>{
 });
 
 describe('soundtrack entry gesture',()=>{
+ for(const events of [['pointerdown','pointerup','click'],['keydown','keyup','click']])it(`lets the music control receive ${events.join('/')} without skipping`,()=>{
+  class MusicButton extends EventTarget { closest(selector:string){return selector==='[data-opening-control]'?this:null;} }
+  vi.stubGlobal('Element',MusicButton);
+  try{
+   const button=new MusicButton(),finish=vi.fn(),toggle=vi.fn();
+   const dispose=openingInputGate(button,()=>true,finish);button.addEventListener('click',toggle);
+   for(const type of events){const event=new Event(type,{cancelable:true});button.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);}
+   expect(toggle).toHaveBeenCalledOnce();expect(finish).not.toHaveBeenCalled();dispose();
+  }finally{vi.unstubAllGlobals();}
+ });
  it('allows the explicit play control without skipping, then consumes table taps',()=>{
   class StartButton extends EventTarget { closest(selector:string){return selector==='[data-opening-start]'?this:null;} }
   vi.stubGlobal('Element',StartButton);

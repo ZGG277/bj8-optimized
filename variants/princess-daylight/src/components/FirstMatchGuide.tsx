@@ -1,6 +1,6 @@
 /*
 [INPUT]: 当前首局微提示、对局是否允许展示、跳过回调与逐控件学习记录
-[OUTPUT]: 对外提供跟随真实球桌或控件的半透明无底板手势提示，含弱化跳过入口与无障碍名称
+[OUTPUT]: 小手和箭头独立对准真实控件；文字旁置避让，只有跳过按钮接收触控
 [POS]: HUD 展示层；只观察稳定 DOM 锚点，不持有引导状态或改写对局
 [PROTOCOL]: 提示文案、锚点或布局变化时更新本注释、components/CLAUDE.md 与样式文档
 */
@@ -26,13 +26,13 @@ type PositionForAnchorOptions = {
 };
 
 export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
-  'first-power': { text: '右侧向下拉，蓄力；松开出杆', selector: '[data-control-slot="power"]' },
+  'first-power': { text: '下拉蓄力，松手出杆', selector: '[data-control-slot="power"] .shoot-pad' },
   'first-rolling': { text: '看球慢慢停稳', selector: '.scoreboard' },
-  'turn-wait': { text: '轮到对手啦，公主稍等一下', selector: '.scoreboard' },
-  'free-place': { text: '对手犯规了，先在台面放好白球', selector: '.viewport' },
-  'ghost-place': { text: '轻点台面或拖动幽灵球，选好瞄准落点', selector: '.viewport' },
-  'aim-direction': { text: '拨动下方瞄准轮，微调方向', selector: '[data-control-slot="aimDial"]' },
-  'next-power': { text: '瞄准好了，下拉蓄力，再打一杆', selector: '[data-control-slot="power"]' },
+  'turn-wait': { text: '对手回合，稍等一下', selector: '.scoreboard' },
+  'free-place': { text: '点台面，放好白球', selector: '.viewport' },
+  'ghost-place': { text: '点目标球，或拖动瞄准点', selector: '.viewport' },
+  'aim-direction': { text: '拨动刻度，微调方向', selector: '[data-control-slot="aimDial"] .aim-dial' },
+  'next-power': { text: '下拉蓄力，松手出杆', selector: '[data-control-slot="power"] .shoot-pad' },
   'break-place': {
     text: '放好白球',
     selector: '.viewport',
@@ -43,15 +43,15 @@ export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
   },
   'break-fine': {
     text: '拨动瞄准轮微调',
-    selector: '[data-control-slot="aimDial"]',
+    selector: '[data-control-slot="aimDial"] .aim-dial',
     fallbackSelector: '.viewport',
   },
   'break-power': {
     text: '下拉蓄力·松手击球',
-    selector: '[data-control-slot="power"]',
+    selector: '[data-control-slot="power"] .shoot-pad',
   },
   'player-view': {
-    text: '拖动切视角',
+    text: '点右上角，切换视角',
     selector: '[data-control-slot="view"]',
   },
   'player-spin': {
@@ -76,6 +76,15 @@ const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 8;
 const MOBILE_BOTTOM_RESERVE = 82;
 const FULLSCREEN_AVOID_THRESHOLD = 0.82;
+
+/** 48×67.2px 手势图的指尖固定在控件内，文字避让不再带走手势。 */
+export function gestureForControl(anchor: GuideAvoidRect, horizontal: boolean, power: boolean) {
+  return {
+    left: anchor.left + anchor.width / 2 - 29 * .6,
+    top: anchor.top + anchor.height * (power && !horizontal ? .38 : .5) - 26 * .6,
+    rotation: horizontal ? -90 : 0,
+  };
+}
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
@@ -237,6 +246,7 @@ export function FirstMatchGuide({
   const hintRef = useRef<HTMLElement>(null);
   const [position, setPosition] = useState<AnchorPosition | null>(null);
   const [horizontal, setHorizontal] = useState(false);
+  const [gesture, setGesture] = useState<ReturnType<typeof gestureForControl> | null>(null);
   const selectors = useMemo(
     () => [copy.selector, copy.fallbackSelector].filter(Boolean) as string[],
     [copy.fallbackSelector, copy.selector],
@@ -266,10 +276,14 @@ export function FirstMatchGuide({
         .map(el => normalizeAvoidRect(el.getBoundingClientRect()));
       const anchorRect = anchor.getBoundingClientRect();
       const point = anchor.matches('.viewport') ? getTablePoint?.() : null;
-      setHorizontal(anchorRect.width > anchorRect.height * 1.35 && !anchor.matches('.viewport'));
+      const isHorizontal = anchorRect.width > anchorRect.height * 1.35 && !anchor.matches('.viewport');
+      setHorizontal(isHorizontal);
+      const action = actionForStep(step);
+      const nextGesture = !anchor.matches('.viewport') && (action === 'power' || action === 'aim')
+        ? gestureForControl(anchorRect, isHorizontal, action === 'power') : null;
       const next: AnchorPosition = point ? {
-        left: clamp(point.x - 32, VIEWPORT_MARGIN, window.innerWidth - 88),
-        top: clamp(point.y - 18, 100, window.innerHeight - 150),
+        left: clamp(point.x - 90, VIEWPORT_MARGIN, window.innerWidth - hint.getBoundingClientRect().width - VIEWPORT_MARGIN),
+        top: clamp(point.y - 18, 100, window.innerHeight - hint.getBoundingClientRect().height - MOBILE_BOTTOM_RESERVE),
         side: 'table',
       } : positionForAnchor(
         anchorRect,
@@ -284,10 +298,11 @@ export function FirstMatchGuide({
           viewportWidth: window.innerWidth,
         },
       );
-      const signature = `${Math.round(next.left)}:${Math.round(next.top)}:${next.side}`;
+      const signature = `${Math.round(next.left)}:${Math.round(next.top)}:${next.side}:${nextGesture?.left}:${nextGesture?.top}:${nextGesture?.rotation}`;
       if (signature !== last) {
         last = signature;
         setPosition(next);
+        setGesture(nextGesture);
       }
     };
     const schedule = () => {
@@ -315,9 +330,13 @@ export function FirstMatchGuide({
       window.removeEventListener('resize', schedule);
       if (projectionTimer !== null) window.clearInterval(projectionTimer);
     };
-  }, [selectors, visible, getTablePoint, copy.selector]);
+  }, [selectors, visible, getTablePoint, copy.selector, step]);
 
   if (!visible) return null;
+
+  const instruction = textOverride ?? (actionForStep(step) === 'power'
+    ? `${horizontal ? '右拉' : '下拉'}蓄力，松手出杆`
+    : copy.text);
 
   return (
     <aside
@@ -330,9 +349,13 @@ export function FirstMatchGuide({
       } as CSSProperties}
       role="status"
       aria-live="polite"
-      aria-label={`新手提示：${textOverride ?? copy.text}`}
+      aria-label={`新手提示：${instruction}`}
     >
-      <svg className="guide-gesture" viewBox="0 0 80 112" fill="none" aria-hidden="true">
+      <svg className={`guide-gesture${gesture ? ' on-control' : ''}`} viewBox="0 0 80 112" fill="none" aria-hidden="true"
+        style={gesture && position ? {
+          position: 'absolute', left: gesture.left - position.left, top: gesture.top - position.top,
+          transform: `rotate(${gesture.rotation}deg)`, transformOrigin: '17.4px 15.6px',
+        } : undefined}>
         <g className="gesture-trail" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M28 21v54m-6-7 6 7 6-7"/>
         </g>
@@ -341,6 +364,7 @@ export function FirstMatchGuide({
           <path d="M26 53V28a4 4 0 0 1 8 0v16-5a4 4 0 0 1 8 0v6-3a4 4 0 0 1 8 0v6-1a4 4 0 0 1 8 0v16c0 9-5 15-14 15h-4c-6 0-9-3-13-8l-11-14a4 4 0 0 1 6-5l4 4Z"/>
         </g>
       </svg>
+      <span className="guide-copy">{instruction}</span>
       <button
         type="button"
         className="guide-skip"

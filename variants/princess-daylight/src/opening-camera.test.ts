@@ -1,6 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import * as THREE from 'three';
 import {openingCastlePose,openingTablePose,openingCameraPose,openingBoundsPoints,OPENING_DURATION,OPENING_REVEAL_DURATION,OPENING_SAFETY,openingHidesFixtures} from './opening-camera';
+import {filmLastFramePose,filmHandoffPose,FILM_HANDOFF_DURATION} from './opening-camera';
 import {projectFramingPoint,DEFAULT_CAMERA_SAFETY} from './camera-framing';
 import {createCrystalStructure} from './scene/crystal-style';
 import {cameraPoseAt} from './camera-view';
@@ -8,6 +9,25 @@ import sceneSource from './Scene3D.ts?raw';
 import gameSource from './Game.tsx?raw';
 const safety=OPENING_SAFETY;
 describe('far to complete furniture opening',()=>{
+ it('影片中心在比分栏下方画布中仍对齐全屏末帧',()=>{
+  const h=750,w=390,centerY=(844/2-94)/h;
+  const pose=filmLastFramePose(w/h,{frameAspect:w/844,centerY});
+  const p=projectFramingPoint({x:0,y:.035,z:0},pose,w/h)!;
+  expect(p.y).toBeCloseTo(1-2*centerY,2);
+ });
+ for(const aspect of [390/844,1280/900])it(`影片末帧同位，连续到第一视角 ${aspect}`,()=>{
+  const end=cameraPoseAt(0,.64,0,0,0,aspect,DEFAULT_CAMERA_SAFETY);
+  const start=filmLastFramePose(aspect);
+  expect(filmHandoffPose(0,aspect,end)).toEqual(start);
+  expect(filmHandoffPose(FILM_HANDOFF_DURATION,aspect,end)).toEqual(end);
+  for(let t=0;t<=FILM_HANDOFF_DURATION;t+=.05){
+    const p=filmHandoffPose(t,aspect,end);
+    expect(p.position.y).toBeGreaterThanOrEqual(end.position.y-.000001);
+    expect(Number.isFinite(p.position.y+p.lookAt.z)).toBe(true);
+    const next=filmHandoffPose(Math.min(FILM_HANDOFF_DURATION,t+.001),aspect,end);
+    expect(Math.hypot(next.position.x-p.position.x,next.position.y-p.position.y,next.position.z-p.position.z)).toBeLessThan(.05);
+  }
+ });
  for(const [w,h] of [[320,568],[390,844],[430,932],[844,390],[1024,768]]) it(`fits entire furniture and feet ${w}x${h}`,()=>{
   const aspect=w/h,near=openingTablePose(aspect,safety),end=cameraPoseAt(0,.64,0,0,1,aspect,safety);
   const root=createCrystalStructure();root.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(root);

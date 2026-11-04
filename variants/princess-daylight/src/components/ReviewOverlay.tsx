@@ -7,6 +7,7 @@
 import type { ShotReview } from '../planner/review';
 import { useDraggableOverlay } from '../hooks/useDraggableOverlay';
 import { markControlLearned } from '../control-onboarding';
+import { RoyalIcon } from './RoyalIcon';
 
 interface ReviewOverlayProps {
   review: ShotReview;
@@ -35,7 +36,7 @@ export function ReviewOverlay({ review, open, onOpen, onClose }: ReviewOverlayPr
   if (!open) {
     return (
       <div ref={drag.elementRef} className="review-float" style={drag.style}>
-        <span className="overlay-drag-handle" aria-label="拖动复盘提示" {...drag.dragHandleProps}>⠿</span>
+        <span className="overlay-drag-handle" aria-label="拖动复盘提示" {...drag.dragHandleProps}><RoyalIcon name="grip"/></span>
         {canCompare ? (
           <button type="button" className="review-chip" data-control-tip="review-open" onClick={() => {
             onOpen();
@@ -56,7 +57,7 @@ export function ReviewOverlay({ review, open, onOpen, onClose }: ReviewOverlayPr
   return (
     <div ref={drag.elementRef} className="review-float" style={drag.style}>
       <div className="review-bar" role="dialog" aria-label="击球复盘">
-        <span className="overlay-drag-handle" aria-label="拖动复盘提示" {...drag.dragHandleProps}>⠿</span>
+        <span className="overlay-drag-handle" aria-label="拖动复盘提示" {...drag.dragHandleProps}><RoyalIcon name="grip"/></span>
         <span className="review-title">复盘</span>
         <span className={`review-verdict ${review.verdict}`}>{VERDICT_LABEL[review.verdict]}</span>
         <span className="review-bar-message">{review.message}</span>
@@ -68,7 +69,7 @@ export function ReviewOverlay({ review, open, onOpen, onClose }: ReviewOverlayPr
           onClose();
           markControlLearned('review-close');
         }}>
-          ✕
+          <RoyalIcon name="close"/>
         </button>
       </div>
     </div>

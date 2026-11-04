@@ -1,8 +1,8 @@
 import { ControlHelp } from './components/ControlHelp';
 import { positionAfterPot } from './opponent/position-observation';
 /*
-[INPUT]: 离线 H3 动画 WebP 开场；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供陪练/挑战、复盘/训练总结与局后可选留言、默认拨轮、延迟 3D、运动快照、按需走位、幽灵球落位瞄准/击球后目标近景→全台、双指回退视角、目标袋口自适应取景与逐陪练赞美卡册
+[INPUT]: 自动播放的短 WebP 开场；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
+[OUTPUT]: 对外提供8秒影片到第一视角的连续开场及输入门禁、可跳过/重看的穿透式引导、首次视角提示、陪练/挑战、复盘/训练总结、运动快照、幽灵球瞄准、双指回退与赞美卡册
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -13,6 +13,7 @@ import { PauseMenu } from './components/PauseMenu';
 import { CompanionCollectionBook } from './components/CompanionCollection';
 import { RoyalIcon } from './components/RoyalIcon';
 import { OpeningFilm } from './components/OpeningFilm';
+import { FirstPersonViewHint } from './components/FirstPersonViewHint';
 import openingMovie from './assets/opening/arrival.webp?url';
 import { actionForEvent, actionForStep, createGuideLearning, type GuideAction } from './guide-learning';
 import {
@@ -155,6 +156,7 @@ export default function Game() {
   }, []);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [openingActive, setOpeningActive] = useState(true);
+  const [filmVisible, setFilmVisible] = useState(true);
   const openingCompletedRef = useRef(false);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const [followFeel, setFollowFeel] = useState<FollowFeel>('current');
@@ -338,10 +340,11 @@ export default function Game() {
   const [, refreshGuideLearning] = useState(0);
   const guideGesture = useRef(0);
   const pendingGuideActions = useRef(new Set<GuideAction>());
-  const [guideDismissed, setGuideDismissed] = useState(false);
+  const [guideDismissed, setGuideDismissed] = useState(() =>
+    controlLearning.hasCompletedMatch() || playerSkill.matchesEvaluated > 0 ||
+    !shouldRunFirstMatchGuide(browserStorage(), playerSkill.totalPlayerShots));
   const [manualGuide, setManualGuide] = useState(false);
   const recordGuideAction = useCallback((action: GuideAction) => {
-    setManualGuide(false);
     if (guideLearning.record(action, guideGesture.current)) refreshGuideLearning(n => n + 1);
   }, [guideLearning]);
   useEffect(() => {
@@ -393,6 +396,8 @@ export default function Game() {
   firstMatchGuideStepRef.current = firstMatchGuideStep;
   const finishFirstMatchGuide = useCallback(() => {
     saveFirstMatchGuideCompleted(browserStorage());
+    setGuideDismissed(true);
+    setManualGuide(false);
     firstMatchGuideStepRef.current = null;
     setFirstMatchGuideStep(null);
   }, []);
@@ -954,10 +959,10 @@ export default function Game() {
   // Update normal first-person aiming too, including button entry and dial adjustments.
   // Manual orbit and active touch gestures retain their deliberate camera lock.
   useEffect(() => {
-    if (!canAimBase || isOverheadCameraView(viewLevel) || manualCameraActive || manualCameraPinned || touchAimCameraLocked || openingActive) return;
+    if (!canAimBase || isOverheadCameraView(viewLevel) || manualCameraActive || manualCameraPinned || touchAimCameraLocked) return;
     const next = cameraFramingForAim(worldRef.current, aim, legalTargets, cameraSafety);
     setAimCameraFraming(current => JSON.stringify(current) === JSON.stringify(next) ? current : next);
-  }, [aim, canAimBase, worldView, viewLevel, manualCameraActive, manualCameraPinned, touchAimCameraLocked, openingActive, legalTargets, cameraSafety, worldRef]);
+  }, [aim, canAimBase, worldView, viewLevel, manualCameraActive, manualCameraPinned, touchAimCameraLocked, legalTargets, cameraSafety, worldRef]);
 
   const handleGuideViewLevel = useCallback((level: number) => {
     const adjusted = Math.abs(level - viewLevel) > 0.0005;
@@ -1130,7 +1135,7 @@ export default function Game() {
         worldId: selectedWorld,
         skipOpening: openingCompletedRef.current,
         openingFilm: selectedWorld === 'castle',
-        onOpeningChange: active => { if (!active) openingCompletedRef.current = true; setOpeningActive(active); },
+        onOpeningChange: active => { if (!active) { openingCompletedRef.current = true; setFilmVisible(false); } setOpeningActive(active); },
         onRenderUnavailable: setRenderError,
         onThermalQualityChange: quality => handleThermalQualityChange(quality.movingPresentationFps),
       });
@@ -1214,6 +1219,7 @@ export default function Game() {
 
   // Each gesture retires independently after two valid uses, including free-ball placement.
   let displayGuide: FirstMatchGuideStep | null = null;
+  if (!guideDismissed && firstMatchGuideStep === 'turn-wait' && match.actor === 'opponent') displayGuide = 'turn-wait';
   if (!guideDismissed && match.actor === 'player') {
     if (match.phase === 'placing' && (manualGuide || !guideLearning.learned('place'))) displayGuide = 'free-place';
     else if (match.phase === 'aiming') {
@@ -1242,10 +1248,14 @@ export default function Game() {
         <p>{renderError}</p><button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 12 }}>重新进入</button>
       </div>}
       {openingActive && !renderError && (selectedWorld === 'castle'
-        ? <OpeningFilm src={openingMovie} muted={muted} onFinish={() => scene3DRef.current?.finishOpening()}/>
+        ? filmVisible && <OpeningFilm src={openingMovie} onFinish={skipped => { setFilmVisible(false); if (skipped) scene3DRef.current?.finishOpening(); else scene3DRef.current?.beginFilmHandoff(); }}/>
         : <div className="royal-opening"><button className="opening-skip" aria-label="跳过开场" onClick={() => scene3DRef.current?.finishOpening()}><RoyalIcon name="skip"/></button></div>)}
       {paused && !collectionOpen && !renderError && <PauseMenu onCollection={() => setCollectionOpen(true)} gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} muted={muted} onMute={toggleMuted} onResume={() => setPaused(false)} onRestart={() => { handleReplay(); setPaused(false); }} />}
-      {helpOpen && <ControlHelp onClose={() => setHelpOpen(false)}/>}
+      {helpOpen && <ControlHelp onClose={() => setHelpOpen(false)} onReplayGuide={match.phase === 'finished' ? undefined : () => {
+        const step = match.actor === 'opponent' ? 'turn-wait' : match.phase === 'placing' ? 'free-place' : match.breaking ? 'first-power' : 'ghost-place';
+        firstMatchGuideStepRef.current = step; setFirstMatchGuideStep(step);
+        setGuideDismissed(false); setManualGuide(true); setHelpOpen(false);
+      }}/>}
       {collectionOpen && <CompanionCollectionBook collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
       <div className="royal-entry" role="group" aria-label="场景、教学与暂停">
         <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>
@@ -1364,6 +1374,7 @@ export default function Game() {
           onClose={handleCloseReview}
         />
       )}
+      <FirstPersonViewHint active={canAim && !isGlobalCameraView(viewLevel) && !charging}/>
       {displayGuide && match.phase !== 'finished' && (
         <FirstMatchGuide
           step={displayGuide}

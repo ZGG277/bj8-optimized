@@ -1,4 +1,9 @@
-/** Native cache first; hydrate before mounting. Keep legacy keys/bytes and never clear old saves. */
+/**
+ * [INPUT]: 浏览器旧存档与可选原生缓存接口。
+ * [OUTPUT]: 挂载前统一读档、串行写入；保存原字节，兼容首次视角提示完成标记。
+ * [POS]: 存储适配边界；不清旧存档，不更改比赛状态。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
+ */
 export const SAVE_KEYS = [
   'princess-billiards:player-skill:v3', 'princess-billiards:player-skill:v2',
   'princess-billiards:player-skill:v1', 'princess-billiards:control-layout:v3',
@@ -9,6 +14,7 @@ export const SAVE_KEYS = [
   'princess-billiards:guide-learning:v1',
   'princess-billiards:companion-collection:v1',
   'princess-billiards:victory-praise:v1',
+  'princess-billiards:view-switch-hint:v1',
 ];
 export type SaveStore = Pick<Storage, 'getItem' | 'setItem'>;
 type NativeCache = {
@@ -55,7 +61,8 @@ function decodeNativeSave(key: string, data: string): string {
   } catch {
     const validTheme = key === 'princess-billiards:ui-theme:v1' && ['celadon', 'noir', 'neon'].includes(data);
     const completed = (key === 'princess-billiards:completed-match:v1'
-      || key === 'princess-billiards:first-match-guide:v1') && data === 'done';
+      || key === 'princess-billiards:first-match-guide:v1'
+      || key === 'princess-billiards:view-switch-hint:v1') && data === 'done';
     const scene = key === 'princess-billiards:scene:v1' && ['castle', 'lake'].includes(data);
     if (validTheme || completed || scene) return data;
     throw new Error(`存档格式无法读取（${key}），请保留原数据。`);

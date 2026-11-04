@@ -1,4 +1,10 @@
-/** The displayed win card is also the exact first image passed to postNote. */
+/**
+ * [INPUT]: 本局人物/原句、包内肖像与统一霞鹜文楷加载门禁。
+ * [OUTPUT]: 局后/卡册/分享共用的同一张720x960卡面，字体就绪后才固化图像。
+ * [POS]: 卡面绘制缓存；不抽取赞美、不改存档或胜负。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
+ */
+import { canvasFont, ensureUiFont } from '../typography';
 export async function loadCardImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -21,7 +27,7 @@ export function renderMatchCard(art: string, name: string, praise: string): Prom
 }
 async function drawCard(art: string, name: string, praise: string): Promise<string> {
   const portrait = await loadCardImage(art);
-  if (document.fonts) await document.fonts.ready;
+  await ensureUiFont();
   const canvas = document.createElement('canvas'); canvas.width = 720; canvas.height = 960;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('卡片暂未准备好，请重试。');
@@ -37,19 +43,19 @@ async function drawCard(art: string, name: string, praise: string): Promise<stri
     ctx.beginPath(); ctx.moveTo(0,74); ctx.quadraticCurveTo(0,0,74,0); ctx.moveTo(0,42); ctx.quadraticCurveTo(28,42,42,0); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(22,22,10,18,-Math.PI/4,0,Math.PI*2); ctx.stroke(); ctx.restore();
   }
-  ctx.textAlign='center';ctx.fillStyle='#8e754c';ctx.font='24px "Princess WenKai UI", serif';ctx.fillText('公主的赞美',360,104);
+  ctx.textAlign='center';ctx.fillStyle='#8e754c';ctx.font=canvasFont(24);ctx.fillText('公主的赞美',360,104);
   ctx.fillStyle='#d5be89';ctx.beginPath();ctx.arc(360,292,171,0,Math.PI*2);ctx.fill();
   ctx.save();ctx.beginPath();ctx.arc(360,292,163,0,Math.PI*2);ctx.clip();
   const side=Math.min(portrait.naturalWidth,portrait.naturalHeight);
   ctx.drawImage(portrait,(portrait.naturalWidth-side)/2,(portrait.naturalHeight-side)/2,side,side,197,129,326,326);ctx.restore();
   ctx.strokeStyle=gold;ctx.lineWidth=1;ctx.beginPath();ctx.arc(360,292,179,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle='#8a6a36';ctx.font='36px "Princess WenKai UI", serif';ctx.fillText(name,360,526);
+  ctx.fillStyle='#8a6a36';ctx.font=canvasFont(36);ctx.fillText(name,360,526);
   ctx.strokeStyle='#c8af7b';ctx.beginPath();ctx.moveTo(240,574);ctx.lineTo(330,574);ctx.moveTo(390,574);ctx.lineTo(480,574);ctx.stroke();
   ctx.save();ctx.translate(360,574);ctx.rotate(Math.PI/4);ctx.strokeRect(-6,-6,12,12);ctx.restore();
-  ctx.fillStyle='#3f6251';ctx.font='42px "Princess WenKai UI", serif';
+  ctx.fillStyle='#3f6251';ctx.font=canvasFont(42);
   ctx.fillText(praise,360,670,590);
   ctx.strokeStyle='#c3ac7d';ctx.beginPath();ctx.moveTo(290,736);ctx.quadraticCurveTo(325,712,360,736);ctx.quadraticCurveTo(395,712,430,736);ctx.stroke();
-  ctx.fillStyle='#9f926f';ctx.font='20px "Princess WenKai UI", serif';ctx.fillText('公主请开球',360,914);
+  ctx.fillStyle='#9f926f';ctx.font=canvasFont(20);ctx.fillText('公主请开球',360,914);
   return canvas.toDataURL('image/jpeg',.92);
 }
 

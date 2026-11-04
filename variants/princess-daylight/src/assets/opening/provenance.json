@@ -1,15 +1,15 @@
 {
   "asset": "arrival.webp",
-  "version": "seedance-opening-20261025-115pct",
+  "version": "full-film-8s-20261104",
   "kind": "user-supplied-seedance-castle-approach",
-  "durationSeconds": 13.097,
+  "durationSeconds": 8,
   "resolution": [
     540,
     960
   ],
-  "fps": 18.4,
+  "fps": 27.5,
   "audio": true,
-  "encoding": "Original 220 ANMF image chunks preserved byte-for-byte; cumulative timestamps retimed from 15062ms to 13097ms at 1.15x; one play",
+  "encoding": "All 220 existing WebP frame payloads preserved byte-for-byte; only ANMF timestamps retimed to exactly 8000ms; no additional trim or re-encoding.",
   "deliveryRepresentation": {
     "format": "animated-webp",
     "reason": "Current 1.8.0 platform file whitelist excludes MP4; complete user film adapted to offline animated WebP",
@@ -29,18 +29,32 @@
     "retimed": true,
     "trimmed": false,
     "gameplayHandoff": "Last 350ms overlay dissolves into live authored game; game camera and gameplay preserved",
-    "audio": "Original soundtrack accelerated with ffmpeg atempo=1.15, pitch preserved; AAC mono 32kHz/48kbps. Existing gesture, mute and release behavior preserved.",
-    "playbackSpeed": 1.15,
-    "originalDurationSeconds": 15.062
+    "audio": "Original supplied film audio 0.8-10.4s, pitch-preserving 1.2x to 8s; same filtering/loudness/edge fades as previous candidate.",
+    "playbackSpeed": 1.880208375,
+    "originalDurationSeconds": 15.041667
   },
   "limitations": [
-    "AI-generated table and authored playable table differ; transition is a brief dissolve, not exact pixel match.",
-    "Platform delivery 540x960, original frames at 1.15x speed; original 720x1280@24fps preserved."
+    "AI film and real scene are different renderers; scene calibration targets final-frame appearance rather than claiming exact pixel equivalence.",
+    "Existing platform-adapted 540x960 frames preserved; original 720x1280 film remains archived."
   ],
   "files": {
-    "arrival.webp": "a97780a95d650d644e3d61eecd2e2a76604b9fd80152432b42e107da486fee23",
+    "arrival.webp": "1ff57efac3f204c11b90718d7c98f87de247b4452a2f16ce6e62f542744ba618",
     "valley-poster.jpg": "11393fb131ab140dd20b4af346b9bd55ac0d66411235f23fa31ecb7259dda2db",
-    "soundtrack.json": "9335a025d08e8d6b4c31e6a117c42c33d52e0e2f90548464587e2feabe59bd4b"
+    "soundtrack.json": "5d64ee8e3abd40da8d48f71fae57afea80ce5ee3ea03da260c61848cb151d67f"
   },
-  "encodedFrames": 220
+  "encodedFrames": 220,
+  "openingMusic": {
+    "origin": "Audio from original user-supplied castle film",
+    "source": "artifacts/seedance-release-20261017/castle_billiards_opening_15s.mp4",
+    "sourceSha256": "69219c16eb6849812a2866d3121053e8914ad30d5126f1b998a3d4f11d732063",
+    "clipSeconds": [
+      0.8,
+      10.4
+    ],
+    "playbackSpeed": 1.2,
+    "durationSeconds": 8,
+    "processing": "atempo pitch-preserving; 70Hz highpass,7kHz lowpass,-20LUFS,100/300ms edge fades",
+    "selectionBasis": "Same original-film phrase as previous 5s excerpt, extended by 3 seconds at unchanged pitch and tempo; subjective acceptance pending.",
+    "outputSha256": "56d4113121ca333113baf4974cbd95350a731053c6253c765c31dbdbe939d881"
+  }
 }

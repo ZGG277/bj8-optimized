@@ -9,6 +9,7 @@ import { markControlLearned, type ControlTipId } from '../control-onboarding';
 import { useDraggableOverlay } from '../hooks/useDraggableOverlay';
 import type { ShotCandidate } from '../planner/candidates';
 import type { PositionPlan } from '../planner/search';
+import { RoyalIcon } from './RoyalIcon';
 
 interface PlanOverlayProps {
   plans: PositionPlan[];
@@ -47,7 +48,7 @@ export function PlanOverlay({ plans, onClose, onShowStep }: PlanOverlayProps) {
 
   return (
     <div ref={drag.elementRef} className="plan-bar" style={drag.style} role="dialog" aria-label="走位规划">
-      <span className="overlay-drag-handle" aria-label="拖动走位提示" {...drag.dragHandleProps}>⠿</span>
+      <span className="overlay-drag-handle" aria-label="拖动走位提示" {...drag.dragHandleProps}><RoyalIcon name="grip"/></span>
       <div className="plan-step-tabs" role="tablist" aria-label="分杆路线">
         {plan.steps.map((candidateStep, i) => (
             <button
@@ -77,7 +78,7 @@ export function PlanOverlay({ plans, onClose, onShowStep }: PlanOverlayProps) {
         onClose();
         markControlLearned('plan-close');
       }}>
-        ✕
+        <RoyalIcon name="close"/>
       </button>
     </div>
   );

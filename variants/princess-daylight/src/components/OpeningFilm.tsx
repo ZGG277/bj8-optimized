@@ -1,100 +1,106 @@
-/**
- * [INPUT]: Offline film/poster/soundtrack, mute preference and completion callback.
- * [OUTPUT]: Gesture-started, pitch-preserved original soundtrack synchronized to the 1.15x WebP.
- * [POS]: Opening presentation; every exit releases audio and timers.
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
- */
+/*
+[INPUT]: 完整8秒WebP与同步延长的原片配乐
+[OUTPUT]: 每次开场默认开启音乐；自然结束交还连续推镜，跳过/错误/后台立即交还球桌
+[POS]: 片头呈现层，不依赖音频成功才交还球桌
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
 import { useEffect, useRef, useState } from 'react';
 import { RoyalIcon } from './RoyalIcon';
 import poster from '../assets/opening/valley-poster.jpg?url';
 import openingAsset from '../assets/opening/provenance.json';
 import soundtrack from '../assets/opening/soundtrack.json';
 
-const FILM_DURATION_MS = Math.round(openingAsset.durationSeconds * 1000);
-
-export function OpeningFilm({ src, muted = false, onFinish }: { src: string; muted?: boolean; onFinish: () => void }) {
-  const closed = useRef(false);
-  const preparing = useRef(false);
-  const started = useRef(false);
-  const timers = useRef<number[]>([]);
-  const context = useRef<AudioContext | null>(null);
-  const buffer = useRef<AudioBuffer | null>(null);
-  const sound = useRef<AudioBufferSourceNode | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [arriving, setArriving] = useState(false);
-  const [audioState, setAudioState] = useState('ready');
-  const finish = useRef(onFinish);
-  finish.current = onFinish;
+export const FILM_DURATION_MS = Math.round(openingAsset.durationSeconds * 1000);
+export const OPENING_MAX_WAIT_MS = FILM_DURATION_MS + 200;
+export function OpeningFilm({ src, onFinish }: { src: string; onFinish: (skipped: boolean) => void }) {
+  const [muted, setMuted] = useState(false);
+  const finish = useRef(onFinish); finish.current = onFinish;
+  const closed = useRef(false), startedAt = useRef<number | null>(null);
+  const context = useRef<AudioContext | null>(null), decoded = useRef<AudioBuffer | null>(null);
+  const source = useRef<AudioBufferSourceNode | null>(null);
+  const volume = useRef<GainNode | null>(null);
+  const timers = useRef<number[]>([]), mutedRef = useRef(muted); mutedRef.current = muted;
+  const musicIntent = useRef<boolean | null>(null);
+  const loadingDeadline = useRef<number | null>(null);
+  const [arriving, setArriving] = useState(false), [audioState, setAudioState] = useState('preparing');
   const stop = () => {
-    timers.current.forEach(timer => window.clearTimeout(timer));
-    timers.current = [];
-    try { sound.current?.stop(); } catch { /* Already ended. */ }
-    sound.current?.disconnect();
-    sound.current = null;
-    const ctx = context.current;
-    context.current = null;
+    timers.current.forEach(clearTimeout); timers.current = [];
+    try { source.current?.stop(); } catch { /* already ended */ }
+    source.current?.disconnect(); source.current = null;
+    volume.current?.disconnect(); volume.current = null;
+    const ctx = context.current; context.current = null;
     if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => {});
-    buffer.current = null;
+    decoded.current = null;
   };
-  const done = () => {
-    if (closed.current) return;
-    closed.current = true;
-    stop();
-    finish.current();
+  const done = (skipped = false) => { if (closed.current) return; closed.current = true; stop(); finish.current(skipped); };
+  const startSound = () => {
+    const ctx = context.current, buffer = decoded.current;
+    if (closed.current || mutedRef.current || source.current || !buffer || !ctx || ctx.state !== 'running' || startedAt.current === null) return;
+    const offset = Math.max(0, (performance.now() - startedAt.current) / 1000);
+    if (offset >= buffer.duration) return;
+    const node = ctx.createBufferSource(); node.buffer = buffer; node.connect(volume.current ?? ctx.destination);
+    source.current = node; node.start(0, offset); setAudioState('playing');
   };
-  const later = (fn: () => void, ms: number) => { timers.current.push(window.setTimeout(fn, ms)); };
   useEffect(() => {
     closed.current = false;
-    if (!src || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) later(done, 0);
-    const leave = () => { if (document.hidden) done(); };
-    document.addEventListener('visibilitychange', leave);
-    return () => {
-      closed.current = true;
-      stop();
-      document.removeEventListener('visibilitychange', leave);
+    if (!src || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) timers.current.push(window.setTimeout(() => done(true), 0));
+    // No choice screen and no dependency on successful audio decode/resume.
+    loadingDeadline.current = window.setTimeout(() => done(true), OPENING_MAX_WAIT_MS);
+    timers.current.push(loadingDeadline.current);
+    if (typeof AudioContext !== 'undefined') {
+      try {
+        const ctx = new AudioContext(); context.current = ctx;
+        const gain = ctx.createGain(); gain.gain.value = mutedRef.current ? 0 : 1; gain.connect(ctx.destination); volume.current = gain;
+        const bytes = Uint8Array.from(atob(soundtrack.base64), char => char.charCodeAt(0));
+        void ctx.decodeAudioData(bytes.buffer).then(buffer => {
+          if (closed.current || context.current !== ctx) return;
+          decoded.current = buffer; setAudioState(mutedRef.current ? 'muted' : ctx.state === 'running' ? 'ready' : 'waiting-gesture'); startSound();
+        }).catch(() => { if (!closed.current && context.current === ctx) setAudioState('unavailable'); });
+        // Permitted hosts can play sound immediately; a blocked resume never delays the image.
+        if (!mutedRef.current) void ctx.resume().then(startSound).catch(() => {});
+      } catch { setAudioState('unavailable'); }
+    } else setAudioState('unavailable');
+    const unlock = (event: Event) => {
+      if (event.target instanceof Element && event.target.closest('[data-opening-control]')) return;
+      const ctx = context.current;
+      if (ctx && !closed.current && !mutedRef.current) void ctx.resume().then(startSound).catch(() => {});
     };
+    const leave = () => { if (document.hidden) done(true); };
+    document.addEventListener('pointerdown', unlock, true); document.addEventListener('keydown', unlock, true);
+    document.addEventListener('visibilitychange', leave);
+    return () => { closed.current = true; stop(); document.removeEventListener('pointerdown', unlock, true); document.removeEventListener('keydown', unlock, true); document.removeEventListener('visibilitychange', leave); };
   }, [src]);
-  const begin = () => {
-    if (preparing.current || closed.current) return;
-    preparing.current = true;
-    setLoading(true);
-    // Resume inside the tap, before any decode; no autoplay assumptions.
-    let revealed = false;
-    const reveal = () => { if (!revealed && !closed.current) { revealed = true; setPlaying(true); setLoading(false); } };
-    later(done, FILM_DURATION_MS + 4000);
-    later(reveal, 2000); // A failed audio decoder must not trap the opening.
-    if (muted || typeof AudioContext === 'undefined') { setAudioState(muted ? 'muted' : 'unavailable'); reveal(); return; }
-    try {
-      const ctx = new AudioContext();
-      context.current = ctx;
-      const resumed = ctx.resume();
-      const bytes = Uint8Array.from(atob(soundtrack.base64), char => char.charCodeAt(0));
-      void Promise.all([resumed, ctx.decodeAudioData(bytes.buffer)]).then(([, decoded]) => {
-        if (closed.current || revealed) return;
-        buffer.current = decoded;
-        reveal();
-      }).catch(() => { if (!closed.current) { setAudioState('unavailable'); reveal(); } });
-    } catch { setAudioState('unavailable'); reveal(); }
+  useEffect(() => {
+    const ctx = context.current;
+    if (!ctx || closed.current) return;
+    volume.current?.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, .02);
+    if (muted) setAudioState('muted');
+    else void ctx.resume().then(() => { startSound(); if (!closed.current && source.current) setAudioState('playing'); }).catch(() => {});
+  }, [muted]);
+  const toggleMusic = () => {
+    const ctx = context.current;
+    if (!ctx || closed.current) return;
+    const wantsSound = musicIntent.current ?? (mutedRef.current || audioState === 'waiting-gesture'); musicIntent.current = null;
+    if (!wantsSound) {
+      mutedRef.current = true; volume.current?.gain.setTargetAtTime(0, ctx.currentTime, .02); setAudioState('muted'); setMuted(true);
+      return;
+    }
+    if (mutedRef.current) { mutedRef.current = false; setMuted(false); }
+    volume.current?.gain.setTargetAtTime(1, ctx.currentTime, .02);
+    void ctx.resume().then(() => { startSound(); if (!closed.current && source.current) setAudioState('playing'); }).catch(() => {});
   };
   const loaded = () => {
-    if (!playing || started.current || closed.current) return;
-    started.current = true;
-    const ctx = context.current;
-    if (ctx?.state === 'running' && buffer.current) {
-      const node = ctx.createBufferSource();
-      node.buffer = buffer.current;
-      node.connect(ctx.destination);
-      sound.current = node;
-      node.start();
-      setAudioState('playing');
-    }
-    later(() => { if (!closed.current) setArriving(true); }, FILM_DURATION_MS - 350);
-    later(done, FILM_DURATION_MS);
+    if (closed.current || startedAt.current !== null) return;
+    // 图片加载成功后按真实开播时刻计满8秒，慢下载不截短配乐和最后画面。
+    if (loadingDeadline.current !== null) clearTimeout(loadingDeadline.current);
+    loadingDeadline.current = null;
+    startedAt.current = performance.now(); startSound();
+    timers.current.push(window.setTimeout(() => setArriving(true), Math.max(0, FILM_DURATION_MS - 350)));
+    timers.current.push(window.setTimeout(() => done(false), FILM_DURATION_MS));
   };
-  return <div className={`royal-opening opening-film${arriving ? ' arriving' : ''}`} data-opening-audio={audioState} style={{ backgroundImage: `url(${poster})` }}>
-    <img src={playing ? src : poster} onLoad={loaded} onError={done} alt="" draggable={false} aria-hidden="true"/>
-    {!playing && <button className="opening-start" data-opening-start="true" disabled={loading} onClick={begin} aria-label={muted ? '播放开场' : '播放开场和原声'}><RoyalIcon name="play"/><span>{loading ? '正在进入…' : '进入城堡'}</span></button>}
-    <button className="opening-skip" aria-label="跳过开场" onClick={done}><RoyalIcon name="skip"/></button>
+  return <div className={`royal-opening opening-film${arriving ? ' arriving' : ''}`} data-opening-autoplay="true" data-opening-audio={audioState} data-opening-duration={FILM_DURATION_MS} style={{ backgroundImage: `url(${poster})` }}>
+    <img src={src} onLoad={loaded} onError={() => done(true)} alt="" draggable={false} aria-hidden="true"/>
+    {audioState !== 'unavailable' && <button className="opening-music" data-opening-control="music" aria-pressed={!muted} onPointerDown={() => { musicIntent.current = muted || audioState === 'waiting-gesture'; }} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') musicIntent.current = muted || audioState === 'waiting-gesture'; }} onClick={toggleMusic}><RoyalIcon name={muted ? 'muted' : 'sound'}/><span>{muted ? '开启音乐' : audioState === 'waiting-gesture' ? '轻触有声' : '关闭音乐'}</span></button>}
+    <button className="opening-skip" aria-label="跳过开场" onClick={() => done(true)}><RoyalIcon name="skip"/><span>跳过</span></button>
   </div>;
 }

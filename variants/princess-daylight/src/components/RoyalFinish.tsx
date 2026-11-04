@@ -1,4 +1,11 @@
+/**
+ * [INPUT]: 真实胜负、陪练与统一赞美卡面，以及可选小红书分享接口。
+ * [OUTPUT]: 统一局后卡/分享/重开；缺少平台接口时预览同图，取消或失败仍保留卡片。
+ * [POS]: 局后呈现与用户主动分享入口，不制造胜局或改写对局规则。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { containRoyalDialogTab } from './royal-dialog-focus';
 import { companionFor } from '../opponent/companions';
 import { COMPANION_CARD_ART } from '../opponent/companion-card-art';
@@ -29,6 +36,14 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', companionI
   const [cardImage, setCardImage] = useState('');
   useEffect(() => { setCardImage(''); }, [art, companion.name, line]);
   const [sharing, setSharing] = useState(false), [shareMessage, setShareMessage] = useState('');
+  const [sharePreview, setSharePreview] = useState(false);
+  const previewClose = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!sharePreview) return;
+    const previous = document.activeElement as HTMLElement | null;
+    previewClose.current?.focus();
+    return () => previous?.focus();
+  }, [sharePreview]);
   const sharingLock = useRef(false), mounted = useRef(true);
   const [celebrating, setCelebrating] = useState(false);
   const cancelCelebration = useRef<(() => void) | null>(null);
@@ -57,7 +72,8 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', companionI
         if (!mounted.current) return;
         await postVictoryNote(api, image, gameMode, companion.name, scene, won);
       } else if (import.meta.env.VITE_MINITOOL === '1') {
-        throw new Error('分享能力暂未就绪，请稍后重试。');
+        // 本地浏览器没有平台分享页；展示同图，不把缺少宿主报成分享失败。
+        setSharePreview(true);
       } else {
         const response = await fetch(image), file = new File([await response.blob()], '公主的赞美卡.jpg', { type: 'image/jpeg' });
         if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: '公主请开球' });
@@ -70,7 +86,7 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', companionI
     onPointerDown={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerCancel={e => e.stopPropagation()}
     onKeyDown={e => { containRoyalDialogTab(e); if (e.key === 'Escape') stopCelebration(); e.stopPropagation(); }}>
     <h1 id="royal-result-title" className="royal-sr-only">{won ? '公主赢了' : '本局结束'}</h1>
-    {celebrating && <div className="royal-petals" aria-hidden="true">{Array.from({ length: ROYAL_CELEBRATION_PARTICLES }, (_, i) => <i key={i} className="royal-flower" style={{ '--fall-x':`${(i*37+7)%100}%`, '--fall-delay':`${i%7*.08}s`, '--fall-spin':`${i%2?210:-160}deg`, '--petal-color':['#eab6c3','#fff3db','#cfabc9','#d4b469'][i%4] } as CSSProperties}>✧</i>)}</div>}
+    {celebrating && <div className="royal-petals" aria-hidden="true">{Array.from({ length: ROYAL_CELEBRATION_PARTICLES }, (_, i) => <i key={i} className="royal-flower" style={{ '--fall-x':`${(i*37+7)%100}%`, '--fall-delay':`${i%7*.08}s`, '--fall-spin':`${i%2?210:-160}deg`, '--petal-color':['#eab6c3','#fff3db','#cfabc9','#d4b469'][i%4] } as CSSProperties}><RoyalIcon name="sparkle"/></i>)}</div>}
     {onCollection && <button className="royal-finish-book" aria-label="查看赞美卡册" onClick={() => { stopCelebration(); onCollection(); }}><RoyalIcon name="cards"/><span>赞美卡册</span></button>}
     <div className="finish-content royal-result-card unified-praise-card" data-companion-id={companion.id}>
       <PraiseCard art={art} name={companion.name} text={line} onImage={setCardImage}/>
@@ -81,5 +97,13 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', companionI
     </div>
     {collectionSaveFailed && <p className="royal-card-status" role="status">卡片暂未保存，请保持页面打开。</p>}
     {shareMessage && <p className="royal-card-status" role="status">{shareMessage}</p>}
+    {sharePreview && createPortal(<div className="royal-share-preview" role="dialog" aria-modal="true" aria-labelledby="share-preview-title"
+      onKeyDown={e => { containRoyalDialogTab(e); if (e.key === 'Escape') setSharePreview(false); e.stopPropagation(); }}>
+      <section><header><h2 id="share-preview-title">这张赞美，送给你</h2><button ref={previewClose} aria-label="关闭分享预览" onClick={() => setSharePreview(false)}><RoyalIcon name="close"/></button></header>
+        <img src={cardImage} alt={`${companion.name} · ${line}`} className="share-preview-image"/>
+        <p>浏览器试玩可预览卡片，在小红书内可直接分享。</p>
+        <button className="share-preview-return" onClick={() => setSharePreview(false)}>返回赞美卡</button>
+      </section>
+    </div>, document.body)}
   </div>;
 }

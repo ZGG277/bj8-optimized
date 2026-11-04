@@ -6,6 +6,7 @@
 */
 import type { PositionPlanStatus } from '../hooks/usePositionPlan';
 import { markControlLearned } from '../control-onboarding';
+import { RoyalIcon } from './RoyalIcon';
 
 interface PlanStatusNoticeProps {
   status: Extract<PositionPlanStatus, 'computing' | 'failed'>;
@@ -25,7 +26,7 @@ export function PlanStatusNotice({ status, onClose }: PlanStatusNoticeProps) {
         onClose();
         markControlLearned('plan-status-close');
       }}>
-        ✕
+        <RoyalIcon name="close"/>
       </button>
     </div>
   );
