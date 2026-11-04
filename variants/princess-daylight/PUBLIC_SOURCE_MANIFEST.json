@@ -483,6 +483,10 @@
   "zipBytes": 10257614,
   "sourceBranch": "release/princess-ball-clarity-20261105",
   "publicPreview": "https://zgg277.github.io/guagua-game-prototypes/princess/",
-  "platformStatus": "Not submitted by this release yet; separate platform receipt required",
-  "validation": "837 tests/typecheck/build and static audit passed; user accepted local candidate; native Android/iOS/Chrome61 not verified"
+  "platformStatus": "Xiaohongshu1.0.10 submitted once; independent original app list confirms review pending. Public release not yet verified.",
+  "validation": "837 tests/typecheck/build and static audit passed; user accepted local candidate; native Android/iOS/Chrome61 not verified",
+  "platformVersion": "1.0.10",
+  "platformAppId": "6ac8c0d3c4b5540015fa41d0",
+  "platformUploadCount": 1,
+  "platformSubmitCount": 1
 }

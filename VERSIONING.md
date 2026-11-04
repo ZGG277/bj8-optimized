@@ -1,3 +1,11 @@
+# Princess platform submission outcome - 2026-11-05
+
+Xiaohongshu original app6ac8c0d3c4b5540015fa41d0: V1.0.10 submitted once after successful deployment/simulator native shot and explicit user agreement acceptance. Independent platform list confirms review pending; public release is not yet verified. Existing ego-browser CLI account is authenticated; prior IAB401 only concerned the separate IAB login state. No account/permission/global settings changed.
+
+Accepted source474 remains ddfeac9811e3bf563684699fd1c606dadd62bd49999d2707cd23d9ab8664de52; code458683aa5a288bd85c7868c5e723d4d02a2f7edf. ZIP10257614bytes/3d4fd91b7f97d1bc080c68a443ad16a2de78e1d49b90daa5e6aa7593b99b9fa0. GitHub permanent playtest deployment264495484bbe31ea473f4eb670b724c5e646a8fd verified. Android/iOS/Chrome61 remain unverified.
+
+## Prior preparation record
+
 # 当前源码与发布对应 · 2026-11-05
 
 ## 用户验收：公主8秒开场、暖象牙场景及彩球通透修正
