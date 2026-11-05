@@ -17,6 +17,15 @@ describe('accepted card and control interface', () => {
     expect(CONTROL_HELP.slice(0,2).map(row=>row[0])).toEqual(['瞄准方向','蓄力出杆']);
     expect(html).toContain('松手出杆');expect(html).toContain('选中的按钮会变色');
   });
+  it('keeps both named view choices in the compact right-side control', () => {
+    const html=renderToStaticMarkup(<ViewToolbar compact viewLevel={0} manualCameraActive={false} disabled={false} orientation="vertical" onViewLevel={()=>{}} onToggleManualCamera={()=>{}}/>);
+    expect(html.match(/<button/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="全局视角"');expect(html).toContain('aria-label="第一视角"');
+    expect(html).toContain('<span>全局</span>');expect(html).toContain('<span>第一</span>');
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(CONTROL_HELP.map(row=>row[1]).join('')).not.toContain('左上角');
+    expect(CONTROL_HELP[CONTROL_HELP.length-1][0]).toBe('移动按钮');
+  });
   it('shows awarded cards in win order instead of filling the book with a companion roster', () => {
     const first=collectCompanionWin(emptyCompanionCollection(),COMPANIONS[4].id,10,'这一杆真漂亮')!;
     const second=collectCompanionWin(first.collection,COMPANIONS[0].id,20,'这份准头我服了')!;

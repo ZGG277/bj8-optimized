@@ -1,10 +1,13 @@
 /*
-[INPUT]: 视口尺寸、Pointer 坐标、本地存储与五个控件的布局事实
-[OUTPUT]: 三类响应式布局、自由位置钳制、保留沿边落点的右/底吸附、容量判断与 v2→v3 安全迁移
+[INPUT]: 视口尺寸、Pointer 坐标、本地存储与五个游戏控件和四个工具按钮的布局事实
+[OUTPUT]: 三类响应式布局、手机右侧小按钮、自由位置钳制、保留沿边落点的右/底吸附、容量判断与 v2→v3 安全迁移
 [POS]: 控件布局纯领域层；不依赖 React 或具体控件 DOM
 [PROTOCOL]: 布局类型、阈值或存储协议变化时同步更新本文件测试与 src/CLAUDE.md
 */
-export type DockItemId = 'view' | 'bulb' | 'spin' | 'power' | 'aimDial';
+export const UTILITY_DOCK_IDS = ['scene', 'help', 'cards', 'pause'] as const;
+export type UtilityDockItemId = typeof UTILITY_DOCK_IDS[number];
+export type DockItemId = 'view' | 'bulb' | 'spin' | 'power' | 'aimDial' | UtilityDockItemId;
+export const isUtilityDockItem = (id: DockItemId) => (UTILITY_DOCK_IDS as readonly string[]).includes(id);
 export type DockEdge = 'right' | 'bottom';
 export type LayoutProfile = 'desktop' | 'portrait' | 'landscape';
 
@@ -36,7 +39,8 @@ export const CONTROL_LAYOUT_TOUCH_MOVE_THRESHOLD = 14;
 export const CONTROL_LAYOUT_SNAP_THRESHOLD = 48;
 export const CONTROL_LAYOUT_SAFE_GUTTER = 8;
 
-const IDS: DockItemId[] = ['view', 'bulb', 'spin', 'power', 'aimDial'];
+const LEGACY_IDS: DockItemId[] = ['view', 'bulb', 'spin', 'power', 'aimDial'];
+const IDS: DockItemId[] = [...LEGACY_IDS, ...UTILITY_DOCK_IDS];
 const PROFILES: LayoutProfile[] = ['desktop', 'portrait', 'landscape'];
 const LEGACY_PREFIX = 'princess-billiards:control-y:v2:';
 
@@ -49,13 +53,20 @@ const DEFAULT_RIGHT_POSITIONS: Record<LayoutProfile, number[]> = {
 export function defaultProfileLayout(
   profile: LayoutProfile = 'desktop',
 ): ProfileLayout {
-  const positions = profile === 'landscape' ? [0.07, 0.23, 0.52, 0.82] : [0.04, 0.12, 0.65, 0.86];
+  const mobile = profile !== 'desktop';
+  const positions = profile === 'landscape' ? [.08, .34, .58, .82] : mobile ? [.30, .43, .65, .86] : [.04, .12, .65, .86];
+  const utility = {} as Record<UtilityDockItemId, Placement>;
+  UTILITY_DOCK_IDS.forEach((id, order) => { utility[id] = mobile
+    ? { mode: 'docked', edge: 'right', order, position: [.02, .08, .14, .20][order] }
+    : { mode: 'free', x: .9, y: .1 + order * .07 };
+  });
   return {
-    view: { mode: 'docked', edge: 'right', order: 0, position: positions[0] },
-    bulb: { mode: 'docked', edge: 'right', order: 1, position: positions[1] },
-    spin: { mode: 'docked', edge: 'right', order: 2, position: positions[2] },
-    power: { mode: 'docked', edge: 'right', order: 3, position: positions[3] },
-    aimDial: { mode: 'docked', edge: 'bottom', order: 0, position: 0.5 },
+    ...utility,
+    view: { mode: 'docked', edge: 'right', order: mobile ? 4 : 0, position: positions[0] },
+    bulb: { mode: 'docked', edge: 'right', order: mobile ? 5 : 1, position: positions[1] },
+    spin: { mode: 'docked', edge: 'right', order: mobile ? 6 : 2, position: positions[2] },
+    power: { mode: 'docked', edge: 'right', order: mobile ? 7 : 3, position: positions[3] },
+    aimDial: { mode: 'docked', edge: 'bottom', order: 0, position: .5 },
   };
 }
 
@@ -123,14 +134,20 @@ function parseProfile(
     }
   }
   // 只替换完整、未调整过的旧默认布局；任一自定义位置都整组保留。
-  const untouched = IDS.every((id, order) => {
+  const untouched = LEGACY_IDS.every((id, order) => {
     const item = result[id];
     return id === 'aimDial'
       ? item.mode === 'free' && item.x === 0.5 && item.y === 0.84
       : item.mode === 'docked' && item.edge === 'right' && item.order === order &&
         item.position === DEFAULT_RIGHT_POSITIONS[profile][order];
   });
-  return untouched ? fallback : result;
+  const previous = profile === 'landscape' ? [.07,.23,.52,.82] : [.04,.12,.65,.86];
+  const previousDefault = LEGACY_IDS.every((id, order) => {
+    const item = result[id];
+    return id === 'aimDial' ? item.mode === 'docked' && item.edge === 'bottom' && item.position === .5
+      : item.mode === 'docked' && item.edge === 'right' && item.order === order && item.position === previous[order];
+  });
+  return UTILITY_DOCK_IDS.some(id => !raw[id]) && (untouched || previousDefault) ? fallback : result;
 }
 
 type StorageReader = Pick<Storage, 'getItem'>;
@@ -244,6 +261,11 @@ export function snapEdgeAt(
   return right <= CONTROL_LAYOUT_SNAP_THRESHOLD ? 'right' : 'bottom';
 }
 
+/** Narrow landscape uses an adjacent utility column, both docked to the phone's right edge. */
+export function sharesDockColumn(edge: DockEdge, a: DockItemId, b: DockItemId, width: number, height: number): boolean {
+  return edge !== 'right' || resolveLayoutProfile(width, height) !== 'landscape' || isUtilityDockItem(a) === isUtilityDockItem(b);
+}
+
 export function canDock(
   layout: ProfileLayout,
   item: DockItemId,
@@ -252,7 +274,8 @@ export function canDock(
   viewportHeight: number,
 ): boolean {
   const docked = IDS.filter(id =>
-    id !== item && layout[id].mode === 'docked' && layout[id].edge === edge);
+    id !== item && layout[id].mode === 'docked' && layout[id].edge === edge &&
+    sharesDockColumn(edge, item, id, viewportWidth, viewportHeight));
   const required =
     docked.reduce(
       (total, id) => total + dockItemLength(edge, id, viewportWidth, viewportHeight),
@@ -272,6 +295,10 @@ export function dockItemLength(
   viewportWidth: number,
   viewportHeight: number,
 ): number {
+  const mobile = resolveLayoutProfile(viewportWidth, viewportHeight) !== 'desktop';
+  const button = viewportHeight <= 700 ? 36 : 40;
+  if (isUtilityDockItem(item)) return mobile ? button : 44;
+  if (mobile && edge === 'right' && (item === 'view' || item === 'bulb' || item === 'spin')) return item === 'view' ? button * 2 : button;
   if (item === 'bulb') return 50;
   if (item === 'view') {
     const shortLandscape = viewportHeight <= 560 && viewportWidth > viewportHeight;
@@ -304,6 +331,7 @@ export function nearestDockPosition(
   itemLength: number,
   occupied: DockInterval[],
   span: number,
+  gap = 6,
 ): number | null {
   if (span <= 0 || itemLength > span) return null;
   const half = itemLength / 2;
@@ -318,9 +346,9 @@ export function nearestDockPosition(
   let cursor = 0;
   for (const interval of sorted) {
     const min = cursor + half;
-    const max = interval.start - 6 - half;
+    const max = interval.start - gap - half;
     if (min <= max) ranges.push({ min, max });
-    cursor = Math.max(cursor, interval.end + 6);
+    cursor = Math.max(cursor, interval.end + gap);
   }
   const min = cursor + half;
   const max = span - half;

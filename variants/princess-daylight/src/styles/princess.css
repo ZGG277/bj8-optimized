@@ -472,3 +472,74 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 @media (max-height:700px) and (orientation:portrait) {
   :root[data-theme] .royal-game .royal-result-scroll .royal-result-card.unified-praise-card {width:min(250px,calc((100dvh - 285px) * .75),100%);}
 }
+
+/* Mobile right rail: scoreboard stays at the top; every tool reuses the draggable slots. */
+@media (max-width:899px), (max-height:560px) {
+  .royal-game > .royal-entry {display:none;}
+  .royal-game .royal-finish-book {display:none;}
+  .royal-game .companion-moment {top:16px;left:8px;max-width:calc(100% - 72px);}
+  .royal-game .royal-foul-status {top:16px;left:8px;right:60px;max-width:none;}
+}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] {--rail-button:40px;--rail-step:44px;z-index:45;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right {top:calc(var(--safe-area-inset-top,env(safe-area-inset-top,0px)) + var(--royal-host-gap) + var(--scoreboard-h) + 8px);right:var(--safe-area-inset-right,env(safe-area-inset-right,0px));bottom:calc(var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)) + 8px);width:44px;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot.is-default-anchor {left:auto!important;right:0!important;width:44px;transform:none;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-scene.is-default-anchor {top:0!important;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-help.is-default-anchor {top:var(--rail-step)!important;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-cards.is-default-anchor {top:calc(var(--rail-step) * 2)!important;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-pause.is-default-anchor {top:calc(var(--rail-step) * 3)!important;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-view.is-default-anchor {top:calc(var(--rail-step) * 4)!important;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-bulb.is-default-anchor {top:calc(var(--rail-step) * 4 + var(--rail-button) * 2 + 4px)!important;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-spin.is-default-anchor {top:auto!important;bottom:calc(var(--floating-power-height) + 8px);}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-power.is-default-anchor {top:auto!important;bottom:0;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-scene .control-slot-body ,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-help .control-slot-body ,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-cards .control-slot-body ,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-pause .control-slot-body {width:44px;height:var(--rail-button);display:grid;place-items:center;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .scene-entry ,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .help-entry ,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .cardbook-entry ,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .pause-entry {position:relative;top:auto;right:auto;bottom:auto;left:auto;display:grid;place-items:center;width:40px;height:var(--rail-button);min-height:0;min-width:0;padding:6px;margin:0;border:1px solid #c5b48177;border-radius:12px;background:#f7f4e9c9;color:#63725b;font:inherit;box-shadow:inset 0 1px #fff9;touch-action:none;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .royal-icon {width:18px;height:18px;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-view .control-slot-body {width:44px;height:calc(var(--rail-button) * 2);padding:0;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .persistent-view-control .view-shortcuts {gap:0;border-radius:12px;overflow:hidden;background:#f7f4e9b8;border:1px solid #c5b48177;box-sizing:border-box;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-mode-button {display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;flex:0 0 var(--rail-button);width:42px;height:var(--rail-button);min-width:0;min-height:0;padding:3px;border-radius:8px;letter-spacing:0;line-height:1;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-mode-button svg {display:block!important;width:16px;height:16px;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-mode-button .view-icon {display:block!important;width:17px;height:12px;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-mode-button > span:last-child {font-size:10px;line-height:11px;white-space:nowrap;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-bulb .control-slot-body,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .assist-control,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .assist-control > .plan-button {width:44px;height:var(--rail-button);min-width:0;min-height:0;margin:0;padding:0;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .plan-button > .bulb-icon {transform:none!important;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .spin-control,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .spin-preview {width:44px;height:var(--rail-button);min-width:0;min-height:0;padding:3px;margin:0;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-spin .control-slot-body {width:44px;height:var(--rail-button);}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-bottom .control-slot-view .control-slot-body {width:88px;height:var(--rail-button);}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-bottom .view-mode-button {flex-basis:44px;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .assist-menu-vertical {right:48px;top:0;}
+:root[data-theme] .game-shell[data-match-finished="true"] .control-deck[data-mobile-rail="true"] {visibility:visible;}
+:root[data-theme] .game-shell[data-match-finished="true"] .control-deck[data-mobile-rail="true"] .control-slot {visibility:hidden;pointer-events:none;}
+:root[data-theme] .game-shell[data-match-finished="true"] .control-deck[data-mobile-rail="true"] .control-slot-cards {visibility:visible;pointer-events:auto;}
+@media(max-height:700px) {:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] {--rail-button:36px;--rail-step:40px;}}
+@media(orientation:landscape) {
+  :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-scene ,
+  :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-help ,
+  :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-cards ,
+  :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-pause {right:48px!important;}
+  :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-view {right:0!important;width:44px;}
+  :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-view.is-default-anchor {top:0!important;}
+  :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-bulb.is-default-anchor {top:calc(var(--rail-button) * 2 + 4px)!important;}
+}
+
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot {width:44px;right:0;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-power,
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot-power.is-default-anchor {width:48px;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .spin-control {padding:0;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .spin-preview {box-sizing:border-box;padding:3px;}
+
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right .control-slot.is-default-anchor {position:absolute;height:auto;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .persistent-view-control .view-shortcuts.is-vertical {flex-direction:column;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .persistent-view-control .view-shortcuts.is-horizontal {flex-direction:row;}
+
+@media(orientation:landscape) {
+:root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-scene.is-default-anchor,:root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-help.is-default-anchor,:root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-cards.is-default-anchor,:root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-pause.is-default-anchor{right:48px!important;}
+}

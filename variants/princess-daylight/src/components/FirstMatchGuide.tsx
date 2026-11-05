@@ -51,7 +51,7 @@ export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
     selector: '[data-control-slot="power"] .shoot-pad',
   },
   'player-view': {
-    text: '点右上角，切换视角',
+    text: '点右侧，切换视角',
     selector: '[data-control-slot="view"]',
   },
   'player-spin': {

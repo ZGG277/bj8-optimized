@@ -202,7 +202,8 @@ export function useAimInteraction({
     const scene = scene3DRef.current;
     if (!scene) return;
     const cue = getCueBall(worldRef.current);
-    const candidates = [cue, ...[.35, .15, -.15, -.35].flatMap(z => [-.25, 0, .25].map(x => ({ x, z: z * TABLE.length })))];
+    const candidates: Array<{x: number; z: number} | null> = [cue ?? null];
+    for (const z of [.35, .15, -.15, -.35]) for (const x of [-.25, 0, .25]) candidates.push({x, z: z * TABLE.length});
     for (const candidate of candidates) {
       if (!candidate) continue;
       const point = scene.tableToScreenAt(candidate.x, candidate.z, cameraAzimuthRef.current, viewLevel);

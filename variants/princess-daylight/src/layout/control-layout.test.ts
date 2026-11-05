@@ -1,12 +1,14 @@
 /*
 [INPUT]: control-layout 纯函数与模拟 Storage
 [OUTPUT]: 响应式档案、自由钳制、吸附、容量、轴向与 v2 迁移断言
-[POS]: 五控件布局领域层回归测试
+[POS]: 九控件布局领域层回归测试
 [PROTOCOL]: 布局协议变化时同步更新本文件
 */
 import { describe, expect, it } from 'vitest';
 import {
   CONTROL_LAYOUT_STORAGE_KEY,
+  UTILITY_DOCK_IDS,
+  sharesDockColumn,
   canDock,
   clampFreePlacement,
   controlAxisDelta,
@@ -78,9 +80,9 @@ describe('control layout geometry', () => {
   it('swaps two controls already docked on the same edge', () => {
     const layout = createDefaultControlLayouts().layouts.portrait;
     const swapped = swapDockedControlPositions(layout, 'view', 'spin');
-    expect(swapped.view).toMatchObject({ edge: 'right', order: 2, position: 0.65 });
-    expect(swapped.spin).toMatchObject({ edge: 'right', order: 0, position: 0.04 });
-    expect(swapped.bulb).toMatchObject({ edge: 'right', order: 1, position: 0.12 });
+    expect(swapped.view).toEqual(layout.spin);
+    expect(swapped.spin).toEqual(layout.view);
+    expect(swapped.bulb).toEqual(layout.bulb);
   });
 
   it('ignores a swap across different dock edges', () => {
@@ -165,6 +167,43 @@ describe('floating control defaults and saved layouts', () => {
       ? JSON.stringify({version: 3, layouts: {portrait: profile}}) : null }).layouts.portrait;
     expect(load(oldProfile)).toEqual(createDefaultControlLayouts().layouts.portrait);
     const custom = { ...oldProfile, aimDial: {mode: 'free', x: .43, y: .87} };
-    expect(load(custom)).toEqual(custom);
+    expect(load(custom)).toMatchObject(custom);
   });
+});
+
+describe('mobile utility rail compatibility', () => {
+  it('places every new utility on the right in portrait and landscape, without changing the bottom aim dial', () => {
+    const d=createDefaultControlLayouts();
+    for(const profile of ['portrait','landscape'] as const) {
+      for(const id of UTILITY_DOCK_IDS) expect(d.layouts[profile][id]).toMatchObject({mode:'docked',edge:'right'});
+      expect(d.layouts[profile].aimDial).toMatchObject({mode:'docked',edge:'bottom'});
+    }
+    expect(d.layouts.desktop.view).toMatchObject({position:.04});
+  });
+  it('upgrades the previous untouched five-control default, preserving storage and adding the tools', () => {
+    const profile={view:{mode:'docked',edge:'right',order:0,position:.04},bulb:{mode:'docked',edge:'right',order:1,position:.12},spin:{mode:'docked',edge:'right',order:2,position:.65},power:{mode:'docked',edge:'right',order:3,position:.86},aimDial:{mode:'docked',edge:'bottom',order:0,position:.5}};
+    const raw=JSON.stringify({version:3,layouts:{portrait:profile}});
+    const data=new Map([[CONTROL_LAYOUT_STORAGE_KEY,raw]]);
+    const loaded=loadControlLayouts({getItem:k=>data.get(k)??null});
+    expect(loaded.layouts.portrait).toEqual(createDefaultControlLayouts().layouts.portrait);
+    expect(data.get(CONTROL_LAYOUT_STORAGE_KEY)).toBe(raw);
+  });
+  it('does not reset a deliberately moved new tool on reload', () => {
+    const d=createDefaultControlLayouts();d.layouts.portrait.cards={mode:'free',x:.4,y:.3};
+    const loaded=loadControlLayouts({getItem:k=>k===CONTROL_LAYOUT_STORAGE_KEY?JSON.stringify(d):null});
+    expect(loaded).toEqual(d);
+  });
+  it('reserves separate right-side columns only in short landscape', () => {
+    expect(sharesDockColumn('right','help','view',844,390)).toBe(false);
+    expect(sharesDockColumn('right','help','cards',844,390)).toBe(true);
+    expect(sharesDockColumn('right','help','view',390,844)).toBe(true);
+    expect(sharesDockColumn('bottom','help','view',844,390)).toBe(true);
+  });
+  it('allows docking into the available utility column in landscape', () => {
+    const l=createDefaultControlLayouts().layouts.landscape;
+    expect(canDock(l,'scene','right',844,390)).toBe(true);
+    expect(canDock(l,'view','right',844,390)).toBe(true);
+    expect(nearestDockPosition(64,40,[{start:0,end:40},{start:88,end:128}],200,4)).toBeCloseTo(.32);
+  });
+
 });

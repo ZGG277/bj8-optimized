@@ -110,7 +110,7 @@ function browserStorage(): ReturnType<typeof gameStorage> {
   }
 }
 
-/** 避开比分栏与手机默认顶部工具行；自由拖动控件不扩大构图边距。 */
+/** 避开比分栏与手机默认右侧工具列；自由拖动控件不扩大构图边距。 */
 function aimCameraSafetyFor(viewport: HTMLElement) {
   const bounds = viewport.getBoundingClientRect();
   const controls: Array<{ left: number; top: number; right: number; bottom: number; dockEdge: 'top' | 'right' | 'bottom' }> = [];
@@ -120,16 +120,8 @@ function aimCameraSafetyFor(viewport: HTMLElement) {
     const { left, top, right, bottom } = scoreboard.getBoundingClientRect();
     controls.push({ left, top, right, bottom, dockEdge: 'top' });
   }
-  if (bounds.height >= bounds.width && bounds.width <= 640) {
-    for (const element of document.querySelectorAll<HTMLElement>(
-      '.royal-entry, .control-slot-view.is-default-anchor, .control-slot-bulb.is-default-anchor',
-    )) {
-      const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
-      if (width > 0 && height > 0) controls.push({ left, top, right, bottom, dockEdge: 'top' });
-    }
-    for (const element of document.querySelectorAll<HTMLElement>(
-      '.control-slot-power.is-default-anchor, .control-slot-spin.is-default-anchor, .control-slot-aimDial.is-default-anchor',
-    )) {
+  if (window.innerWidth < 900 || window.innerHeight <= 560) {
+    for (const element of document.querySelectorAll<HTMLElement>('[data-control-slot].is-default-anchor')) {
       const dockEdge = element.dataset.dockEdge;
       if (dockEdge !== 'right' && dockEdge !== 'bottom') continue;
       const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
@@ -1223,6 +1215,13 @@ export default function Game() {
     legalTargets,
   ]);
 
+  const utilityControls = {
+    scene: <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>,
+    help: <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/></button>,
+    cards: <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>,
+    pause: <button className="pause-entry" aria-label="暂停与设置" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setPaused(true); }}><RoyalIcon name="pause"/></button>,
+  };
+
   // Each gesture retires independently after two valid uses, including free-ball placement.
   let displayGuide: FirstMatchGuideStep | null = null;
   if (!guideDismissed && firstMatchGuideStep === 'turn-wait' && match.actor === 'opponent') displayGuide = 'turn-wait';
@@ -1264,10 +1263,7 @@ export default function Game() {
       }}/>}
       {collectionOpen && <CompanionCollectionBook collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
       <div className="royal-entry" role="group" aria-label="场景、教学与暂停">
-        <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>
-        <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/></button>
-        {match.phase !== 'finished' && <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>}
-        <button className="pause-entry" aria-label="暂停与设置" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setPaused(true); }}><RoyalIcon name="pause"/></button>
+        {Object.entries(utilityControls).filter(([id]) => id !== 'cards' || match.phase !== 'finished').map(([id, node]) => <span key={id}>{node}</span>)}
       </div>
       {scenePickerOpen && <ScenePicker value={selectedWorld} disabled={(!canAimBase && match.phase !== 'finished') || openingActive || charging || followShotPending || worldView.moving} onClose={() => setScenePickerOpen(false)} onChange={next => { if ((!canAimBase && match.phase !== 'finished') || openingActive || charging || worldRef.current.moving || followShotPendingRef.current) return; try { browserStorage()?.setItem('princess-billiards:scene:v1', next); } catch { /* Current scene still switches. */ } const url = new URL(location.href); url.searchParams.set('world', next); url.searchParams.delete('lake360'); history.replaceState(null, '', url.href); setSelectedWorld(next); setScenePickerOpen(false); }} />}
       {import.meta.env.DEV && <div className="follow-comparison" aria-label="开发手感对照">
@@ -1325,6 +1321,7 @@ export default function Game() {
         onResetGame={handleReplay}
       />
       <ControlDeck
+        utilityControls={utilityControls}
         viewLevel={viewLevel}
         manualCameraActive={manualCameraActive}
         viewLocked={spectatorActive}

@@ -1,6 +1,6 @@
 /*
-[INPUT]: 五个游戏控件状态、模式门控、观战视角锁、默认拨轮/可选方向键、四项辅助入口、视口尺寸、Pointer 手势与逐控件学习记录
-[OUTPUT]: 纯视觉五控件层；右上灯泡展开辅助开关，视角推杆常驻可见；保留自由拖动、右/底吸附与 v3 持久化
+[INPUT]: 五个游戏控件与四个工具按钮状态、模式门控、观战视角锁、默认拨轮/可选方向键、四项辅助入口、视口尺寸、Pointer 手势与逐控件学习记录
+[OUTPUT]: 统一可拖动控件层，手机工具小按钮吸附右侧；右上灯泡展开辅助开关，视角推杆常驻可见；保留自由拖动、右/底吸附与 v3 持久化
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimControls·AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
@@ -31,6 +31,8 @@ import {
   resolveLayoutProfile,
   saveControlLayouts,
   snapEdgeAt,
+  sharesDockColumn,
+  type UtilityDockItemId,
   swapDockedControlPositions,
   type DockEdge,
   type DockItemId,
@@ -273,6 +275,7 @@ function DockableControlSlot({
 }
 
 interface ControlDeckProps {
+  utilityControls?: Partial<Record<UtilityDockItemId, ReactNode>>;
   viewLevel: number;
   manualCameraActive: boolean;
   viewLocked: boolean;
@@ -329,6 +332,7 @@ function axisFor(id: DockItemId, placement: Placement): Axis {
 }
 
 export function ControlDeck({
+  utilityControls,
   viewLevel,
   manualCameraActive,
   viewLocked,
@@ -372,7 +376,7 @@ export function ControlDeck({
 
   const profile = resolveLayoutProfile(viewport.width, viewport.height);
   const layout = storedLayouts.layouts[profile];
-  const viewOrientation = viewport.height <= 560 && viewport.width > viewport.height
+  const viewOrientation = profile === 'desktop' && viewport.height <= 560 && viewport.width > viewport.height
     ? 'horizontal' : axisFor('view', layout.view);
   const layoutRef = useRef<ProfileLayout>(layout);
   const profileRef = useRef(profile);
@@ -441,6 +445,39 @@ export function ControlDeck({
       };
     });
   }, [profile, viewport.height, viewport.width]);
+
+  useEffect(() => {
+    if (profile === 'desktop') return;
+    const rail = document.querySelector<HTMLElement>('.dock-rail-right');
+    if (!rail) return;
+    const bounds = rail.getBoundingClientRect();
+    const slots = Array.from(rail.querySelectorAll<HTMLElement>('[data-control-slot]'));
+    const occupied: Array<{ id: DockItemId; start: number; end: number }> = [];
+    const next = { ...layoutRef.current };
+    let changed = false;
+    for (const slot of slots) {
+      const id = slot.dataset.controlSlot as DockItemId;
+      const box = slot.getBoundingClientRect();
+      if (!box.width || !box.height) continue;
+      let start = box.top - bounds.top, end = box.bottom - bounds.top;
+      const peers = occupied.filter(other => sharesDockColumn('right', id, other.id, viewport.width, viewport.height));
+      const conflicts = start < 0 || end > bounds.height || peers.some(other => start < other.end + 4 && end > other.start - 4);
+      if (conflicts) {
+        const center = nearestDockPosition((start+end)/2, box.height, peers, bounds.height, 4);
+        if (center !== null) {
+          const old = next[id];
+          if (old.mode === 'docked') next[id] = { ...old, position: center };
+          start = center * bounds.height - box.height/2; end = start + box.height;
+          changed = true;
+        }
+      }
+      occupied.push({id, start, end});
+    }
+    if (changed) setStoredLayouts(current => {
+      layoutRef.current = next;
+      return { ...current, layouts: { ...current.layouts, [profile]: next } };
+    });
+  }, [profile, viewport.width, viewport.height]);
 
   const updatePlacement = useCallback((
     targetProfile: typeof profile,
@@ -634,7 +671,7 @@ export function ControlDeck({
         const railRect = rail?.getBoundingClientRect();
         const siblings = rail
           ? Array.from(rail.querySelectorAll<HTMLElement>('[data-control-slot]'))
-            .filter(element => element.dataset.controlSlot !== drag.id)
+            .filter(element => element.dataset.controlSlot !== drag.id && sharesDockColumn(edge, drag.id, element.dataset.controlSlot as DockItemId, currentViewport.width, currentViewport.height))
           : [];
         const occupied = railRect
           ? siblings.map(element => {
@@ -690,6 +727,7 @@ export function ControlDeck({
           ),
           occupied,
           span,
+          profileRef.current === 'desktop' ? 6 : 4,
         );
         if (!docked && position !== null) {
           dockAtPosition(profileRef.current, drag.id, edge, position);
@@ -750,9 +788,14 @@ export function ControlDeck({
   const guidanceStateClass = guidanceEnabled ? 'is-open' : 'is-off';
 
   const nodes = useMemo<Record<DockItemId, ReactNode>>(() => ({
+    scene: profile === 'desktop' ? null : utilityControls?.scene ?? null,
+    help: profile === 'desktop' ? null : utilityControls?.help ?? null,
+    cards: profile === 'desktop' ? null : utilityControls?.cards ?? null,
+    pause: profile === 'desktop' ? null : utilityControls?.pause ?? null,
     view: (
       <div className={`persistent-view-control is-${viewOrientation}`} role="group" aria-label="视角调整">
           <ViewToolbar
+            compact={profile !== 'desktop'}
             viewLevel={viewLevel}
             manualCameraActive={manualCameraActive}
             disabled={viewLocked}
@@ -881,6 +924,7 @@ export function ControlDeck({
       )
     ) : null,
   }), [
+    profile, utilityControls,
     aimAssistEnabled,
     aimDialEnabled,
     aimDialPrecisionActive,
@@ -960,6 +1004,7 @@ export function ControlDeck({
     <footer
       className={`control-deck ${draggingId ? 'is-layout-dragging' : ''}`}
       data-layout-profile={profile}
+      data-mobile-rail={profile !== 'desktop'}
       onContextMenuCapture={(event) => event.preventDefault()}
     >
       <div className={`dock-snap-preview dock-snap-right ${snapPreview === 'right' ? 'active' : ''}`} />

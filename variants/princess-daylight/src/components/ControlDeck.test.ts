@@ -29,3 +29,13 @@ describe('controlActivationIntent', () => {
     expect(controlActivationIntent('aimDial', 2, true, 14)).toBe('layout');
   });
 });
+
+
+describe('mobile utility long-press intent', () => {
+  it('uses the same stationary long press for all tool buttons, without stealing ordinary taps', () => {
+    for(const id of ['scene','help','cards','pause','view'] as const) {
+      expect(controlActivationIntent(id,0,false,14)).toBe('pending');
+      expect(controlActivationIntent(id,2,true,14)).toBe('layout');
+    }
+  });
+});
