@@ -1,8 +1,9 @@
+import { addShotHighlight, EMPTY_HIGHLIGHTS } from './match/highlights';
 import { ControlHelp } from './components/ControlHelp';
 import { positionAfterPot } from './opponent/position-observation';
 /*
 [INPUT]: 自动播放的短 WebP 开场；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 对外提供8秒影片到第一视角的连续开场及输入门禁、可跳过/重看的穿透式引导、首次视角提示、陪练/挑战、复盘/训练总结、运动快照、幽灵球瞄准、双指回退与赞美卡册
+[OUTPUT]: 本局真实击球亮点聚合、可触摸自由球光圈与既有对局编排； 对外提供8秒影片到第一视角的连续开场及输入门禁、可跳过/重看的穿透式引导、首次视角提示、陪练/挑战、复盘/训练总结、运动快照、幽灵球瞄准、双指回退与赞美卡册
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -162,12 +163,13 @@ export default function Game() {
   const [followFeel, setFollowFeel] = useState<FollowFeel>('current');
   const [followShotPending, setFollowShotPending] = useState(false);
   const followShotPendingRef = useRef(false);
+  const [matchHighlights, setMatchHighlights] = useState(EMPTY_HIGHLIGHTS);
   const [shotReward, setShotReward] = useState<ShotReward | null>(null);
   useEffect(() => {
     if (!shotReward) return;
     const timer = window.setTimeout(() => {
       setShotReward(current => current?.shotId === shotReward.shotId ? null : current);
-    }, 1600);
+    }, 2800);
     return () => window.clearTimeout(timer);
   }, [shotReward]);
   const [selectedWorld, setSelectedWorld] = useState<'lake' | 'castle'>(() => {
@@ -787,6 +789,7 @@ export default function Game() {
 
   // ── 瞄准交互（在 useShotInput 之后，以获取 setAim）──
   const {
+    placementHalo,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -819,7 +822,7 @@ export default function Game() {
     },
   });
 
-  const stageInteractionMode = cameraInteractionMode(
+  const stageInteractionMode = match.phase === 'placing' ? 'aim' : cameraInteractionMode(
     spectatorActive,
     manualCameraActive,
   );
@@ -1014,6 +1017,7 @@ export default function Game() {
     setFollowShotPending(false);
     setCollectionOpen(false);
     setShotReward(null);
+    setMatchHighlights(EMPTY_HIGHLIGHTS);
     resetGame(setAim, nextMode);
     markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
     setSpin({ x: 0, y: 0 });
@@ -1031,7 +1035,9 @@ export default function Game() {
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
+    const before = matchRef.current;
     const settlement = settleShotRaw(setViewLevel);
+    if (settlement) setMatchHighlights(previous => addShotHighlight(previous, before, settlement.facts, settlement.resolution));
     setShotReward(settlement ? rewardForStoppedShot(settlement.facts, settlement.resolution) : null);
     if (settlement && firstMatchGuideStepRef.current) {
       const next = guideAfterSettlement(firstMatchGuideStepRef.current, settlement.resolution.next, settlement.facts.pocketed);
@@ -1296,6 +1302,8 @@ export default function Game() {
         shotReward={shotReward}
       />
       <TableStage
+        placementHalo={placementHalo}
+        highlights={matchHighlights}
         victoryPraise={victoryPraise}
         shotReward={shotReward}
         collectionReward={collectionReward}

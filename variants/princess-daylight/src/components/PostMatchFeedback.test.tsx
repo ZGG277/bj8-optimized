@@ -38,4 +38,12 @@ describe('局后留言入口', () => {
     expect(html).not.toContain('>留言</button>');
     expect(html).toContain('data-match-finished="true"');
   });
+  it('compact mode starts collapsed and leaves replay on the main card', () => {
+    const html = renderToStaticMarkup(<PostMatchFeedback outcome="win" mode="practice" compact onContinue={() => {}}/>);
+    expect(html).toContain('给作者留言');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('<textarea');
+    expect(html).not.toContain('再来一局');
+  });
+
 });

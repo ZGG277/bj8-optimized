@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 physics 台球世界、独立视觉相机方位、Scene3D 屏幕坐标映射与 match 状态
-[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、默认拨轮/可选方向键微调、母球点击/拖放、自由球预览与抬手后幽灵球落位事实、双指晋升前的球路回滚
+[OUTPUT]: 对外提供自由/跟随相机下统一的 360° 粗瞄、默认拨轮/可选方向键微调、母球点击/拖放、自由球常驻触摸光圈预览与抬手后幽灵球落位事实、双指晋升前的球路回滚
 [POS]: 交互协调层，把当前视觉相机下的指针与微调控件映射为世界瞄准角；拨轮消费用户显式粗/精档位
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -70,6 +70,8 @@ export function useAimInteraction({
     ghostPlaced: boolean;
   } | null>(null);
   const placementPointerRef = useRef<number | null>(null);
+  const [placementHalo, setPlacementHalo] = useState<{ x: number; y: number; valid: boolean } | null>(null);
+  const placementPreviewRef = useRef<{ x: number; z: number; valid: boolean } | null>(null);
   const placementErrorRef = useRef<MatchMessageKey | null>(null);
   // 'line' 模式下用相对增量旋转，避免手机端绝对映射导致的方向跳变
   const lineLastXRef = useRef<number | null>(null);
@@ -184,6 +186,8 @@ export function useAimInteraction({
     const scene = scene3DRef.current;
     const placement = cuePlacementAt(clientX, clientY);
     if (!scene) return null;
+    placementPreviewRef.current = placement ? { x: placement.x, z: placement.z, valid: !placement.error } : null;
+    setPlacementHalo({ x: clientX, y: clientY, valid: Boolean(placement && !placement.error) });
     if (!placement || placement.error) {
       scene.setGhostCue(0, 0, false);
       return placement;
@@ -191,6 +195,32 @@ export function useAimInteraction({
     scene.setGhostCue(placement.x, placement.z, true);
     return placement;
   }, [scene3DRef, cuePlacementAt]);
+
+  // A persistent touch target is visible before the first touch, not just on mouse hover.
+  useEffect(() => {
+    if (matchPhase !== 'placing') { setPlacementHalo(null); placementPreviewRef.current = null; return; }
+    const scene = scene3DRef.current;
+    if (!scene) return;
+    const cue = getCueBall(worldRef.current);
+    const candidates = [cue, ...[.35, .15, -.15, -.35].flatMap(z => [-.25, 0, .25].map(x => ({ x, z: z * TABLE.length })))];
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const point = scene.tableToScreenAt(candidate.x, candidate.z, cameraAzimuthRef.current, viewLevel);
+      if (!point) continue;
+      const valid = previewCuePlacement(point.x, point.y);
+      if (valid && !valid.error) break;
+    }
+    const project = () => {
+      const candidate = placementPreviewRef.current;
+      if (!candidate) return;
+      const point = scene.tableToScreen(candidate.x, candidate.z);
+      setPlacementHalo(previous => previous && Math.hypot(previous.x-point.x, previous.y-point.y)<.5 && previous.valid===candidate.valid
+        ? previous : { ...point, valid: candidate.valid });
+    };
+    project();
+    const timer = window.setInterval(project, 100);
+    return () => { window.clearInterval(timer); scene.setGhostCue(0, 0, false); };
+  }, [matchPhase, viewLevel, previewCuePlacement, scene3DRef, worldRef, cameraAzimuthRef]);
 
   const commitCuePlacement = useCallback((clientX: number, clientY: number) => {
     const placement = cuePlacementAt(clientX, clientY);
@@ -277,6 +307,7 @@ export function useAimInteraction({
     const cue=getCueBall(worldRef.current);
     beforePointerRef.current={world:worldRef.current,shot:worldRef.current.shot,aim:aimRef.current,distance:aimGhostDistRef.current,cue:cue?{...cue}:cue};
     if (matchPhase === 'placing') {
+      if (placementPointerRef.current !== null) return;
       placementPointerRef.current = e.pointerId;
       previewCuePlacement(e.clientX, e.clientY);
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -309,6 +340,7 @@ export function useAimInteraction({
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     // 放置模式：幽灵球预览（开球时限制在开球区）
     if (matchPhase === 'placing') {
+      if (placementPointerRef.current !== null && placementPointerRef.current !== e.pointerId) return;
       previewCuePlacement(e.clientX, e.clientY);
       return;
     }
@@ -391,7 +423,9 @@ export function useAimInteraction({
     placementErrorRef.current = null;
     lineLastXRef.current = null;
     if (matchPhase === 'placing') {
-      scene3DRef.current?.setGhostCue(0, 0, false);
+      const preview = placementPreviewRef.current;
+      if (preview?.valid) scene3DRef.current?.setGhostCue(preview.x, preview.z, true);
+      else scene3DRef.current?.setGhostCue(0, 0, false);
     }
     if (releaseCapture && (e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
@@ -443,6 +477,7 @@ export function useAimInteraction({
   }, [canAim, aimDialVisible]);
 
   return {
+    placementHalo,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,

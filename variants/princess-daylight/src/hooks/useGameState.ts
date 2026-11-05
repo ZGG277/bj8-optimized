@@ -4,7 +4,7 @@ import { collectCompanionWin, loadCompanionCollection, saveCompanionCollection, 
 import { createFriendlyOpponentProfile } from '../opponent/friendly-style';
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
-[OUTPUT]: 对外提供每次初始化默认第一视角的对局状态、整局结束才提交的双方能力档案与单点训练总结、
+[OUTPUT]: 摆球错误保留真实犯规原因； 对外提供每次初始化默认第一视角的对局状态、整局结束才提交的双方能力档案与单点训练总结、
           resetGame / settleShot / recordPlayerShot / completeMatchAssessment 等编排动作
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -84,7 +84,7 @@ export function useGameState() {
 
   /** 更新消息 */
   const setMessage = useCallback((key: MatchMessageKey, params: MatchMessageParams = {}) => {
-    setMatch(m => ({ ...m, messageKey: key, messageParams: params }));
+    setMatch(m => ({ ...m, messageKey: key, messageParams: key.startsWith('place-') ? { ...m.messageParams, ...params } : params }));
   }, []);
 
   /** 相同一杆只结算一次；重开局时必须与新世界 shot=0 一起归零。 */

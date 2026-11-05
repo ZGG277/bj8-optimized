@@ -1,6 +1,6 @@
 /*
 [INPUT]: 本局胜负/模式与开始下一局动作；通过 post-match-feedback 提交有限留言
-[OUTPUT]: 可跳过的局后卡片，保留失败内容、同键重试、发送中/成功/失败明确状态
+[OUTPUT]: 可跳过的局后留言，compact 模式仅显示折叠入口、沿用结果页重开；保留失败内容、同键重试、发送中/成功/失败明确状态
 [POS]: 结束覆层展示组件；不收集额外身份，不把网络等待接入游戏状态机
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -18,9 +18,10 @@ interface PostMatchFeedbackProps {
   outcome: 'win' | 'loss';
   mode: GameMode;
   onContinue: () => void;
+  compact?: boolean;
 }
 
-export function PostMatchFeedback({ outcome, mode, onContinue }: PostMatchFeedbackProps) {
+export function PostMatchFeedback({ outcome, mode, onContinue, compact = false }: PostMatchFeedbackProps) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'saved' | 'error'>('idle');
@@ -53,6 +54,7 @@ export function PostMatchFeedback({ outcome, mode, onContinue }: PostMatchFeedba
     }
   };
 
+  if (compact && !open) return <section className="royal-author-feedback"><button type="button" aria-expanded="false" aria-controls="match-feedback-panel" onClick={() => setOpen(true)}>给作者留言 <span aria-hidden="true">⌄</span></button></section>;
   if (!open) {
     return (
       <section className="finish-actions" aria-label="本局结束操作">
@@ -75,6 +77,7 @@ export function PostMatchFeedback({ outcome, mode, onContinue }: PostMatchFeedba
       aria-label="本局留言"
       data-feedback-state={status}
     >
+      {compact && <button type="button" className="feedback-collapse" aria-expanded="true" aria-controls="match-feedback-panel" onClick={() => setOpen(false)}>收起留言 ⌃</button>}
       {status === 'saved' ? (
         <p className="feedback-success" role="status">留言已保存，谢谢你！</p>
       ) : (
@@ -107,12 +110,12 @@ export function PostMatchFeedback({ outcome, mode, onContinue }: PostMatchFeedba
             onClick={submit}
           >{status === 'sending' ? '发送中…' : status === 'error' ? '重试提交' : '提交留言'}</button>
         )}
-        <button
+        {!compact && <button
           type="button"
           data-control-tip="new-match"
           className="feedback-continue"
           onClick={onContinue}
-        >再来一局</button>
+        >再来一局</button>}
       </div>
     </section>
   );

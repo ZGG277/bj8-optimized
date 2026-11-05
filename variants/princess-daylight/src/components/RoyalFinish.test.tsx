@@ -27,4 +27,19 @@ describe('royal match ending', () => {
     const html=renderToStaticMarkup(<TableStage viewLevel={1} spectatorActive={false} manualCameraActive={false} firstMatchGuideActive={false} match={createInitialMatchState()} trainingSummary={null} gameMode="practice" containerRef={null} onPointerDown={()=>{}} onPointerMove={()=>{}} onPointerUp={()=>{}} onPointerCancel={()=>{}} onResetGame={()=>{}} />);
     expect(html).not.toContain('royal-finish');expect(html).not.toContain('prince-white-horse');
   });
+  it('keeps the canonical card before factual highlights and never exposes an unsupported author form', () => {
+    const html = renderToStaticMarkup(<RoyalFinish winner="player" onRestart={()=>{}} highlights={{shots: 12, legalPots: 8, bestRun: 3, run: 1}}/>);
+    expect(html).toContain('合法进球'); expect(html).toContain('最高连进'); expect(html).toContain('本局出杆');
+    expect(html.indexOf('data-card-text')).toBeLessThan(html.indexOf('本局亮点'));
+    expect(html).not.toContain('<textarea');
+    expect(html).not.toContain('给作者留言');
+  });
+
+  it('keeps a terminal foul cause outside the unchanged comfort card', () => {
+    const html=renderToStaticMarkup(<RoyalFinish winner="opponent" messageKey="lose-8-foul" foulExplanation="公主白球落袋，本局结束。" onRestart={()=>{}}/>);
+    expect(html).toContain('没关系，我陪你');
+    expect(html).toContain('公主白球落袋，本局结束。');
+    expect(html).not.toContain('差一点');
+  });
+
 });

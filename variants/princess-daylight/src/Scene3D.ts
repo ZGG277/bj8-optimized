@@ -9,7 +9,7 @@ import { createCrystalLighting, updateCrystalCeilingVisibility } from './scene/c
 import { createImpactFeedback } from './scene/impact-feedback';
 /*
 [INPUT]: 依赖 physics 物理世界快照、pocket-render 共享袋口实体、相机方位与目标、textures/统一Canvas字体、scene Blender 视觉资产与 Three.js
-[OUTPUT]: 装配球桌与世界，影片末帧同位连续推进第一视角；统一字体、真实反馈、按需渲染与温控，几何/环境/天空纹理完整回收
+[OUTPUT]: 装配球桌与世界，影片末帧同位连续推进第一视角；蓄力球杆逐帧后拉及原位送杆、统一字体、真实反馈、按需渲染与温控，几何/环境/天空纹理完整回收
 [POS]: 渲染适配层，只消费世界快照；不得决定球局结果，不得改写物理世界
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -261,6 +261,7 @@ export class Scene3D {
     this.requestRender();
   }
   private cuePull = 0;
+  private targetCuePull = 0;
   private clock = new THREE.Clock();
   private lastSyncTime = 0;
   private syncDt = 1 / 60;
@@ -1908,8 +1909,7 @@ export class Scene3D {
       const showCue = cueActive && phase === 'aiming' && !this.lastWorld?.moving && !this.planActive;
       this.cueGroup.visible = showCue;
       if (showCue) {
-        const targetPull = power * 0.0032;
-        this.cuePull += (targetPull - this.cuePull) * 0.35;
+        this.targetCuePull = Math.max(0, Math.min(100, power)) * 0.0032;
         const gap = R + 0.025 + this.cuePull;
         // 加塞时球杆横向偏移（视觉对齐击球点）
         const side = -this.spin.y * R * 0.55;
@@ -1922,7 +1922,7 @@ export class Scene3D {
         );
         this.cueGroup.rotation.set(-0.1, -angle, 0, 'YXZ'); // yaw 取负：杆尾指向瞄准反向，理由见 triggerStrike
       } else {
-        this.cuePull = 0;
+        this.cuePull = this.targetCuePull = 0;
       }
     }
 
@@ -1939,7 +1939,7 @@ export class Scene3D {
       !filmWaiting && (this.camera.position.distanceToSquared(this.targetCameraPos) > 1e-8 ||
       this.smoothLookAt.distanceToSquared(this.targetLookAt) > 1e-8);
     return (this.openingElapsed !== null && !this.environmentOptions.openingFilm) || this.filmHandoffStartedAt !== null || cameraMoving || this.shotCameraReturn !== null || this.strikeAnim !== null ||
-      this.dropAnims.size > 0 || this.planPlayAnim !== null || Boolean(this.impactFeedback?.active);
+      (this.cueGroup.visible && Math.abs(this.targetCuePull - this.cuePull) > 0.0001) || this.dropAnims.size > 0 || this.planPlayAnim !== null || Boolean(this.impactFeedback?.active);
   }
 
   private requestRender(refreshShadows = false) {
@@ -1955,7 +1955,7 @@ export class Scene3D {
       }
       this.renderSlotMs = nowMs;
       this.render();
-      if (this.hasFrameWork()) this.requestRender(this.strikeAnim !== null || this.dropAnims.size > 0 || this.planPlayAnim !== null);
+      if (this.hasFrameWork()) this.requestRender(this.strikeAnim !== null || (this.cueGroup.visible && Math.abs(this.targetCuePull - this.cuePull) > 0.0001) || this.dropAnims.size > 0 || this.planPlayAnim !== null);
     });
   }
 
@@ -2115,6 +2115,18 @@ export class Scene3D {
       const lerpK = 1 - Math.pow(0.0001, dt);
       this.camera.position.lerp(this.targetCameraPos, Math.min(0.25, lerpK * 3));
       this.smoothLookAt.lerp(this.targetLookAt, Math.min(0.3, lerpK * 4));
+    }
+    // Continue pull-back between input events; release/strike retains the visible starting pose.
+    if (!this.strikeAnim && this.cueGroup.visible && this.phase === 'aiming') {
+      this.cuePull += (this.targetCuePull - this.cuePull) * (1 - Math.exp(-24 * dt));
+      if (Math.abs(this.targetCuePull - this.cuePull) < 0.0001) this.cuePull = this.targetCuePull;
+      const gap = R + 0.025 + this.cuePull;
+      const side = -this.spin.y * R * 0.55;
+      this.cueGroup.position.set(
+        this.lastCueX - Math.sin(this.aimAngle) * gap + Math.cos(this.aimAngle) * side,
+        R + 0.012 + this.spin.x * R * 0.25,
+        this.lastCueZ + Math.cos(this.aimAngle) * gap + Math.sin(this.aimAngle) * side,
+      );
     }
     this.camera.lookAt(this.smoothLookAt);
     // 按相机的实际高度显隐，而不是按先一步更新的目标视角显隐。
