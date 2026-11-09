@@ -1,37 +1,25 @@
 /** Favor the princess through shot choice, never by rewriting physics or a result. */
-import { confidenceAdjustedLevel, createOpponentProfile, levelLabel, levelToSigma, type GameMode, type OpponentProfile, type PlayerSkillProfile } from './model';
+import { confidenceAdjustedLevel, createOpponentProfile, levelLabel, levelToSigma, recordedAccuracy, type GameMode, type OpponentProfile, type PlayerSkillProfile } from './model';
 
-export const FRIENDLY_STYLE_DESCRIPTION = '按公主的准度和走位调整下一局。陪练会留机会，连让三杆后认真打一杆。';
+export const FRIENDLY_STYLE_DESCRIPTION = '按公主多局的准度和走位匹配实力。顺手的球认真打，难球偶尔留一杆机会。';
 const MAX_CONSECUTIVE_OPPORTUNITIES = 3;
 
 export function createFriendlyOpponentProfile(player: PlayerSkillProfile, mode: GameMode): OpponentProfile {
   const original = createOpponentProfile(player, mode);
-  const recent = player.recentResults ?? [];
-  // A loss relaxes the next match promptly; wins only ease this relief back gradually.
-  const relief = Math.min(10, recent.reduce((value, won) => Math.max(0, value + (won ? -1 : 3)), 0));
   const practice = mode === 'practice';
-  let accuracyAttempts = 0;
-  let accuracySuccesses = 0;
-  let routeAttempts = 0;
-  let routeSuccesses = 0;
-  for (const assessment of (player.recentAssessments ?? []).slice(-3)) {
-    accuracyAttempts += assessment.accuracyAttempts;
-    accuracySuccesses += assessment.accuracySuccesses;
-    routeAttempts += assessment.routeAttempts;
-    routeSuccesses += assessment.routeSuccesses;
-  }
-  // Keep the long-term skill as the anchor; limited evidence moves it only a little.
-  const accuracyForm = (accuracySuccesses - .5 * accuracyAttempts) / (accuracyAttempts + 4);
-  const routeForm = (routeSuccesses - .6 * routeAttempts) / (routeAttempts + 3);
-  const form = (accuracyForm * .72 + routeForm * .28) * 24;
-  const level = Math.max(0, Math.min(practice ? 58 : 72,
-    confidenceAdjustedLevel(player) + form - (practice ? 10 : 6) - relief));
-  const progress = Math.max(0, Math.min(1, (level - 15) / 36));
+  const accuracy = recordedAccuracy(player);
+  // Use lifetime evidence. These bounded adjustments complement the difficulty-adjusted level;
+  // a single rack carries little weight, and early-eight losses do not change the tier by themselves.
+  const precision = (accuracy.successes - .5 * accuracy.attempts) / (accuracy.attempts + 24);
+  const route = (player.positionSuccesses - .5 * player.positionAttempts) / (player.positionAttempts + 16);
+  const form = (precision * .72 + route * .28) * 8;
+  const level = Math.min(100, confidenceAdjustedLevel(player) + (practice ? 8 : 12) + form);
+  const progress = Math.max(0, Math.min(1, (level - 25) / 75));
   return {
     ...original,
     effectiveLevel: level, targetLevel: level, tierLevel: Math.round(level), label: levelLabel(level),
     aimSigma: levelToSigma(level),
-    aimWindowFraction: (practice ? 1.75 : 1.5) - .48 * progress,
+    aimWindowFraction: (practice ? 1.45 : 1.3) - .45 * progress,
     powerJitter: (practice ? .14 : .10) - .05 * progress,
     tactical: {
       ...original.tactical, allowSafety: false,
@@ -39,7 +27,7 @@ export function createFriendlyOpponentProfile(player: PlayerSkillProfile, mode: 
       simulationLimit: practice ? 15 : 18,
       followUpWeight: (practice ? .42 : .55) * progress,
       alternativeChance: (practice ? .45 : .3) - .2 * progress,
-      opportunityChance: Math.min(.82, (practice ? .62 : .46) - .28 * progress + relief * .015),
+      opportunityChance: (practice ? .48 : .34) - .22 * progress,
       deadlineMs: practice ? 750 : 1000,
     },
   };

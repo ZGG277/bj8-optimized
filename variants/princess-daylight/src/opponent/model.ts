@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
-[OUTPUT]: 玩家整局能力画像、近局准度与路线证据、训练总结、分级执行误差与安全持久化
+[OUTPUT]: 玩家整局能力画像、累计及近局准度与路线证据、训练总结、分级执行误差与安全持久化
 [POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；对局中档案锁定，只在整局结束时统一评估
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
@@ -51,10 +51,12 @@ export type PlayerSkillProfile = {
   matchesEvaluated: number;
   /** 最近一局结束时带来的可见分数变化。 */
   lastMatchDelta: number;
-  /** Last six completed results, used only for next-match friendliness. */
+  /** 仅用于记录最近六局胜负。匹配实力不依据胜负。 */
   recentResults?: boolean[];
   /** 本局证据按结束顺序保留最近六局，规划辅助样本折权。 */
   recentAssessments?: MatchSkillAssessment[];
+  /** 可核实的累计准度样本；旧档只用保留的逐局明细补算。 */
+  accuracyTotals?: { attempts: number; successes: number };
 };
 
 export type OpponentProfile = {
@@ -330,6 +332,13 @@ export function buildMatchTrainingSummary(
   };
 }
 
+export function recordedAccuracy(profile: PlayerSkillProfile): NonNullable<PlayerSkillProfile['accuracyTotals']> {
+  return profile.accuracyTotals ?? (profile.recentAssessments ?? []).reduce((total, rack) => ({
+    attempts: total.attempts + rack.accuracyAttempts,
+    successes: total.successes + rack.accuracySuccesses,
+  }), { attempts: 0, successes: 0 });
+}
+
 /** Completed match only: keep the skill estimate independent of who won. */
 export function assessCompletedMatch(profile: PlayerSkillProfile, observations: ShotSkillObservation[], won: boolean): PlayerSkillProfile {
   const next = applyMatchObservations(profile, observations);
@@ -348,8 +357,13 @@ export function assessCompletedMatch(profile: PlayerSkillProfile, observations: 
       if (shot.position === 'success') assessment.routeSuccesses += weight;
     }
   }
+  const prior = recordedAccuracy(profile);
   return {
     ...next, matchesEvaluated: profile.matchesEvaluated + 1,
+    accuracyTotals: {
+      attempts: prior.attempts + assessment.accuracyAttempts,
+      successes: prior.successes + assessment.accuracySuccesses,
+    },
     lastMatchDelta: observations.length ? next.lastMatchDelta : 0,
     recentResults: [...(profile.recentResults ?? []), won].slice(-RECENT_MATCH_LIMIT),
     recentAssessments: [...(profile.recentAssessments ?? []), assessment].slice(-RECENT_MATCH_LIMIT),
@@ -502,6 +516,12 @@ function parseProfile(value: unknown): PlayerSkillProfile | null {
           };
         }) : [],
   };
+  if (raw.accuracyTotals && typeof raw.accuracyTotals === 'object') {
+    const attempts = clamp(finite(raw.accuracyTotals.attempts, 0), 0, Number.MAX_SAFE_INTEGER);
+    parsed.accuracyTotals = {
+      attempts, successes: clamp(finite(raw.accuracyTotals.successes, 0), 0, attempts),
+    };
+  }
   return pendingObservations.length > 0
     ? applyMatchObservations(parsed, pendingObservations)
     : parsed;

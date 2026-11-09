@@ -129,6 +129,26 @@ function candidateEase(candidate: ShotCandidate): number {
   );
 }
 
+/** Protect clean, forgiving routes and short straight balls waiting at a pocket. */
+export function isObviousPot(candidate: Pick<ShotCandidate, 'cutAngle' | 'tolerance' | 'cueDistance' | 'pocketDistance'>): boolean {
+  const distance = candidate.cueDistance + candidate.pocketDistance;
+  return candidate.cutAngle <= .62 && distance <= 1.65 && candidate.tolerance >= .012
+    || candidate.cutAngle <= .38 && candidate.pocketDistance <= .28 && distance <= 1.45 && candidate.tolerance >= .006;
+}
+
+function comfortableLeave(end: BilliardsWorld, opponentLegal: number[], playerLegal: number[]): number {
+  const facts = factsFromWorld(end);
+  if (facts.cueScratch || facts.firstContact === null || !opponentLegal.includes(facts.firstContact) ||
+      !facts.cushionAfterFirstContact || facts.pocketed.length) return -Infinity;
+  const cue = getCueBall(end);
+  if (!cue?.active) return -Infinity;
+  const next = generateCandidates(end, playerLegal).filter(candidate =>
+    candidate.tolerance >= .009 && candidate.cutAngle <= .9 && candidate.cueDistance + candidate.pocketDistance <= 2.6);
+  const nearRail = Math.min(TABLE.width / 2 - Math.abs(cue.x), TABLE.length / 2 - Math.abs(cue.z));
+  const railPenalty = Math.max(0, .12 - nearRail) * 5;
+  return next.length ? Math.max(...next.map(candidateEase)) - railPenalty : -Infinity;
+}
+
 function nextLegalNumbers(
   initialWorld: BilliardsWorld,
   endWorld: BilliardsWorld,
@@ -219,59 +239,62 @@ export function* tacticalShotSteps(
   rng: () => number = Math.random,
 ): Generator<void, TacticalShotResult, void> {
   const simulationLimit = Math.max(1, Math.floor(config.simulationLimit));
-  const bases = generateCandidates(world, legal)
-    .sort((a, b) => candidateEase(b) - candidateEase(a))
-    .slice(0, Math.max(1, Math.floor(config.candidateLimit)));
+  const routes = generateCandidates(world, legal)
+    .sort((a, b) => Number(isObviousPot(b)) - Number(isObviousPot(a)) || candidateEase(b) - candidateEase(a));
+  const bases = routes.slice(0, Math.max(1, Math.floor(config.candidateLimit)));
   let simulations = 0;
   const verified: VerifiedShot[] = [];
 
-  // A friendly opportunity is an ordinary legal contact-and-cushion shot, never a
-  // scratch or early eight. It must leave the player a geometric potting line.
-  // One draw per turn; the caller can increase this chance while ahead or on a run.
-  const tryOpportunity = (config.opportunityChance ?? 0) > rng();
-  if (tryOpportunity && config.playerLegal?.length && getCueBall(world)?.active) {
-    const cue = getCueBall(world);
+  // On a difficult table, try a close miss around a real potting line first. Any
+  // deliberate miss must still be legal and leave a playable shot on the actual table.
+  const tryOpportunity = (config.opportunityChance ?? 0) > rng() && !routes.some(isObviousPot);
+  const cue = getCueBall(world);
+  if (tryOpportunity && config.playerLegal?.length && cue?.active) {
+    const playerLegal = config.playerLegal;
+    const opportunityLimit = Math.min(9, simulationLimit);
+    const probes: ShotCandidate[] = [];
+    for (const base of bases.slice(0, 1)) {
+      const missOffset = clamp(base.tolerance * 1.7, .009, .043);
+      for (const direction of [-1, 1]) {
+        probes.push(withVariant(base, SPIN_VARIANTS[0].spin, -3, direction * missOffset));
+      }
+    }
+
     const targets = world.balls.filter(ball => ball.active && legal.includes(ball.number))
-      .sort((a, b) => Math.hypot(a.x - cue!.x, a.z - cue!.z) - Math.hypot(b.x - cue!.x, b.z - cue!.z));
+      .sort((a, b) => Math.hypot(a.x - cue.x, a.z - cue.z) - Math.hypot(b.x - cue.x, b.z - cue.z));
+    for (const target of targets.slice(0, 2)) {
+      const cueDistance = Math.hypot(target.x - cue.x, target.z - cue.z);
+      for (const power of [32, 48, 62]) {
+        probes.push({
+          target: target.number, pocket: -1, angle: Math.atan2(target.x - cue.x, -(target.z - cue.z)),
+          power, spin: { x: 0, y: 0 }, tolerance: .012, cueDistance, pocketDistance: 0, cutAngle: 0,
+        });
+      }
+    }
+
     let opportunity: ShotCandidate | null = null;
     let bestEase = -Infinity;
-    if (cue?.active) for (const target of targets.slice(0, 2)) {
-      for (const power of [32, 48, 62]) {
-        if (simulations >= Math.min(9, simulationLimit)) break;
-        const angle = Math.atan2(target.x - cue.x, -(target.z - cue.z));
-        const candidate: ShotCandidate = { target: target.number, pocket: 0, angle, power,
-          spin: { x: 0, y: 0 }, friendlyOpportunity: true,
-          tolerance: Math.min(0.012, Math.asin(Math.min(1, TABLE.ballRadius * 2 / Math.hypot(target.x - cue.x, target.z - cue.z))) * 0.1),
-          cueDistance: Math.hypot(target.x - cue.x, target.z - cue.z), pocketDistance: 0, cutAngle: 0 };
-        const end = cloneWorld(world);
-        strikeCueBall(end, angle, power, candidate.spin);
-        simulateUntilStop(end); simulations += 1;
-        yield; // Let MiniTool paint/cancel before any robustness probe.
-        const facts = factsFromWorld(end);
-        if (!facts.cueScratch && facts.firstContact !== null && legal.includes(facts.firstContact)
-          && facts.cushionAfterFirstContact && facts.pocketed.length === 0) {
-          const next = generateCandidates(end, config.playerLegal).filter(next =>
-            next.tolerance >= 0.009 && next.cutAngle <= 0.9 && next.cueDistance + next.pocketDistance <= 2.6);
-          const ease = next.length ? Math.max(...next.map(candidateEase)) : -Infinity;
-          if (ease > bestEase) {
-            // Reject fragile give-backs at two small execution-boundary probes.
-            // These are planning probes, not retries of the actual stroke.
-            let robust = true;
-            for (const direction of [-1, 1]) {
-              if (simulations >= Math.min(9, simulationLimit)) { robust = false; break; }
-              const probe = cloneWorld(world);
-              strikeCueBall(probe, angle + direction * 0.0008, power * (1 + direction * 0.008), candidate.spin);
-              simulateUntilStop(probe); simulations += 1;
-              const pf = factsFromWorld(probe);
-              if (pf.cueScratch || pf.firstContact === null || !legal.includes(pf.firstContact) ||
-                !pf.cushionAfterFirstContact || pf.pocketed.length > 0 ||
-                !generateCandidates(probe, config.playerLegal).some(next => next.tolerance >= 0.009 &&
-                  next.cutAngle <= 0.9 && next.cueDistance + next.pocketDistance <= 2.6)) robust = false;
-              yield;
-            }
-            if (robust) { bestEase = ease; opportunity = candidate; }
-          }
-        }
+    for (const candidate of probes) {
+      if (simulations >= opportunityLimit) break;
+      const end = cloneWorld(world);
+      strikeCueBall(end, candidate.angle, candidate.power, candidate.spin);
+      simulateUntilStop(end); simulations++;
+      yield;
+      // Prefer a plausible attempted pot when it leaves an equally comfortable line.
+      const ease = comfortableLeave(end, legal, playerLegal) + (candidate.pocket >= 0 ? .3 : 0);
+      if (ease <= bestEase || simulations + 2 > opportunityLimit) continue;
+
+      let robust = true;
+      for (const direction of [-1, 1]) {
+        const probe = cloneWorld(world);
+        strikeCueBall(probe, candidate.angle + direction * .0008, candidate.power * (1 + direction * .008), candidate.spin);
+        simulateUntilStop(probe); simulations++;
+        if (comfortableLeave(probe, legal, playerLegal) === -Infinity) robust = false;
+        yield;
+      }
+      if (robust) {
+        bestEase = ease;
+        opportunity = { ...candidate, friendlyOpportunity: true };
       }
     }
     if (opportunity) return { shot: opportunity, simulations };
@@ -308,9 +331,10 @@ export function* tacticalShotSteps(
     }
   }
 
-  verified.sort((a, b) => b.score - a.score);
+  verified.sort((a, b) =>
+    Number(isObviousPot(b.candidate)) - Number(isObviousPot(a.candidate)) || b.score - a.score);
   const best = verified[0];
-  const alternative = verified.find(item => best &&
+  const alternative = verified.find(item => best && !isObviousPot(best.candidate) &&
     (item.candidate.target !== best.candidate.target || item.candidate.pocket !== best.candidate.pocket));
   const useAlternative = !!alternative && rng() < clamp(config.alternativeChance, 0, 1);
   return {

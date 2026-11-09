@@ -19,13 +19,13 @@ export function fixture(index = 0, clearPlayerChances = false) {
 describe('fixed friendly style', () => {
  it('caps skill, keeps finite errors and locks a profile without mutating player storage', () => {
   const player={...createPlayerSkillProfile(),level:100,confidence:1,totalPlayerShots:30}; const before=JSON.stringify(player);
-  expect(createFriendlyOpponentProfile(player,'practice').effectiveLevel).toBe(58);
-  expect(createFriendlyOpponentProfile(player,'challenge').effectiveLevel).toBe(72);
+  expect(createFriendlyOpponentProfile(player,'practice').effectiveLevel).toBe(100);
+  expect(createFriendlyOpponentProfile(player,'challenge').effectiveLevel).toBe(100);
   expect(JSON.stringify(player)).toBe(before);
   for(const mode of ['practice','challenge'] as const) {
    const p=createFriendlyOpponentProfile(player,mode);const rng=seeded(712);let misses=0;
    for(let i=0;i<1000;i++) if(Math.abs(sampleOpponentAimOffset(p.aimSigma,.004,rng,p.aimWindowFraction))>.004)misses++;
-   expect(misses).toBeGreaterThanOrEqual(10);expect(misses).toBeLessThan(700);
+   expect(misses).toBeLessThan(80);
   }
  });
  it('uses the same real physics for legal opportunities and leaves geometric player chances', () => {
@@ -80,6 +80,28 @@ describe('fixed friendly style', () => {
   expect(facts.firstContact).toBe(9);
   expect(facts.pocketed).toContain(9);
   expect(facts.cueScratch).toBe(false);
+ });
+ it('takes and converts a short straight pot even when offered a certain give-back', () => {
+  const world=createInitialWorld();
+  for(const b of world.balls){
+   b.active=[0,1,8,9].includes(b.number);
+   if(b.number===0){b.x=.2;b.z=0;}
+   if(b.number===1){b.x=-.48;b.z=-1.08;}
+   if(b.number===8){b.x=.1;b.z=-.95;}
+   if(b.number===9){b.x=.5;b.z=0;}
+  }
+  const p=createFriendlyOpponentProfile(createPlayerSkillProfile(),'practice');
+  const result=chooseTacticalShot(world,[9],{...p.tactical,opportunityChance:1,alternativeChance:1,playerLegal:[1]},()=>.25);
+  expect(result.shot).toMatchObject({target:9});
+  expect(result.shot?.friendlyOpportunity).toBeUndefined();
+  const rng=seeded(79);
+  for(let run=0;run<16;run++){
+   const execution=sampleOpponentExecution(result.shot!,p,rng);
+   const end=cloneWorld(world);
+   strikeCueBall(end,execution.angle,execution.power,result.shot!.spin);
+   simulateUntilStop(end);
+   expect(factsFromWorld(end)).toMatchObject({firstContact:9,pocketed:[9],cueScratch:false});
+  }
  });
  it('can legally finish the black ball instead of forcing a user win', () => {
   const world=createInitialWorld();for(const b of world.balls){b.active=b.number===0||b.number===8;if(b.number===0){b.x=.2;b.z=0;}if(b.number===8){b.x=.5;b.z=0;}}

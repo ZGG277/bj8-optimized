@@ -6,6 +6,7 @@
  */
 import type { FoulReason, MatchState, ShotFacts } from '../match/types';
 import type { CompanionDialogue } from './companion-dialogue';
+import { companionVoice } from './companion-voices';
 
 type RuleLines = { sceneId: string; lines: readonly string[] };
 
@@ -46,35 +47,52 @@ const opponentFouls: Record<FoulReason, RuleLines> = {
 };
 
 export function ruleLinesForShot(before: MatchState, facts: ShotFacts, next: MatchState): RuleLines | null {
+  const voice = companionVoice(before.companionId);
+  const speak = (fallback: RuleLines, fact: string, myTurn: boolean): RuleLines =>
+    voice ? { sceneId: fallback.sceneId, lines: [myTurn ? voice.take(fact) : voice.give(fact)] } : fallback;
+
   if (next.messageKey === 'group-assigned') {
-    const text = groupInstruction(next.playerGroup);
+    const group = next.playerGroup;
+    const text = voice && group
+      ? group === 'solid' ? voice.group('全色球', '1到7', '花色球') : voice.group('花色球', '9到15', '全色球')
+      : groupInstruction(group);
     return text ? { sceneId: 'GROUP_ASSIGNED', lines: [text] } : null;
   }
   if (next.messageKey === 'foul') {
     const reason = next.messageParams.reason;
     if (!reason) return null;
-    if (before.actor === 'opponent') return opponentFouls[reason];
+    if (before.actor === 'opponent') {
+      const fact = reason === 'scratch' ? '我把白球打进袋' : `我这杆${turnFoulFacts[reason]}`;
+      const result = speak(opponentFouls[reason], fact, false);
+      return voice ? { ...result, lines: result.lines.map(line => `${line} 白球由你摆。`) } : result;
+    }
     if (reason === 'wrong-first') {
       const hit = facts.firstContact;
       const hitGroup = hit !== null && hit >= 1 && hit <= 7 ? 'solid'
         : hit !== null && hit >= 9 && hit <= 15 ? 'stripe' : null;
       if (before.playerGroup && hitGroup && hitGroup !== before.playerGroup) {
-        return { sceneId: 'P_WRONG_FIRST', lines: [
+        return speak({ sceneId: 'P_WRONG_FIRST', lines: [
           '公主先碰到我的球啦，该我打咯。',
           '公主这杆先碰了我的球，换我来啦。',
-        ] };
+        ] }, '公主先碰到我的球', true);
       }
-      if (hit === 8) return { sceneId: 'P_WRONG_FIRST', lines: ['公主先碰黑八啦，这杆换我咯。'] };
+      if (hit === 8) return speak({ sceneId: 'P_WRONG_FIRST', lines: ['公主先碰黑八啦，这杆换我咯。'] }, '公主先碰黑八', true);
     }
-    return playerFouls[reason];
+    return speak(playerFouls[reason], reason === 'scratch' ? '公主的白球进袋' : `公主这杆${turnFoulFacts[reason]}`, true);
   }
   if (next.messageKey === 'opponent-pot-turn') {
     return before.actor === 'player'
-      ? { sceneId: 'P_OPPONENT_ONLY', lines: ['公主帮我把球送进袋了，这杆轮到我啦。', '我的球先下班了，该我打咯。'] }
-      : { sceneId: 'N_PLAYER_ONLY', lines: ['我把公主的球带进袋啦，换你打。', '这杆进的是公主的球，到你啦。'] };
+      ? speak({ sceneId: 'P_OPPONENT_ONLY', lines: ['公主帮我把球送进袋了，这杆轮到我啦。', '我的球先下班了，该我打咯。'] }, '公主把我的球打进袋', true)
+      : speak({ sceneId: 'N_PLAYER_ONLY', lines: ['我把公主的球带进袋啦，换你打。', '这杆进的是公主的球，到你啦。'] }, '我把公主的球带进袋', false);
   }
   return null;
 }
+
+const turnFoulFacts: Record<Exclude<FoulReason, 'scratch'>, string> = {
+  'no-contact': '没碰到球',
+  'wrong-first': '先碰错球',
+  'no-cushion': '碰球后没进球也没碰库',
+};
 
 const foulDetails: Record<FoulReason, string> = {
   scratch: '白球也进袋了',
@@ -95,7 +113,7 @@ export function earlyEightAnnouncement(match: MatchState): CompanionDialogue | n
     id: -1,
     sceneId: 'EARLY_EIGHT_FINISH',
     companionId: match.companionId,
-    text: `${shooter}提前打进黑八啦，这局就结束了。咱们再来一局。`,
+    text: companionVoice(match.companionId)?.early(shooter) ?? `${shooter}提前打进黑八啦，这局就结束了。咱们再来一局。`,
   };
 }
 
@@ -128,11 +146,12 @@ export function companionInstruction({ match, prioritySpeech, guide, view, eight
     return line('PLACE_CORRECTION', '公主，白球放回开球区就好。');
   }
   if (prioritySpeech) return prioritySpeech;
+  const voice = companionVoice(match.companionId);
   if (guide) return line('CONTROL_GUIDE', guide);
   if (view) return line('VIEW_GUIDE', view);
-  if (match.phase === 'placing') return line('FREE_BALL', '公主，拖着光圈，挑个位置放白球。');
+  if (match.phase === 'placing') return line('FREE_BALL', voice?.placement ?? '公主，拖着光圈，挑个位置放白球。');
   if (eightReady && match.actor === 'player' && match.phase === 'aiming') {
-    return line('EIGHT_READY', '公主清完啦，下一杆打黑八。');
+    return line('EIGHT_READY', voice?.eight ?? '公主清完啦，下一杆打黑八。');
   }
   return null;
 }

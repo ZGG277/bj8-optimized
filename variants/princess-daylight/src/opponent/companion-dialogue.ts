@@ -7,6 +7,7 @@
 import type { MatchState, RoundResolution, ShotFacts } from '../match/types';
 import { DIALOGUE_SCENES, DIALOGUE_SETTINGS as settings, SHOT_PROGRESS_LINES } from './companion-dialogue-bank';
 import { settledShot, type SettledShot } from '../match/shot-log';
+import { companionVoice, voicedProgress } from './companion-voices';
 import { companionMomentLine } from './companion-moments';
 import { ruleLinesForShot } from './companion-instructions';
 import { POCKETS, TABLE, type BilliardsWorld, type PhysicsEvent } from '../physics';
@@ -68,7 +69,10 @@ export function createCompanionDialogue(random: () => number = Math.random) {
     const limit = settings.semantic_limits[scene.semantic_group as keyof typeof settings.semantic_limits];
     if ((scenes.get(scene.id) ?? 0) >= scene.max_per_rack || (groups.get(scene.semantic_group) ?? 0) >= limit) return null;
     if (!opening && (now - lastAt < settings.cooldown_ms || shotLog.size - lastShot < settings.min_shot_gap)) return null;
-    const lines = scene.lines.filter(line => !spoken.has(line.text));
+    const custom = companionVoice(companionId)?.scenes[scene.id];
+    const authored = typeof custom === 'string' ? [custom] : custom;
+    const lines = (authored?.map(text => ({ text, weight: 1 })) ?? scene.lines)
+      .filter(line => !spoken.has(line.text));
     if (!lines.length || roll() >= scene.probability) return null;
     const weights = lines.map(line => line.weight * (recent.some(rack => rack.includes(line.text)) ? settings.recent_line_weight_multiplier : 1));
     let position = roll() * weights.reduce((sum, weight) => sum + weight, 0), index = 0;
@@ -79,10 +83,11 @@ export function createCompanionDialogue(random: () => number = Math.random) {
   }
 
   function progress(id: ProgressId, companionId: string | undefined, now: number, toBlackEight = false): CompanionDialogue | null {
-    const available = SHOT_PROGRESS_LINES[id].filter(text => !spoken.has(text));
+    const available = (voicedProgress(companionVoice(companionId), id) ?? SHOT_PROGRESS_LINES[id])
+      .map(text => toBlackEight ? `${text} 下一杆打黑八。` : text)
+      .filter(text => !spoken.has(text));
     if (!available.length || (!id.endsWith('_LATER') && scenes.has(id))) return null;
-    const line = available[Math.floor(roll() * available.length)];
-    const text = toBlackEight ? `${line} 下一杆打黑八。` : line;
+    const text = available[Math.floor(roll() * available.length)];
     const choice = { id: ++token, text, sceneId: id, companionId, kind: 'progress' as const };
     pending = { choice, group: null, shot: shotLog.size, at: now, opening: false };
     return choice;
@@ -189,7 +194,7 @@ export function createCompanionDialogue(random: () => number = Math.random) {
     if (ended || thinkingDone || pending || now - lastAt < settings.cooldown_ms || shotLog.size - lastShot < settings.min_shot_gap
       || ordinaryCount >= settings.max_lines_per_rack - settings.reserve_terminal) return null;
     thinkingDone = true;
-    const choice = { id: ++token, text: companionMomentLine(companionId, 'thinking'), sceneId: 'THINKING', companionId };
+    const choice = { id: ++token, text: companionVoice(companionId)?.thinking ?? companionMomentLine(companionId, 'thinking'), sceneId: 'THINKING', companionId };
     pending = { choice, group: 'opponent_waiting', at: now, shot: shotLog.size, opening: false };
     return choice;
   }

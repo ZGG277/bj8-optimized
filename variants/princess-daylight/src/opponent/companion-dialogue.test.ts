@@ -6,6 +6,7 @@
 */
 import { describe, expect, it, vi } from 'vitest';
 import { createCompanionDialogue } from './companion-dialogue';
+import { COMPANIONS } from './companions';
 import { DIALOGUE_SCENES } from './companion-dialogue-bank';
 import { beginMatch, createInitialMatchState, resolveStoppedShot } from '../match/match-machine';
 import type { MatchState, ShotFacts } from '../match/types';
@@ -24,6 +25,23 @@ describe('facts-first companion dialogue', () => {
     expect(new Set(lines).size).toBe(60);
     expect(lines.every(text => Array.from(text).length <= 10)).toBe(true);
     expect(DIALOGUE_SCENES.some(s => s.id.includes('BANK') || s.id.includes('NEAR_MISS'))).toBe(false);
+  });
+  it('keeps ten distinct voices across the real opening, score, foul, and group paths', () => {
+    const choices = COMPANIONS.map(({ id }) => {
+      const director = createCompanionDialogue(() => 0);
+      const opening = director.ready(id, 1000);
+      if (opening) director.shown(opening.id, 1000);
+      const scored = shot(director, 1, {}, { companionId: id });
+      const foul = shot(director, 2, { pocketed: [0], cueScratch: true }, { companionId: id });
+      const group = shot(director, 3, {}, { companionId: id, playerGroup: null });
+      expect(scored).toMatchObject({ sceneId: 'P_FIRST_POT', companionId: id });
+      expect(foul).toMatchObject({ sceneId: 'P_SCRATCH', companionId: id, text: expect.stringContaining('白球进袋') });
+      expect(group).toMatchObject({ sceneId: 'GROUP_ASSIGNED', companionId: id, text: expect.stringContaining('1到7号') });
+      return [opening?.text, scored?.text, foul?.text, group?.text];
+    });
+    for (let scene = 0; scene < 4; scene++) {
+      expect(new Set(choices.map(lines => lines[scene])).size).toBe(10);
+    }
   });
   it.each([
     ['scratch', { cueScratch: true, pocketed: [0, 1] }, 'P_SCRATCH'],

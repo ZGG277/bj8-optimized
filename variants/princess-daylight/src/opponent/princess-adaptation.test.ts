@@ -17,38 +17,55 @@ describe('princess-favored adaptation',()=>{
   expect(win.recentAssessments).toEqual([{accuracyAttempts:1,accuracySuccesses:1,routeAttempts:1,routeSuccesses:1}]);
   expect(start.totalPlayerShots).toBe(0);
  });
- it('relaxes after losses, remains below the player and disables defensive play at every level',()=>{
+ it('locks in stronger opposition without making a loss an input to skill',()=>{
   for(const mode of ['practice','challenge'] as const)for(const level of [0,25,50,75,100]){
    const p={...createPlayerSkillProfile(),level,executionLevel:level,confidence:1,totalPlayerShots:30};
    const normal=createFriendlyOpponentProfile(p,mode);
-   const relieved=createFriendlyOpponentProfile({...p,recentResults:[false,false]},mode);
-   expect(normal.effectiveLevel).toBeLessThanOrEqual(level);
-   expect(relieved.effectiveLevel).toBeLessThanOrEqual(normal.effectiveLevel);
-   expect(relieved.tactical.opportunityChance!).toBeGreaterThan(normal.tactical.opportunityChance!);
+   expect(normal.effectiveLevel).toBe(Math.min(100,level+(mode==='practice'?8:12)));
+   expect(createFriendlyOpponentProfile({...p,recentResults:[false,false]},mode)).toEqual(normal);
    expect(normal.tactical.allowSafety).toBe(false);
    const turn=friendlyTurnTactics(normal,5,1,2,0);
    expect(turn.opportunityChance).toBeGreaterThan(normal.tactical.opportunityChance!);
-   expect(turn.opportunityChance).toBeLessThan(1);expect(turn.allowSafety).toBe(false);
-   expect(normal.tactical.opportunityChance).not.toBe(turn.opportunityChance);
+   expect(turn.opportunityChance).toBeLessThan(1);
   }
  });
- it('uses both recent dimensions even when the outcome and long-term level match',()=>{
+ it('responds to sustained precision and route planning and resists a single bad rack',()=>{
   const player={...createPlayerSkillProfile(),level:40,confidence:.6};
-  const assessment={accuracyAttempts:6,accuracySuccesses:3,routeAttempts:5,routeSuccesses:3};
-  const profile=(accuracySuccesses:number,routeSuccesses:number)=>createFriendlyOpponentProfile({
-   ...player,recentAssessments:[{...assessment,accuracySuccesses,routeSuccesses}],recentResults:[true],
+  const profile=(successes:number,positionSuccesses:number)=>createFriendlyOpponentProfile({
+   ...player,accuracyTotals:{attempts:80,successes},positionAttempts:40,positionSuccesses,
   },'practice');
-  const baseline=profile(3,3), precise=profile(6,3), planned=profile(3,5);
+  const baseline=profile(40,20), precise=profile(60,20), planned=profile(40,32);
   for(const improved of [precise,planned]){
    expect(improved.effectiveLevel).toBeGreaterThan(baseline.effectiveLevel);
    expect(improved.tactical.opportunityChance!).toBeLessThan(baseline.tactical.opportunityChance!);
    expect(improved.tactical.followUpWeight).toBeGreaterThan(baseline.tactical.followUpWeight);
   }
-  const start=createFriendlyOpponentProfile(createPlayerSkillProfile(),'practice');
-  const result=assessCompletedMatch(createPlayerSkillProfile(),Array.from({length:6},()=>({
-   tolerance:.009,pocketed:true,foul:false,position:'success' as const,assisted:false,
-  })),true);
-  expect(createFriendlyOpponentProfile(result,'practice').effectiveLevel).toBeGreaterThan(start.effectiveLevel+4);
+
+  const hits=Array.from({length:8},()=>({tolerance:.009,pocketed:true,foul:false,position:'success' as const,assisted:false}));
+  const misses=hits.map(shot=>({...shot,pocketed:false,position:'unknown' as const}));
+  let history=createPlayerSkillProfile();
+  for(let rack=0;rack<12;rack++)history=assessCompletedMatch(history,hits,true);
+  const cold=createFriendlyOpponentProfile(createPlayerSkillProfile(),'practice');
+  const established=createFriendlyOpponentProfile(history,'practice');
+  expect(established.effectiveLevel).toBeGreaterThan(cold.effectiveLevel+5);
+  expect(history.accuracyTotals).toEqual({attempts:96,successes:96});
+  expect(history.positionAttempts).toBe(96);
+  const offDay=assessCompletedMatch(history,misses,false);
+  const next=createFriendlyOpponentProfile(offDay,'practice');
+  expect(Math.abs(next.effectiveLevel-established.effectiveLevel)).toBeLessThan(2);
+  expect(offDay.accuracyTotals).toEqual({attempts:104,successes:96});
+ });
+ it('seeds the lifetime total from only the verified racks in an older save',()=>{
+  const old={...createPlayerSkillProfile(),qualifiedShots:90,positionAttempts:30,positionSuccesses:19,
+   recentAssessments:[{accuracyAttempts:7,accuracySuccesses:3,routeAttempts:4,routeSuccesses:2}]};
+  const storage={getItem:()=>JSON.stringify(old)};
+  const next=assessCompletedMatch(loadPlayerSkillProfile(storage),[
+   {tolerance:.009,pocketed:true,foul:false,position:'success',assisted:false},
+  ],true);
+  expect(next.accuracyTotals).toEqual({attempts:8,successes:4});
+  expect(next.qualifiedShots).toBe(91);
+  expect(next.positionAttempts).toBe(31);
+  expect(next.positionSuccesses).toBe(20);
  });
  it('requires a normal shot after three deliberate give-backs even while ahead',()=>{
   const profile=createFriendlyOpponentProfile(createPlayerSkillProfile(),'practice');
