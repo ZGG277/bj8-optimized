@@ -1,6 +1,12 @@
-/* 小工具原生能力边界：只由用户点击调用，不依赖外部 SDK 或网络。 */
+/*
+[INPUT]: 用户主动分享的整图首图、原卡与真实胜局对手名单
+[OUTPUT]: 固定胜局标题、真实已赢姓名及带 #话题名[话题]# 的笔记正文；取消/失败可重试
+[POS]: 小工具原生能力边界，只唤起笔记编辑页，不自动发布笔记或修改战绩
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
 import { paintVictoryCard } from './victory-art';
 import type { GameMode } from '../opponent/model';
+import { COMPANIONS } from '../opponent/companions';
 
 export type NoteDraft = {
   title: string;
@@ -18,19 +24,24 @@ export function miniToolApi(): MiniToolApi | undefined {
   return typeof api?.postNote === 'function' ? api : undefined;
 }
 
-export function victoryNote(image: string, mode: GameMode, opponentName = '对手', sceneImage?: string, won = true): NoteDraft {
+export function victoryNote(image: string, mode: GameMode, opponentName = '对手', extraImage?: string, won = true, defeatedNames: readonly string[] = []): NoteDraft {
   if (!/^data:image\/(png|jpeg);base64,/.test(image)) throw new Error('战绩卡生成失败，请重试。');
-  if (sceneImage !== undefined && !/^data:image\/(png|jpeg);base64,/.test(sceneImage)) throw new Error('城堡图片生成失败，请重试。');
+  if (extraImage !== undefined && !/^data:image\/(png|jpeg);base64,/.test(extraImage)) throw new Error('分享图片生成失败，请重试。');
+  const names = [...new Set([...defeatedNames, opponentName])].filter(name => COMPANIONS.some(c => c.name === name));
+  const wins = names.length ? `本公主已经赢过${names.join('、')}啦！👑🎱` : '本公主又赢下一局啦！👑🎱';
+  const topics = ['小红书小工具', '公主请开球', '台球'];
+  if (won) topics.push(mode === 'challenge' ? '挑战模式' : '陪练模式');
+  const topicLine = topics.map(topic => `#${topic}[话题]#`).join(' ');
   return {
-    title: won ? '这一局，我赢了！' : '公主的赞美卡',
-    content: won ? `在公主请开球${mode === 'challenge' ? '挑战' : '陪练'}模式赢下${opponentName}。\n从瞄准到落袋，认真打好每一杆。\n#小红书小工具 #公主请开球 #台球` : `在公主请开球和${opponentName}打了一局。\n#小红书小工具 #公主请开球 #台球`,
-    mediaInfo: { image_resources: [image, ...(sceneImage ? [sceneImage] : [])].map(url => ({ url })) },
+    title: won ? '这一局公主又赢了' : '公主的赞美卡',
+    content: won ? `${wins}\n公主宝宝好棒啊💕💕✨\n${topicLine}` : `在公主请开球和${opponentName}打了一局。\n${topicLine}`,
+    mediaInfo: { image_resources: [image, ...(extraImage ? [extraImage] : [])].map(url => ({ url })) },
   };
 }
 
 /** Prefer the documented temporary-file bridge for larger generated cards. */
-export async function postVictoryNote(api: MiniToolApi, image: string, mode: GameMode, opponentName = '对手', sceneImage?: string, won = true) {
-  const draft = victoryNote(image, mode, opponentName, sceneImage, won);
+export async function postVictoryNote(api: MiniToolApi, image: string, mode: GameMode, opponentName = '对手', extraImage?: string, won = true, defeatedNames: readonly string[] = []) {
+  const draft = victoryNote(image, mode, opponentName, extraImage, won, defeatedNames);
   if (typeof api.writeTempFile === 'function') {
     for (const resource of draft.mediaInfo.image_resources) {
       const { filePath } = await api.writeTempFile({ data: resource.url });

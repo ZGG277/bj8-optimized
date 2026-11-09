@@ -45,6 +45,7 @@ export type MatchMessageParams = {
   count?: number;
   group?: ObjectGroup;
   reason?: FoulReason;
+  earlyEight?: true;
   target?: number;
 };
 

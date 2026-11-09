@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 正常/热档预算；现有米制桌帮 UV，不读取外部素材。
- * [OUTPUT]: 可释放的暖象牙色图、R微起伏/G粗糙度合图与单层不透明材质。
- * [POS]: 开场末帧校色的奶油象牙工艺；固定种子周期骨纹，无裂纹、污渍、虹彩或透射。
+ * [OUTPUT]: 可释放的象牙白色图、R微起伏/G粗糙度合图与单层不透明哑光材质。
+ * [POS]: 球桌象牙工艺；固定种子周期骨纹，无裂纹、污渍、虹彩或透射。
  * [PROTOCOL]: 变更时更新此头部，然后检查 scene/CLAUDE.md。
  */
 import * as THREE from 'three';
@@ -36,8 +36,8 @@ export function createWarmIvoryMaps(hot=false): WarmIvoryMaps {
     const pore=grainNoise(u,v,172,154,131);
     const tone=cloud*2.6+fibre*1.6+cross*.7+pore*.32;
     const i=(y*size+x)*4;
-    // Warm cream remains a clean solid even in shadow; no dark aged veins.
-    color.set([221+tone,203+tone*.94,166+tone*.8,255],i);
+    // A pale bone tone stays distinct from warm stone and the lake.
+    color.set([245+tone,239+tone*.94,224+tone*.8,255],i);
     detail.set([128+fibre*16+cross*7+pore*10,218+cloud*7-fibre*8+pore*5,0,255],i);
   }
   const texture=(bytes:Uint8Array,name:string,srgb:boolean)=>{
@@ -49,22 +49,21 @@ export function createWarmIvoryMaps(hot=false): WarmIvoryMaps {
     return t;
   };
   return {color:texture(color,'Warm ivory | clean bone colour',true),
-    detail:texture(detail,'Warm ivory | microrelief and polish',false)};
+    detail:texture(detail,'Warm ivory | microrelief and matte roughness',false)};
 }
 
-/** The low clearcoat is a rubbed finish, not a resin shell; roughness map G
- * keeps the main reflection around .41, while 55 µm bump adds only fine relief. */
+/** The roughness map spreads highlights softly, and 55 µm bump preserves the fine grain. */
 export function warmIvoryMaterial(hot=false,maps=createWarmIvoryMaps(hot),support=false) {
   const material=new THREE.MeshPhysicalMaterial({
     name:support?'Warm ivory | continuous support':'Warm ivory | upper rails',
-    color:support?0xf3ead8:0xffffff,map:maps.color,
+    color:support?0xf9f3e8:0xffffff,map:maps.color,
     bumpMap:maps.detail,bumpScale:hot?.00004:.000055,
-    roughnessMap:maps.detail,roughness:support?.59:.48,metalness:0,
-    clearcoat:support?.02:.045,clearcoatRoughness:.44,
-    ior:1.49,specularIntensity:.38,envMapIntensity:.52,
+    roughnessMap:maps.detail,roughness:support?.9:.84,metalness:0,
+    clearcoat:0,
+    ior:1.49,specularIntensity:.23,envMapIntensity:.4,
     transmission:0,thickness:0,iridescence:0,
     transparent:false,opacity:1,side:THREE.FrontSide,depthWrite:true,
   });
-  material.userData.ivoryFinish='opening-cream-ivory-20261104';
+  material.userData.ivoryFinish='matte-white-ivory-20261108';
   return material;
 }

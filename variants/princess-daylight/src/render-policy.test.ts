@@ -16,7 +16,7 @@ describe('minitool clarity within the existing pixel budget', () => {
         expect(budget.pixelRatio).toBe(2);
         expect(budget.movingPresentationFps).toBe(30);
         expect(cappedPixelRatio(width, height, budget.pixelRatio, false)).toBe(2);
-        expect(adaptiveRenderQualityFor(budget, 'warm').pixelRatio).toBe(1.5);
+        expect(adaptiveRenderQualityFor(budget, 'warm')).toMatchObject({ pixelRatio: 2, movingPresentationFps: 24 });
         expect(adaptiveRenderQualityFor(budget, 'hot').pixelRatio).toBe(1);
       }
     } finally { vi.unstubAllEnvs(); }
@@ -76,7 +76,7 @@ describe('renderBudgetFor', () => {
     });
   });
 
-  it('高压时逐级降低像素、阴影、帧率与毛玻璃合成', () => {
+  it('桌面先降阴影和帧率，持续高压才降低像素比', () => {
     const budget = renderBudgetFor({
       width: 1440,
       height: 900,
@@ -91,7 +91,7 @@ describe('renderBudgetFor', () => {
       backdropBlur: true,
     });
     expect(adaptiveRenderQualityFor(budget, 'warm')).toMatchObject({
-      pixelRatio: 1.25,
+      pixelRatio: 1.75,
       shadowMapSize: 1024,
       movingPresentationFps: 24,
       backdropBlur: false,
@@ -117,7 +117,7 @@ describe('renderBudgetFor', () => {
       movingPresentationFps: 45,
     });
     expect(adaptiveRenderQualityFor(budget, 'warm')).toMatchObject({
-      pixelRatio: 1.5,
+      pixelRatio: 2,
       movingPresentationFps: 30,
     });
     expect(adaptiveRenderQualityFor(budget, 'hot')).toMatchObject({

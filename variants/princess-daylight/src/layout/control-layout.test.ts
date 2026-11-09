@@ -149,12 +149,25 @@ describe('control layout persistence', () => {
 
 
 describe('floating control defaults and saved layouts', () => {
-  it('docks the aim dial at the bottom when no legacy storage exists', () => {
+  it('docks the aim dial at the bottom in each default profile', () => {
     const defaults = createDefaultControlLayouts();
     expect(loadControlLayouts({ getItem: () => null })).toEqual(defaults);
     for (const layout of Object.values(defaults.layouts)) {
       expect(layout.aimDial).toEqual({ mode: 'docked', edge: 'bottom', order: 0, position: 0.5 });
     }
+  });
+
+  it('restores the previous right-side wheel to center and preserves customized positions', () => {
+    const old = createDefaultControlLayouts();
+    old.layouts.portrait.aimDial = { mode: 'docked', edge: 'right', order: 8, position: .68 };
+    const load = () => loadControlLayouts({ getItem: key => key === CONTROL_LAYOUT_STORAGE_KEY ? JSON.stringify(old) : null });
+    expect(load()).toEqual(createDefaultControlLayouts());
+    const previousHelp = old.layouts.portrait.help;
+    if (previousHelp.mode === 'docked') previousHelp.position = .127;
+    expect(load()).toEqual(createDefaultControlLayouts());
+    old.layouts.portrait.help = { mode: 'free', x: .5, y: .15 };
+    old.layouts.portrait.aimDial = { mode: 'docked', edge: 'right', order: 6, position: .72 };
+    expect(load()).toEqual(old);
   });
 
   it('only updates an entirely untouched legacy default profile', () => {
@@ -172,11 +185,10 @@ describe('floating control defaults and saved layouts', () => {
 });
 
 describe('mobile utility rail compatibility', () => {
-  it('places every new utility on the right in portrait and landscape, without changing the bottom aim dial', () => {
+  it('places every new utility on the right in portrait and landscape', () => {
     const d=createDefaultControlLayouts();
     for(const profile of ['portrait','landscape'] as const) {
       for(const id of UTILITY_DOCK_IDS) expect(d.layouts[profile][id]).toMatchObject({mode:'docked',edge:'right'});
-      expect(d.layouts[profile].aimDial).toMatchObject({mode:'docked',edge:'bottom'});
     }
     expect(d.layouts.desktop.view).toMatchObject({position:.04});
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFriendlyOpponentProfile } from './friendly-style';
+import { createFriendlyOpponentProfile, friendlyTurnTactics } from './friendly-style';
 import { createPlayerSkillProfile, sampleOpponentAimOffset } from './model';
 import { sampleOpponentExecution } from './execution';
 import { chooseTacticalShot, planClearContactFallback } from './tactical-shot';
@@ -19,12 +19,12 @@ export function fixture(index = 0, clearPlayerChances = false) {
 describe('fixed friendly style', () => {
  it('caps skill, keeps finite errors and locks a profile without mutating player storage', () => {
   const player={...createPlayerSkillProfile(),level:100,confidence:1,totalPlayerShots:30}; const before=JSON.stringify(player);
-  expect(createFriendlyOpponentProfile(player,'practice').effectiveLevel).toBe(48);
-  expect(createFriendlyOpponentProfile(player,'challenge').effectiveLevel).toBe(62);
+  expect(createFriendlyOpponentProfile(player,'practice').effectiveLevel).toBe(58);
+  expect(createFriendlyOpponentProfile(player,'challenge').effectiveLevel).toBe(72);
   expect(JSON.stringify(player)).toBe(before);
   for(const mode of ['practice','challenge'] as const) {
    const p=createFriendlyOpponentProfile(player,mode);const rng=seeded(712);let misses=0;
-   for(let i=0;i<1000;i++) if(Math.abs(sampleOpponentAimOffset(p.aimSigma,.01,rng,p.aimWindowFraction))>.01)misses++;
+   for(let i=0;i<1000;i++) if(Math.abs(sampleOpponentAimOffset(p.aimSigma,.004,rng,p.aimWindowFraction))>.004)misses++;
    expect(misses).toBeGreaterThanOrEqual(10);expect(misses).toBeLessThan(700);
   }
  });
@@ -58,6 +58,28 @@ describe('fixed friendly style', () => {
   const w=fixture();for(const b of w.balls){b.active=[0,1,9,10].includes(b.number);if(b.number===0){b.x=0;b.z=.7;}if(b.number===1){b.x=0;b.z=.25;}if(b.number===9){b.x=0;b.z=-.3;}if(b.number===10){b.x=.4;b.z=.5;}}
   expect(planClearContactFallback(w,[9,10])?.target).toBe(10);
   expect(planClearContactFallback(w,[9])).toBeNull();
+ });
+ it('plays a real attack after the third consecutive give-back', () => {
+  const world=createInitialWorld();
+  for(const b of world.balls){
+   b.active=[0,1,8,9].includes(b.number);
+   if(b.number===0){b.x=.2;b.z=0;}
+   if(b.number===1){b.x=-.48;b.z=-1.08;}
+   if(b.number===8){b.x=.1;b.z=-.95;}
+   if(b.number===9){b.x=.5;b.z=0;}
+  }
+  const profile=createFriendlyOpponentProfile(createPlayerSkillProfile(),'practice');
+  const forced=friendlyTurnTactics(profile,5,1,2,3);
+  const result=chooseTacticalShot(world,[9],{...forced,playerLegal:[1]},()=>.25);
+  expect(result.shot).not.toBeNull();
+  expect(result.shot?.friendlyOpportunity).toBeFalsy();
+  const end=cloneWorld(world);
+  strikeCueBall(end,result.shot!.angle,result.shot!.power,result.shot!.spin);
+  simulateUntilStop(end);
+  const facts=factsFromWorld(end);
+  expect(facts.firstContact).toBe(9);
+  expect(facts.pocketed).toContain(9);
+  expect(facts.cueScratch).toBe(false);
  });
  it('can legally finish the black ball instead of forcing a user win', () => {
   const world=createInitialWorld();for(const b of world.balls){b.active=b.number===0||b.number===8;if(b.number===0){b.x=.2;b.z=0;}if(b.number===8){b.x=.5;b.z=0;}}

@@ -147,6 +147,25 @@ function parseProfile(
     return id === 'aimDial' ? item.mode === 'docked' && item.edge === 'bottom' && item.position === .5
       : item.mode === 'docked' && item.edge === 'right' && item.order === order && item.position === previous[order];
   });
+  const oldDial = result.aimDial;
+  if (profile === 'portrait' && oldDial.mode === 'docked' && oldDial.edge === 'right' &&
+      oldDial.order === 8 && oldDial.position === .68) {
+    result.aimDial = fallback.aimDial;
+  }
+  const dial = result.aimDial;
+  if (profile === 'portrait' && dial.mode === 'docked' && dial.edge === 'bottom' &&
+      dial.order === 0 && dial.position === .5 &&
+      IDS.every(id => {
+        if (id === 'aimDial') return true;
+        const saved = result[id];
+        const initial = fallback[id];
+        return saved.mode === 'docked' && initial.mode === 'docked' &&
+          saved.edge === initial.edge && saved.order === initial.order &&
+          (id !== 'scene' && id !== 'power' || saved.position === initial.position);
+      })) {
+    // The old collision pass saved viewport-specific positions without changing their dock order.
+    return fallback;
+  }
   return UTILITY_DOCK_IDS.some(id => !raw[id]) && (untouched || previousDefault) ? fallback : result;
 }
 
@@ -295,8 +314,9 @@ export function dockItemLength(
   viewportWidth: number,
   viewportHeight: number,
 ): number {
-  const mobile = resolveLayoutProfile(viewportWidth, viewportHeight) !== 'desktop';
-  const button = viewportHeight <= 700 ? 36 : 40;
+  const profile = resolveLayoutProfile(viewportWidth, viewportHeight);
+  const mobile = profile !== 'desktop';
+  const button = profile === 'portrait' && edge === 'right' ? 32 : viewportHeight <= 700 ? 36 : 40;
   if (isUtilityDockItem(item)) return mobile ? button : 44;
   if (mobile && edge === 'right' && (item === 'view' || item === 'bulb' || item === 'spin')) return item === 'view' ? button * 2 : button;
   if (item === 'bulb') return 50;

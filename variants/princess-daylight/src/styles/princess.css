@@ -1,6 +1,6 @@
 /*
 [INPUT]: Game/HUD DOM and OpeningFilm animated-image overlay.
-[OUTPUT]: Princess WenKai text, mobile placement halo, companion feedback, factual result layout and opening music/skip controls.
+[OUTPUT]: Princess WenKai text, mobile camera buttons and slim dial, placement halo, companion feedback, result layout and opening controls.
 [POS]: Product presentation layer; preserves gameplay input geometry and physics.
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -193,26 +193,11 @@
 :root[data-theme] .royal-game .shoot-pad { background:#6b593536; border:1px solid #94733a80; border-radius:18px; }
 .royal-game .royal-entry button { min-height:44px; }
 .royal-game .royal-entry .help-entry { width:36px; }
-.pause-entry { position:absolute;z-index:41;left:132px;top:calc(var(--scoreboard-h) + 12px);width:44px;height:44px;border:1px solid #bba16b99;border-radius:50%;background:#fff8eae8;color:#73562a;font:20px Georgia,serif;box-shadow:0 2px 8px #45321718; }
-.pause-entry:disabled { opacity:.45; }
 .royal-turn-status { position:absolute;z-index:12;top:68px;left:50%;transform:translateX(-50%);max-width:calc(100% - 80px);padding:5px 12px;border:1px solid #c3a57080;border-radius:18px;background:#fff8eae8;color:#6b4e28;font:12px/1.5 Georgia,'Songti SC',serif;text-align:center;pointer-events:none;white-space:nowrap; }
-.royal-pause-mask { position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:18px;background:#263c3266; }
-.royal-pause-card { box-sizing:border-box;width:350px;max-width:100%;max-height:calc(100% - 20px);overflow:auto;padding:24px;border:1px solid #baa06d;border-radius:26px;background:linear-gradient(145deg,#fffaf0,#eee3d1);box-shadow:0 16px 45px #15332840;color:#6a502d;text-align:center; }
-.royal-pause-card h2 { font:500 24px/1.5 Georgia,'Songti SC',serif;margin:12px 0 20px; }
-.royal-pause-card button { min-height:44px;border:1px solid #b69760;border-radius:24px;padding:10px 18px;background:#fff8ea;color:#70522b;font:14px/1.4 sans-serif;cursor:pointer; }
-.royal-pause-card .pause-resume { display:block;width:100%;background:linear-gradient(140deg,#fff0c5,#debd77);color:#563b16;font-size:16px; }
-.royal-pause-card .pause-sound { margin-top:12px; }
-.pause-rule,.pause-persistence { font:13px/1.8 sans-serif; }
-.pause-rule { margin-top:20px; }
-.pause-persistence { color:#816e53;font-size:12px; }
-.royal-pause-card .pause-restart { border:0;background:transparent;margin-top:4px; }
-.pause-confirm { border-top:1px solid #c5ad844d;margin-top:16px;padding-top:8px;font-size:14px; }
-.pause-confirm button { margin:4px; }
 .royal-result-reason { position:relative;z-index:3;color:#725b3b;font:13px/1.7 sans-serif;margin:-10px 0 18px; }
-:root[data-theme] .game-shell[data-paused='true'] > .royal-pause-mask { opacity:1!important;pointer-events:auto!important; }
 .royal-game button:focus-visible { outline:2px solid #765528;outline-offset:3px; }
-@media(max-width:640px) and (orientation:portrait){.pause-entry{top:60px;left:130px;}.royal-turn-status{top:62px;}}
-@media(orientation:landscape) and (max-height:560px){.royal-turn-status{top:12px;max-width:calc(100% - 430px);font-size:11px;white-space:normal;}.royal-pause-card{padding:12px 22px;}.royal-pause-card h2{font-size:20px;margin:4px 0 10px;}.pause-rule{margin-top:10px;}.royal-pause-card .royal-result-eyebrow{margin-top:2px;}}
+@media(max-width:640px) and (orientation:portrait){.royal-turn-status{top:62px;}}
+@media(orientation:landscape) and (max-height:560px){.royal-turn-status{top:12px;max-width:calc(100% - 430px);font-size:11px;white-space:normal;}}
 @media(prefers-reduced-motion:reduce){.royal-game .control-slot-body{transition:none;}}
 
 /* RC2: one type scale, quiet toolbar, translucent gesture-only lessons. */
@@ -254,16 +239,6 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .gesture-aim.is-right .guide-gesture,.gesture-aim.is-left .guide-gesture {transform:none;}
 .royal-game .royal-turn-status {background:transparent;border:0;box-shadow:none;color:#fdf8e9;text-shadow:0 1px 3px #28413288;top:20px;}
 .game-shell[data-guide='first-power'] [data-control-slot='power'],.game-shell[data-guide='next-power'] [data-control-slot='power'],.game-shell[data-guide='aim-direction'] [data-control-slot='aimDial'] {filter:none;}
-.royal-game .royal-pause-mask {background:#273e3233;}
-.royal-game .royal-pause-card {width:236px;padding:22px;border:0;border-radius:20px;background:#faf7eeed;box-shadow:0 12px 36px #263a2d1c;}
-.royal-game .royal-pause-card h2 {margin:0 0 18px;}
-.royal-game .royal-pause-card button {border:0;box-shadow:none;background:transparent;color:#625f51;}
-.royal-game .royal-pause-card .pause-resume {width:58px;height:58px;margin:auto;padding:16px;background:#e2e9dd;border-radius:50%;}
-.royal-game .pause-resume .royal-icon {width:26px;height:26px;}
-.royal-game .pause-tools {display:flex;justify-content:center;gap:22px;margin-top:16px;}
-.royal-game .pause-tools button {margin:0;padding:12px;width:44px;height:44px;}
-.royal-game .pause-confirm {border-top:1px solid #9b9a8b24;margin-top:12px;}
-.royal-game .pause-confirm p {margin:10px 0 0;}
 .royal-game .scene-picker-mask {padding-top:calc(var(--scoreboard-h) + 52px);background:#263a301a;}
 .royal-game .scene-picker {width:300px;padding:10px 14px 16px;border:0;border-radius:20px;background:#faf7eef0;box-shadow:0 10px 24px #263a2d1c;}
 .royal-game .scene-picker header {justify-content:flex-end;margin:0 0 4px;}
@@ -279,8 +254,8 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .royal-game .royal-result-reason {margin:0 0 18px;color:#767267;}
 .royal-game .royal-share {border:0;margin-top:8px;}
 .royal-game .royal-skip {padding:10px!important;}
-.pause-mode {display:block;margin-top:16px;}
-.pause-mode select {border:0;background:transparent;color:#625f51;padding:8px;}
+.help-mode {display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;}
+.help-mode select {border:1px solid #d4c49e;border-radius:8px;background:#fffaf0;color:#49634f;font:inherit;padding:5px 8px;}
 @keyframes royal-gesture-pull {0%,15%{transform:translateY(0);opacity:.5;}60%,75%{transform:translateY(26px);opacity:1;}100%{transform:translateY(26px);opacity:0;}}
 @keyframes royal-gesture-tap {0%,100%{transform:translateY(6px);opacity:.5;}30%,65%{transform:translateY(0);opacity:1;}}
 @keyframes royal-gesture-ripple {0%,20%{transform:scale(.55);opacity:0;}35%{opacity:.8;}70%,100%{transform:scale(1.35);opacity:0;}}
@@ -380,10 +355,12 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .praise-card-face {display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:contain;border-radius:0;user-select:none;-webkit-user-drag:none;}
 .praise-card-placeholder {display:flex;align-items:center;justify-content:flex-start;flex-direction:column;padding-top:17%;box-sizing:border-box;background:linear-gradient(140deg,#fffdf5,#e8eee2);border:6px double #c8b17e;}
 .praise-card-placeholder img {width:46%;aspect-ratio:1;border-radius:50%;object-fit:cover;border:3px solid #d5be89;}.praise-card-placeholder p {font-size:20px;color:#8a6a36;margin:20px 0 24px;}.praise-card-placeholder strong {font-size:21px;font-weight:400;white-space:nowrap;color:#3f6251;}
-:root[data-theme] .royal-game .royal-card-actions {position:absolute;left:9%;right:9%;bottom:7.5%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0;}
-:root[data-theme] .royal-game .royal-card-actions button {min-width:0;min-height:44px;margin:0;padding:10px 5px;border:1px solid #b9a37199;border-radius:12px;background:#f8f4e8c9;color:#78613e;font-size:14px;font-weight:400;letter-spacing:.08em;box-shadow:inset 0 1px #fff9;}
-:root[data-theme] .royal-game .royal-card-actions button:last-child {background:#dce8dd;color:#375e49;border-color:#9eb5a399;}
+:root[data-theme] .royal-game .royal-card-actions {display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-gap:8px;align-items:start;width:100%;max-width:300px;flex-shrink:0;margin:0;}
+:root[data-theme] .royal-game .royal-card-actions button {min-width:0;min-height:44px;margin:0;padding:7px 4px;border:1px solid #b9a37199;border-radius:12px;background:#f8f4e8c9;color:#78613e;font-family:inherit;font-size:13px;line-height:1.25;font-weight:400;box-shadow:inset 0 1px #fff9;}
+:root[data-theme] .royal-game .royal-card-actions > button:last-child {background:#dce8dd;color:#375e49;border-color:#9eb5a399;}
 .royal-finish-book {position:fixed;right:18px;top:calc(env(safe-area-inset-top,0px) + 18px);display:flex;align-items:center;gap:6px;min-height:40px;padding:8px 12px;border:1px solid #e4d8b766;border-radius:12px;background:#f8f5e8e6;color:#6d5b3c;font-size:12px;}.royal-finish-book .royal-icon{width:18px;height:18px;}
+:root[data-theme] .royal-game .royal-card-actions .follow-author-entry {min-width:0;margin:0;color:#fff6df;}
+:root[data-theme] .royal-game .royal-card-actions .follow-author-entry button {width:100%;}
 .royal-card-status {max-width:340px;margin:0;color:#fff6df;font-size:12px;text-align:center;}
 .companion-book-mask {z-index:10020;}
 .companion-card-stack {width:min(330px,calc((100dvh - 190px) * .75));height:auto;aspect-ratio:3/4;margin:18px 0;flex-shrink:0;}
@@ -398,7 +375,7 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .royal-game .control-deck .dock-rail-bottom .control-slot-view .control-slot-body {width:181px;height:44px;}
 .royal-game .control-deck .view-shortcuts.is-horizontal .view-mode-button {flex-basis:88px;}
 @media(orientation:landscape) and (max-height:560px){.royal-game .control-deck .control-slot-view .control-slot-body {width:181px;height:44px;}.royal-game .control-deck .dock-rail-right .control-slot-view {width:181px;}}
-:root[data-theme] .royal-game .royal-card-actions {width:auto;box-sizing:border-box;}
+:root[data-theme] .royal-game .royal-card-actions {box-sizing:border-box;}
 
 /* 2026-11-02: 明确但不阻挡操作的开场/首局提示。 */
 .royal-game .opening-skip {display:flex;align-items:center;justify-content:center;gap:5px;width:auto;min-width:76px;min-height:44px;height:44px;right:16px;bottom:calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 20px);padding:8px 12px;background:#fffae9df;border:1px solid #b89e6766;border-radius:22px;}
@@ -420,6 +397,8 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .royal-share-preview .royal-icon {width:20px;height:20px;}
 .royal-share-preview .share-preview-image {display:block;width:260px;max-width:100%;height:auto;margin:6px auto 10px;border-radius:10px;}
 .royal-share-preview p {margin:4px 0 12px;font-size:13px;line-height:1.6;text-align:center;}
+.royal-share-preview .share-preview-copy {width:100%;text-align:left;white-space:pre-line;overflow-wrap:break-word;}
+.royal-share-preview .share-preview-hint {font-size:11px;color:#7b816c;}
 .royal-share-preview .share-preview-return {min-height:44px;width:100%;border:1px solid #b8ad87;border-radius:12px;background:#e4ecde;color:#46624e;font:inherit;}
 @media(max-height:700px){.royal-share-preview .share-preview-image{width:200px;}}
 
@@ -457,9 +436,17 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .free-ball-halo span {position:absolute;top:64px;left:50%;transform:translateX(-50%);width:154px;text-align:center;font-size:12px;text-shadow:0 1px 4px #183d2b;white-space:nowrap;}
 .free-ball-halo.invalid {border-color:#ffc8ae;background:#b65c4a33;box-shadow:0 0 0 6px #f7a38f22,0 0 16px #d67d5c66;}
 .royal-foul-status {position:absolute;z-index:40;top:78px;left:12px;right:12px;max-width:350px;margin:auto;padding:9px 12px;border:1px solid #dfcda688;border-radius:12px;background:#f7f2e9ed;color:#78503b;font-size:13px;line-height:1.5;text-align:center;pointer-events:none;box-shadow:0 4px 18px #172e2922;}
-.companion-moment {position:absolute;top:78px;left:12px;z-index:35;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100% - 84px);min-height:76px;padding:0 13px 0 0;border:1px solid #dfcca17a;border-radius:16px;background:linear-gradient(115deg,#f8f1e4f2,#eef2e5eb);color:#3d5b49;box-shadow:0 6px 24px #142f2920;pointer-events:none;overflow:hidden;}
-.companion-moment img {width:64px;height:82px;object-fit:cover;object-position:center 30%;flex:none;}
-.companion-moment small {font-size:11px;color:#8a7045;}.companion-moment p{margin:5px 0;font-size:14px;line-height:1.4;}
+/* Opponent speech floats directly over the scene; only the small avatar has an edge. */
+.companion-moment {position:absolute;top:78px;left:12px;z-index:35;display:flex;align-items:center;gap:7px;width:max-content;max-width:calc(100% - 84px);height:30px;padding:0;border:0;border-radius:0;background:none;color:#fff6df;box-shadow:none;pointer-events:none;animation:companion-appear .22s ease-out both;}
+.companion-moment img {box-sizing:border-box;width:28px;height:28px;object-fit:cover;object-position:center 30%;border:1px solid #ddc99aab;border-radius:50%;flex:none;box-shadow:0 1px 5px #183c3a55;}
+.companion-moment p {margin:0;font-size:13px;line-height:1.5;white-space:nowrap;text-shadow:0 1px 3px #12392e,0 0 7px #12392ed9;}
+.royal-game .companion-moment {height:auto;min-height:30px;align-items:flex-start;}
+.royal-game .companion-moment p {min-width:0;white-space:normal;overflow-wrap:break-word;padding-top:3px;}
+.royal-game .first-match-guide.speech-delivered {width:48px;max-width:48px;min-height:67px;}
+.royal-game .first-match-guide.speech-delivered .guide-skip {top:-22px;right:-18px;}
+.companion-moment[data-after-foul] {top:146px;}
+@keyframes companion-appear {from {opacity:0;transform:translateY(4px);}to {opacity:1;transform:translateY(0);}}
+@media (prefers-reduced-motion:reduce) {.companion-moment {animation:none;}}
 :root[data-theme] .royal-game .royal-result-scroll {display:flex;flex-direction:column;align-items:center;gap:12px;width:min(360px,100%);max-height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 5px 12px;scrollbar-width:thin;}
 :root[data-theme] .royal-game .royal-result-scroll .royal-result-card.unified-praise-card {width:min(300px,100%);flex-shrink:0;}
 .royal-match-highlights {width:min(300px,100%);box-sizing:border-box;padding:10px 14px 12px;border:1px solid #d8c49977;border-radius:14px;background:#f6f2e8ef;color:#42604e;flex-shrink:0;}
@@ -469,8 +456,34 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .royal-author-feedback span {margin-left:12px;}.royal-result-scroll .match-feedback {margin:0;padding:12px;border-radius:12px;background:#f5f1e8;color:#53644f;}.royal-result-scroll .feedback-collapse {color:#78613e;background:transparent;}
 @media (max-height:700px) {:root[data-theme] .royal-game .royal-result-scroll .royal-result-card.unified-praise-card{width:min(250px,100%);}.royal-match-highlights{padding:8px 10px;}.royal-match-highlights h2{margin-bottom:5px;}}
 
-@media (max-height:700px) and (orientation:portrait) {
-  :root[data-theme] .royal-game .royal-result-scroll .royal-result-card.unified-praise-card {width:min(250px,calc((100dvh - 285px) * .75),100%);}
+@media (max-width:899px) and (orientation:portrait) {
+  :root[data-theme] .royal-game .royal-finish {
+    --result-top-gap:clamp(12px, 5vh, 42px);
+    --result-safe-top:var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    --result-safe-bottom:var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+    position:fixed;
+    top:calc(var(--result-safe-top) + var(--royal-host-gap));
+    justify-content:flex-start;
+    padding:var(--result-top-gap) 12px calc(var(--result-safe-bottom) + 8px);
+  }
+  :root[data-theme] .royal-game .royal-result-scroll {
+    --result-details-space:112px;
+    --result-viewport-height:100vh;
+    gap:8px;
+    padding:0 5px 8px;
+  }
+  :root[data-theme] .royal-game .royal-result-scroll[data-has-highlights] {--result-details-space:184px;}
+  :root[data-theme] .royal-game .royal-result-scroll .royal-result-card.unified-praise-card {
+    --result-card-width:calc((var(--result-viewport-height) - var(--royal-host-gap) - var(--result-top-gap) - var(--result-safe-top) - var(--result-safe-bottom) - var(--result-details-space)) * .75);
+    width:var(--result-card-width);
+    min-width:126px;
+    max-width:300px;
+    width:min(300px, 100%, max(126px, var(--result-card-width)));
+  }
+  @supports (height:100dvh) {
+    :root[data-theme] .royal-game .royal-result-scroll {--result-viewport-height:100dvh;}
+  }
+  .royal-game .royal-result-scroll .royal-card-status {line-height:1.35;}
 }
 
 /* Mobile right rail: scoreboard stays at the top; every tool reuses the draggable slots. */
@@ -478,7 +491,15 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
   .royal-game > .royal-entry {display:none;}
   .royal-game .royal-finish-book {display:none;}
   .royal-game .companion-moment {top:16px;left:8px;max-width:calc(100% - 72px);}
+  .royal-game .companion-moment[data-after-foul] {top:82px;}
   .royal-game .royal-foul-status {top:16px;left:8px;right:60px;max-width:none;}
+}
+/* The short landscape canvas starts at y=0, unlike the portrait canvas below the score. */
+@media (orientation:landscape) and (max-height:560px) {
+  .royal-game .companion-moment,
+  .royal-game .royal-foul-status {top:calc(var(--royal-host-gap) + 54px);}
+  .royal-game .royal-foul-status {right:104px;}
+  .royal-game .companion-moment[data-after-foul] {top:calc(var(--royal-host-gap) + 122px);}
 }
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] {--rail-button:40px;--rail-step:44px;z-index:45;}
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .dock-rail-right {top:calc(var(--safe-area-inset-top,env(safe-area-inset-top,0px)) + var(--royal-host-gap) + var(--scoreboard-h) + 8px);right:var(--safe-area-inset-right,env(safe-area-inset-right,0px));bottom:calc(var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)) + 8px);width:44px;}
@@ -498,7 +519,7 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .scene-entry ,
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .help-entry ,
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .cardbook-entry ,
-:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .pause-entry {position:relative;top:auto;right:auto;bottom:auto;left:auto;display:grid;place-items:center;width:40px;height:var(--rail-button);min-height:0;min-width:0;padding:6px;margin:0;border:1px solid #c5b48177;border-radius:12px;background:#f7f4e9c9;color:#63725b;font:inherit;box-shadow:inset 0 1px #fff9;touch-action:none;}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .sound-entry {position:relative;top:auto;right:auto;bottom:auto;left:auto;display:grid;place-items:center;width:40px;height:var(--rail-button);min-height:0;min-width:0;padding:6px;margin:0;border:1px solid #c5b48177;border-radius:12px;background:#f7f4e9c9;color:#63725b;font:inherit;box-shadow:inset 0 1px #fff9;touch-action:none;}
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .royal-icon {width:18px;height:18px;}
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .control-slot-view .control-slot-body {width:44px;height:calc(var(--rail-button) * 2);padding:0;}
 :root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .persistent-view-control .view-shortcuts {gap:0;border-radius:12px;overflow:hidden;background:#f7f4e9b8;border:1px solid #c5b48177;box-sizing:border-box;}
@@ -542,4 +563,130 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 
 @media(orientation:landscape) {
 :root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-scene.is-default-anchor,:root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-help.is-default-anchor,:root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-cards.is-default-anchor,:root[data-theme] .royal-game .control-deck[data-layout-profile="landscape"] .dock-rail-right .control-slot-pause.is-default-anchor{right:48px!important;}
+}
+
+/* All portrait right-rail controls share the same slim footprint. */
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] {
+  --rail-button:32px;
+  --rail-step:36px;
+  --portrait-tool-width:32px;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right,
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .control-slot:not(.control-slot-aimDial),
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .control-slot-power.is-default-anchor {
+  width:var(--portrait-tool-width);
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right :is(
+  .control-slot-scene .control-slot-body,
+  .control-slot-help .control-slot-body,
+  .control-slot-cards .control-slot-body,
+  .control-slot-pause .control-slot-body,
+  .control-slot-view .control-slot-body,
+  .control-slot-bulb .control-slot-body,
+  .control-slot-spin .control-slot-body,
+  .control-slot-power .control-slot-body,
+  .assist-control,
+  .spin-control
+) {
+  width:var(--portrait-tool-width);
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right :is(
+  .scene-entry, .help-entry, .cardbook-entry, .sound-entry, .assist-control > .plan-button, .spin-preview
+) {
+  width:32px;
+  height:var(--rail-button);
+  min-width:0;
+  min-height:0;
+  margin:0 auto;
+  padding:3px;
+  border-radius:10px;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .control-slot-view.is-default-anchor {
+  top:auto!important;
+  bottom:calc(var(--floating-power-height) + var(--rail-button) + 14px);
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .control-slot-bulb.is-default-anchor {
+  top:calc(var(--rail-step) * 4)!important;
+}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .persistent-view-control .view-shortcuts {
+  border:0;
+  background:#f7f2e2;
+  box-shadow:0 2px 6px #3d372333;
+  transition:none;
+}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-shortcuts .view-mode-button {
+  border:0;
+  border-radius:0;
+  background:#f7f2e2;
+  color:#415749;
+  box-shadow:none;
+}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-shortcuts .view-mode-button.is-active {
+  background:#275343;
+  color:#fff6dd;
+}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-shortcuts .view-mode-button:focus-visible {
+  outline:2px solid #ae8239;
+  outline-offset:-3px;
+}
+:root[data-theme] .royal-game .control-deck[data-mobile-rail="true"] .view-mode-button > span:last-child {
+  font-size:12px;
+  line-height:1;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .view-shortcuts .view-mode-button {
+  width:100%;
+  padding:2px 0;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .spin-preview-ball {width:24px;height:24px;}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .spin-popover {right:40px;}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .assist-menu-vertical {right:40px;}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .shoot-pad.is-vertical {
+  border-color:transparent;
+  background:none;
+  box-shadow:none;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .shoot-pad.is-vertical::before {
+  content:'';
+  position:absolute;
+  inset:0 1px;
+  border:1px solid #c5b48199;
+  border-radius:12px;
+  background:#f0e3be35;
+  pointer-events:none;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .shoot-pad.is-vertical.charging::before {
+  box-shadow:0 0 14px #e9cf9266;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .shoot-pad.is-vertical .shoot-power-fill {
+  left:1px;
+  right:1px;
+  border-radius:10px;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-bottom .control-slot-aimDial:not(.is-aim-buttons) .control-slot-body,
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .control-slot-aimDial.is-free:not(.is-aim-buttons) .control-slot-body {
+  width:min(250px, calc(100vw - 124px));
+  height:44px;
+}
+:root[data-theme] .royal-game .control-deck[data-layout-profile="portrait"] .dock-rail-right .control-slot-aimDial:not(.is-aim-buttons) .control-slot-body {
+  width:44px;
+}
+
+/* Speech floats below the scores, in the space above the table. */
+@media (max-width:899px) and (orientation:portrait) {
+  .royal-game {--scoreboard-h:38px;--portrait-speech-safe-top:37px;grid-template-rows:var(--scoreboard-h) minmax(0,1fr);}
+  :root[data-theme] .royal-game .royal-scoreboard {height:var(--scoreboard-h);}
+  .royal-game .viewport .companion-moment {
+    position:absolute;
+    top:5px;
+    left:8px;
+    right:38px;
+    width:auto;
+    min-height:24px;
+    max-width:none;
+    align-items:center;
+    gap:5px;
+    color:#293d32;
+  }
+  .royal-game .viewport .companion-moment img {width:22px;height:22px;box-shadow:none;}
+  .royal-game .viewport .companion-moment p {font-size:12px;line-height:1.25;padding:0;text-shadow:0 1px 2px #fff7e4,0 0 5px #fff7e4;}
 }

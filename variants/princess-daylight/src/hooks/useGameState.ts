@@ -66,7 +66,6 @@ export function useGameState() {
   const playerSkillRef = useRef(playerSkill);
   useEffect(() => { playerSkillRef.current = playerSkill; }, [playerSkill]);
   const [gameMode, setGameMode] = useState<GameMode>('practice');
-  const gameModeRef = useRef<GameMode>('practice');
   const [opponentProfile, setOpponentProfile] = useState(() =>
     createFriendlyOpponentProfile(playerSkill, 'practice'),
   );
@@ -105,7 +104,6 @@ export function useGameState() {
     const companion = pickCompanion(matchRef.current.companionId);
     setMatch(m => beginMatch({ ...m, companionId: companion.id }));
     setGameMode(nextMode);
-    gameModeRef.current = nextMode;
     setOpponentProfile(createFriendlyOpponentProfile(playerSkillRef.current, nextMode));
     setViewLevel(OVERHEAD_VIEW);
     setAim(0);
@@ -139,7 +137,6 @@ export function useGameState() {
     playerSkillRef.current = next;
     setPlayerSkill(next);
     savePlayerSkillProfile(next, browserStorage());
-    setOpponentProfile(createFriendlyOpponentProfile(next, gameModeRef.current));
     return next;
   }, []);
 

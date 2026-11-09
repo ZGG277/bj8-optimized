@@ -69,7 +69,8 @@ describe('impact feedback', () => {
     expect(sceneSource).toContain('this.impactFeedback?.observe(world);');
     expect(sceneSource).toContain('this.impactFeedback?.sync(this.ballMeshes, this.camera, dt);');
     expect(sceneSource).toContain('Boolean(this.impactFeedback?.active)');
-    expect(sceneSource).toContain('this.impactFeedback?.setHot(tier === \'hot\');');
+    expect(sceneSource).toContain("const hot = tier === 'hot';");
+    expect(sceneSource).toContain('this.impactFeedback?.setHot(hot);');
     expect(sceneSource).toContain('this.impactFeedback?.dispose();');
   });
 

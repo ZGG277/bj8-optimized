@@ -26,6 +26,8 @@ export type ThermalSnapshot = {
 };
 
 const WINDOW_MS = 2000;
+// GPU timing is sampled every eight frames. Allow a short gap without counting idle time.
+const MAX_SAMPLE_GAP_MS = 1000;
 const HIGH_DUTY = 0.45;
 const SEVERE_DUTY = 0.72;
 const COOL_DUTY = 0.28;
@@ -55,7 +57,7 @@ export function createThermalGovernor(initialTargetFps: number) {
     targetFps,
   };
 
-  const resetWindow = (nowMs: number) => {
+  const resetWindow = (nowMs: number | null) => {
     windowStartedAt = nowMs;
     renderTotalMs = 0;
     renderSamples = 0;
@@ -63,7 +65,16 @@ export function createThermalGovernor(initialTargetFps: number) {
     droppedFrames = 0;
   };
 
+  const resetActivity = () => {
+    resetWindow(null);
+    highWindows = 0;
+    severeWindows = 0;
+    coolWindows = 0;
+  };
+
   return {
+    resetActivity,
+
     setTargetFps(nextTargetFps: number) {
       targetFps = Math.max(1, nextTargetFps);
       snapshot = { ...snapshot, targetFps };
@@ -71,6 +82,9 @@ export function createThermalGovernor(initialTargetFps: number) {
 
     sample(sample: ThermalSample): RenderQualityTier | null {
       if (!Number.isFinite(sample.nowMs) || !Number.isFinite(sample.renderMs)) return null;
+      if (lastActiveSampleAt !== null && sample.nowMs - lastActiveSampleAt > MAX_SAMPLE_GAP_MS) {
+        resetActivity();
+      }
       lastActiveSampleAt = sample.nowMs;
       if (windowStartedAt === null) resetWindow(sample.nowMs);
 
@@ -133,9 +147,7 @@ export function createThermalGovernor(initialTargetFps: number) {
 
       tier = tier === 'hot' ? 'warm' : 'balanced';
       lastActiveSampleAt = nowMs;
-      highWindows = 0;
-      severeWindows = 0;
-      coolWindows = 0;
+      resetActivity();
       snapshot = {
         ...snapshot,
         tier,

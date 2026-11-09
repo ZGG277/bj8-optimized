@@ -15,6 +15,8 @@ export type WorldShell = {
   root: THREE.Group;
   ready: Promise<boolean>;
   dispose: () => void;
+  /** Optional experimental scenery may hide in hot tier without removing the base world. */
+  setHot?: (hot: boolean) => void;
 };
 export type WorldShellFactory = (context: WorldShellContext) => WorldShell;
 

@@ -24,7 +24,7 @@ export function otherActor(actor: Actor): Actor {
 }
 
 /** 球号 → 分组；8 号不属于任何花色组 */
-function groupOfNumber(n: number): ObjectGroup | null {
+export function groupOfNumber(n: number): ObjectGroup | null {
   if (n >= 1 && n <= 7) return 'solid';
   if (n >= 9 && n <= 15) return 'stripe';
   return null;
@@ -125,7 +125,7 @@ export function resolveStoppedShot(state: MatchState, facts: ShotFacts): RoundRe
         breaking: false,
         winner: win ? actor : otherActor(actor),
         messageKey: win ? 'win-8' : foul ? 'lose-8-foul' : 'lose-8-early',
-        messageParams: { actor, reason: foul ?? undefined },
+        messageParams: { actor, reason: foul ?? undefined, earlyEight: cleared ? undefined : true },
       },
       effects: [],
     };

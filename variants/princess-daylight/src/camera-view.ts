@@ -4,7 +4,7 @@
 [POS]: 相机纯几何层；Scene3D 的活相机与虚拟拾取相机必须共享这里的唯一位姿公式，全台投影拟合委托 camera-framing
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { fullTableCameraPose, type CameraSafetyInsets } from './camera-framing';
+import { DEFAULT_CAMERA_SAFETY, fullTableCameraPose, type CameraSafetyInsets } from './camera-framing';
 import { POCKETS } from './physics';
 import { tableFrameEnvelope } from './pocket-render/frame-geometry';
 import { pocketSeamContract } from './pocket-render/seam-contract';
@@ -23,6 +23,7 @@ const FP_CAM_SIDE = 0.015;
 const FP_CAM_HEIGHT = 0.22;
 const FP_LOOK_AHEAD = 0.42;
 const OVERHEAD_ORBIT_RADIUS = 0.85;
+const PORTRAIT_OVERHEAD_ORBIT_RADIUS = 0.3;
 /** 木帮外缘的半尺寸，略留 1cm 给阴影和抗锯齿边缘。 */
 const frameEnvelope = tableFrameEnvelope(POCKETS.map(p => pocketSeamContract(p, pocketRenderProfile(p))));
 const TABLE_OUTER_HALF_WIDTH = frameEnvelope.halfWidth + .01;
@@ -118,13 +119,23 @@ const mix = (from: number, to: number, amount: number) => from + (to - from) * a
  * 把旋转后的球台外框分别投影到屏幕横/纵轴，再由透视 FOV 反算最低高度。
  * 竖屏的水平 FOV 最窄，因此方位角转到横台时会自动继续拉远，始终保留整台。
  */
+function overheadOrbitRadius(aspect: number, safety?: Partial<CameraSafetyInsets>): number {
+  if (!Number.isFinite(aspect) || aspect <= 0 || aspect >= 1) return OVERHEAD_ORBIT_RADIUS;
+  const { left = DEFAULT_CAMERA_SAFETY.left, right = DEFAULT_CAMERA_SAFETY.right,
+    top = DEFAULT_CAMERA_SAFETY.top, bottom = DEFAULT_CAMERA_SAFETY.bottom } = safety ?? {};
+  const usableAspect = aspect * (1 - left - right) / Math.max(.1, 1 - top - bottom);
+  // Tall portrait has room for a flatter view, which gives the far end more width.
+  const heightLimited = Math.min(1, Math.max(0, (usableAspect - .51) / .09));
+  return PORTRAIT_OVERHEAD_ORBIT_RADIUS + (OVERHEAD_ORBIT_RADIUS - PORTRAIT_OVERHEAD_ORBIT_RADIUS) * heightLimited;
+}
+
 export function overheadFitHeight(aspect: number, cameraAzimuth: number): number {
   return fullTableCameraPose({
     aspect,
     azimuth: normalizeCameraAzimuth(cameraAzimuth),
     halfWidth: TABLE_OUTER_HALF_WIDTH,
     halfLength: TABLE_OUTER_HALF_LENGTH,
-    orbitRadius: OVERHEAD_ORBIT_RADIUS,
+    orbitRadius: overheadOrbitRadius(aspect),
   }).pose.position.y;
 }
 
@@ -155,7 +166,7 @@ export function cameraPoseAt(
     azimuth: angle,
     halfWidth: TABLE_OUTER_HALF_WIDTH,
     halfLength: TABLE_OUTER_HALF_LENGTH,
-    orbitRadius: OVERHEAD_ORBIT_RADIUS,
+    orbitRadius: overheadOrbitRadius(aspect, fullTableSafety),
     safety: fullTableSafety,
   }).pose;
 

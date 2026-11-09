@@ -2,7 +2,7 @@ import { followFeelSpin } from '../input/follow-feel';
 import { createShotLease } from '../shot-lifecycle';
 /*
 [INPUT]: 依赖局前锁定 OpponentProfile、分级预算战术 Worker、按等级执行误差、physics 击球/复位、match 规则与场景动画
-[OUTPUT]: 副作用 Hook：对手回合按等级选择与执行球路；友好机会或普通进攻由同一真实物理执行，无候选时优先清晰合法首碰
+[OUTPUT]: 对手按局前实力选择并真实出杆；连续三次主动让球后按正常进攻选杆
 [POS]: AI 调度层，只做对手回合的编排；不关心 UI 交互或玩家输入
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -61,13 +61,17 @@ export function useOpponentAI({
   onShot,
 }: OpponentAIProps) {
   const runRef = useRef(0);
+  const opportunityStreakRef = useRef(0);
   const runWorldRef = useRef(worldRef.current);
   const onShotRef = useCallback(onShot, [onShot]);
 
   useEffect(() => {
-    if (runWorldRef.current !== worldRef.current || matchRef.current?.actor === 'player') {
-      runRef.current = 0; runWorldRef.current = worldRef.current;
+    if (runWorldRef.current !== worldRef.current) {
+      runRef.current = 0;
+      opportunityStreakRef.current = 0;
+      runWorldRef.current = worldRef.current;
     }
+    if (matchRef.current?.actor === 'player') runRef.current = 0;
     if (!active) return;
     let cancelled = false;
     const lease = createShotLease(worldRef, matchRef, 'opponent');
@@ -85,7 +89,9 @@ export function useOpponentAI({
         const legal = legalNumbers(world, 'opponent', currentMatch.playerGroup);
         const playerLegal = legalNumbers(world, 'player', currentMatch.playerGroup);
         const remaining = (numbers: number[]) => numbers.filter(n => n !== 8).length;
-        const tactics = friendlyTurnTactics(opponentProfile, remaining(playerLegal), remaining(legal), runRef.current);
+        const tactics = friendlyTurnTactics(
+          opponentProfile, remaining(playerLegal), remaining(legal), runRef.current, opportunityStreakRef.current,
+        );
 
         let planned: ShotCandidate | null = null;
         try {
@@ -128,6 +134,8 @@ export function useOpponentAI({
           if (cancelled || !strikeCueBall(world, angle, shotPower, spin)) return;
           contactCommitted = true;
           runRef.current += 1;
+          // Deliberate give-backs survive the player's turn. Only a real opponent stroke changes the streak.
+          opportunityStreakRef.current = planned?.friendlyOpportunity ? opportunityStreakRef.current + 1 : 0;
           audioRef.current?.strike(shotPower);
           onShotRef();
           setWorldView(cloneWorld(world));

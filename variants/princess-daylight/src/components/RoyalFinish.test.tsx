@@ -16,9 +16,10 @@ describe('royal match ending', () => {
     const html=renderToStaticMarkup(<RoyalFinish winner="opponent" onRestart={()=>{}} />);
     expect(html).not.toContain('谢不赢与白马');expect(html).toContain('下局再赢回来');expect(html).not.toContain('惜败');expect(html).toContain('再来一局');expect(html).not.toContain('你输了');expect(html).not.toContain('royal-petals');
   });
-  it('comforts an early black-eight finish with one short line and no rule explanation', () => {
-    const html=renderToStaticMarkup(<RoyalFinish winner="opponent" messageKey="lose-8-early" reason="公主还没清空本组球，8号已落袋。" onRestart={()=>{}} />);
+  it('comforts an early black-eight finish with one short card line and a separate rule explanation', () => {
+    const html=renderToStaticMarkup(<RoyalFinish winner="opponent" messageKey="lose-8-early" resultExplanation="得先清完本组球，下一杆才能打黑八。" onRestart={()=>{}} />);
     expect(html).toContain('没关系，我陪你');
+    expect(html).toContain('role="status">得先清完本组球，下一杆才能打黑八。');
     for(const text of ['差一点','惜败','还没清空','收到','新赞美卡'])expect(html).not.toContain(text);
     expect(Array.from(resultCardLine('opponent','','lose-8-early'))).toHaveLength(7);
     expect(html.indexOf('>分享<')).toBeLessThan(html.indexOf('>再来一局<'));
@@ -36,7 +37,7 @@ describe('royal match ending', () => {
   });
 
   it('keeps a terminal foul cause outside the unchanged comfort card', () => {
-    const html=renderToStaticMarkup(<RoyalFinish winner="opponent" messageKey="lose-8-foul" foulExplanation="公主白球落袋，本局结束。" onRestart={()=>{}}/>);
+    const html=renderToStaticMarkup(<RoyalFinish winner="opponent" messageKey="lose-8-foul" resultExplanation="公主白球落袋，本局结束。" onRestart={()=>{}}/>);
     expect(html).toContain('没关系，我陪你');
     expect(html).toContain('公主白球落袋，本局结束。');
     expect(html).not.toContain('差一点');

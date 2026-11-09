@@ -1,6 +1,6 @@
 /**
  * [INPUT]: Three.js renderer for the unchanged reflection environment; no external sky asset.
- * [OUTPUT]: 既有日光反射环境与独立512×256暖天际/低仰角蓝天/克制远山背景纹理。
+ * [OUTPUT]: 既有日光反射环境与独立512×256暖桃色天际/蓝天/蓝紫远山背景纹理。
  * [POS]: 反射与可见天空分离；天空由Scene3D统一释放，不加灯、网格或动画。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -29,15 +29,15 @@ export function createCastleSkyBackground() {
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
     const elevation=(y/(height-1)-.5)*Math.PI,phi=x/(width-1)*Math.PI*2-Math.PI;
     const rise=THREE.MathUtils.smoothstep(elevation,0,.55);
-    let color=mix([226,219,195],[116,158,180],rise);
-    const glow=Math.pow(Math.max(0,Math.cos(phi+2.27)),8)*Math.exp(-Math.pow((elevation-.09)/.30,2))*.18;
+    let color=mix([241,217,199],[140,178,205],rise);
+    const glow=Math.pow(Math.max(0,Math.cos(phi+2.27)),8)*Math.exp(-Math.pow((elevation+.04)/.38,2))*.18;
     color=mix(color,[246,222,177],glow);
-    const distant=.025+.017*Math.sin(phi*3+.4)+.012*Math.cos(phi*7-1.2)+.006*Math.sin(phi*11);
-    const near=-.022+.022*Math.sin(phi*2-.8)+.012*Math.cos(phi*5+.3);
+    const distant=-.05+.055*Math.sin(phi*3+.4)+.035*Math.cos(phi*7-1.2)+.016*Math.sin(phi*11);
+    const near=-.18+.065*Math.sin(phi*2-.8)+.035*Math.cos(phi*5+.3);
     const silhouette=(ridge:number)=>1-THREE.MathUtils.smoothstep(elevation,ridge-.009,ridge+.009);
-    color=mix(color,[190,197,180],silhouette(distant)*.52);
-    color=mix(color,[158,178,160],silhouette(near)*.46);
-    color=mix(color,[161,174,151],THREE.MathUtils.smoothstep(-elevation,.12,.7));
+    color=mix(color,[172,176,195],silhouette(distant)*.55);
+    color=mix(color,[141,160,181],silhouette(near)*.44);
+    color=mix(color,[202,195,189],THREE.MathUtils.smoothstep(-elevation,.40,1.1));
     const i=(y*width+x)*4;bytes.set([...color.map(Math.round),255],i);
   }
   const sky=new THREE.DataTexture(bytes,width,height,THREE.RGBAFormat);

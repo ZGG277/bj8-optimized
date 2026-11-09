@@ -66,7 +66,7 @@ export function renderBudgetFor(environment: RenderEnvironment): RenderBudget {
 }
 
 /**
- * GPU 压力升高时只降表现层成本：像素、阴影、展示帧率与毛玻璃合成。
+ * GPU 压力升高时先降展示帧率、阴影和毛玻璃合成，持续高压才降低像素比。
  * 物理步长、规则与输入采样不受影响。
  */
 export function adaptiveRenderQualityFor(
@@ -86,9 +86,9 @@ export function adaptiveRenderQualityFor(
   if (tier === 'warm') {
     return {
       tier,
-      pixelRatio: Math.min(budget.pixelRatio, budget.mobile ? 1.5 : 1.25),
+      pixelRatio: budget.pixelRatio,
       shadowMapSize: 1024,
-      movingPresentationFps: budget.mobile ? 30 : 24,
+      movingPresentationFps: import.meta.env.VITE_MINITOOL === '1' ? 24 : budget.mobile ? 30 : 24,
       backdropBlur: false,
     };
   }

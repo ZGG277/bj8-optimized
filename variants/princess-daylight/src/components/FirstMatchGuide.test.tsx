@@ -9,6 +9,13 @@ import { describe, expect, it } from 'vitest';
 import { FirstMatchGuide, gestureForControl } from './FirstMatchGuide';
 
 describe('FirstMatchGuide 微提示结构', () => {
+  it('lets the companion say the instruction while retaining the control gesture and skip', () => {
+    const markup = renderToStaticMarkup(<FirstMatchGuide step="first-power" visible onSkip={() => {}} onInstruction={() => {}}/>);
+    expect(markup).toContain('speech-delivered');
+    expect(markup).not.toContain('class="guide-copy"');
+    expect(markup).toContain('guide-gesture');
+    expect(markup).toContain('跳过新手引导');
+  });
   it('蓄力指尖落在球杆热区内，文字如何避让都不改变它', () => {
     const anchor = { left: 344, right: 388, top: 670, bottom: 790, width: 44, height: 120 };
     const hand = gestureForControl(anchor, false, true);

@@ -433,10 +433,12 @@ export class Scene3D {
     this.environmentOptions.onRenderUnavailable?.('画面资源已恢复，可点击重新进入。');
   };
   private onVisibility = () => {
+    this.overloadFrames = 0;
     if (document.hidden) {
       this.finishOpening();
       if (this.animationId) cancelAnimationFrame(this.animationId);
       this.animationId = 0; this.clearThermalIdleRecovery();
+      this.thermalGovernor.resetActivity();
     } else { this.clock.start(); this.lastRenderedAt = null; this.renderSlotMs = null; this.requestRender(); }
   };
   private enforceMiniToolBudget(): boolean {
@@ -460,7 +462,7 @@ export class Scene3D {
     if (!withinSceneBudget(cost, low) && !['lake', 'castle'].includes(this.environmentOptions.worldId ?? '') && this.studioEnvironment?.root.visible) { this.studioEnvironment.root.visible = false; cost = sceneCost(this.scene); }
     if (!withinSceneBudget(cost, low)) {
       this.renderer.domElement.dataset.miniToolBudget = JSON.stringify({ ...cost, low });
-      this.unavailable('当前画面超过设备绘制预算，已暂停画面。请稍后重新进入。'); return false;
+      this.unavailable('当前设备暂时无法绘制球桌，请重新进入。'); return false;
     }
     this.renderer.domElement.dataset.miniToolBudget = JSON.stringify({ ...cost, low, requestedCost, gemTransmission: (this.ballMeshes[1]?.material as THREE.MeshPhysicalMaterial)?.transmission ?? 0 });
     return true;
@@ -832,6 +834,7 @@ export class Scene3D {
   }
 
   private setBallGeometryQuality(hot: boolean) {
+    this.studioEnvironment?.worldShell.setHot?.(hot);
     if(this.daylight?.ready){this.daylight.setHot(hot);return;}
     if (this.ballGeometryHot === hot || !this.ballMeshes.length) return;
     const previous = this.ballMeshes[0].geometry;
@@ -1517,6 +1520,7 @@ export class Scene3D {
       if (this.animationId) cancelAnimationFrame(this.animationId);
       this.animationId = 0;
       this.clearThermalIdleRecovery();
+      this.thermalGovernor.resetActivity();
     } else {
       this.clock.start(); this.lastRenderedAt = null; this.renderSlotMs = null;
       this.requestRender(true);
@@ -2008,15 +2012,23 @@ export class Scene3D {
   private applyThermalTier(tier: RenderQualityTier) {
     const quality = adaptiveRenderQualityFor(this.renderBudget, tier);
     if (quality.tier === this.adaptiveQuality.tier) return;
-    this.miniToolBudgetDirty = true;
+    const hot = tier === 'hot';
+    const geometryChanged = hot !== (this.adaptiveQuality.tier === 'hot');
+    const shadowSizeChanged = quality.shadowMapSize !== this.shadowMapSize;
     this.adaptiveQuality = quality;
-    this.setBallGeometryQuality(tier === 'hot');
-    this.impactFeedback?.setHot(tier === 'hot');
     this.shadowMapSize = quality.shadowMapSize;
-    this.renderer.setPixelRatio(import.meta.env.VITE_MINITOOL === '1' ? cappedPixelRatio(this.element.clientWidth, this.element.clientHeight, quality.pixelRatio, tier === 'hot') : quality.pixelRatio);
-    this.renderer.setSize(this.element.clientWidth, this.element.clientHeight);
-    this.syncTransmissionScale();
-    if (this.keyLight) {
+    if (geometryChanged) {
+      this.setBallGeometryQuality(hot);
+      this.impactFeedback?.setHot(hot);
+    }
+    const pixelRatio = import.meta.env.VITE_MINITOOL === '1'
+      ? cappedPixelRatio(this.element.clientWidth, this.element.clientHeight, quality.pixelRatio, hot)
+      : quality.pixelRatio;
+    if (pixelRatio !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(pixelRatio);
+      this.syncTransmissionScale();
+    }
+    if (this.keyLight && shadowSizeChanged) {
       this.keyLight.shadow.map?.dispose();
       this.keyLight.shadow.map = null;
       this.keyLight.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
@@ -2025,7 +2037,7 @@ export class Scene3D {
     this.renderSlotMs = null;
     document.documentElement.dataset.renderQuality = quality.tier;
     this.onThermalQualityChange?.(quality, this.thermalGovernor.snapshot());
-    this.requestRender(true);
+    this.requestRender(geometryChanged || shadowSizeChanged);
   }
 
   private observeThermalLoad(
@@ -2200,7 +2212,7 @@ export class Scene3D {
     }
     if (import.meta.env.VITE_MINITOOL === '1' && this.adaptiveQuality.tier === 'hot') {
       this.overloadFrames = continuousWork && frameIntervalMs !== null && frameIntervalMs > 80 ? this.overloadFrames + 1 : 0;
-      if (this.overloadFrames >= 60) { this.unavailable('设备当前负载较高，已暂停画面。请稍后重新进入。'); return; }
+      if (this.overloadFrames >= 60) { this.unavailable('设备当前负载较高，请稍后重新进入。'); return; }
     }
     this.finishGpuTimer(gpuQuery);
     if (continuousWork && !this.gpuTimerExtension) {
@@ -2214,6 +2226,7 @@ export class Scene3D {
     }
     this.renderFrameCount += 1;
     if (!this.lastWorld?.moving && !this.hasFrameWork()) {
+      this.thermalGovernor.resetActivity();
       this.scheduleThermalIdleRecovery();
     }
   }

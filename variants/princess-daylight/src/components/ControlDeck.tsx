@@ -1,6 +1,6 @@
 /*
 [INPUT]: 五个游戏控件与四个工具按钮状态、模式门控、观战视角锁、默认拨轮/可选方向键、四项辅助入口、视口尺寸、Pointer 手势与逐控件学习记录
-[OUTPUT]: 统一可拖动控件层，手机工具小按钮吸附右侧；右上灯泡展开辅助开关，视角推杆常驻可见；保留自由拖动、右/底吸附与 v3 持久化
+[OUTPUT]: 统一可拖动控件层，手机方向拨轮独占触摸，右侧双视角与灯泡常驻；保留工具自由拖动、右/底吸附与 v3 持久化
 [POS]: HUD 控件编排层；组合 ViewToolbar / AimControls·AimDial / SpinControl / ShootControl，不持有游戏规则
 [PROTOCOL]: 控件集合、布局手势或存储协议变化时同步更新本注释、components/CLAUDE.md 与布局测试
 */
@@ -83,6 +83,7 @@ type DockableControlSlotProps = {
   id: DockItemId;
   placement: Placement;
   dragging: boolean;
+  layoutDrag: boolean;
   children: ReactNode;
   className?: string;
   onLayoutStart: (
@@ -101,6 +102,7 @@ function DockableControlSlot({
   id,
   placement,
   dragging,
+  layoutDrag,
   children,
   className = '',
   onLayoutStart,
@@ -146,7 +148,7 @@ function DockableControlSlot({
       ].filter(Boolean).join(' ')}
       style={style}
       onPointerDownCapture={(event) => {
-        if (dragging) return;
+        if (dragging || !layoutDrag) return;
         // 左右微调按钮的静止长按属于连续瞄准，不得被控件布局长按抢走。
         if (event.target instanceof Element &&
           event.target.closest('[data-control-content-hold="aim-button"]')) return;
@@ -451,7 +453,7 @@ export function ControlDeck({
     const rail = document.querySelector<HTMLElement>('.dock-rail-right');
     if (!rail) return;
     const bounds = rail.getBoundingClientRect();
-    const slots = Array.from(rail.querySelectorAll<HTMLElement>('[data-control-slot]'));
+    const slots = Array.from(rail.querySelectorAll<HTMLElement>(':scope > [data-control-slot]'));
     const occupied: Array<{ id: DockItemId; start: number; end: number }> = [];
     const next = { ...layoutRef.current };
     let changed = false;
@@ -462,7 +464,7 @@ export function ControlDeck({
       let start = box.top - bounds.top, end = box.bottom - bounds.top;
       const peers = occupied.filter(other => sharesDockColumn('right', id, other.id, viewport.width, viewport.height));
       const conflicts = start < 0 || end > bounds.height || peers.some(other => start < other.end + 4 && end > other.start - 4);
-      if (conflicts) {
+      if (conflicts && !slot.classList.contains('is-default-anchor')) {
         const center = nearestDockPosition((start+end)/2, box.height, peers, bounds.height, 4);
         if (center !== null) {
           const old = next[id];
@@ -670,7 +672,7 @@ export function ControlDeck({
         const rail = document.querySelector<HTMLElement>(`.dock-rail-${edge}`);
         const railRect = rail?.getBoundingClientRect();
         const siblings = rail
-          ? Array.from(rail.querySelectorAll<HTMLElement>('[data-control-slot]'))
+          ? Array.from(rail.querySelectorAll<HTMLElement>(':scope > [data-control-slot]'))
             .filter(element => element.dataset.controlSlot !== drag.id && sharesDockColumn(edge, drag.id, element.dataset.controlSlot as DockItemId, currentViewport.width, currentViewport.height))
           : [];
         const occupied = railRect
@@ -963,6 +965,13 @@ export function ControlDeck({
     viewLevel,
   ]);
 
+  const defaults = defaultProfileLayout(profile);
+  const isDefaultAnchor = (id: DockItemId) => {
+    const placement = layout[id];
+    const fallback = defaults[id];
+    return placement.mode === 'docked' && fallback.mode === 'docked' &&
+      placement.edge === fallback.edge && placement.position === fallback.position;
+  };
   const visibleIds = (Object.keys(nodes) as DockItemId[])
     .filter(id => nodes[id] !== null);
   const docked = (edge: DockEdge) => visibleIds
@@ -976,21 +985,17 @@ export function ControlDeck({
     });
   const free = visibleIds.filter(id => layout[id].mode === 'free');
 
-  const defaults = defaultProfileLayout(profile);
   const renderSlot = (id: DockItemId) => {
-    const placement = layout[id];
-    const fallback = defaults[id];
-    const defaultAnchor = placement.mode === 'docked' && fallback.mode === 'docked' &&
-      placement.edge === fallback.edge && placement.position === fallback.position;
     return (
     <DockableControlSlot
       key={id}
       id={id}
       placement={layout[id]}
       dragging={draggingId === id}
+      layoutDrag={profile === 'desktop' || id !== 'aimDial' || !aimDialEnabled}
       className={[
         id === 'aimDial' && !aimDialEnabled ? 'is-aim-buttons' : '',
-        defaultAnchor ? 'is-default-anchor' : '',
+        isDefaultAnchor(id) ? 'is-default-anchor' : '',
         id === 'bulb' && assistMenuOpen ? 'is-expanded' : '',
       ].filter(Boolean).join(' ')}
       onLayoutStart={startLayoutDrag}

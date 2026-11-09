@@ -1,12 +1,13 @@
 /*
 [INPUT]: 可见状态、横/竖停靠方向、用户精瞄档、Pointer 压力、返回真实变化事实的拨动/切档回调与逐控件学习记录
-[OUTPUT]: 对外提供轻点切换粗/精档的纯视觉无边界拨轮，以刻度、中心标记和紧度环表达当前手感
+[OUTPUT]: 轻点切换粗/精档，长按后仍可拨动，取消或失去捕获时复位；刻度和紧度环表达手感
 [POS]: 控制组件层；采集显式切档、相对位移与可靠压力，不持有世界角且不探测目标球或袋口
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { markControlLearned } from '../control-onboarding';
+import { CONTROL_LAYOUT_TOUCH_LONG_PRESS_MS } from '../layout/control-layout';
 import {
   aimDialMode,
   aimDialPressureProfile,
@@ -29,7 +30,13 @@ export function AimDial({
   onTogglePrecision,
 }: AimDialProps) {
   const lastCoordRef = useRef<number | null>(null);
-  const gestureStartRef = useRef<{ pointerId: number; x: number; y: number; changed: boolean } | null>(null);
+  const gestureStartRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    time: number;
+    changed: boolean;
+  } | null>(null);
   const pressureDetectedRef = useRef(false);
   const [tickOffset, setTickOffset] = useState(0);
   const [active, setActive] = useState(false);
@@ -59,7 +66,9 @@ export function AimDial({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     if (!allowToggle) return;
-    const toggled = travel < 6 && onTogglePrecision();
+    const tapped = travel < 6 && !start.changed &&
+      event.timeStamp - start.time < CONTROL_LAYOUT_TOUCH_LONG_PRESS_MS;
+    const toggled = tapped && onTogglePrecision();
     if (toggled || start.changed) markControlLearned('aim-dial');
   };
 
@@ -81,11 +90,18 @@ export function AimDial({
       aria-valuenow={precisionActive ? 1 : 0}
       aria-valuetext={label}
       onPointerDown={(event) => {
+        if (gestureStartRef.current || event.button !== 0) return;
         event.stopPropagation();
         event.preventDefault();
         lastCoordRef.current =
           orientation === 'vertical' ? event.clientY : event.clientX;
-        gestureStartRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, changed: false };
+        gestureStartRef.current = {
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          time: event.timeStamp,
+          changed: false,
+        };
         pressureDetectedRef.current = false;
         const pressure = aimDialPressureProfile(
           event.pointerType,
@@ -116,6 +132,7 @@ export function AimDial({
       }}
       onPointerUp={(event) => finish(event, true)}
       onPointerCancel={(event) => finish(event, false)}
+      onLostPointerCapture={(event) => finish(event, false)}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         const backward = orientation === 'vertical' ? 'ArrowUp' : 'ArrowLeft';

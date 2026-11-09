@@ -1,16 +1,15 @@
 import { addShotHighlight, EMPTY_HIGHLIGHTS } from './match/highlights';
 import { ControlHelp } from './components/ControlHelp';
-import { positionAfterPot } from './opponent/position-observation';
+import { observePlayerShot } from './opponent/position-observation';
 /*
 [INPUT]: 自动播放的短 WebP 开场；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 本局真实击球亮点聚合、可触摸自由球光圈与既有对局编排； 对外提供8秒影片到第一视角的连续开场及输入门禁、可跳过/重看的穿透式引导、首次视角提示、陪练/挑战、复盘/训练总结、运动快照、幽灵球瞄准、双指回退与赞美卡册
+[OUTPUT]: 教学/分组/犯规与鼓励共用小头像通道、本局击球亮点与触摸自由球；既有8秒开场、双视角、训练与赞美卡册
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
 import { gameStorage } from './minitool/persistent-storage';
 import { createShotLease } from './shot-lifecycle';
 import { rewardForStoppedShot, type ShotReward } from './shot-reward';
-import { PauseMenu } from './components/PauseMenu';
 import { CompanionCollectionBook } from './components/CompanionCollection';
 import { RoyalIcon } from './components/RoyalIcon';
 import { OpeningFilm } from './components/OpeningFilm';
@@ -30,6 +29,7 @@ import {
   TABLE,
   strikeCueBall,
   cloneWorld,
+  type BilliardsWorld,
 } from './physics';
 import { legalNumbers } from './match/match-machine';
 import { useShotInput } from './input/use-shot-input';
@@ -46,6 +46,7 @@ import { usePositionPlan } from './hooks/usePositionPlan';
 import { useAimAssist } from './hooks/useAimAssist';
 import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
+import { createCompanionDialogue, type CompanionDialogue } from './opponent/companion-dialogue';
 import { ControlDeck } from './components/ControlDeck';
 import { PlanOverlay } from './components/PlanOverlay';
 import { PlanStatusNotice } from './components/PlanStatusNotice';
@@ -55,7 +56,7 @@ import { ScenePicker } from './components/ScenePicker';
 import { Scene3D } from './Scene3D';
 import type { PlannedStep, PositionPlan } from './planner/search';
 import { buildShotReview, type ShotCapture, type ShotReview } from './planner/review';
-import { findPrecisionAim } from './aim/aim-solution';
+import { findPrecisionAim, firstObjectHit } from './aim/aim-solution';
 import { cameraFramingForAim } from './camera-aim-intent';
 import {
   cameraSafetyFromControlRects,
@@ -80,7 +81,7 @@ import {
   observeShotCameraFollow,
   type ShotCameraFollowState,
 } from './shot-camera-follow';
-import type { GameMode, PositionOutcome } from './opponent/model';
+import type { GameMode } from './opponent/model';
 import {
   guideStepAfterEvent,
   guideAfterSettlement, GUIDE_PROGRESS_KEY,
@@ -90,16 +91,11 @@ import {
   type FirstMatchGuideStep,
 } from './first-match-guide';
 
-type SkillShotCapture = {
-  target: number | null;
-  pocket: number | null;
-  tolerance: number | null;
-  assisted: boolean;
-};
-
 const TOUCH_AIM_CAMERA_RELEASE_MS = 650;
 const POCKETED_SHOT_CAMERA_HOLD_MS = 420;
 const STOPPED_SHOT_CAMERA_HOLD_MS = 260;
+const FAR_SHOT_MIN_DISTANCE = TABLE.length * .58;
+const FAR_SHOT_VIEW_LINE = '这球有点远，切到全局视角，瞄得更准。';
 
 function browserStorage(): ReturnType<typeof gameStorage> {
   if (typeof window === 'undefined') return null;
@@ -110,7 +106,7 @@ function browserStorage(): ReturnType<typeof gameStorage> {
   }
 }
 
-/** 避开比分栏与手机默认右侧工具列；自由拖动控件不扩大构图边距。 */
+/** 避开比分、竖屏台词留白和默认停靠控件；自由控件不扩大构图边距。 */
 function aimCameraSafetyFor(viewport: HTMLElement) {
   const bounds = viewport.getBoundingClientRect();
   const controls: Array<{ left: number; top: number; right: number; bottom: number; dockEdge: 'top' | 'right' | 'bottom' }> = [];
@@ -129,8 +125,10 @@ function aimCameraSafetyFor(viewport: HTMLElement) {
     }
   }
   const x = 4 / Math.max(1, bounds.width);
-  const y = 4 / Math.max(1, bounds.height);
-  return cameraSafetyFromControlRects(bounds, controls, { left: x, right: x, top: y, bottom: y }, 4);
+  const height = Math.max(1, bounds.height);
+  const speechInset = parseFloat(getComputedStyle(viewport).getPropertyValue('--portrait-speech-safe-top')) || 0;
+  const y = 4 / height;
+  return cameraSafetyFromControlRects(bounds, controls, { left: x, right: x, top: Math.max(4, speechInset) / height, bottom: y }, 4);
 }
 
 function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
@@ -138,16 +136,18 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 }
 
 export default function Game() {
-  const [paused, setPaused] = useState(() => typeof document !== 'undefined' && document.hidden);
+  const [pageHidden, setPageHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const gamePaused = paused || collectionOpen || helpOpen;
+  const gamePaused = pageHidden || collectionOpen || helpOpen;
   useEffect(() => {
-    const hidden = () => { if (document.hidden) setPaused(true); };
-    document.addEventListener('visibilitychange', hidden);
-    return () => document.removeEventListener('visibilitychange', hidden);
+    const syncVisibility = () => setPageHidden(document.hidden);
+    document.addEventListener('visibilitychange', syncVisibility);
+    syncVisibility();
+    return () => document.removeEventListener('visibilitychange', syncVisibility);
   }, []);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [sceneRevision, setSceneRevision] = useState(0);
   const [openingActive, setOpeningActive] = useState(true);
   const [filmVisible, setFilmVisible] = useState(true);
   const openingCompletedRef = useRef(false);
@@ -179,6 +179,41 @@ export default function Game() {
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
+
+  const dialogueDirector = useRef<ReturnType<typeof createCompanionDialogue> | null>(null);
+  if (!dialogueDirector.current) dialogueDirector.current = createCompanionDialogue();
+  const [dialogue, setDialogue] = useState<CompanionDialogue | null>(null);
+  const [guideSpeech, setGuideSpeech] = useState<string | null>(null);
+  const [viewSpeech, setViewSpeech] = useState<string | null>(null);
+  const [farShotHint, setFarShotHint] = useState<number | null>(null);
+  const lastFarShotHint = useRef<{ world: BilliardsWorld; shot: number } | null>(null);
+  const onDialogueShown = useCallback((id: number) => { dialogueDirector.current?.shown(id, performance.now()); }, []);
+  useEffect(() => {
+    if (!dialogue || (dialogue.kind && (gamePaused || openingActive || scenePickerOpen || renderError))) return;
+    const timer = window.setTimeout(() => {
+      setDialogue(current => current?.id === dialogue.id ? null : current);
+    }, dialogue.kind === 'rule' ? 4800 : dialogue.kind === 'progress' ? 3600 : 2800);
+    return () => window.clearTimeout(timer);
+  }, [dialogue, gamePaused, openingActive, scenePickerOpen, renderError]);
+  const dialogueCompanion = useRef(match.companionId);
+  useEffect(() => {
+    if (dialogueCompanion.current === match.companionId) return;
+    dialogueCompanion.current = match.companionId;
+    setDialogue(null); dialogueDirector.current?.cancel();
+  }, [match.companionId]);
+  useEffect(() => {
+    if (gamePaused || openingActive || scenePickerOpen || renderError) {
+      setDialogue(current => current?.kind ? current : null);
+      if (!dialogue?.kind) dialogueDirector.current?.cancel();
+      return;
+    }
+    const director = dialogueDirector.current!;
+    const choice = match.phase === 'aiming' && match.breaking
+      ? director.ready(match.companionId, performance.now())
+      : match.phase === 'opponent' && !dialogue?.kind && match.messageKey !== 'foul'
+        ? director.thinking(match.companionId, performance.now()) : null;
+    if (choice) setDialogue(choice);
+  }, [gamePaused, openingActive, scenePickerOpen, renderError, match.phase, match.breaking, match.companionId, match.messageKey, dialogue?.kind]);
 
   const legalTargets = useMemo(
     () =>
@@ -322,8 +357,8 @@ export default function Game() {
 
   // ── 击球复盘（默认收起；玩家从灯泡打开后才显示最新复盘）──
   // 出杆瞬间在 handleCommit 的 doShot 里捕获快照；对手杆走 useOpponentAI 不经此路，天然只记玩家杆
-  const shotCaptureRef = useRef<ShotCapture | null>(null);
-  const skillShotCaptureRef = useRef<SkillShotCapture | null>(null);
+  const shotCaptureRef = useRef<(ShotCapture & { startedWithFreeBall: boolean; assisted: boolean }) | null>(null);
+  const freeBallPendingRef = useRef(false);
   const [shotReview, setShotReview] = useState<ShotReview | null>(null);
   const [reviewEnabled, setReviewEnabled] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -614,6 +649,8 @@ export default function Game() {
     const lease = createShotLease(worldRef, matchRef, 'player');
     if (!lease.current()) return;
     setShotReward(null);
+    setDialogue(null);
+    dialogueDirector.current?.cancel();
     setTouchAimCameraLocked(false);
     const angle = aimRef.current;
     const cueBall = getCueBall(worldRef.current);
@@ -637,16 +674,11 @@ export default function Game() {
       const declaredIntent = currentMatch.breaking
         ? null
         : findPrecisionAim(worldRef.current, angle, legal);
-      skillShotCaptureRef.current = {
-        target: declaredIntent?.target ?? null,
-        pocket: declaredIntent?.pocket ?? null,
-        tolerance: declaredIntent?.halfWidth ?? null,
-        assisted: planConsultedRef.current,
-      };
-      planConsultedRef.current = false;
       // 击球前快照（复盘捕获点）：strikeCueBall 会改写 worldRef，必须先克隆
       shotCaptureRef.current = {
         worldBefore: cloneWorld(worldRef.current),
+        startedWithFreeBall: freeBallPendingRef.current,
+        assisted: planConsultedRef.current,
         angle,
         power: intent.power,
         spin: intent.spin,
@@ -661,12 +693,13 @@ export default function Game() {
           : null,
         breaking: currentMatch.breaking,
       };
+      planConsultedRef.current = false;
       consultedPlanStepRef.current = null;
       if (!strikeCueBall(worldRef.current, angle, intent.power, intent.spin)) {
         shotCaptureRef.current = null;
-        skillShotCaptureRef.current = null;
         return;
       }
+      freeBallPendingRef.current = false;
       advanceFirstMatchGuide('shot-committed');
       markControlLearned('shoot');
       const followedTarget = declaredIntent && aimCameraFraming &&
@@ -999,16 +1032,19 @@ export default function Game() {
   }, [advanceFirstMatchGuide]);
 
   // ── 重置游戏 ──
-  const handleResetGame = useCallback((nextMode: GameMode) => {
+  const handleResetGame = useCallback((nextMode: GameMode, isReplay = false) => {
     scene3DRef.current?.cancelStrike();
     cancelCharge();
     shotCaptureRef.current = null;
+    freeBallPendingRef.current = false;
     setShotReview(null); setReviewOpen(false);
     resetEvents();
     followShotPendingRef.current = false;
     setFollowShotPending(false);
     setCollectionOpen(false);
     setShotReward(null);
+    setDialogue(null);
+    dialogueDirector.current?.reset(isReplay);
     setMatchHighlights(EMPTY_HIGHLIGHTS);
     resetGame(setAim, nextMode);
     markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
@@ -1017,18 +1053,30 @@ export default function Game() {
     showFullTable();
     planConsultedRef.current = false;
     consultedPlanStepRef.current = null;
-    skillShotCaptureRef.current = null;
     aimGhostDistRef.current = null;
     if (firstMatchGuideStepRef.current) { firstMatchGuideStepRef.current = 'first-power'; setFirstMatchGuideStep('first-power'); }
   }, [showFullTable, resetGame, setAim, setSpin, aimGhostDistRef, cancelCharge, resetEvents]);
   const handleReplay = useCallback(() => {
-    handleResetGame(gameMode);
-  }, [gameMode, handleResetGame]);
+    if (renderError) {
+      setRenderError(null);
+      setSceneRevision(revision => revision + 1);
+    }
+    handleResetGame(gameMode, true);
+  }, [gameMode, handleResetGame, renderError]);
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
     const before = matchRef.current;
     const settlement = settleShotRaw(setViewLevel);
+    const capture = shotCaptureRef.current;
+    shotCaptureRef.current = null;
+    if (settlement) {
+      freeBallPendingRef.current = settlement.resolution.effects.some(effect => effect.type === 'request-player-placement');
+      const context = capture && before.actor === 'player'
+        ? { ...capture, events: worldRef.current.events, executionSigma: playerSkill.executionSigma }
+        : undefined;
+      setDialogue(dialogueDirector.current!.settle(before, settlement.facts, settlement.resolution, performance.now(), context));
+    }
     if (settlement) setMatchHighlights(previous => addShotHighlight(previous, before, settlement.facts, settlement.resolution));
     setShotReward(settlement ? rewardForStoppedShot(settlement.facts, settlement.resolution) : null);
     if (settlement && firstMatchGuideStepRef.current) {
@@ -1037,8 +1085,6 @@ export default function Game() {
       else { firstMatchGuideStepRef.current = next; setFirstMatchGuideStep(next); }
     }
     // 复盘生成：有捕获（玩家杆）→ 判定；无捕获（对手杆）→ 清掉旧复盘
-    const capture = shotCaptureRef.current;
-    shotCaptureRef.current = null;
     const review = capture && settlement
       ? buildShotReview(capture, {
           pocketed: settlement.facts.pocketed,
@@ -1050,39 +1096,14 @@ export default function Game() {
     // 复盘只生成数据；是否显示由灯泡中的独立开关决定。
     setGuidanceEnabled(false);
 
-    const skillCapture = skillShotCaptureRef.current;
-    skillShotCaptureRef.current = null;
-    if (settlement && skillCapture && capture) {
-      const { facts, resolution } = settlement;
-      const messageKey = resolution.next.messageKey;
-      const foul = messageKey === 'foul' || messageKey === 'lose-8-foul';
-      const pocketed =
-        skillCapture.target !== null && facts.pocketed.includes(skillCapture.target);
-      const plannedCandidate = review?.planned?.candidate;
-      const samePlan =
-        skillCapture.target !== null &&
-        skillCapture.pocket !== null &&
-        plannedCandidate?.target === skillCapture.target &&
-        plannedCandidate.pocket === skillCapture.pocket;
-      let position: PositionOutcome = 'unknown';
-      if (pocketed && !foul && resolution.next.phase !== 'finished') {
-        position = samePlan
-          ? (review?.verdict === 'perfect' ? 'success' : 'miss')
-          : positionAfterPot(worldRef.current, legalNumbers(worldRef.current, 'player', resolution.next.playerGroup));
-      }
-      recordPlayerShot({
-        tolerance: skillCapture.tolerance,
-        pocketed,
-        foul,
-        position,
-        assisted: skillCapture.assisted,
-      });
+    if (settlement && capture && before.actor === 'player') {
+      recordPlayerShot(observePlayerShot(capture, worldRef.current, before, settlement.facts, settlement.resolution.next));
     }
     if (settlement?.resolution.next.phase === 'finished') {
       completeMatchAssessment(settlement.resolution.next.winner);
       if (settlement.resolution.next.winner === 'player') playVictory();
     }
-  }, [completeMatchAssessment, finishFirstMatchGuide, playVictory, recordPlayerShot, settleShotRaw, setViewLevel]);
+  }, [completeMatchAssessment, finishFirstMatchGuide, playerSkill.executionSigma, playVictory, recordPlayerShot, settleShotRaw, setViewLevel, worldRef]);
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
@@ -1149,6 +1170,7 @@ export default function Game() {
     if (import.meta.env.DEV || import.meta.env.VITE_BJ8_ACCEPTANCE === '1') {
       (window as unknown as { __bj8: unknown }).__bj8 = {
         world: worldRef,
+        shotLog: () => dialogueDirector.current?.snapshot().shots ?? [],
         scene: scene3DRef,
         aim: aimRef,
         match: matchRef,
@@ -1173,9 +1195,9 @@ export default function Game() {
       scene3DRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneEnabled, selectedWorld]);
+  }, [sceneEnabled, selectedWorld, sceneRevision]);
 
-  useEffect(() => { scene3DRef.current?.setPaused(gamePaused || !!renderError); }, [gamePaused, renderError, selectedWorld]);
+  useEffect(() => { scene3DRef.current?.setPaused(gamePaused || !!renderError); }, [gamePaused, renderError, selectedWorld, sceneRevision]);
 
   // ── 同步世界状态到 3D 场景 ──
   useEffect(() => {
@@ -1213,13 +1235,15 @@ export default function Game() {
     spin,
     aimGhostDistRef,
     legalTargets,
+    sceneRevision,
   ]);
 
   const utilityControls = {
     scene: <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>,
     help: <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/></button>,
     cards: <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>,
-    pause: <button className="pause-entry" aria-label="暂停与设置" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setPaused(true); }}><RoyalIcon name="pause"/></button>,
+    // Reuse the saved dock position of the former pause control.
+    pause: <button className="sound-entry" aria-label={muted ? '开启音效' : '关闭音效'} disabled={openingActive || !!renderError} onClick={toggleMuted}><RoyalIcon name={muted ? 'muted' : 'sound'}/></button>,
   };
 
   // Each gesture retires independently after two valid uses, including free-ball placement.
@@ -1234,6 +1258,34 @@ export default function Game() {
       else if (!match.breaking) displayGuide = !guideLearning.learned('ghost') ? 'ghost-place' : !guideLearning.learned('aim') ? 'aim-direction' : !guideLearning.learned('power') ? 'next-power' : null;
     }
   }
+  let farShotTarget: number | null = null;
+  if (canAim && !charging && !match.breaking && !displayGuide && !dialogue?.kind &&
+      !isGlobalCameraView(viewLevel) && !manualCameraActive) {
+    const cue = getCueBall(worldView);
+    const firstHit = firstObjectHit(worldView, aim);
+    const target = worldView.balls.find(ball => ball.number === firstHit);
+    if (cue && target && legalTargets.includes(target.number) &&
+        Math.hypot(cue.x - target.x, cue.z - target.z) >= FAR_SHOT_MIN_DISTANCE) {
+      farShotTarget = target.number;
+    }
+  }
+  const shotNumber = worldView.shot;
+  useEffect(() => {
+    setFarShotHint(null);
+    const world = worldRef.current;
+    const previous = lastFarShotHint.current;
+    if (farShotTarget === null || previous?.world === world && previous.shot === shotNumber) return;
+    let hideTimer: number | undefined;
+    const showTimer = window.setTimeout(() => {
+      lastFarShotHint.current = { world, shot: shotNumber };
+      setFarShotHint(shotNumber);
+      hideTimer = window.setTimeout(() => setFarShotHint(null), 4200);
+    }, 520);
+    return () => {
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [farShotTarget, shotNumber, worldRef]);
   const getGuideTablePoint = useCallback(() => {
     const scene = scene3DRef.current;
     if (!scene) return null;
@@ -1249,20 +1301,19 @@ export default function Game() {
   // ── 渲染 ──
   return (
     <div className={`game-shell royal-game${import.meta.env.DEV ? ' follow-ab' : ''}`} data-paused={gamePaused ? 'true' : undefined} data-guide={displayGuide ?? undefined} data-world={selectedWorld} data-match-finished={match.phase === 'finished' ? 'true' : undefined} data-opening={openingActive && !renderError ? 'true' : undefined}>
-      {renderError && <div role="alert" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 9998, background: '#10251b', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      {renderError && match.phase !== 'finished' && <div role="alert" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 9998, background: '#10251b', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <p>{renderError}</p><button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 12 }}>重新进入</button>
       </div>}
       {openingActive && !renderError && (selectedWorld === 'castle'
         ? filmVisible && <OpeningFilm src={openingMovie} onFinish={skipped => { setFilmVisible(false); if (skipped) scene3DRef.current?.finishOpening(); else scene3DRef.current?.beginFilmHandoff(); }}/>
         : <div className="royal-opening"><button className="opening-skip" aria-label="跳过开场" onClick={() => scene3DRef.current?.finishOpening()}><RoyalIcon name="skip"/></button></div>)}
-      {paused && !collectionOpen && !renderError && <PauseMenu onCollection={() => setCollectionOpen(true)} gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} muted={muted} onMute={toggleMuted} onResume={() => setPaused(false)} onRestart={() => { handleReplay(); setPaused(false); }} />}
-      {helpOpen && <ControlHelp onClose={() => setHelpOpen(false)} onReplayGuide={match.phase === 'finished' ? undefined : () => {
+      {helpOpen && <ControlHelp onClose={() => setHelpOpen(false)} gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} onReplayGuide={match.phase === 'finished' ? undefined : () => {
         const step = match.actor === 'opponent' ? 'turn-wait' : match.phase === 'placing' ? 'free-place' : match.breaking ? 'first-power' : 'ghost-place';
         firstMatchGuideStepRef.current = step; setFirstMatchGuideStep(step);
         setGuideDismissed(false); setManualGuide(true); setHelpOpen(false);
       }}/>}
       {collectionOpen && <CompanionCollectionBook collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
-      <div className="royal-entry" role="group" aria-label="场景、教学与暂停">
+      <div className="royal-entry" role="group" aria-label="场景、教学与声音">
         {Object.entries(utilityControls).filter(([id]) => id !== 'cards' || match.phase !== 'finished').map(([id, node]) => <span key={id}>{node}</span>)}
       </div>
       {scenePickerOpen && <ScenePicker value={selectedWorld} disabled={(!canAimBase && match.phase !== 'finished') || openingActive || charging || followShotPending || worldView.moving} onClose={() => setScenePickerOpen(false)} onChange={next => { if ((!canAimBase && match.phase !== 'finished') || openingActive || charging || worldRef.current.moving || followShotPendingRef.current) return; try { browserStorage()?.setItem('princess-billiards:scene:v1', next); } catch { /* Current scene still switches. */ } const url = new URL(location.href); url.searchParams.set('world', next); url.searchParams.delete('lake360'); history.replaceState(null, '', url.href); setSelectedWorld(next); setScenePickerOpen(false); }} />}
@@ -1301,7 +1352,12 @@ export default function Game() {
         placementHalo={placementHalo}
         highlights={matchHighlights}
         victoryPraise={victoryPraise}
-        shotReward={shotReward}
+        dialogue={!gamePaused && !openingActive && !scenePickerOpen && !renderError ? dialogue : null}
+        onDialogueShown={onDialogueShown}
+        guideText={guideSpeech}
+        viewHintText={farShotTarget !== null && farShotHint === shotNumber ? FAR_SHOT_VIEW_LINE : viewSpeech}
+        speechEnabled={!gamePaused && !openingActive && !scenePickerOpen && (!renderError || match.phase === 'finished') && !charging}
+        collection={collection}
         collectionReward={collectionReward}
         collectionSaveFailed={collectionSaveFailed}
         onCollection={() => setCollectionOpen(true)}
@@ -1379,9 +1435,10 @@ export default function Game() {
           onClose={handleCloseReview}
         />
       )}
-      <FirstPersonViewHint active={canAim && !isGlobalCameraView(viewLevel) && !charging}/>
+      <FirstPersonViewHint active={canAim && !isGlobalCameraView(viewLevel) && !charging && !displayGuide} onInstruction={setViewSpeech}/>
       {displayGuide && match.phase !== 'finished' && (
         <FirstMatchGuide
+          onInstruction={setGuideSpeech}
           step={displayGuide}
           getTablePoint={getGuideTablePoint}
           visible={

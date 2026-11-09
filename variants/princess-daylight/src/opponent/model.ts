@@ -1,6 +1,6 @@
 /*
 [INPUT]: 依赖 planner/evaluate 的 erf 进球概率模型；接收所有真实玩家出杆事实
-[OUTPUT]: 玩家整局能力画像与训练总结、按等级跨越袋口容错的谢不赢执行误差、分级战术/走位预算、等级/置信度展示与安全持久化
+[OUTPUT]: 玩家整局能力画像、近局准度与路线证据、训练总结、分级执行误差与安全持久化
 [POS]: 自适应对手纯领域层，不依赖 React/DOM/物理世界；对局中档案锁定，只在整局结束时统一评估
 [PROTOCOL]: 模型字段、更新阈值或模式映射变化时，同步更新本注释、opponent/CLAUDE.md 与 model.test.ts
 */
@@ -27,6 +27,13 @@ export type MatchTrainingSummary = {
   nextGoal: string;
 };
 
+export type MatchSkillAssessment = {
+  accuracyAttempts: number;
+  accuracySuccesses: number;
+  routeAttempts: number;
+  routeSuccesses: number;
+};
+
 export type PlayerSkillProfile = {
   version: 3;
   level: number;
@@ -46,6 +53,8 @@ export type PlayerSkillProfile = {
   lastMatchDelta: number;
   /** Last six completed results, used only for next-match friendliness. */
   recentResults?: boolean[];
+  /** 本局证据按结束顺序保留最近六局，规划辅助样本折权。 */
+  recentAssessments?: MatchSkillAssessment[];
 };
 
 export type OpponentProfile = {
@@ -63,7 +72,7 @@ export type OpponentProfile = {
   tactical: {
     /** 入门局不允许谢不赢主动退回安全球，降低新手连续丢失球权的挫败感。 */
     allowSafety: boolean;
-    /** 固定友好风格选可打让杆的概率，不根据比分变化。 */
+    /** 本局基础让杆率，回合策略另处理领先、连杆与让杆上限。 */
     opportunityChance?: number;
     candidateLimit: number;
     simulationLimit: number;
@@ -88,6 +97,7 @@ export const BEGINNER_START_LEVEL = 25;
 export const OPPONENT_SAFETY_UNLOCK_LEVEL = 50;
 const POSITION_WEIGHT = 0.28;
 const PRECISION_WEIGHT = 1 - POSITION_WEIGHT;
+const RECENT_MATCH_LIMIT = 6;
 export const OPPONENT_AIM_WINDOW_FRACTION = 0.82;
 
 function clamp(value: number, min: number, max: number): number {
@@ -146,6 +156,7 @@ export function createPlayerSkillProfile(): PlayerSkillProfile {
     matchesEvaluated: 0,
     lastMatchDelta: 0,
     recentResults: [],
+    recentAssessments: [],
   };
 }
 
@@ -196,7 +207,7 @@ export function applyMatchObservations(
     const evidenceWeight = observation.assisted ? 0.55 : 1;
     foulAttempts += evidenceWeight;
     if (observation.foul) fouls += evidenceWeight;
-    if (observation.position !== 'unknown') {
+    if (observation.position !== 'unknown' && !observation.foul) {
       positionAttempts += evidenceWeight;
       if (observation.position === 'success') positionSuccesses += evidenceWeight;
     }
@@ -322,9 +333,27 @@ export function buildMatchTrainingSummary(
 /** Completed match only: keep the skill estimate independent of who won. */
 export function assessCompletedMatch(profile: PlayerSkillProfile, observations: ShotSkillObservation[], won: boolean): PlayerSkillProfile {
   const next = applyMatchObservations(profile, observations);
-  return { ...next, matchesEvaluated: profile.matchesEvaluated + 1,
+  const assessment: MatchSkillAssessment = {
+    accuracyAttempts: 0, accuracySuccesses: 0, routeAttempts: 0, routeSuccesses: 0,
+  };
+  for (const raw of observations) {
+    const shot = normalizedObservation(raw);
+    const weight = shot.assisted ? 0.55 : 1;
+    if (shot.tolerance !== null) {
+      assessment.accuracyAttempts += weight;
+      if (shot.pocketed && !shot.foul) assessment.accuracySuccesses += weight;
+    }
+    if (shot.position !== 'unknown' && !shot.foul) {
+      assessment.routeAttempts += weight;
+      if (shot.position === 'success') assessment.routeSuccesses += weight;
+    }
+  }
+  return {
+    ...next, matchesEvaluated: profile.matchesEvaluated + 1,
     lastMatchDelta: observations.length ? next.lastMatchDelta : 0,
-    recentResults: [...(profile.recentResults ?? []), won].slice(-6) };
+    recentResults: [...(profile.recentResults ?? []), won].slice(-RECENT_MATCH_LIMIT),
+    recentAssessments: [...(profile.recentAssessments ?? []), assessment].slice(-RECENT_MATCH_LIMIT),
+  };
 }
 
 /** 兼容纯模型/单杆校准调用；生产对局使用 applyMatchObservations。 */
@@ -458,7 +487,20 @@ function parseProfile(value: unknown): PlayerSkillProfile | null {
     totalPlayerShots: Math.max(0, finite(raw.totalPlayerShots, 0) - pendingObservations.length),
     matchesEvaluated: Math.max(0, finite(raw.matchesEvaluated, 0)),
     lastMatchDelta: finite(raw.lastMatchDelta, finite(raw.lastBatchDelta, 0)),
-    recentResults: Array.isArray(raw.recentResults) ? raw.recentResults.filter((v): v is boolean => typeof v === 'boolean').slice(-6) : [],
+    recentResults: Array.isArray(raw.recentResults) ? raw.recentResults.filter((v): v is boolean => typeof v === 'boolean').slice(-RECENT_MATCH_LIMIT) : [],
+    recentAssessments: Array.isArray(raw.recentAssessments)
+      ? raw.recentAssessments.slice(-RECENT_MATCH_LIMIT)
+        .filter(entry => entry && typeof entry === 'object')
+        .map(entry => {
+          const accuracyAttempts = clamp(finite(entry.accuracyAttempts, 0), 0, Number.MAX_SAFE_INTEGER);
+          const routeAttempts = clamp(finite(entry.routeAttempts, 0), 0, Number.MAX_SAFE_INTEGER);
+          return {
+            accuracyAttempts,
+            accuracySuccesses: clamp(finite(entry.accuracySuccesses, 0), 0, accuracyAttempts),
+            routeAttempts,
+            routeSuccesses: clamp(finite(entry.routeSuccesses, 0), 0, routeAttempts),
+          };
+        }) : [],
   };
   return pendingObservations.length > 0
     ? applyMatchObservations(parsed, pendingObservations)

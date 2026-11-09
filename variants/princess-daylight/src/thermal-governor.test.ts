@@ -35,6 +35,16 @@ function feedWindows(
 }
 
 describe('thermal governor', () => {
+  it('does not combine isolated slow render bursts across idle time', () => {
+    const governor = createThermalGovernor(30);
+    for (const start of [0, 2500, 5000, 7500]) {
+      for (const offset of [0, 50, 100]) {
+        governor.sample({ nowMs: start + offset, renderMs: 25, frameIntervalMs: 50, source: 'cpu-fallback' });
+      }
+    }
+    expect(governor.snapshot().tier).toBe('balanced');
+  });
+
   it('持续高 GPU duty 会从均衡档降到温控档', () => {
     const governor = createThermalGovernor(30);
     const result = feedWindows(governor, 0, 3, 18, 1000 / 30);

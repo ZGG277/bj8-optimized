@@ -116,6 +116,24 @@ describe('continuous camera view', () => {
     expect((minY + maxY) / 2).toBeCloseTo(safety.bottom - safety.top, 3);
   });
 
+  it('竖屏俯视放宽远端，并留出右栏和底部拨轮', () => {
+    const aspect = 390 / 758;
+    const safety = { top: 4 / 758, right: 44 / 390, bottom: 48 / 758, left: 4 / 390 };
+    const pose = cameraPoseAt(0, 0, FULL_TABLE_AZIMUTH, 0, OVERHEAD_VIEW, aspect, safety);
+    const camera = new PerspectiveCamera(CAMERA_FOV_DEGREES, aspect, 0.01, 60);
+    camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    camera.lookAt(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
+    camera.updateMatrixWorld(true);
+    const [far, near] = [-HZ, HZ].map(z => [-HX, HX].map(x => new Vector3(x, 0.04, z).project(camera)));
+    for (const point of [...far, ...near]) {
+      expect(point.x).toBeGreaterThanOrEqual(-1 + safety.left * 2 - 1e-6);
+      expect(point.x).toBeLessThanOrEqual(1 - safety.right * 2 + 1e-6);
+      expect(point.y).toBeGreaterThanOrEqual(-1 + safety.bottom * 2 - 1e-6);
+      expect(point.y).toBeLessThanOrEqual(1 - safety.top * 2 + 1e-6);
+    }
+    expect((far[1].x - far[0].x) / (near[1].x - near[0].x)).toBeGreaterThan(.95);
+  });
+
   it.each([0, 0.25, 0.6, 1])('在高度 %s 转向 180° 会环绕到球台另一侧', (level) => {
     const forward = cameraPoseAt(0, 0, 0, 0, level);
     const reverse = cameraPoseAt(0, 0, Math.PI, 0, level);
