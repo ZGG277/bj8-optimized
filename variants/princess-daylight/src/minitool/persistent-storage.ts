@@ -28,7 +28,17 @@ let active: SaveStore | null = null;
 function legacy(): Storage | null {
   try { return typeof window === 'undefined' ? null : window.localStorage; } catch { return null; }
 }
+const TOY_SAVE_PREFIX = 'toy:princess-billiards:';
+
 export function gameStorage(): SaveStore | null {
+  if (import.meta.env.VITE_BILIBILI_TOY === '1') {
+    const storage = legacy();
+    if (!storage) return null;
+    return {
+      getItem: key => storage.getItem(TOY_SAVE_PREFIX + key),
+      setItem: (key, value) => storage.setItem(TOY_SAVE_PREFIX + key, value),
+    };
+  }
   return import.meta.env.VITE_MINITOOL === '1' && active ? active : legacy();
 }
 function bounded<T>(request: Promise<T>): Promise<T> {
@@ -115,7 +125,7 @@ export async function createNativeSaveStore(api: NativeCache, old: SaveStore | n
 
 }
 export async function prepareGameStorage() {
-  if (import.meta.env.VITE_MINITOOL !== '1') return;
+  if (import.meta.env.VITE_BILIBILI_TOY === '1' || import.meta.env.VITE_MINITOOL !== '1') return;
   const bridge = (window as Window & { xhs?: Bridge }).xhs;
   const api = bridge?.miniTool;
   let version = Number(bridge?.launchOptions?.miniToolEnv?.buildVersion) || 0;

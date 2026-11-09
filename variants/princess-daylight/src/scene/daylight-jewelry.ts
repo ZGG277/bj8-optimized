@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 原始桌球GLB、共享物理尺寸、宝石光学与已就绪的统一字体、独立暖天空背景。
  * [OUTPUT]: 帮面卷草金丝、暖象牙上缘与下架、末帧深翡翠细绒台呢与同源护口；正常/热档宝石球号统一霞鹜文楷。
- * [POS]: 实际 daylight GLB 视觉适配；消费共享袋口尺寸，不改球光学或曝光；城堡仅暖化既有日光/半球光。
+ * [POS]: 实际 daylight GLB 视觉适配；实验分支补亮城堡日光及暗部，保留球光学/反射环境，sunlit=0可对照旧光照。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import * as THREE from 'three';
@@ -34,15 +34,16 @@ export function setupDaylight(scene:THREE.Scene,renderer:THREE.WebGLRenderer,key
   scene.traverse(o=>{if(o instanceof THREE.AmbientLight)o.intensity=.32;if(o instanceof THREE.HemisphereLight){o.color.set(0xe6f3ff);o.groundColor.set(0x91baa5);o.intensity=.48;}});
   if(castle){
     scene.environment?.dispose();scene.environment=createDaylightEnvironment(renderer);scene.environmentIntensity=.62;scene.environmentRotation.set(0,0,0);
-    renderer.toneMappingExposure=.94;
-    key.position.set(-3.8,5.8,-4.5);key.intensity=2.2;key.color.set(0xffecd0);key.shadow.radius=3;
-    scene.traverse(o=>{if(o instanceof THREE.AmbientLight)o.intensity=.10;if(o instanceof THREE.HemisphereLight){o.color.set(0xe4edf1);o.groundColor.set(0xa39878);o.intensity=.32;}});
+    const sunlit = new URLSearchParams(location.search).get('sunlit') !== '0';
+    renderer.toneMappingExposure=sunlit ? 1.04 : .94;
+    key.position.set(-3.8,5.8,-4.5);key.intensity=sunlit ? 2.55 : 2.2;key.color.set(sunlit ? 0xfff0dd : 0xffecd0);key.shadow.radius=3;
+    scene.traverse(o=>{if(o instanceof THREE.AmbientLight)o.intensity=sunlit ? .22 : .10;if(o instanceof THREE.HemisphereLight){o.color.set(sunlit ? 0xe6f2ff : 0xe4edf1);o.groundColor.set(sunlit ? 0xb9b69c : 0xa39878);o.intensity=sunlit ? .56 : .32;}});
     Object.assign(key.shadow.camera,{left:-6,right:6,top:6,bottom:-6,far:24});key.shadow.camera.updateProjectionMatrix();
     scene.fog=new THREE.Fog(0xded8bf,50,230);
     if(scene.background instanceof THREE.Texture)scene.background.dispose();
     scene.background=createCastleSkyBackground();
   }
-  renderer.domElement.dataset.visualVersion='princess-scene-r2-ball-clarity-20261104';
+  renderer.domElement.dataset.visualVersion='princess-marble-columns-20261107';
 }
 function styleCloth(table:THREE.Group){
   table.traverse(o=>{if(!(o instanceof THREE.Mesh)||!(o.name==='table-cloth'||o.name.startsWith('cushion-')))return;

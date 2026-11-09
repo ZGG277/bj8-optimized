@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { miniToolApi, postVictoryNote, shareFailure, victoryNote } from './share-note';
+import { COMPANIONS } from '../opponent/companions';
 afterEach(() => vi.unstubAllGlobals());
 describe('小工具分享合同', () => {
   it('无容器时不伪造平台能力', () => {
@@ -14,7 +15,9 @@ describe('小工具分享合同', () => {
     expect(postNote).toHaveBeenCalledWith(draft);
     expect(draft.title.length).toBeLessThanOrEqual(20);
     expect(draft.content.length).toBeLessThanOrEqual(1000);
-    expect(draft.content).toContain('挑战');
+    expect(draft.content.split('\n').pop()).toBe('＃小红书小工具 ＃公主请开球 ＃台球 ＃挑战模式');
+    expect(draft.title).toBe('这一局公主又赢了');
+    expect(draft.content).toContain('公主宝宝好棒啊💕💕✨');
     expect(draft.mediaInfo.image_resources).toHaveLength(1);
     expect(() => victoryNote('https://example.com/card.jpg', 'practice')).toThrow();
   });
@@ -25,15 +28,21 @@ describe('小工具分享合同', () => {
 });
 
 describe('real two-image victory draft', () => {
- it('keeps the visible card first, castle second and the tool topic prefilled', async () => {
-  const card='data:image/jpeg;base64,Y2FyZA==',scene='data:image/jpeg;base64,c2NlbmU=';
-  const draft=victoryNote(card,'practice','沈予白',scene);
-  expect(draft.content).toContain('#小红书小工具');expect(draft.mediaInfo.image_resources.map(x=>x.url)).toEqual([card,scene]);
-  const writeTempFile=vi.fn().mockResolvedValueOnce({filePath:'tmp/card.jpg'}).mockResolvedValueOnce({filePath:'tmp/castle.jpg'});
+ it('keeps the generated composite cover first, original card second and the real winner list', async () => {
+  const cover='data:image/jpeg;base64,Y292ZXI=',card='data:image/jpeg;base64,Y2FyZA==';
+  const names=[COMPANIONS[0].name,COMPANIONS[1].name,COMPANIONS[9].name];
+  const draft=victoryNote(cover,'practice',COMPANIONS[9].name,card,true,names);
+  expect(draft.content).toContain(`本公主已经赢过${names.join('、')}啦`);
+  expect(draft.content.split(COMPANIONS[9].name)).toHaveLength(2);
+  expect(draft.content).not.toContain(COMPANIONS[8].name);
+  expect(draft.content.split('\n').pop()).toBe('＃小红书小工具 ＃公主请开球 ＃台球 ＃陪练模式');expect(draft.mediaInfo.image_resources.map(x=>x.url)).toEqual([cover,card]);
+  const writeTempFile=vi.fn().mockResolvedValueOnce({filePath:'tmp/cover.jpg'}).mockResolvedValueOnce({filePath:'tmp/card.jpg'});
   const postNote=vi.fn().mockRejectedValue({errMsg:'postNote:fail cancel'});
-  await expect(postVictoryNote({writeTempFile,postNote},card,'practice','沈予白',scene)).rejects.toMatchObject({errMsg:'postNote:fail cancel'});
-  expect(writeTempFile.mock.calls).toEqual([[{data:card}],[{data:scene}]]);
-  expect(postNote.mock.calls[0][0].mediaInfo.image_resources).toEqual([{url:'tmp/card.jpg'},{url:'tmp/castle.jpg'}]);
+  await expect(postVictoryNote({writeTempFile,postNote},cover,'practice',COMPANIONS[9].name,card,true,names)).rejects.toMatchObject({errMsg:'postNote:fail cancel'});
+  expect(writeTempFile.mock.calls).toEqual([[{data:cover}],[{data:card}]]);
+  expect(postNote.mock.calls[0][0].mediaInfo.image_resources).toEqual([{url:'tmp/cover.jpg'},{url:'tmp/card.jpg'}]);
+  expect(postNote.mock.calls[0][0].title).toBe(draft.title);
+  expect(postNote.mock.calls[0][0].content).toBe(draft.content);
  });
  it('rejects missing temporary paths and accepts base64 when the file bridge is absent',async()=>{
   const image='data:image/jpeg;base64,YQ=='; const postNote=vi.fn().mockResolvedValue({errMsg:'ok'});
@@ -43,6 +52,14 @@ describe('real two-image victory draft', () => {
 });
 
 it('keeps a comfort card share honest after an early black-eight loss', () => {
-  const draft=victoryNote('data:image/jpeg;base64,YQ==','practice','陆璟辰',undefined,false);
-  expect(draft.title).not.toContain('赢');expect(draft.content).not.toContain('赢下');expect(draft.content).toContain('#小红书小工具');
+  const draft=victoryNote('data:image/jpeg;base64,YQ==','practice','陆璟辰',undefined,false,COMPANIONS.map(c=>c.name));
+  expect(draft.title).not.toContain('赢');expect(draft.content).not.toContain('赢下');expect(draft.content.split('\n').pop()).toBe('＃小红书小工具 ＃公主请开球 ＃台球');
+  expect(draft.content).not.toContain('已经赢过');expect(draft.mediaInfo.image_resources).toHaveLength(1);
+});
+
+it('filters unknown names and deduplicates the full ten-opponent draft within platform limits', () => {
+  const names=COMPANIONS.map(c=>c.name),draft=victoryNote('data:image/jpeg;base64,YQ==','practice',names[0],undefined,true,[...names,...names,'路过的人']);
+  expect(draft.content).not.toContain('路过的人');
+  for(const name of names)expect(draft.content.split(name)).toHaveLength(2);
+  expect(draft.content.length).toBeLessThanOrEqual(1000);expect(draft.title.length).toBeLessThanOrEqual(20);
 });

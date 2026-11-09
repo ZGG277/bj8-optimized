@@ -1,6 +1,6 @@
 /**
  * [INPUT]: THREE、合并几何与独占资源壳体。
- * [OUTPUT]: 暖米黄大理石平台、非条带细云纹/窄拼缝与柔和磨光、哑光柱廊；不含远景城堡。
+ * [OUTPUT]: 暖米黄大理石平台、非条带细云纹/窄拼缝与柔和磨光、细纹大理石柱廊；无花台或绿植。
  * [POS]: 可玩露台渲染壳体；与开场暖石材衔接，不影响碰撞。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -58,14 +58,35 @@ function stoneMaps() {
   });
   return {color:maps[0],height:maps[1],roughness:maps[2],textures:maps};
 }
+/** 柱身专用连续石纹，无砖缝；暖白底、稀疏灰金矿脉与克制磨光。 */
+function columnMarble() {
+  const size=512,data=new Uint8Array(size*size*4);
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++) {
+    const u=x/size,v=y/size;
+    const cloud=stoneNoise(u,v,5,9,227),warp=stoneNoise(u,v,11,13,263);
+    const mineral=stoneNoise(u+cloud*.045,v+warp*.025,17,23,317);
+    const fine=stoneNoise(u,v,73,91,359);
+    const vein=Math.pow(Math.max(0,1-Math.abs(mineral+cloud*.28)/.065),1.5);
+    const shade=cloud*4.5+warp*2+fine*.6-vein*24;
+    const i=(y*size+x)*4;
+    data.set([225+shade,221+shade*.94,210+shade*.83,255],i);
+  }
+  const map=new THREE.DataTexture(data,size,size,THREE.RGBAFormat);
+  map.name='Columns | warm marble grey-gold mineral veins';map.colorSpace=THREE.SRGBColorSpace;
+  map.wrapS=map.wrapT=THREE.RepeatWrapping;map.magFilter=THREE.LinearFilter;
+  map.minFilter=THREE.LinearMipmapLinearFilter;map.generateMipmaps=true;map.anisotropy=4;map.needsUpdate=true;
+  const material=new THREE.MeshPhysicalMaterial({name:'Columns | softly polished marble',color:0xffffff,map,bumpMap:map,bumpScale:.00022,roughness:.43,metalness:0,clearcoat:.08,clearcoatRoughness:.42,specularIntensity:.42,envMapIntensity:.48});
+  return {map,material};
+}
+
 export function createCastlePlatform(){
   const root=new THREE.Group();root.name='world-shell-castle';
-  const stone=stoneMaps(),time={value:0};
+  const stone=stoneMaps(),marble=columnMarble(),time={value:0};
   const materials={
     stone:new THREE.MeshPhysicalMaterial({color:0xf4f1e9,map:stone.color,bumpMap:stone.height,bumpScale:.0012,roughnessMap:stone.roughness,roughness:.67,metalness:0,clearcoat:.045,clearcoatRoughness:.50,specularIntensity:.28,envMapIntensity:.32}),
     ivory:new THREE.MeshStandardMaterial({color:0xc9bea4,roughness:.82}),
     edge:new THREE.MeshStandardMaterial({color:0x94866a,roughness:.67,metalness:.12}),
-    sage:new THREE.MeshStandardMaterial({color:0x719181,roughness:.75,side:THREE.DoubleSide}),
+    column:marble.material,
   };
   type Kind=keyof typeof materials;
   const groups=new Map<Kind,THREE.BufferGeometry[]>();
@@ -74,7 +95,6 @@ export function createCastlePlatform(){
     groups.set(kind,[...(groups.get(kind)??[]),part]);
   };
   const box=(kind:Kind,w:number,h:number,d:number,x:number,y:number,z:number)=>add(kind,new THREE.BoxGeometry(w,h,d),x,y,z);
-  const line=(kind:Kind,points:THREE.Vector3[],radius=.012)=>add(kind,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),8,radius,3,false),0,0,0);
   // Cut stone lip and two shallow steps, no full palace or mountain mesh.
   box('ivory',8.5,.24,9.8,0,-.96,0);box('edge',8.2,.055,9.5,0,-.813,0);
   box('stone',8.1,.09,9.4,0,-.744,0);
@@ -86,13 +106,20 @@ export function createCastlePlatform(){
   for(const x of [-1.9,1.9])for(const z of [-2.43,2.43]){
     const medallion=new THREE.TorusGeometry(.10,.009,4,20);medallion.rotateX(Math.PI/2);add('edge',medallion,x,-.687,z);
   }
-  const pillar=(x:number,z:number)=>{
-    const y=-.68,h=3.42,r=.105;
-    const g=new THREE.CylinderGeometry(r*.78,r,h,16,1),p=g.getAttribute('position');
-    for(let i=0;i<p.count;i++){const a=Math.atan2(p.getZ(i),p.getX(i)),f=1+.045*Math.cos(a*8);p.setX(i,p.getX(i)*f);p.setZ(i,p.getZ(i)*f);}g.computeVertexNormals();add('ivory',g,x,y+h/2,z);
-    for(const dy of [0,.10,h-.13,h]){const top=dy>1;add('ivory',new THREE.CylinderGeometry(top?.18:.20,top?.13:.21,.075,12),x,y+dy,z);}
-    for(const dy of [.17,h-.20]){const ring=new THREE.TorusGeometry(.108,.014,5,16);ring.rotateX(Math.PI/2);add('edge',ring,x,y+dy,z);}
-    for(let k=0;k<6;k++){const a=k*Math.PI/3;line('ivory',[new THREE.Vector3(x,y+h-.44,z),new THREE.Vector3(x+Math.cos(a)*.09,y+h-.18,z+Math.sin(a)*.09),new THREE.Vector3(x+Math.cos(a)*.18,y+h-.07,z+Math.sin(a)*.18)],.014);}
+  const pillar=(x:number,z:number,r=.105,h=3.42)=>{
+    const y=-.68;
+    const g=new THREE.CylinderGeometry(r*.86,r,h,64,1),p=g.getAttribute('position');
+    for(let i=0;i<p.count;i++){
+      const a=Math.atan2(p.getZ(i),p.getX(i)),flute=1-.055*(.5+.5*Math.cos(a*16));
+      p.setX(i,p.getX(i)*flute);p.setZ(i,p.getZ(i)*flute);
+    }
+    g.computeVertexNormals();add('column',g,x,y+h/2,z);
+    // Separate turned marble bases/capitals, seated below the visible floor surface.
+    for(const dy of [0,.08,.15,h-.18,h-.10,h]) {
+      const cap=dy>1,rr=r*(cap?1.35:1.5);
+      add('column',new THREE.CylinderGeometry(rr,rr*1.06,.06,24),x,y+dy,z);
+    }
+    for(const dy of [.20,h-.23]){const ring=new THREE.TorusGeometry(r*1.02,.009,4,24);ring.rotateX(Math.PI/2);add('edge',ring,x,y+dy,z);}
   };
   const arch=(x:number,z:number,w:number,rotation=0)=>{
     const shape=new THREE.Shape(),r=w/2,h=1.10;
@@ -101,20 +128,13 @@ export function createCastlePlatform(){
     const g=new THREE.ExtrudeGeometry(shape,{depth:.13,bevelEnabled:false,curveSegments:10});g.translate(0,0,-.065);add('ivory',g,x,1.62,z,rotation);
   };
   for(const x of [-3.15,3.15])for(const z of [-3.2,0,3.2])pillar(x,z);
+  for(const x of [-.98,.98])pillar(x,-4.0,.16,2.65);
   for(const x of [-3.15,3.15])for(const z of [-1.6,1.6])arch(x,z,3.2,Math.PI/2);
   for(const x of [-3.15,3.15]){box('ivory',.29,.11,6.6,x,2.82,0);box('edge',.30,.024,6.7,x,2.89,0);}
   // Fine terrace balustrade remains outside the camera/table envelope.
   for(const x of [-3.68,3.68]){
     for(let z=-3.8;z<=3.81;z+=.38){add('ivory',new THREE.LatheGeometry([new THREE.Vector2(.045,0),new THREE.Vector2(.023,.14),new THREE.Vector2(.033,.35),new THREE.Vector2(.024,.60)],6),x,-.68,z);}
     box('ivory',.15,.075,8.15,x,-.025,0);box('edge',.14,.015,8.13,x,.020,0);
-  }
-  for(const x of [-2.78,2.78])for(const z of [-3.92,3.92]){
-    add('ivory',new THREE.CylinderGeometry(.24,.18,.30,12),x,-.53,z);
-    for(let j=0;j<8;j++){
-      const a=j*2.399,r=.12+(j%3)*.075,h=.26+(j%4)*.095;
-      line('sage',[new THREE.Vector3(x,-.39,z),new THREE.Vector3(x+Math.cos(a)*r*.55,-.26+h*.4,z+Math.sin(a)*r*.55),new THREE.Vector3(x+Math.cos(a)*r,-.39+h,z+Math.sin(a)*r)],.008);
-      const leaf=new THREE.SphereGeometry(.095,5,3);leaf.scale(.38,1,.12);leaf.rotateZ(.45);add('sage',leaf,x+Math.cos(a)*r,-.39+h,z+Math.sin(a)*r,a);
-    }
   }
   for(const [kind,parts]of groups){const g=mergeGeometries(parts)!;parts.forEach(p=>p.dispose());const mesh=new THREE.Mesh(g,materials[kind]);mesh.name='terrace-'+kind;mesh.castShadow=true;mesh.receiveShadow=true;root.add(mesh);}
   const fabric=new THREE.MeshPhysicalMaterial({color:0xfffdf2,roughness:.76,transparent:true,opacity:.27,side:THREE.DoubleSide,depthWrite:false,sheen:.8,sheenColor:0xffffff,sheenRoughness:.7,forceSinglePass:true});
@@ -129,6 +149,7 @@ export function createCastlePlatform(){
   }
   const g=mergeGeometries(drapes)!;drapes.forEach(p=>p.dispose());const curtains=new THREE.Mesh(g,fabric);curtains.name='terrace-sheer-curtains';root.add(curtains);
   root.userData.updateVisual=(seconds:number)=>{time.value=seconds;};
-  root.userData.visualScope='playable terrace only; distant architecture is not modeled';
-  return ownedWorldShell(root,stone.textures);
+  root.userData.visualScope='marble columns only; no floral modules or planters';
+  root.userData.columnCentres=[[-.98,-4.0],[.98,-4.0],...[-3.15,3.15].flatMap(x=>[-3.2,0,3.2].map(z=>[x,z]))];
+  return ownedWorldShell(root,[...stone.textures,marble.map]);
 }

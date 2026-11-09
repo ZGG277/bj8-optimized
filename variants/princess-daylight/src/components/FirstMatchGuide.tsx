@@ -1,6 +1,6 @@
 /*
 [INPUT]: 当前首局微提示、对局是否允许展示、跳过回调与逐控件学习记录
-[OUTPUT]: 小手和箭头独立对准真实控件；文字旁置避让，只有跳过按钮接收触控
+[OUTPUT]: 小手和箭头独立对准真实控件；实际教学文案交给帅哥单句通道，只有跳过按钮接收触控
 [POS]: HUD 展示层；只观察稳定 DOM 锚点，不持有引导状态或改写对局
 [PROTOCOL]: 提示文案、锚点或布局变化时更新本注释、components/CLAUDE.md 与样式文档
 */
@@ -29,7 +29,7 @@ export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
   'first-power': { text: '下拉蓄力，松手出杆', selector: '[data-control-slot="power"] .shoot-pad' },
   'first-rolling': { text: '看球慢慢停稳', selector: '.scoreboard' },
   'turn-wait': { text: '对手回合，稍等一下', selector: '.scoreboard' },
-  'free-place': { text: '点台面，放好白球', selector: '.viewport' },
+  'free-place': { text: '拖动光圈，松手放好白球', selector: '.viewport' },
   'ghost-place': { text: '点目标球，或拖动瞄准点', selector: '.viewport' },
   'aim-direction': { text: '拨动刻度，微调方向', selector: '[data-control-slot="aimDial"] .aim-dial' },
   'next-power': { text: '下拉蓄力，松手出杆', selector: '[data-control-slot="power"] .shoot-pad' },
@@ -228,6 +228,7 @@ export function positionForAnchor(
 }
 
 interface FirstMatchGuideProps {
+  onInstruction?: (text: string | null) => void;
   getTablePoint?: () => { x: number; y: number } | null;
   textOverride?: string;
   step: FirstMatchGuideStep;
@@ -236,6 +237,7 @@ interface FirstMatchGuideProps {
 }
 
 export function FirstMatchGuide({
+  onInstruction,
   getTablePoint,
   textOverride,
   step,
@@ -332,24 +334,27 @@ export function FirstMatchGuide({
     };
   }, [selectors, visible, getTablePoint, copy.selector, step]);
 
-  if (!visible) return null;
-
   const instruction = textOverride ?? (actionForStep(step) === 'power'
-    ? `${horizontal ? '右拉' : '下拉'}蓄力，松手出杆`
+    ? `按住球杆按钮，${horizontal ? '右拉' : '下拉'}蓄力，松手击球。`
     : copy.text);
+  useEffect(() => {
+    onInstruction?.(visible ? instruction : null);
+    return () => onInstruction?.(null);
+  }, [visible, instruction, onInstruction]);
+  if (!visible) return null;
 
   return (
     <aside
       ref={hintRef}
-      className={`first-match-guide gesture-${actionForStep(step) ?? 'wait'} is-${position?.side ?? 'measuring'} ${horizontal ? 'is-horizontal' : ''}`}
+      className={`first-match-guide${onInstruction ? ' speech-delivered' : ''} gesture-${actionForStep(step) ?? 'wait'} is-${position?.side ?? 'measuring'} ${horizontal ? 'is-horizontal' : ''}`}
       style={{
         left: position?.left ?? -1000,
         top: position?.top ?? -1000,
         visibility: position ? 'visible' : 'hidden',
       } as CSSProperties}
-      role="status"
-      aria-live="polite"
-      aria-label={`新手提示：${instruction}`}
+      role={onInstruction ? undefined : 'status'}
+      aria-live={onInstruction ? undefined : 'polite'}
+      aria-label={onInstruction ? undefined : `新手提示：${instruction}`}
     >
       <svg className={`guide-gesture${gesture ? ' on-control' : ''}`} viewBox="0 0 80 112" fill="none" aria-hidden="true"
         style={gesture && position ? {
@@ -364,7 +369,7 @@ export function FirstMatchGuide({
           <path d="M26 53V28a4 4 0 0 1 8 0v16-5a4 4 0 0 1 8 0v6-3a4 4 0 0 1 8 0v6-1a4 4 0 0 1 8 0v16c0 9-5 15-14 15h-4c-6 0-9-3-13-8l-11-14a4 4 0 0 1 6-5l4 4Z"/>
         </g>
       </svg>
-      <span className="guide-copy">{instruction}</span>
+      {!onInstruction && <span className="guide-copy">{instruction}</span>}
       <button
         type="button"
         className="guide-skip"

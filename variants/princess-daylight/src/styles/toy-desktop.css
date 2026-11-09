@@ -1,0 +1,419 @@
+/* The PC Toy sits inside a resizable iframe. Keep touch layouts on the existing styles. */
+.toy-score-details,
+.toy-tool-label {
+  display: none;
+}
+
+@media (orientation: landscape) and (hover: hover) and (pointer: fine) {
+  .royal-game {
+    --royal-host-gap: 6px;
+    --toy-primary-text: 14px;
+    --toy-action-text: 13px;
+  }
+
+  .royal-game .royal-scoreboard .player-name,
+  .royal-game .royal-scoreboard .royal-eight,
+  .royal-game .companion-moment,
+  .royal-game .royal-foul-status {
+    --royal-font-size: var(--toy-primary-text);
+  }
+
+  .royal-game .companion-moment p {
+    padding: 4px 8px;
+    border-radius: 7px;
+    background: #173b2fdf;
+    color: #fff9e8;
+    text-shadow: none;
+    line-height: 1.45;
+  }
+
+  .royal-game .first-match-guide .guide-copy {
+    font-size: var(--toy-primary-text) !important;
+    max-width: min(230px, 48vw);
+    white-space: normal;
+  }
+
+  .royal-game .royal-pause-card,
+  .royal-game .royal-help-card,
+  .royal-game .royal-card-actions,
+  .royal-share-preview {
+    --royal-font-size: 14px;
+  }
+
+  .royal-game .royal-pause-card h2,
+  .royal-game .royal-help-card h2,
+  .royal-share-preview h2 {
+    --royal-font-size: 17px;
+  }
+
+  .royal-game .royal-help-card {
+    width: min(400px, 100%);
+    padding: 16px 18px;
+  }
+
+  .royal-game .control-deck .view-shortcuts .view-mode-button {
+    --royal-font-size: var(--toy-action-text);
+  }
+
+  .royal-game .control-deck {
+    --toy-dial-width: min(222px, calc(100vw - 124px));
+    --toy-arrow-width: min(176px, calc(100vw - 100px));
+    --toy-dial-clearance: 56px;
+  }
+
+  /* Use the visible control width when a saved dock position reaches an edge. */
+  .royal-game .control-deck .dock-rail-bottom .control-slot-aimDial {
+    --toy-aim-half: calc(var(--toy-dial-width) / 2);
+    left: clamp(
+      var(--toy-aim-half),
+      var(--toy-dock-position, 50%),
+      calc(100% - var(--toy-aim-half) - var(--toy-dial-clearance))
+    ) !important;
+  }
+
+  .royal-game .control-deck .dock-rail-bottom .control-slot-aimDial.is-aim-buttons {
+    --toy-aim-half: calc(var(--toy-arrow-width) / 2);
+  }
+
+  .royal-game .control-deck .control-slot-aimDial.is-aim-buttons .control-slot-body {
+    width: var(--toy-arrow-width);
+    height: 54px;
+  }
+
+  .royal-game .aim-controls {
+    grid-template-columns: minmax(0, 54px) 28px minmax(0, 54px);
+    gap: 5px;
+    padding: 4px;
+  }
+
+  .royal-game .aim-controls button {
+    width: 100%;
+    height: 44px;
+    --royal-font-size: 17px;
+  }
+
+  .royal-game .aim-controls-cue {
+    width: 28px;
+    height: 36px;
+  }
+
+  .royal-game .aim-controls-cue::before {
+    height: 28px;
+  }
+}
+
+/* Match the existing desktop control layout threshold, including split-window use. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 561px) and (hover: hover) and (pointer: fine) {
+  :root {
+    --scoreboard-h: 60px;
+  }
+
+  .royal-game {
+    --toy-view-button-width: 104px;
+    --toy-hit: 44px;
+    --toy-rail-control: 48px;
+  }
+
+  :root[data-theme] .royal-game .royal-scoreboard {
+    height: var(--scoreboard-h);
+    gap: 9px;
+  }
+
+  .royal-game .royal-scoreboard .royal-player {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-areas: "name details" "rack rack";
+    gap: 3px 7px;
+    max-width: 276px;
+    padding: 3px 8px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+  }
+
+  .royal-game .royal-scoreboard .royal-player.opponent {
+    grid-template-columns: minmax(0, 1fr) max-content 22px;
+    grid-template-areas: "details name avatar" "rack rack rack";
+  }
+
+  .royal-game .royal-scoreboard .royal-player[data-active="true"] {
+    background: #e2ecdf;
+    border-color: #adbfaa;
+  }
+
+  .royal-game .royal-scoreboard .player-name {
+    grid-area: name;
+    color: #34473b;
+  }
+
+  .royal-game .royal-scoreboard .player-name::after {
+    display: none;
+  }
+
+  .royal-game .toy-score-details {
+    grid-area: details;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #465547;
+    white-space: nowrap;
+    --royal-font-size: 13px;
+  }
+
+  .royal-game .royal-player.opponent .toy-score-details {
+    justify-content: flex-end;
+  }
+
+  .royal-game .toy-score-count {
+    color: #284e39;
+  }
+
+  .royal-game .toy-score-turn {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: #285541;
+    color: #fff9e8;
+    --royal-font-size: 12px;
+  }
+
+  .royal-game .royal-scoreboard .royal-ball-rack {
+    grid-area: rack;
+    justify-content: flex-start;
+    gap: 5px;
+  }
+
+  .royal-game .royal-player.opponent .royal-ball-rack {
+    justify-content: flex-end;
+  }
+
+  :root[data-theme] .royal-game .royal-scoreboard .royal-ball-rack .mini-ball:not(.unassigned) {
+    display: grid;
+    place-items: center;
+    width: 21px;
+    height: 21px;
+    flex-basis: 21px;
+  }
+
+  .royal-game .royal-ball-rack .mini-ball[data-ball-number]::before {
+    content: attr(data-ball-number);
+    display: grid;
+    place-items: center;
+    color: #fff9ec;
+    text-shadow: 0 1px 2px #171f18, 0 0 2px #171f18, 0 0 2px #171f18;
+    font: 12px/1 var(--royal-font);
+    z-index: 1;
+  }
+
+  .royal-game .royal-ball-rack .mini-ball.stripe::before {
+    color: #302a20;
+    text-shadow: none;
+  }
+
+  :root[data-theme] .royal-game .royal-scoreboard .royal-ball-rack .mini-ball.down {
+    opacity: .52;
+    transform: none;
+  }
+
+  :root[data-theme] .royal-game .royal-scoreboard .mini-ball.royal-eight {
+    width: 25px;
+    height: 25px;
+    flex-basis: 25px;
+  }
+
+  .royal-game .royal-companion-avatar {
+    grid-area: avatar;
+    width: 22px;
+    height: 22px;
+  }
+
+  .royal-game .companion-moment {
+    top: 62px;
+    max-width: min(420px, calc(100% - 130px));
+  }
+
+  .royal-game .companion-moment[data-after-foul] {
+    top: 114px;
+  }
+
+  .royal-game .royal-foul-status {
+    top: 62px;
+    padding: 6px 9px;
+  }
+
+  .royal-game .royal-entry {
+    gap: 4px;
+  }
+
+  .royal-game .royal-entry button[aria-label] {
+    width: auto;
+    min-width: 76px;
+    height: var(--toy-hit);
+    min-height: var(--toy-hit);
+    gap: 4px;
+    padding: 0 8px;
+    background: #f7f4e9e6;
+    color: #375748;
+    --royal-font-size: var(--toy-action-text);
+  }
+
+  .royal-game .royal-entry button[aria-label]:hover,
+  .royal-game .royal-entry button[aria-label]:focus-visible {
+    background: #fffaf0;
+  }
+
+  .royal-game .royal-entry .royal-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .royal-game .royal-entry .toy-tool-label,
+  .royal-game .assist-control .toy-tool-label {
+    display: inline;
+  }
+
+  .royal-game .control-deck {
+    --toy-dial-width: min(230px, calc(100vw - 132px));
+    --toy-dial-clearance: 60px;
+    --floating-power-height: clamp(132px, 24vh, 194px);
+  }
+
+  .royal-game .control-deck .dock-rail-bottom .control-slot-aimDial:not(.is-aim-buttons) .control-slot-body,
+  .royal-game .control-deck .control-slot-aimDial.is-free:not(.is-aim-buttons) .control-slot-body {
+    width: var(--toy-dial-width);
+    height: 54px;
+  }
+
+  .royal-game .control-deck .dock-rail-right .control-slot-aimDial:not(.is-aim-buttons) .control-slot-body {
+    width: var(--toy-rail-control);
+  }
+
+  .royal-game .control-deck .dock-rail-right .control-slot-power .control-slot-body,
+  .royal-game .control-deck .control-slot-power.is-free .control-slot-body {
+    width: var(--toy-rail-control);
+    height: var(--floating-power-height);
+  }
+
+  .royal-game .control-deck .dock-rail-bottom .control-slot-power .control-slot-body {
+    height: var(--toy-hit);
+  }
+
+  .royal-game .control-deck .control-slot-spin .control-slot-body,
+  .royal-game .control-deck .spin-control,
+  .royal-game .control-deck .spin-preview {
+    width: var(--toy-rail-control);
+  }
+
+  .royal-game .control-deck .spin-preview {
+    height: var(--toy-rail-control);
+  }
+
+  .royal-game .control-deck .control-slot-bulb .control-slot-body,
+  .royal-game .control-deck .assist-control,
+  .royal-game .control-deck .plan-button {
+    width: 82px;
+  }
+
+  .royal-game .control-deck .plan-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    height: var(--toy-rail-control);
+    background: #f7f4e9e6;
+    color: #375748;
+    --royal-font-size: var(--toy-action-text);
+  }
+
+  .royal-game .control-deck .dock-rail-right .plan-button > .bulb-icon {
+    transform: none;
+  }
+
+  .royal-game .control-deck .assist-option {
+    width: var(--toy-hit);
+    height: var(--toy-hit);
+  }
+
+  .royal-game .control-deck .assist-option.dial-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 94px;
+    --royal-font-size: var(--toy-action-text);
+  }
+
+  .royal-game .control-deck .dock-rail-right .assist-menu-vertical {
+    right: calc(100% + 8px);
+  }
+
+  .royal-game .control-deck .dock-rail-right {
+    top: calc(var(--royal-host-gap) + var(--scoreboard-h) + env(safe-area-inset-top, 0px) + 8px);
+    right: max(10px, env(safe-area-inset-right, 0px));
+  }
+
+  .royal-game .control-deck .dock-rail-right .control-slot-view.is-default-anchor {
+    top: calc(var(--toy-rail-control) + 8px) !important;
+  }
+
+  .royal-game .control-deck .control-slot-view .control-slot-body {
+    width: var(--toy-view-button-width);
+    height: calc(var(--toy-hit) * 2);
+  }
+
+  .royal-game .control-deck .view-shortcuts .view-mode-button {
+    width: var(--toy-view-button-width);
+    height: var(--toy-hit);
+    min-height: var(--toy-hit);
+    flex-basis: var(--toy-hit);
+  }
+
+  .royal-game .control-deck .dock-rail-bottom .control-slot-view .control-slot-body {
+    width: calc(var(--toy-view-button-width) * 2);
+    height: var(--toy-hit);
+  }
+
+  .royal-game .control-deck .view-shortcuts.is-horizontal .view-mode-button {
+    flex-basis: var(--toy-view-button-width);
+  }
+
+  .royal-game .control-deck .view-shortcuts .view-mode-button {
+    background: #f7f4e9e6;
+    color: #375748;
+  }
+
+  .royal-game .control-deck .view-shortcuts .view-mode-button.is-active {
+    background: #dceadd;
+    color: #264a39;
+  }
+
+  .royal-game .royal-pause-card {
+    width: min(264px, 100%);
+    padding: 16px;
+  }
+
+  .royal-game .pause-tools button,
+  .royal-game .royal-help-card header button,
+  .royal-game .scene-picker header button,
+  .royal-game .companion-book-header button,
+  .royal-game .companion-book-nav button,
+  .royal-share-preview header button {
+    width: var(--toy-hit);
+    height: var(--toy-hit);
+    min-width: var(--toy-hit);
+    min-height: var(--toy-hit);
+  }
+
+  .royal-game .royal-pause-card .pause-resume {
+    width: 52px;
+    height: 52px;
+    padding: 12px;
+  }
+
+  .royal-game .pause-mode select,
+  .royal-game .pause-confirm button,
+  .royal-game .royal-help-card .replay-guide,
+  :root[data-theme] .royal-game .royal-card-actions button,
+  .royal-share-preview .share-preview-download,
+  .royal-share-preview .share-preview-return {
+    min-height: var(--toy-hit);
+  }
+}

@@ -17,6 +17,8 @@ import './styles/controls.css';
 import './styles/themes/index.css';
 import './styles/princess.css';
 
+if (import.meta.env.VITE_BILIBILI_TOY === '1') void import('./styles/toy-desktop.css');
+
 async function boot() {
   try {
     await prepareGameStorage();

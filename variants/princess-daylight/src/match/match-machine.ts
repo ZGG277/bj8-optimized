@@ -24,7 +24,7 @@ export function otherActor(actor: Actor): Actor {
 }
 
 /** 球号 → 分组；8 号不属于任何花色组 */
-function groupOfNumber(n: number): ObjectGroup | null {
+export function groupOfNumber(n: number): ObjectGroup | null {
   if (n >= 1 && n <= 7) return 'solid';
   if (n >= 9 && n <= 15) return 'stripe';
   return null;

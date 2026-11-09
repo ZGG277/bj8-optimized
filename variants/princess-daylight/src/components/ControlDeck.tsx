@@ -123,14 +123,17 @@ function DockableControlSlot({
 
   useEffect(() => () => clearActivation(), []);
 
-  const style: CSSProperties = placement.mode === 'free'
+  const style: CSSProperties & { '--toy-dock-position'?: string } = placement.mode === 'free'
     ? {
         left: `${placement.x * 100}%`,
         top: `${placement.y * 100}%`,
       }
     : placement.edge === 'right'
       ? { top: `${placement.position * 100}%` }
-      : { left: `${placement.position * 100}%` };
+      : {
+          left: `${placement.position * 100}%`,
+          '--toy-dock-position': `${placement.position * 100}%`,
+        };
 
   return (
     <div
@@ -819,6 +822,7 @@ export function ControlDeck({
           }}
         >
           <span className="bulb-icon" aria-hidden="true"><i /></span>
+          {import.meta.env.VITE_BILIBILI_TOY === '1' && <span className="toy-tool-label" aria-hidden="true">辅助</span>}
         </button>
         {assistMenuOpen && (
           <div
@@ -888,6 +892,7 @@ export function ControlDeck({
               ) : (
                 <span className="dial-icon" aria-hidden="true"><i /></span>
               )}
+              {import.meta.env.VITE_BILIBILI_TOY === '1' && <span className="toy-tool-label" aria-hidden="true">{aimDialEnabled ? '方向键' : '拨轮'}</span>}
             </button>
           </div>
         )}

@@ -1,26 +1,32 @@
 /*
-[INPUT]: 依赖 viewLevel / match / 固定俯视观战、首局引导、pointer 处理器与控件学习记录
-[OUTPUT]: 渲染 3D 球桌、手动相机状态、首局语境观战提示及可触摸摆球光圈、角色短台词与真实亮点结算
+[INPUT]: viewLevel / match、已选台词与展示回执、pointer处理器与控件学习记录
+[OUTPUT]: 单一小头像通道按事实优先显示犯规/分组/教学/台词；渲染球桌、摆球光圈及真实亮点结算
 [POS]: HUD 组件层；瞄准拨轮已并入统一可停靠控制层，相机/对局状态由上层持有
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { markControlLearned } from '../control-onboarding';
 import type { MatchState } from '../match/types';
 import type { GameMode, MatchTrainingSummary } from '../opponent/model';
 import { RoyalFinish } from './RoyalFinish';
-import type { CompanionReward } from '../opponent/companion-collection';
+import type { CompanionCollection, CompanionReward } from '../opponent/companion-collection';
 import { CompanionMoment } from './CompanionMoment';
 import type { MatchHighlights } from '../match/highlights';
-import { foulSentence, finishReason } from '../match/presentation';
-import type { ShotReward } from '../shot-reward';
+
+import type { CompanionDialogue } from '../opponent/companion-dialogue';
+import { companionInstruction, terminalFoulInstruction } from '../opponent/companion-instructions';
 
 interface TableStageProps {
   placementHalo?: { x: number; y: number; valid: boolean } | null;
   highlights?: MatchHighlights;
   victoryPraise?: string;
-  shotReward?: ShotReward | null;
+  dialogue?: CompanionDialogue | null;
+  onDialogueShown?: (id: number) => void;
+  guideText?: string | null;
+  viewHintText?: string | null;
+  speechEnabled?: boolean;
   collectionReward?: CompanionReward | null;
+  collection?: CompanionCollection;
   collectionSaveFailed?: boolean;
   onCollection?: () => void;
   viewLevel: number;
@@ -42,8 +48,8 @@ interface TableStageProps {
 export function TableStage({
   placementHalo, highlights,
   victoryPraise,
-  shotReward,
-  collectionReward, collectionSaveFailed, onCollection,
+  dialogue, onDialogueShown, guideText, viewHintText, speechEnabled = true, eightReady,
+  collection, collectionReward, collectionSaveFailed, onCollection,
   viewLevel,
   spectatorActive,
   manualCameraActive,
@@ -56,17 +62,11 @@ export function TableStage({
   onPointerCancel,
   onResetGame,
 }: TableStageProps) {
-  const foul = foulSentence(match);
-  const [foulNotice, setFoulNotice] = useState<string | null>(null);
-  const foulTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (match.phase === 'finished' || match.breaking) { setFoulNotice(null); return; }
-    if (!foul) return;
-    if (foulTimer.current) clearTimeout(foulTimer.current);
-    setFoulNotice(foul);
-    foulTimer.current = setTimeout(() => setFoulNotice(null), 3500);
-  }, [foul, match.phase === 'finished', match.breaking]);
-  useEffect(() => () => { if (foulTimer.current) clearTimeout(foulTimer.current); }, []);
+  const instruction = companionInstruction({
+    match, prioritySpeech: dialogue?.kind ? dialogue : null,
+    guide: guideText, view: viewHintText, eightReady,
+  });
+  const speech = instruction ?? dialogue;
   return (
     <section className="table-stage">
       <div
@@ -81,13 +81,10 @@ export function TableStage({
         onPointerCancel={onPointerCancel}
         onLostPointerCapture={onPointerCancel}
       >
-        {match.phase !== 'finished' && foulNotice && <div className="royal-foul-status" role="status">{foulNotice}</div>}
-        {match.phase === 'placing' && placementHalo && <div className={`free-ball-halo ${placementHalo.valid ? '' : 'invalid'}`} style={{ left: placementHalo.x, top: placementHalo.y }} role="img" aria-label={placementHalo.valid ? '拖动光圈，松手放白球' : '此处不能放球，请拖回台面空位'}><i/><span>拖动 · 松手放球</span></div>}
-        {shotReward && match.phase === 'aiming' && <CompanionMoment companionId={match.companionId} moment="pot" eventId={shotReward.shotId}/>}
-        {match.actor === 'opponent' && (match.phase === 'opponent' || match.phase === 'rolling') && !foulNotice && match.messageKey !== 'foul' && <CompanionMoment companionId={match.companionId} moment="thinking" thinking={match.phase === 'opponent'}/>}
-        {match.phase === 'placing' && match.messageKey.startsWith('place-') && <div className="royal-turn-status" role="status">{match.messageKey === 'place-occupied' ? '这里有球' : match.messageKey === 'place-near-pocket' ? '离袋口远一点' : '放在开球区'}</div>}
+        {match.phase === 'placing' && placementHalo && <div className={`free-ball-halo ${placementHalo.valid ? '' : 'invalid'}`} style={{ left: placementHalo.x, top: placementHalo.y }} role="img" aria-label={placementHalo.valid ? '拖动光圈，松手放白球' : '此处不能放球，请拖回台面空位'}><i/></div>}
+        {speechEnabled && speech && match.phase !== 'finished' && <CompanionMoment key={`${speech.id}:${speech.sceneId}:${speech.text}`} dialogue={speech} onShown={speech.id >= 0 && speech.kind !== 'rule' ? onDialogueShown : undefined}/>}
 
-        {match.phase === 'finished' && <RoyalFinish foulExplanation={match.messageKey === 'lose-8-foul' ? foulSentence(match) : null} highlights={highlights} victoryPraise={victoryPraise} collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} messageKey={match.messageKey} reason={match.messageKey === 'win-8' ? '' : finishReason(match)} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
+        {match.phase === 'finished' && <RoyalFinish foulExplanation={terminalFoulInstruction(match)} highlights={highlights} victoryPraise={victoryPraise} collection={collection} collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} messageKey={match.messageKey} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
       </div>
 
     </section>

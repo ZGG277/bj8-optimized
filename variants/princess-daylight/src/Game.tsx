@@ -3,7 +3,7 @@ import { ControlHelp } from './components/ControlHelp';
 import { positionAfterPot } from './opponent/position-observation';
 /*
 [INPUT]: 自动播放的短 WebP 开场；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 本局真实击球亮点聚合、可触摸自由球光圈与既有对局编排； 对外提供8秒影片到第一视角的连续开场及输入门禁、可跳过/重看的穿透式引导、首次视角提示、陪练/挑战、复盘/训练总结、运动快照、幽灵球瞄准、双指回退与赞美卡册
+[OUTPUT]: 教学/分组/犯规与鼓励共用小头像通道、本局击球亮点与触摸自由球；既有8秒开场、双视角、训练与赞美卡册
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -44,8 +44,10 @@ import { useOpponentAI } from './hooks/useOpponentAI';
 import { useAudioManager } from './hooks/useAudioManager';
 import { usePositionPlan } from './hooks/usePositionPlan';
 import { useAimAssist } from './hooks/useAimAssist';
+import { useAimControlMode } from './hooks/useAimControlMode';
 import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
+import { createCompanionDialogue, type CompanionDialogue } from './opponent/companion-dialogue';
 import { ControlDeck } from './components/ControlDeck';
 import { PlanOverlay } from './components/PlanOverlay';
 import { PlanStatusNotice } from './components/PlanStatusNotice';
@@ -179,6 +181,39 @@ export default function Game() {
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
+
+  const dialogueDirector = useRef<ReturnType<typeof createCompanionDialogue> | null>(null);
+  if (!dialogueDirector.current) dialogueDirector.current = createCompanionDialogue();
+  const [dialogue, setDialogue] = useState<CompanionDialogue | null>(null);
+  const [guideSpeech, setGuideSpeech] = useState<string | null>(null);
+  const [viewSpeech, setViewSpeech] = useState<string | null>(null);
+  const onDialogueShown = useCallback((id: number) => { dialogueDirector.current?.shown(id, performance.now()); }, []);
+  useEffect(() => {
+    if (!dialogue || (dialogue.kind && (gamePaused || openingActive || scenePickerOpen || renderError))) return;
+    const timer = window.setTimeout(() => {
+      setDialogue(current => current?.id === dialogue.id ? null : current);
+    }, dialogue.kind === 'rule' ? 4800 : dialogue.kind === 'progress' ? 3600 : 2800);
+    return () => window.clearTimeout(timer);
+  }, [dialogue, gamePaused, openingActive, scenePickerOpen, renderError]);
+  const dialogueCompanion = useRef(match.companionId);
+  useEffect(() => {
+    if (dialogueCompanion.current === match.companionId) return;
+    dialogueCompanion.current = match.companionId;
+    setDialogue(null); dialogueDirector.current?.cancel();
+  }, [match.companionId]);
+  useEffect(() => {
+    if (gamePaused || openingActive || scenePickerOpen || renderError) {
+      setDialogue(current => current?.kind ? current : null);
+      if (!dialogue?.kind) dialogueDirector.current?.cancel();
+      return;
+    }
+    const director = dialogueDirector.current!;
+    const choice = match.phase === 'aiming' && match.breaking
+      ? director.ready(match.companionId, performance.now())
+      : match.phase === 'opponent' && !dialogue?.kind && match.messageKey !== 'foul'
+        ? director.thinking(match.companionId, performance.now()) : null;
+    if (choice) setDialogue(choice);
+  }, [gamePaused, openingActive, scenePickerOpen, renderError, match.phase, match.breaking, match.companionId, match.messageKey, dialogue?.kind]);
 
   const legalTargets = useMemo(
     () =>
@@ -322,14 +357,14 @@ export default function Game() {
 
   // ── 击球复盘（默认收起；玩家从灯泡打开后才显示最新复盘）──
   // 出杆瞬间在 handleCommit 的 doShot 里捕获快照；对手杆走 useOpponentAI 不经此路，天然只记玩家杆
-  const shotCaptureRef = useRef<ShotCapture | null>(null);
+  const shotCaptureRef = useRef<(ShotCapture & { startedWithFreeBall: boolean }) | null>(null);
+  const freeBallPendingRef = useRef(false);
   const skillShotCaptureRef = useRef<SkillShotCapture | null>(null);
   const [shotReview, setShotReview] = useState<ShotReview | null>(null);
   const [reviewEnabled, setReviewEnabled] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const aimAssist = useAimAssist();
-  // 拨轮是默认瞄准器；灯泡里可切换回方向键。
-  const [aimDialEnabled, setAimDialEnabled] = useState(true);
+  const { aimDialEnabled, toggleAimDial } = useAimControlMode();
   const [guideLearning] = useState(() => createGuideLearning(browserStorage()));
   const [, refreshGuideLearning] = useState(0);
   const guideGesture = useRef(0);
@@ -614,6 +649,8 @@ export default function Game() {
     const lease = createShotLease(worldRef, matchRef, 'player');
     if (!lease.current()) return;
     setShotReward(null);
+    setDialogue(null);
+    dialogueDirector.current?.cancel();
     setTouchAimCameraLocked(false);
     const angle = aimRef.current;
     const cueBall = getCueBall(worldRef.current);
@@ -647,6 +684,7 @@ export default function Game() {
       // 击球前快照（复盘捕获点）：strikeCueBall 会改写 worldRef，必须先克隆
       shotCaptureRef.current = {
         worldBefore: cloneWorld(worldRef.current),
+        startedWithFreeBall: freeBallPendingRef.current,
         angle,
         power: intent.power,
         spin: intent.spin,
@@ -667,6 +705,7 @@ export default function Game() {
         skillShotCaptureRef.current = null;
         return;
       }
+      freeBallPendingRef.current = false;
       advanceFirstMatchGuide('shot-committed');
       markControlLearned('shoot');
       const followedTarget = declaredIntent && aimCameraFraming &&
@@ -999,16 +1038,19 @@ export default function Game() {
   }, [advanceFirstMatchGuide]);
 
   // ── 重置游戏 ──
-  const handleResetGame = useCallback((nextMode: GameMode) => {
+  const handleResetGame = useCallback((nextMode: GameMode, isReplay = false) => {
     scene3DRef.current?.cancelStrike();
     cancelCharge();
     shotCaptureRef.current = null;
+    freeBallPendingRef.current = false;
     setShotReview(null); setReviewOpen(false);
     resetEvents();
     followShotPendingRef.current = false;
     setFollowShotPending(false);
     setCollectionOpen(false);
     setShotReward(null);
+    setDialogue(null);
+    dialogueDirector.current?.reset(isReplay);
     setMatchHighlights(EMPTY_HIGHLIGHTS);
     resetGame(setAim, nextMode);
     markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
@@ -1022,13 +1064,20 @@ export default function Game() {
     if (firstMatchGuideStepRef.current) { firstMatchGuideStepRef.current = 'first-power'; setFirstMatchGuideStep('first-power'); }
   }, [showFullTable, resetGame, setAim, setSpin, aimGhostDistRef, cancelCharge, resetEvents]);
   const handleReplay = useCallback(() => {
-    handleResetGame(gameMode);
+    handleResetGame(gameMode, true);
   }, [gameMode, handleResetGame]);
 
   // ── 物理停止结算 ──
   const settleShot = useCallback(() => {
     const before = matchRef.current;
     const settlement = settleShotRaw(setViewLevel);
+    const capture = shotCaptureRef.current;
+    shotCaptureRef.current = null;
+    if (settlement) {
+      freeBallPendingRef.current = settlement.resolution.effects.some(effect => effect.type === 'request-player-placement');
+      const context = capture && before.actor === 'player' ? { ...capture, events: worldRef.current.events } : undefined;
+      setDialogue(dialogueDirector.current!.settle(before, settlement.facts, settlement.resolution, performance.now(), context));
+    }
     if (settlement) setMatchHighlights(previous => addShotHighlight(previous, before, settlement.facts, settlement.resolution));
     setShotReward(settlement ? rewardForStoppedShot(settlement.facts, settlement.resolution) : null);
     if (settlement && firstMatchGuideStepRef.current) {
@@ -1037,8 +1086,6 @@ export default function Game() {
       else { firstMatchGuideStepRef.current = next; setFirstMatchGuideStep(next); }
     }
     // 复盘生成：有捕获（玩家杆）→ 判定；无捕获（对手杆）→ 清掉旧复盘
-    const capture = shotCaptureRef.current;
-    shotCaptureRef.current = null;
     const review = capture && settlement
       ? buildShotReview(capture, {
           pocketed: settlement.facts.pocketed,
@@ -1082,7 +1129,7 @@ export default function Game() {
       completeMatchAssessment(settlement.resolution.next.winner);
       if (settlement.resolution.next.winner === 'player') playVictory();
     }
-  }, [completeMatchAssessment, finishFirstMatchGuide, playVictory, recordPlayerShot, settleShotRaw, setViewLevel]);
+  }, [completeMatchAssessment, finishFirstMatchGuide, playVictory, recordPlayerShot, settleShotRaw, setViewLevel, worldRef]);
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
@@ -1149,6 +1196,7 @@ export default function Game() {
     if (import.meta.env.DEV || import.meta.env.VITE_BJ8_ACCEPTANCE === '1') {
       (window as unknown as { __bj8: unknown }).__bj8 = {
         world: worldRef,
+        shotLog: () => dialogueDirector.current?.snapshot().shots ?? [],
         scene: scene3DRef,
         aim: aimRef,
         match: matchRef,
@@ -1215,11 +1263,14 @@ export default function Game() {
     legalTargets,
   ]);
 
+  const toyToolLabel = (label: string) => import.meta.env.VITE_BILIBILI_TOY === '1'
+    ? <span className="toy-tool-label" aria-hidden="true">{label}</span>
+    : null;
   const utilityControls = {
-    scene: <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>,
-    help: <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/></button>,
-    cards: <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>,
-    pause: <button className="pause-entry" aria-label="暂停与设置" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setPaused(true); }}><RoyalIcon name="pause"/></button>,
+    scene: <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/>{toyToolLabel('场景')}</button>,
+    help: <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/>{toyToolLabel('说明')}</button>,
+    cards: <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/>{toyToolLabel('卡册')}</button>,
+    pause: <button className="pause-entry" aria-label="暂停与设置" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setPaused(true); }}><RoyalIcon name="pause"/>{toyToolLabel('暂停')}</button>,
   };
 
   // Each gesture retires independently after two valid uses, including free-ball placement.
@@ -1301,7 +1352,12 @@ export default function Game() {
         placementHalo={placementHalo}
         highlights={matchHighlights}
         victoryPraise={victoryPraise}
-        shotReward={shotReward}
+        dialogue={!gamePaused && !openingActive && !scenePickerOpen && !renderError ? dialogue : null}
+        onDialogueShown={onDialogueShown}
+        guideText={guideSpeech}
+        viewHintText={viewSpeech}
+        speechEnabled={!gamePaused && !openingActive && !scenePickerOpen && !renderError && !charging}
+        collection={collection}
         collectionReward={collectionReward}
         collectionSaveFailed={collectionSaveFailed}
         onCollection={() => setCollectionOpen(true)}
@@ -1345,7 +1401,7 @@ export default function Game() {
         onToggleGuidance={handleTogglePlan}
         onToggleReview={handleToggleReview}
         onToggleAimAssist={aimAssist.toggle}
-        onToggleAimDial={() => setAimDialEnabled(current => !current)}
+        onToggleAimDial={toggleAimDial}
         onAimButtonAdjust={handleStableAimButtonAdjust}
         onAimDialAdjust={handleStableAimDialAdjust}
         onToggleAimDialPrecision={toggleAimDialPrecision}
@@ -1379,9 +1435,10 @@ export default function Game() {
           onClose={handleCloseReview}
         />
       )}
-      <FirstPersonViewHint active={canAim && !isGlobalCameraView(viewLevel) && !charging}/>
+      <FirstPersonViewHint active={canAim && !isGlobalCameraView(viewLevel) && !charging && !displayGuide} onInstruction={setViewSpeech}/>
       {displayGuide && match.phase !== 'finished' && (
         <FirstMatchGuide
+          onInstruction={setGuideSpeech}
           step={displayGuide}
           getTablePoint={getGuideTablePoint}
           visible={

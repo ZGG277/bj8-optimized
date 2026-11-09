@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { containRoyalDialogTab } from './royal-dialog-focus';
 import type { GameMode } from '../opponent/model';
-import { FollowAuthor } from './FollowAuthor';
 import { RoyalIcon } from './RoyalIcon';
 
 export function PauseMenu({ muted, onMute, onResume, onRestart, gameMode, onModeChange, onCollection }: {
@@ -30,7 +29,6 @@ export function PauseMenu({ muted, onMute, onResume, onRestart, gameMode, onMode
         {onCollection && <button aria-label="查看赞美卡册" onClick={onCollection}><RoyalIcon name="cards"/></button>}
       </div>
       {onModeChange && <label className="pause-mode"><select aria-label="本局模式" value={gameMode} onChange={event => onModeChange(event.target.value as GameMode)}><option value="practice">友好陪练</option><option value="challenge">轻松挑战</option></select></label>}
-      <FollowAuthor />
       {confirmRestart && <div className="pause-confirm"><p>重新开局？</p><button onClick={() => setConfirmRestart(false)}>取消</button><button onClick={onRestart}>重开</button></div>}
     </section>
   </div>;

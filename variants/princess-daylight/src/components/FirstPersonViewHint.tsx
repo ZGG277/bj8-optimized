@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 玩家首次进入第一视角的安全展示状态，以及既有存档适配器。
- * [OUTPUT]: 指向全局按钮的一次性短提示，6秒/离开第一视角后退出，完全穿透操作。
+ * [OUTPUT]: 首次全局按钮的短提示交给陪练通道，6秒/离开第一视角后退出，完全穿透操作。
  * [POS]: HUD发现提示；不控制相机，不修改首局教学和球局状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -11,7 +11,7 @@ export const VIEW_SWITCH_HINT_KEY = 'princess-billiards:view-switch-hint:v1';
 function alreadySeen() {
   try { return gameStorage()?.getItem(VIEW_SWITCH_HINT_KEY) === 'done'; } catch { return false; }
 }
-export function FirstPersonViewHint({ active }: { active: boolean }) {
+export function FirstPersonViewHint({ active, onInstruction }: { active: boolean; onInstruction?: (text: string | null) => void }) {
   const eligible = useRef(!alreadySeen());
   const deadline = useRef<number | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number; arrow: number } | null>(null);
@@ -37,5 +37,9 @@ export function FirstPersonViewHint({ active }: { active: boolean }) {
     const timer = window.setTimeout(() => { eligible.current = false; setPosition(null); }, Math.max(0, deadline.current - Date.now()));
     return () => { clearTimeout(timer); window.removeEventListener('resize', place); };
   }, [active]);
-  return position ? <div className="first-view-hint" role="status" style={{ left: position.left, top: position.top, '--arrow-x': `${position.arrow}px` } as CSSProperties}>点这里，切回全局视角</div> : null;
+  useEffect(() => {
+    onInstruction?.(position ? '点右侧的全局按钮，可以看整张球桌。' : null);
+    return () => onInstruction?.(null);
+  }, [Boolean(position), onInstruction]);
+  return position && !onInstruction ? <div className="first-view-hint" role="status" style={{ left: position.left, top: position.top, '--arrow-x': `${position.arrow}px` } as CSSProperties}>点这里，切回全局视角</div> : null;
 }

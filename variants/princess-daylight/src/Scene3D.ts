@@ -832,6 +832,7 @@ export class Scene3D {
   }
 
   private setBallGeometryQuality(hot: boolean) {
+    this.studioEnvironment?.worldShell.setHot?.(hot);
     if(this.daylight?.ready){this.daylight.setHot(hot);return;}
     if (this.ballGeometryHot === hot || !this.ballMeshes.length) return;
     const previous = this.ballMeshes[0].geometry;

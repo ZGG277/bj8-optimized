@@ -1,3 +1,9 @@
+/*
+[INPUT]: 经验证的真实胜局收藏与本局已获胜的陪练ID
+[OUTPUT]: 同一赞美卡历史与按首次获胜顺序去重的对手姓名
+[POS]: 收藏领域层；不从总胜局虚构对手，不改旧卡，不在分享时写战绩
+[PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
 import { companionFor, COMPANIONS } from './companions';
 import type { SaveStore } from '../minitool/persistent-storage';
 
@@ -8,6 +14,17 @@ export type CompanionCollection = { version: 1; cards: Record<string, CollectedC
 export type CompanionReward = { companionId: string; isNew: boolean; wins: number };
 const validId = (id: string) => COMPANIONS.some(companion => companion.id === id);
 export const emptyCompanionCollection = (): CompanionCollection => ({ version: 1, cards: {} });
+
+/** Include a just-settled win even if persistence failed or React's collection update has not painted. */
+export function defeatedCompanionNames(collection: CompanionCollection | undefined, currentWinId?: string): string[] {
+  const earned = COMPANIONS.filter(c => {
+    const win = collection?.cards[c.id];
+    return win && Number.isSafeInteger(win.wins) && win.wins > 0 && Number.isFinite(win.firstWonAt) && win.firstWonAt >= 0;
+  }).sort((a, b) => collection!.cards[a.id].firstWonAt - collection!.cards[b.id].firstWonAt || COMPANIONS.indexOf(a) - COMPANIONS.indexOf(b));
+  const current = COMPANIONS.find(c => c.id === currentWinId);
+  if (current && !earned.some(c => c.id === current.id)) earned.push(current);
+  return earned.map(c => c.name);
+}
 
 /** Loading never changes old saves or invents per-companion results from the total win count. */
 export function loadCompanionCollection(store: SaveStore | null): CompanionCollection {

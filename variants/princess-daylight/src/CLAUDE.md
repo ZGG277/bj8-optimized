@@ -6,6 +6,10 @@ R2候选：柔和绿色细呢、可辨冷青水晶；共享球径75.438mm、角�
 
 # src/
 
+2026-11-05分享封面：Game经TableStage传递只读真实胜局收藏，RoyalFinish复用本局已获头像与赞美句，由minitool/share-cover生成整图首封面；share-note生成固定标题和真实已赢对手正文。卡册历史和局后原卡仍用match-card，胜局分享原卡居第二张。新增生成底图仅供分享，不改实机桌/球/开场；本轮由用户要求合并后再发布。
+
+2026-11-05台词：Game只在开场完成、真实停止结算与对手思考开始时向opponent/companion-dialogue提交事件，不在渲染抽台词。已选短句到TableStage/CompanionMoment，经实际挂载确认预算，暂停/换场景/出杆会撤销待播，重开归档会话内最近3局。比分进球反馈与已获赞美卡保持原协议，规则和AI出杆不受台词影响。
+
 2026-11-04：城堡8秒原片末帧校准候选。opening-camera提供contain占比同位俯视与1.2秒第一视角连续推进；Scene3D在影片等待时保持同位静止，推镜才连续渲染，跳过直接到游玩，dispose连同天空纹理释放。Game将影片可见与开场输入门禁分开；useGameState每次初始化第一视角。textures的soft-green仅校准深翡翠细绒，scene模块校准暖象牙、暖米黄石材和暖色渐变远景。物理、球与用户记录保留。
 
 2026-11-03：typography.ts集中字体族、Canvas字号及显式字体加载；main先就绪字体再画球号，match-card等字体就绪才缓存图。OpeningFilm的5秒音乐可自动播放或经明确音乐按钮激活，opening-input允许音乐手势而不结束开场。静音、跳过、后台及卸载释放保持。

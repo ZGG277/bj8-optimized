@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COMPANIONS } from './companions';
-import { collectCompanionWin, collectedCompanionCount, emptyCompanionCollection, loadCompanionCollection, saveCompanionCollection, COMPANION_COLLECTION_KEY } from './companion-collection';
+import { collectCompanionWin, collectedCompanionCount, defeatedCompanionNames, emptyCompanionCollection, loadCompanionCollection, saveCompanionCollection, COMPANION_COLLECTION_KEY } from './companion-collection';
 
 function memoryStore(initial: string | null = null) {
   const entries = new Map<string, string>(initial === null ? [] : [[COMPANION_COLLECTION_KEY, initial]]);
@@ -8,6 +8,23 @@ function memoryStore(initial: string | null = null) {
   return { entries, getItem: (key: string) => entries.get(key) ?? null, setItem: (key: string, value: string) => { entries.set(key, value); } };
 }
 describe('companion victory collection', () => {
+  it('lists only real winners once, in first-win order, including the just-settled match', () => {
+    const first = collectCompanionWin(emptyCompanionCollection(), COMPANIONS[3].id, 100)!;
+    const next = collectCompanionWin(first.collection, COMPANIONS[1].id, 200)!;
+    const repeated = collectCompanionWin(next.collection, COMPANIONS[3].id, 300)!;
+    expect(defeatedCompanionNames(repeated.collection, COMPANIONS[1].id)).toEqual([COMPANIONS[3].name, COMPANIONS[1].name]);
+    expect(defeatedCompanionNames(repeated.collection, COMPANIONS[9].id)).toEqual([COMPANIONS[3].name, COMPANIONS[1].name, COMPANIONS[9].name]);
+    expect(repeated.collection.cards[COMPANIONS[9].id]).toBeUndefined();
+    expect(defeatedCompanionNames(undefined, COMPANIONS[9].id)).toEqual([COMPANIONS[9].name]);
+    expect(defeatedCompanionNames(undefined, 'unknown')).toEqual([]);
+  });
+  it('does not infer defeated opponents from invalid counts or a full roster', () => {
+    const collection = emptyCompanionCollection();
+    collection.cards[COMPANIONS[0].id] = { wins: 0, firstWonAt: 1, lastWonAt: 2 };
+    collection.cards[COMPANIONS[1].id] = { wins: -1, firstWonAt: 1, lastWonAt: 2 };
+    collection.cards.unknown = { wins: 5, firstWonAt: 1, lastWonAt: 2 };
+    expect(defeatedCompanionNames(collection)).toEqual([]);
+  });
   it('unlocks one card per companion and counts repeated wins without adding duplicate cards', () => {
     const first = collectCompanionWin(emptyCompanionCollection(), COMPANIONS[0].id, 100)!;
     const repeat = collectCompanionWin(first.collection, COMPANIONS[0].id, 200)!;
