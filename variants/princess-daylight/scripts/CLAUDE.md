@@ -2,6 +2,8 @@
 
 # scripts/
 
+2026-11-10：opening-film-assets.test.ts 同时核对横屏 MP4 的 mvhd 时长、avc1/mp4a 和 provenance 哈希。package-toy.py 按 B 站白名单接受 .mp4，并写入横屏开场来源。
+
 2026-11-04：opening-film-assets.test.ts读取真实ANMF容器，校验220帧与8秒总时长；fairy-table-finish.test.ts增加视觉倒角不动六袋孔边和三角数、天空确定性与纹理上界门禁。
 
 2026-11-03：fairy-table-finish.test.ts 同时验证暖象牙上沿不透明、细纹理有界且总三角数不变；保留实际两档GLB的分离检查。

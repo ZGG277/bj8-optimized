@@ -6,6 +6,9 @@ R2候选：柔和绿色细呢、可辨冷青水晶；共享球径75.438mm、角�
 
 # src/
 
+2026-11-10：B 站 Toy 横屏使用 arrival-landscape.mp4（Grok Imagine，2026-11-10，配乐为视频制作官原声）。竖屏与非 Toy 构建仍用 arrival.webp。末帧俯视按横屏木框占比交接，物理与规则不变。
+
+
 2026-11-05分享封面：Game经TableStage传递只读真实胜局收藏，RoyalFinish复用本局已获头像与赞美句，由minitool/share-cover生成整图首封面；share-note生成固定标题和真实已赢对手正文。卡册历史和局后原卡仍用match-card，胜局分享原卡居第二张。新增生成底图仅供分享，不改实机桌/球/开场；本轮由用户要求合并后再发布。
 
 2026-11-05台词：Game只在开场完成、真实停止结算与对手思考开始时向opponent/companion-dialogue提交事件，不在渲染抽台词。已选短句到TableStage/CompanionMoment，经实际挂载确认预算，暂停/换场景/出杆会撤销待播，重开归档会话内最近3局。比分进球反馈与已获赞美卡保持原协议，规则和AI出杆不受台词影响。

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 共享球台边界、相机安全区和开场经过时间。
- * [OUTPUT]: 湖面原开场姿态，以及城堡影片末帧对位/连续推进到第一视角的纯相机姿态。
+ * [OUTPUT]: 湖面原开场姿态，以及竖屏/横屏影片末帧对位后连续推进到第一视角的纯相机姿态。
  * [POS]: 呈现层；不修改物理、规则或输入手势。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
  */
@@ -20,14 +20,25 @@ export const OPENING_SAFETY: CameraSafetyInsets = {top:.045,right:.045,bottom:.0
 export const openingBoundsPoints = () => [-1,1].flatMap(x => [-1,1].flatMap(z => [OPENING_BOUNDS.bottom,OPENING_BOUNDS.top].map(y => ({x:x*OPENING_BOUNDS.x,y,z:z*OPENING_BOUNDS.z}))));
 const ease = (v:number) => { const t=Math.max(0,Math.min(1,v)); return t*t*t*(t*(t*6-15)+10); };
 function mix(a:FramingPose,b:FramingPose,t:number):FramingPose { const point=(p:typeof a.position,q:typeof a.position)=>({x:p.x+(q.x-p.x)*t,y:p.y+(q.y-p.y)*t,z:p.z+(q.z-p.z)*t});return {position:point(a.position,b.position),lookAt:point(a.lookAt,b.lookAt)}; }
-/** 末帧是540×960正俯视：按影片contain后的同一占比摆台，不受游玩HUD安全区挤压。 */
-export type FilmFrameLayout = { frameAspect: number; centerY: number };
+/** 竖屏末帧是540×960正俯视，木框约占画面 91%。横屏成片是1280×720，木框只占画面中央。 */
+export const PORTRAIT_FILM_ASPECT = 540 / 960;
+export const LANDSCAPE_FILM_ASPECT = 1280 / 720;
+export const LANDSCAPE_FILM_FILL = { width: 0.27, height: 0.84 };
+export function filmPresentation(media: 'image' | 'video' = 'image') {
+  return media === 'video'
+    ? { imageAspect: LANDSCAPE_FILM_ASPECT, fillWidth: LANDSCAPE_FILM_FILL.width, fillHeight: LANDSCAPE_FILM_FILL.height }
+    : { imageAspect: PORTRAIT_FILM_ASPECT, fillWidth: .91, fillHeight: .91 };
+}
+export type FilmFrameLayout = { frameAspect: number; centerY: number; imageAspect?: number; fillWidth?: number; fillHeight?: number };
 export function filmLastFramePose(aspect: number, layout?: FilmFrameLayout): FramingPose {
-  aspect = Math.max(.25, Math.min(4, Number.isFinite(aspect) ? aspect : 540/960));
-  const imageAspect = 540/960, tan = Math.tan(CAMERA_FOV_DEGREES * Math.PI / 360);
+  aspect = Math.max(.25, Math.min(4, Number.isFinite(aspect) ? aspect : PORTRAIT_FILM_ASPECT));
+  const imageAspect = layout?.imageAspect ?? PORTRAIT_FILM_ASPECT;
+  const fillWidth = layout?.fillWidth ?? .91;
+  const fillHeight = layout?.fillHeight ?? .91;
+  const tan = Math.tan(CAMERA_FOV_DEGREES * Math.PI / 360);
   const frameAspect = layout?.frameAspect ?? aspect;
-  const widthFraction = .91 * Math.min(1, imageAspect/frameAspect);
-  const heightFraction = .91 * Math.min(1, frameAspect/imageAspect) * aspect/frameAspect;
+  const widthFraction = fillWidth * Math.min(1, imageAspect/frameAspect);
+  const heightFraction = fillHeight * Math.min(1, frameAspect/imageAspect) * aspect/frameAspect;
   const height = Math.max(envelope.halfWidth / (tan*aspect*widthFraction), envelope.halfLength / (tan*heightFraction));
   // 摄影影片覆盖整个游戏壳，而WebGL从比分栏下方开始；补偿它们的中心偏移。
   const z = (1 - 2*(layout?.centerY ?? .5)) * height*tan;

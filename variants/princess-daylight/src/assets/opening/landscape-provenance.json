@@ -1,0 +1,49 @@
+{
+  "asset": "arrival-landscape.mp4",
+  "version": "landscape-8s-20261110",
+  "kind": "grok-imagine-castle-approach-landscape",
+  "durationSeconds": 8,
+  "resolution": [1280, 720],
+  "fps": 30,
+  "audio": true,
+  "encoding": "H.264 High + AAC-LC, used as supplied. 1280x720, 30 fps, 8.000s, stereo AAC about 160 kbps. Not retimed and not slowed back to the 12s cut.",
+  "deliveryRepresentation": {
+    "format": "mp4",
+    "reason": "Bilibili Toy publishes a fixed suffix whitelist that includes audio/video .mp4 (alongside .mp3 .wav .ogg .m4a .webm). The desktop packager previously copied the stricter Xiaohongshu image list and rejected .mp4; it now accepts .mp4 so this build can ship the film with its own soundtrack. Xiaohongshu builds are unchanged and still use the portrait animated WebP.",
+    "source": "castle-intro-landscape-8s.mp4",
+    "sourceResolution": [1280, 720],
+    "sourceFps": 30,
+    "sourceDurationSeconds": 8,
+    "loopCount": 1,
+    "bytes": 5180265
+  },
+  "credits": "Grok Imagine generated video, 2026-11-10. Original synthesized music by 视频制作官. Tian approved this 8 second landscape cut and asked for the opening to stay shorter than the previous film.",
+  "sha256": "4373c53ebcf1203202ab4b80717c15785c758ef28be49728eabfb7298ae98085",
+  "poster": {
+    "file": "arrival-landscape-poster.jpg",
+    "sha256": "34087b28462bab7692f6b8433fbd845d435057781c9f29ce6b3f8474fb5c6e08",
+    "note": "First frame of the same 8s film, used only as the landscape loading still."
+  },
+  "edit": {
+    "retimed": false,
+    "trimmed": false,
+    "playbackSpeed": 1,
+    "gameplayHandoff": "Last 350ms overlay dissolves into the live authored ivory table while the camera holds the film's final top-down framing, then eases 1.2s to the first-person play pose. Skip, reduced motion, hidden page and load failure still jump straight to play."
+  },
+  "limitations": [
+    "The generated terrace and the live castle table are different renders. The handoff matches the final top-down table size and cue-ball orientation, not pixel identity.",
+    "Portrait viewports on this branch keep arrival.webp. This file is selected only by the Bilibili Toy build when the viewport is landscape."
+  ],
+  "files": {
+    "arrival-landscape.mp4": "4373c53ebcf1203202ab4b80717c15785c758ef28be49728eabfb7298ae98085",
+    "arrival-landscape-poster.jpg": "34087b28462bab7692f6b8433fbd845d435057781c9f29ce6b3f8474fb5c6e08"
+  },
+  "openingMusic": {
+    "origin": "Original soundtrack embedded in the approved 8s landscape film",
+    "source": "arrival-landscape.mp4",
+    "sourceSha256": "4373c53ebcf1203202ab4b80717c15785c758ef28be49728eabfb7298ae98085",
+    "durationSeconds": 8,
+    "processing": "Already loudness-normalized in the supplied file. Playback uses that audio track with the existing default-on control: sound starts with the picture when the browser allows it, otherwise the music button shows 轻触有声 and a tap on that control unmutes without skipping.",
+    "selectionBasis": "Tian approved the brighter 8s soundtrack. The 12s silent reference was not used."
+  }
+}

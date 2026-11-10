@@ -24,6 +24,8 @@ NOTICES.append(dict(**json.loads((fonts / "provenance.json").read_text()),
                     licenseText=(fonts / "OFL.txt").read_text()))
 NOTICES.append(json.loads((SOURCE / "src/assets/ambience/provenance.json").read_text()))
 (DIST / "THIRD_PARTY_NOTICES.json").write_text(json.dumps(NOTICES, ensure_ascii=False, indent=2) + "\n")
+landscape = json.loads((SOURCE / "src/assets/opening/landscape-provenance.json").read_text())
+(DIST / "OPENING_LANDSCAPE_PROVENANCE.json").write_text(json.dumps(landscape, ensure_ascii=False, indent=2) + "\n")
 
 entry = (DIST / "index.html").read_bytes()
 if len(entry) > 1_000_000:
@@ -32,10 +34,11 @@ files = sorted(p for p in DIST.rglob("*") if p.is_file())
 sha = lambda value: hashlib.sha256(value).hexdigest()
 manifest = {}
 temporary_zip = ZIP.with_suffix(".tmp")
+# Bilibili Toy keeps .mp4. Xiaohongshu's packager still rejects it.
 with zipfile.ZipFile(temporary_zip, "w") as bundle:
     for p in files:
         name = p.relative_to(DIST).as_posix()
-        if p.suffix not in {".html", ".js", ".css", ".json", ".svg", ".webp", ".jpg", ".png", ".woff"}:
+        if p.suffix not in {".html", ".js", ".css", ".json", ".svg", ".webp", ".jpg", ".png", ".woff", ".mp4"}:
             raise ValueError(f"Unexpected runtime file: {name}")
         data = p.read_bytes()
         info = zipfile.ZipInfo(name, (2026, 11, 8, 0, 0, 0))

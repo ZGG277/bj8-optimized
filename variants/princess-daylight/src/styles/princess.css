@@ -178,8 +178,8 @@
 .game-shell[data-opening='true'] > .royal-opening {opacity:1!important;}
 .opening-film {background-color:#d5dfd8;background-position:center;background-size:cover;overflow:hidden;transition:opacity .3s ease;}
 .game-shell[data-opening='true'] > .opening-film.arriving {opacity:0!important;}
-.opening-film img {display:block;width:100%;height:100%;object-fit:contain;background:rgba(216,229,217,.65);}
-@media (min-aspect-ratio:3/4) {.opening-film img {object-fit:contain;background:rgba(216,229,217,.65);}}
+.opening-film img,.opening-film video {display:block;width:100%;height:100%;object-fit:contain;background:rgba(216,229,217,.65);}
+@media (min-aspect-ratio:3/4) {.opening-film img,.opening-film video {object-fit:contain;background:rgba(216,229,217,.65);}}
 
 .royal-game .royal-result-card {background:#fff8ecf5!important;border:1px solid #bda06e;border-radius:28px;color:#74582d;}
 

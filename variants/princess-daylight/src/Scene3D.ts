@@ -2091,7 +2091,9 @@ export class Scene3D {
       const elapsed = this.filmHandoffStartedAt === null ? 0 : Math.max(0, (renderStartedAt-this.filmHandoffStartedAt)/1000);
       const canvasRect = this.element.getBoundingClientRect();
       const filmRect = this.element.closest('.game-shell')?.getBoundingClientRect() ?? canvasRect;
-      const layout = {frameAspect:filmRect.width/Math.max(1,filmRect.height),centerY:(filmRect.top+filmRect.height/2-canvasRect.top)/Math.max(1,canvasRect.height)};
+      const film = this.element.closest('.game-shell')?.querySelector('.opening-film');
+      const readFilm = (name: string) => { const value = Number(film?.getAttribute(name)); return Number.isFinite(value) && value > 0 ? value : undefined; };
+      const layout = {frameAspect:filmRect.width/Math.max(1,filmRect.height),centerY:(filmRect.top+filmRect.height/2-canvasRect.top)/Math.max(1,canvasRect.height),imageAspect:readFilm('data-film-aspect'),fillWidth:readFilm('data-film-fill-x'),fillHeight:readFilm('data-film-fill-y')};
       const pose = this.filmHandoffStartedAt === null ? filmLastFramePose(this.camera.aspect,layout)
         : filmHandoffPose(elapsed,this.camera.aspect,{position:this.targetCameraPos,lookAt:this.targetLookAt},layout);
       this.camera.position.set(pose.position.x,pose.position.y,pose.position.z);
