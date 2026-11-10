@@ -2,8 +2,8 @@ import { addShotHighlight, EMPTY_HIGHLIGHTS } from './match/highlights';
 import { ControlHelp } from './components/ControlHelp';
 import { positionAfterPot } from './opponent/position-observation';
 /*
-[INPUT]: 自动播放的短 WebP 开场；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 教学/分组/犯规与鼓励共用小头像通道、本局击球亮点与触摸自由球；既有8秒开场、双视角、训练与赞美卡册
+[INPUT]: 竖屏 WebP 开场；B 站横屏另播 8 秒 MP4；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
+[OUTPUT]: 教学/分组/犯规与鼓励共用小头像通道、本局击球亮点与触摸自由球；8 秒开场后同一交接、双视角、训练与赞美卡册
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -16,6 +16,7 @@ import { RoyalIcon } from './components/RoyalIcon';
 import { OpeningFilm } from './components/OpeningFilm';
 import { FirstPersonViewHint } from './components/FirstPersonViewHint';
 import openingMovie from './assets/opening/arrival.webp?url';
+import { landscapeOpeningPoster, landscapeOpeningUrl } from './opening-landscape';
 import { actionForEvent, actionForStep, createGuideLearning, type GuideAction } from './guide-learning';
 import {
   useRef,
@@ -99,6 +100,13 @@ type SkillShotCapture = {
   assisted: boolean;
 };
 
+function selectCastleOpening() {
+  const portrait = { src: openingMovie, media: 'image' as const, still: undefined as string | undefined };
+  if (import.meta.env.VITE_BILIBILI_TOY !== '1' || !landscapeOpeningUrl) return portrait;
+  if (typeof matchMedia !== 'function' || !matchMedia('(min-aspect-ratio: 1/1)').matches) return portrait;
+  return { src: landscapeOpeningUrl, media: 'video' as const, still: landscapeOpeningPoster };
+}
+
 const TOUCH_AIM_CAMERA_RELEASE_MS = 650;
 const POCKETED_SHOT_CAMERA_HOLD_MS = 420;
 const STOPPED_SHOT_CAMERA_HOLD_MS = 260;
@@ -152,6 +160,7 @@ export default function Game() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [openingActive, setOpeningActive] = useState(true);
   const [filmVisible, setFilmVisible] = useState(true);
+  const [castleOpening] = useState(selectCastleOpening);
   const openingCompletedRef = useRef(false);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const [followFeel, setFollowFeel] = useState<FollowFeel>('current');
@@ -1304,7 +1313,7 @@ export default function Game() {
         <p>{renderError}</p><button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 12 }}>重新进入</button>
       </div>}
       {openingActive && !renderError && (selectedWorld === 'castle'
-        ? filmVisible && <OpeningFilm src={openingMovie} onFinish={skipped => { setFilmVisible(false); if (skipped) scene3DRef.current?.finishOpening(); else scene3DRef.current?.beginFilmHandoff(); }}/>
+        ? filmVisible && <OpeningFilm src={castleOpening.src} media={castleOpening.media} still={castleOpening.still} onFinish={skipped => { setFilmVisible(false); if (skipped) scene3DRef.current?.finishOpening(); else scene3DRef.current?.beginFilmHandoff(); }}/>
         : <div className="royal-opening"><button className="opening-skip" aria-label="跳过开场" onClick={() => scene3DRef.current?.finishOpening()}><RoyalIcon name="skip"/></button></div>)}
       {paused && !collectionOpen && !renderError && <PauseMenu onCollection={() => setCollectionOpen(true)} gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} muted={muted} onMute={toggleMuted} onResume={() => setPaused(false)} onRestart={() => { handleReplay(); setPaused(false); }} />}
       {helpOpen && <ControlHelp onClose={() => setHelpOpen(false)} onReplayGuide={match.phase === 'finished' ? undefined : () => {

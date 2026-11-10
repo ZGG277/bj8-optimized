@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import * as THREE from 'three';
 import {openingCastlePose,openingTablePose,openingCameraPose,openingBoundsPoints,OPENING_DURATION,OPENING_REVEAL_DURATION,OPENING_SAFETY,openingHidesFixtures} from './opening-camera';
-import {filmLastFramePose,filmHandoffPose,FILM_HANDOFF_DURATION} from './opening-camera';
+import {filmLastFramePose,filmHandoffPose,FILM_HANDOFF_DURATION,filmPresentation} from './opening-camera';
 import {projectFramingPoint,DEFAULT_CAMERA_SAFETY} from './camera-framing';
 import {createCrystalStructure} from './scene/crystal-style';
 import {cameraPoseAt} from './camera-view';
@@ -14,6 +14,16 @@ describe('far to complete furniture opening',()=>{
   const pose=filmLastFramePose(w/h,{frameAspect:w/844,centerY});
   const p=projectFramingPoint({x:0,y:.035,z:0},pose,w/h)!;
   expect(p.y).toBeCloseTo(1-2*centerY,2);
+ });
+ it('横屏末帧把母球留在画面下方，木框不铺满 16:9',()=>{
+  const aspect=16/9, frame=filmPresentation('video');
+  const pose=filmLastFramePose(aspect,{frameAspect:aspect,centerY:.5,...frame});
+  const cue=projectFramingPoint({x:0,y:.035,z:.635},pose,aspect)!;
+  const rack=projectFramingPoint({x:0,y:.035,z:-.635},pose,aspect)!;
+  expect(cue.y).toBeLessThan(-.15); expect(rack.y).toBeGreaterThan(.15);
+  expect(Math.abs(cue.x)).toBeLessThan(.02); expect(Math.abs(rack.x)).toBeLessThan(.02);
+  const portrait=filmLastFramePose(aspect);
+  expect(pose.position.y).toBeGreaterThan(portrait.position.y);
  });
  for(const aspect of [390/844,1280/900])it(`影片末帧同位，连续到第一视角 ${aspect}`,()=>{
   const end=cameraPoseAt(0,.64,0,0,0,aspect,DEFAULT_CAMERA_SAFETY);
