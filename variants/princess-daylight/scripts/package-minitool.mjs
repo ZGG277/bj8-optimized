@@ -1,6 +1,6 @@
 /*
 [INPUT]: dist-minitool 静态构建、package.json 版本与当前 Git 基线
-[OUTPUT]: artifacts/princess-billiards-xhs-minitool-v<version>.zip 及严格离线/CSP 自检回执
+[OUTPUT]: 无损最高压缩级别 ZIP 及严格离线/CSP 自检回执；仍执行 10 MiB 硬门禁
 [POS]: 小红书小工具产物打包边界；只读取构建目录，不修改产品源码
 [PROTOCOL]: 与 .codex/skills/minitool-zip-builder 1.8.0 及在线文档 保持一致
 */
@@ -132,7 +132,7 @@ for (const file of files.filter(file => /\.(?:html|css|js|json)$/i.test(file))) 
 if (textBytes > 5 * MiB) console.warn('WARN: uncompressed text exceeds 5 MiB');
 await mkdir(artifactDir, { recursive: true });
 await unlink(zipPath).catch(error => { if (error.code !== 'ENOENT') throw error; });
-execFileSync('zip', ['-q', '-r', zipPath, '.'], { cwd: distDir });
+execFileSync('zip', ['-9', '-q', '-r', zipPath, '.'], { cwd: distDir });
 execFileSync('unzip', ['-tq', zipPath], { stdio: 'pipe' });
 const zipEntries = execFileSync('unzip', ['-Z1', zipPath], { encoding: 'utf8' }).trim().split('\n');
 if (!zipEntries.includes('index.html')) throw new Error('ZIP root does not contain index.html');

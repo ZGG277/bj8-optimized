@@ -4,9 +4,9 @@
   "license": "OFL-1.1",
   "source": "https://github.com/lxgw/LxgwWenKai-Lite",
   "sourceSha256": "140c99ba4e28e817cec49bf82a0c5fcdc4fe633fb9dfda16d0ee8d59a8545f15",
-  "subsetSha256": "8cf041594d5c09f3a6c53bdef9236595fe622e314e79b4ee40e0af5fd45e7390",
-  "requestedCodepoints": 912,
-  "includedCodepoints": 907,
+  "subsetSha256": "dbea29c0d0679e057fadb94598f3289d05259cc5224c7b70b9c0f05e25b35f4a",
+  "requestedCodepoints": 970,
+  "includedCodepoints": 966,
   "unsupportedCodepoints": [
     8964,
     10024,
@@ -16,5 +16,5 @@
   ],
   "missingHanCodepoints": [],
   "coverageSource": "TS/TSX literal AST + CSS content + title; UI and canonical cards",
-  "bytes": 235224
+  "bytes": 253176
 }

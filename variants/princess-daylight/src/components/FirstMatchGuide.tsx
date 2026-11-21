@@ -1,10 +1,10 @@
 /*
 [INPUT]: 当前首局微提示、对局是否允许展示、跳过回调与逐控件学习记录
-[OUTPUT]: 小手和箭头独立对准真实控件；实际教学文案交给帅哥单句通道，只有跳过按钮接收触控
+[OUTPUT]: 小手和箭头只对准可操作的锚点；等待步骤只发台词
 [POS]: HUD 展示层；只观察稳定 DOM 锚点，不持有引导状态或改写对局
 [PROTOCOL]: 提示文案、锚点或布局变化时更新本注释、components/CLAUDE.md 与样式文档
 */
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { FirstMatchGuideStep } from '../first-match-guide';
 import { markControlLearned } from '../control-onboarding';
 import { actionForStep } from '../guide-learning';
@@ -13,7 +13,6 @@ import { RoyalIcon } from './RoyalIcon';
 type GuideCopy = {
   text: string;
   selector: string;
-  fallbackSelector?: string;
 };
 
 export type GuideAvoidRect = Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'>;
@@ -44,7 +43,6 @@ export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
   'break-fine': {
     text: '拨动瞄准轮微调',
     selector: '[data-control-slot="aimDial"] .aim-dial',
-    fallbackSelector: '.viewport',
   },
   'break-power': {
     text: '下拉蓄力·松手击球',
@@ -245,28 +243,37 @@ export function FirstMatchGuide({
   onSkip,
 }: FirstMatchGuideProps) {
   const copy = FIRST_MATCH_GUIDE_COPY[step];
+  const action = actionForStep(step);
+  const showHint = visible && (action !== null || !onInstruction);
   const hintRef = useRef<HTMLElement>(null);
-  const [position, setPosition] = useState<AnchorPosition | null>(null);
-  const [horizontal, setHorizontal] = useState(false);
-  const [gesture, setGesture] = useState<ReturnType<typeof gestureForControl> | null>(null);
-  const selectors = useMemo(
-    () => [copy.selector, copy.fallbackSelector].filter(Boolean) as string[],
-    [copy.fallbackSelector, copy.selector],
-  );
+  const [placement, setPlacement] = useState<{
+    step: FirstMatchGuideStep;
+    position: AnchorPosition;
+    horizontal: boolean;
+    gesture: ReturnType<typeof gestureForControl> | null;
+  } | null>(null);
+  const current = placement?.step === step ? placement : null;
+  const position = current?.position;
+  const horizontal = current?.horizontal ?? false;
+  const gesture = current?.gesture;
 
   useEffect(() => {
-    if (!visible) return;
-    setPosition(null);
+    if (!showHint) return;
+    setPlacement(null);
     let timer = 0;
     let last = '';
-  const update = () => {
+    const update = () => {
       timer = 0;
       const hint = hintRef.current;
-      const anchor = selectors
-        .map(selector => document.querySelector<HTMLElement>(selector))
-        .find(Boolean);
-      if (!hint || !anchor) {
-        setPosition(null);
+      const anchor = document.querySelector<HTMLElement>(copy.selector);
+      const anchorRect = anchor?.getBoundingClientRect();
+      if (!hint || !anchor || !anchorRect || anchorRect.width <= 0 || anchorRect.height <= 0 ||
+          anchorRect.right <= 0 || anchorRect.bottom <= 0 ||
+          anchorRect.left >= window.innerWidth || anchorRect.top >= window.innerHeight ||
+          anchor.closest('[hidden], [aria-disabled="true"], :disabled') ||
+          getComputedStyle(anchor).visibility !== 'visible' || getComputedStyle(anchor).opacity === '0') {
+        last = '';
+        setPlacement(null);
         return;
       }
       const avoidRects = [
@@ -276,11 +283,8 @@ export function FirstMatchGuide({
         .filter(el => window.getComputedStyle(el).visibility !== 'hidden')
         .filter(el => getComputedStyle(el).opacity !== '0')
         .map(el => normalizeAvoidRect(el.getBoundingClientRect()));
-      const anchorRect = anchor.getBoundingClientRect();
       const point = anchor.matches('.viewport') ? getTablePoint?.() : null;
       const isHorizontal = anchorRect.width > anchorRect.height * 1.35 && !anchor.matches('.viewport');
-      setHorizontal(isHorizontal);
-      const action = actionForStep(step);
       const nextGesture = !anchor.matches('.viewport') && (action === 'power' || action === 'aim')
         ? gestureForControl(anchorRect, isHorizontal, action === 'power') : null;
       const next: AnchorPosition = point ? {
@@ -303,8 +307,7 @@ export function FirstMatchGuide({
       const signature = `${Math.round(next.left)}:${Math.round(next.top)}:${next.side}:${nextGesture?.left}:${nextGesture?.top}:${nextGesture?.rotation}`;
       if (signature !== last) {
         last = signature;
-        setPosition(next);
-        setGesture(nextGesture);
+        setPlacement({ step, position: next, horizontal: isHorizontal, gesture: nextGesture });
       }
     };
     const schedule = () => {
@@ -317,7 +320,7 @@ export function FirstMatchGuide({
       subtree: true,
       attributes: true,
       characterData: true,
-      attributeFilter: ['class', 'style'],
+      attributeFilter: ['class', 'style', 'hidden', 'disabled', 'aria-disabled'],
     });
     const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
     resizeObserver?.observe(document.body);
@@ -332,21 +335,21 @@ export function FirstMatchGuide({
       window.removeEventListener('resize', schedule);
       if (projectionTimer !== null) window.clearInterval(projectionTimer);
     };
-  }, [selectors, visible, getTablePoint, copy.selector, step]);
+  }, [action, showHint, getTablePoint, copy.selector, step]);
 
-  const instruction = textOverride ?? (actionForStep(step) === 'power'
+  const instruction = textOverride ?? (action === 'power'
     ? `按住球杆按钮，${horizontal ? '右拉' : '下拉'}蓄力，松手击球。`
     : copy.text);
   useEffect(() => {
     onInstruction?.(visible ? instruction : null);
     return () => onInstruction?.(null);
   }, [visible, instruction, onInstruction]);
-  if (!visible) return null;
+  if (!showHint) return null;
 
   return (
     <aside
       ref={hintRef}
-      className={`first-match-guide${onInstruction ? ' speech-delivered' : ''} gesture-${actionForStep(step) ?? 'wait'} is-${position?.side ?? 'measuring'} ${horizontal ? 'is-horizontal' : ''}`}
+      className={`first-match-guide${onInstruction ? ' speech-delivered' : ''} gesture-${action ?? 'wait'} is-${position?.side ?? 'measuring'} ${horizontal ? 'is-horizontal' : ''}`}
       style={{
         left: position?.left ?? -1000,
         top: position?.top ?? -1000,
@@ -356,7 +359,7 @@ export function FirstMatchGuide({
       aria-live={onInstruction ? undefined : 'polite'}
       aria-label={onInstruction ? undefined : `新手提示：${instruction}`}
     >
-      <svg className={`guide-gesture${gesture ? ' on-control' : ''}`} viewBox="0 0 80 112" fill="none" aria-hidden="true"
+      {action && <svg className={`guide-gesture${gesture ? ' on-control' : ''}`} viewBox="0 0 80 112" fill="none" aria-hidden="true"
         style={gesture && position ? {
           position: 'absolute', left: gesture.left - position.left, top: gesture.top - position.top,
           transform: `rotate(${gesture.rotation}deg)`, transformOrigin: '17.4px 15.6px',
@@ -368,7 +371,7 @@ export function FirstMatchGuide({
         <g className="gesture-hand" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" fill="#fff9efb8">
           <path d="M26 53V28a4 4 0 0 1 8 0v16-5a4 4 0 0 1 8 0v6-3a4 4 0 0 1 8 0v6-1a4 4 0 0 1 8 0v16c0 9-5 15-14 15h-4c-6 0-9-3-13-8l-11-14a4 4 0 0 1 6-5l4 4Z"/>
         </g>
-      </svg>
+      </svg>}
       {!onInstruction && <span className="guide-copy">{instruction}</span>}
       <button
         type="button"

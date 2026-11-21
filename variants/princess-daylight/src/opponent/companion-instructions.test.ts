@@ -42,4 +42,14 @@ describe('companion-owned operational instructions', () => {
     expect(companionInstruction({ match: match(), eightReady: true })?.text).toContain('黑八');
     expect(companionInstruction({ match: { ...match(), phase: 'rolling' }, eightReady: true })).toBeNull();
   });
+  it('keeps the terminal fact and uses the actual speaker and winner for the closing reaction', () => {
+    const finish = { ...match(), phase: 'finished', messageKey: 'win-8', winner: 'player', actor: 'player' } as const;
+    expect(terminalEightInstruction({ ...finish, companionId: 'gu-yanchuan' }))
+      .toBe('公主清完本组球后打进黑八。你赢了。漂亮。');
+    expect(terminalEightInstruction({ ...finish, companionId: 'wen-xingye' }))
+      .toBe('公主清完本组球后打进黑八。公主赢啦！我输得很有参与感。');
+    const foul = { ...finish, messageKey: 'lose-8-foul', winner: 'opponent', messageParams: { reason: 'scratch' } } as const;
+    expect(terminalEightInstruction({ ...foul, companionId: 'wen-xingye' }))
+      .toContain('白球也进袋了，这局结束啦。我赢了');
+  });
 });

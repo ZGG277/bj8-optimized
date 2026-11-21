@@ -138,6 +138,7 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 export default function Game() {
   const [pageHidden, setPageHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
   const [collectionOpen, setCollectionOpen] = useState(false);
+  const [careerTab, setCareerTab] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const gamePaused = pageHidden || collectionOpen || helpOpen;
   useEffect(() => {
@@ -175,13 +176,13 @@ export default function Game() {
     match, matchRef, setMatch,
     viewLevel, setViewLevel,
     playerSkill, trainingSummary, gameMode, opponentProfile,
-    collection, collectionReward, collectionSaveFailed, victoryPraise,
+    collection, collectionReward, collectionSaveFailed, victoryPraise, career, careerSaveFailed,
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
   } = useGameState();
 
   const dialogueDirector = useRef<ReturnType<typeof createCompanionDialogue> | null>(null);
-  if (!dialogueDirector.current) dialogueDirector.current = createCompanionDialogue();
+  if (!dialogueDirector.current) dialogueDirector.current = createCompanionDialogue(Math.random, browserStorage());
   const [dialogue, setDialogue] = useState<CompanionDialogue | null>(null);
   const [guideSpeech, setGuideSpeech] = useState<string | null>(null);
   const [viewSpeech, setViewSpeech] = useState<string | null>(null);
@@ -1241,7 +1242,7 @@ export default function Game() {
   const utilityControls = {
     scene: <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>,
     help: <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/></button>,
-    cards: <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>,
+    cards: <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCareerTab(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>,
     // Reuse the saved dock position of the former pause control.
     pause: <button className="sound-entry" aria-label={muted ? '开启音效' : '关闭音效'} disabled={openingActive || !!renderError} onClick={toggleMuted}><RoyalIcon name={muted ? 'muted' : 'sound'}/></button>,
   };
@@ -1312,7 +1313,7 @@ export default function Game() {
         firstMatchGuideStepRef.current = step; setFirstMatchGuideStep(step);
         setGuideDismissed(false); setManualGuide(true); setHelpOpen(false);
       }}/>}
-      {collectionOpen && <CompanionCollectionBook collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
+      {collectionOpen && <CompanionCollectionBook career={career} careerSaveFailed={careerSaveFailed} initialCareer={careerTab} collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
       <div className="royal-entry" role="group" aria-label="场景、教学与声音">
         {Object.entries(utilityControls).filter(([id]) => id !== 'cards' || match.phase !== 'finished').map(([id, node]) => <span key={id}>{node}</span>)}
       </div>
@@ -1360,7 +1361,9 @@ export default function Game() {
         collection={collection}
         collectionReward={collectionReward}
         collectionSaveFailed={collectionSaveFailed}
-        onCollection={() => setCollectionOpen(true)}
+        career={career}
+        onCareer={() => { setCareerTab(true); setCollectionOpen(true); }}
+        onCollection={() => { setCareerTab(false); setCollectionOpen(true); }}
         eightReady={legalTargets.length === 1 && legalTargets[0] === 8}
         viewLevel={viewLevel}
         spectatorActive={spectatorActive}

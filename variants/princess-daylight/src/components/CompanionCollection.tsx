@@ -1,3 +1,5 @@
+import { CareerPanel } from './CareerPanel';
+import { careerSummary, type Career } from '../opponent/career';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { COMPANIONS } from '../opponent/companions';
 import { COMPANION_CARD_ART } from '../opponent/companion-card-art';
@@ -7,9 +9,10 @@ import { RoyalIcon } from './RoyalIcon';
 import { PraiseCard } from './PraiseCard';
 import { VICTORY_PRAISES } from '../opponent/victory-praise';
 
-export function CompanionCollectionBook({ collection, initialCompanionId, saveFailed = false, onClose }: {
-  collection: CompanionCollection; initialCompanionId?: string; saveFailed?: boolean; onClose: () => void;
+export function CompanionCollectionBook({ collection, initialCompanionId, saveFailed = false, onClose, career, careerSaveFailed, initialCareer = false }: {
+  career?: Career; careerSaveFailed?: boolean; initialCareer?: boolean; collection: CompanionCollection; initialCompanionId?: string; saveFailed?: boolean; onClose: () => void;
 }) {
+  const [showCareer, setShowCareer] = useState(initialCareer);
   const history = collection.history ?? [];
   // Old saves only knew companion totals; preserve those without inventing a per-match order.
   const legacy = COMPANIONS.filter(p => (collection.cards[p.id]?.wins ?? 0) > history.filter(c => c.companionId === p.id).length)
@@ -27,6 +30,7 @@ export function CompanionCollectionBook({ collection, initialCompanionId, saveFa
     close.current?.focus();
     return () => { previous?.focus(); };
   }, []);
+  if (showCareer && career) return <CareerPanel career={career} saveFailed={careerSaveFailed} onClose={onClose} onCards={() => setShowCareer(false)}/>;
   return <div className="companion-book-mask" role="dialog" aria-modal="true" aria-labelledby="companion-book-title"
     onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()}
     onPointerMove={e => e.stopPropagation()} onKeyDown={event => {
@@ -37,7 +41,7 @@ export function CompanionCollectionBook({ collection, initialCompanionId, saveFa
       event.stopPropagation();
     }}>
     <header className="companion-book-header">
-      <div><h2 id="companion-book-title">公主的赞美卡</h2><p>{count ? (cards[index]?.ordinal ? `第 ${cards[index].ordinal} 次胜局` : '此前收藏') : '赢下一局，收下一张赞美卡'}</p></div>
+      <div><h2 id="companion-book-title">公主的赞美卡</h2>{career && <button className="companion-career-link" onClick={() => setShowCareer(true)}>球局排行 · {careerSummary(career).level} · {career.completed} 局</button>}<p>{count ? (cards[index]?.ordinal ? `第 ${cards[index].ordinal} 次胜局` : '此前收藏') : '赢下一局，收下一张赞美卡'}</p></div>
       <button ref={close} onClick={onClose} aria-label="收起卡册"><RoyalIcon name="close"/></button>
     </header>
     <div className="companion-card-stack" aria-label="左右滑动查看卡牌"

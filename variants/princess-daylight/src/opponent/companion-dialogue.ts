@@ -1,9 +1,12 @@
 /*
 [INPUT]: 双方逐杆结算记录、开局、思考和真实球路事实
 [OUTPUT]: 去重、冷却与事实优先级约束的一句台词；只在UI确实展示时计入预算
-[POS]: 陪练表现层适配器；不判球规、不持久化、不改变AI速度或已获赞美卡
+[POS]: 陪练表现层适配器；不判球规、只持久化有界发言记忆、不改变AI速度或已获赞美卡
 [PROTOCOL]: 变更时更新此头部，然后检查CLAUDE.md
 */
+import { createDialogueMemory, type SpokenLine } from './dialogue-memory';
+import { VOICE_VARIATIONS, dialogueMotif } from './companion-voice-variations';
+import type { SaveStore } from '../minitool/persistent-storage';
 import type { MatchState, RoundResolution, ShotFacts } from '../match/types';
 import { DIALOGUE_SCENES, DIALOGUE_SETTINGS as settings, SHOT_PROGRESS_LINES } from './companion-dialogue-bank';
 import { settledShot, type SettledShot } from '../match/shot-log';
@@ -23,10 +26,21 @@ type ShotContext = {
   intent?: ShotCapture['intent'];
   executionSigma?: number;
 };
-type Selection = { choice: CompanionDialogue; group: string | null; shot: number; at: number; opening: boolean };
+type Selection = { choice: CompanionDialogue; group: string | null; shot: number; at: number; opening: boolean; memoryLine?: SpokenLine; required?: boolean };
 type ProgressId = keyof typeof SHOT_PROGRESS_LINES;
 const runMilestones = [2, 3, 5, 7] as const;
 const RARE_POT_CHANCE = 0.25;
+
+function speechRhythm(companionId: string | undefined) {
+  const cadence = companionVoice(companionId)?.cadence;
+  if (cadence === 'quiet') return { cooldown: 18000, shotGap: 3, limit: 3, chance: .28 };
+  return {
+    cooldown: cadence === 'lively' ? 8500 : settings.cooldown_ms,
+    shotGap: settings.min_shot_gap,
+    limit: settings.max_lines_per_rack - settings.reserve_terminal,
+    chance: cadence === 'lively' ? 2.1 : 1,
+  };
+}
 
 function rarePlayerPot(record: SettledShot, context?: ShotContext): ProgressId | null {
   if (!context || context.worldBefore.shot + 1 !== record.shotId || record.breaking || !record.legalPots.length) return null;
@@ -49,7 +63,9 @@ function rarePlayerPot(record: SettledShot, context?: ShotContext): ProgressId |
   return rare;
 }
 
-export function createCompanionDialogue(random: () => number = Math.random) {
+export function createCompanionDialogue(random: () => number = Math.random, store: SaveStore | null = null) {
+  const memory = createDialogueMemory(store);
+  const lineFor = (text: string, scene: string, voice?: string): SpokenLine => ({ text, scene, voice: voice ?? "default", motif: dialogueMotif(scene, text) });
   let token = 0, rematch = false, ended = false, readyDone = false, thinkingDone = false;
   let pots = 0, dry = 0, empty = 0, ordinaryCount = 0;
   const shotLog = new Map<number, SettledShot>();
@@ -59,42 +75,53 @@ export function createCompanionDialogue(random: () => number = Math.random) {
   const scenes = new Map<string, number>(), groups = new Map<string, number>();
   const ruleVisits = new Map<string, number>();
   const spoken = new Set<string>();
-  const recent: string[][] = [];
+  
   const roll = () => { const n = random(); return Number.isFinite(n) ? Math.max(0, Math.min(.999999999, n)) : 0; };
 
   function choose(ids: SceneId[], companionId: string | undefined, now: number, opening = false): CompanionDialogue | null {
     // Pick facts first. A limited/high-priority scene never falls through to another lottery.
     const scene = DIALOGUE_SCENES.filter(s => ids.includes(s.id)).sort((a, b) => b.priority - a.priority)[0];
-    if (!scene || ended || ordinaryCount >= settings.max_lines_per_rack - settings.reserve_terminal) return null;
+    const voice = companionVoice(companionId);
+    const rhythm = speechRhythm(companionId);
+    if (!scene || ended || ordinaryCount >= rhythm.limit) return null;
+    const firstScore = !!voice && scene.id === 'P_FIRST_POT';
     const limit = settings.semantic_limits[scene.semantic_group as keyof typeof settings.semantic_limits];
     if ((scenes.get(scene.id) ?? 0) >= scene.max_per_rack || (groups.get(scene.semantic_group) ?? 0) >= limit) return null;
-    if (!opening && (now - lastAt < settings.cooldown_ms || shotLog.size - lastShot < settings.min_shot_gap)) return null;
-    const custom = companionVoice(companionId)?.scenes[scene.id];
+    if (!opening && !firstScore && (now - lastAt < rhythm.cooldown || shotLog.size - lastShot < rhythm.shotGap)) return null;
+    const custom = (companionId && VOICE_VARIATIONS[companionId]?.[scene.id]) || voice?.scenes[scene.id];
     const authored = typeof custom === 'string' ? [custom] : custom;
     const lines = (authored?.map(text => ({ text, weight: 1 })) ?? scene.lines)
       .filter(line => !spoken.has(line.text));
-    if (!lines.length || roll() >= scene.probability) return null;
-    const weights = lines.map(line => line.weight * (recent.some(rack => rack.includes(line.text)) ? settings.recent_line_weight_multiplier : 1));
+    const fresh = memory.candidates(lines.map(l => lineFor(l.text, scene.id, companionId)));
+    const eligible = lines.filter(l => fresh.some(f => f.text === l.text));
+    const probability = opening || firstScore ? 1 : Math.min(1, scene.probability * rhythm.chance);
+    if (!eligible.length || roll() >= probability) return null;
+    const weights = eligible.map(line => line.weight);
     let position = roll() * weights.reduce((sum, weight) => sum + weight, 0), index = 0;
-    while (index < lines.length - 1 && position >= weights[index]) position -= weights[index++];
-    const choice = { id: ++token, text: lines[index].text, sceneId: scene.id, companionId };
-    pending = { choice, group: scene.semantic_group, shot: shotLog.size, at: now, opening };
+    while (index < eligible.length - 1 && position >= weights[index]) position -= weights[index++];
+    const choice: CompanionDialogue = { id: ++token, text: eligible[index].text, sceneId: scene.id, companionId,
+      ...(firstScore ? { kind: 'progress' } : {}) };
+    pending = { choice, group: scene.semantic_group, shot: shotLog.size, at: now, opening, memoryLine: lineFor(choice.text, scene.id, companionId) };
     return choice;
   }
 
   function progress(id: ProgressId, companionId: string | undefined, now: number, toBlackEight = false): CompanionDialogue | null {
-    const available = (voicedProgress(companionVoice(companionId), id) ?? SHOT_PROGRESS_LINES[id])
+    const voice = companionVoice(companionId);
+    if (voice?.cadence === 'quiet' && !toBlackEight &&
+        (id.startsWith('N_STREAK_') || id === 'P_STREAK_2' || id === 'P_STREAK_5')) return null;
+    const authored = (voicedProgress(voice, id) ?? SHOT_PROGRESS_LINES[id])
       .map(text => toBlackEight ? `${text} 下一杆打黑八。` : text)
       .filter(text => !spoken.has(text));
+    const available = memory.candidates(authored.map(text => lineFor(text, id, companionId)), toBlackEight).map(line => line.text);
     if (!available.length || (!id.endsWith('_LATER') && scenes.has(id))) return null;
     const text = available[Math.floor(roll() * available.length)];
     const choice = { id: ++token, text, sceneId: id, companionId, kind: 'progress' as const };
-    pending = { choice, group: null, shot: shotLog.size, at: now, opening: false };
+    pending = { choice, group: null, shot: shotLog.size, at: now, opening: false, memoryLine: lineFor(text, id, companionId) };
     return choice;
   }
 
   function reset(isRematch = false) {
-    if (spoken.size) { recent.push([...spoken]); if (recent.length > settings.recent_racks) recent.shift(); }
+    memory.reset();
     pending = null; shotLog.clear(); scenes.clear(); groups.clear(); spoken.clear(); ruleVisits.clear();
     pots = dry = empty = ordinaryCount = 0;
     lastEntry = undefined;
@@ -103,6 +130,7 @@ export function createCompanionDialogue(random: () => number = Math.random) {
 
   function ready(companionId: string | undefined, now: number) {
     if (readyDone || ended) return null;
+    memory.start();
     readyDone = true;
     return choose([rematch ? 'REMATCH' : 'OPEN_PLAYER'], companionId, now, true);
   }
@@ -130,13 +158,11 @@ export function createCompanionDialogue(random: () => number = Math.random) {
     if (rule) {
       const occurrence = ruleVisits.get(rule.sceneId) ?? 0;
       ruleVisits.set(rule.sceneId, occurrence + 1);
-      return {
-        id: ++token,
-        text: rule.lines[occurrence % rule.lines.length],
-        sceneId: rule.sceneId,
-        companionId: before.companionId,
-        kind: 'rule',
-      };
+      const candidates = memory.candidates(rule.lines.map(text => lineFor(text, rule.sceneId, before.companionId)), true);
+      const selected = candidates[occurrence % candidates.length];
+      const choice: CompanionDialogue = { id: ++token, text: selected.text, sceneId: rule.sceneId, companionId: before.companionId, kind: 'rule' };
+      pending = { choice, group: null, at: now, shot: shotLog.size, opening: false, required: true, memoryLine: selected };
+      return choice;
     }
 
     if (foul) return null;
@@ -191,17 +217,23 @@ export function createCompanionDialogue(random: () => number = Math.random) {
   }
 
   function thinking(companionId: string | undefined, now: number) {
-    if (ended || thinkingDone || pending || now - lastAt < settings.cooldown_ms || shotLog.size - lastShot < settings.min_shot_gap
-      || ordinaryCount >= settings.max_lines_per_rack - settings.reserve_terminal) return null;
+    const voice = companionVoice(companionId);
+    const rhythm = speechRhythm(companionId);
+    if (voice?.cadence === 'quiet' || ended || thinkingDone || pending ||
+        now - lastAt < rhythm.cooldown || shotLog.size - lastShot < rhythm.shotGap || ordinaryCount >= rhythm.limit) return null;
     thinkingDone = true;
-    const choice = { id: ++token, text: companionVoice(companionId)?.thinking ?? companionMomentLine(companionId, 'thinking'), sceneId: 'THINKING', companionId };
-    pending = { choice, group: 'opponent_waiting', at: now, shot: shotLog.size, opening: false };
+    const selected = memory.candidates([lineFor(voice?.thinking ?? companionMomentLine(companionId, 'thinking'), 'THINKING', companionId)])[0];
+    if (!selected) return null;
+    const choice = { id: ++token, text: selected.text, sceneId: 'THINKING', companionId };
+    pending = { choice, group: 'opponent_waiting', at: now, shot: shotLog.size, opening: false, memoryLine: selected };
     return choice;
   }
 
   function shown(id: number, now: number) {
     if (!pending || pending.choice.id !== id || now < pending.at) return false;
     const { choice, group, opening } = pending;
+    if (pending.memoryLine) memory.shown(pending.memoryLine);
+    if (pending.required) { pending = null; return true; }
     spoken.add(choice.text); scenes.set(choice.sceneId, (scenes.get(choice.sceneId) ?? 0) + 1);
     if (group) {
       groups.set(group, (groups.get(group) ?? 0) + 1);

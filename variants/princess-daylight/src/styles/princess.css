@@ -309,7 +309,7 @@ body, body * { font-family:var(--royal-font)!important; font-size:var(--royal-fo
 .companion-book-header {display:flex;align-items:center;justify-content:space-between;width:min(100%,440px);flex-shrink:0;gap:24px;}
 .companion-book-header h2 {margin:0;font-size:21px;font-weight:500;letter-spacing:.12em;}
 .companion-book-header p {margin:7px 0 0;font-size:13px;color:#8b785e;}
-.companion-book-header button,.companion-book-nav button {display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;padding:10px;border:1px solid #ccb68c;border-radius:50%;background:#fffaf0;color:#82683e;}
+.companion-book-header > button,.companion-book-nav button {display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;padding:10px;border:1px solid #ccb68c;border-radius:50%;background:#fffaf0;color:#82683e;}
 .companion-book-header .royal-icon,.companion-book-nav .royal-icon {width:22px;height:22px;}
 .companion-card-stack {position:relative;flex:none;width:min(72vw,300px);height:min(104vw,430px);margin:24px 0 18px;touch-action:pan-y;user-select:none;}
 .companion-playing-card {position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;padding:12px;border:1px solid #c8ab73;border-radius:15px;background:#fffaf0;box-shadow:0 16px 32px #604b2b25;z-index:var(--card-z);transform:translateX(calc(var(--card-offset) * 18px + var(--card-drag))) rotate(calc(var(--card-offset) * 5deg)) scale(calc(1 - var(--card-offset) * var(--card-offset) * .025));transition:transform .22s ease;pointer-events:none;}

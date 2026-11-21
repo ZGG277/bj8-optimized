@@ -7,6 +7,7 @@
 import type { FoulReason, MatchState, ShotFacts } from '../match/types';
 import type { CompanionDialogue } from './companion-dialogue';
 import { companionVoice } from './companion-voices';
+import { VOICE_RULE_TURNS } from './companion-voice-variations';
 
 type RuleLines = { sceneId: string; lines: readonly string[] };
 
@@ -49,7 +50,10 @@ const opponentFouls: Record<FoulReason, RuleLines> = {
 export function ruleLinesForShot(before: MatchState, facts: ShotFacts, next: MatchState): RuleLines | null {
   const voice = companionVoice(before.companionId);
   const speak = (fallback: RuleLines, fact: string, myTurn: boolean): RuleLines =>
-    voice ? { sceneId: fallback.sceneId, lines: [myTurn ? voice.take(fact) : voice.give(fact)] } : fallback;
+    voice ? { sceneId: fallback.sceneId, lines: [
+      myTurn ? voice.take(fact) : voice.give(fact),
+      `${fact}。${VOICE_RULE_TURNS[before.companionId ?? '']?.[myTurn ? 0 : 1] ?? (myTurn ? '这杆换我，公主稍等。' : '这一杆交给公主。')}`,
+    ] } : fallback;
 
   if (next.messageKey === 'group-assigned') {
     const group = next.playerGroup;
@@ -122,10 +126,13 @@ export function terminalEightInstruction(match: MatchState): string | null {
   if (isEarlyEightFinish(match)) return '清完本组球后，下一杆才能打黑八。';
   const { reason, actor = match.actor } = match.messageParams;
   const shooter = actor === 'opponent' ? '我' : '公主';
+  const voice = companionVoice(match.companionId);
+  const reaction = match.winner && voice?.result[match.winner === 'player' ? 'win' : 'lose'];
   if (match.messageKey === 'lose-8-foul') {
-    return `${shooter}打进了黑八，但这杆${reason ? foulDetails[reason] : '犯规了'}，这局结束啦。`;
+    return `${shooter}打进了黑八，但这杆${reason ? foulDetails[reason] : '犯规了'}，这局结束啦。${reaction ?? ''}`;
   }
   if (match.messageKey === 'win-8') {
+    if (reaction) return `${shooter}清完本组球后打进黑八。${reaction}`;
     return `${shooter}清完本组球后打进了黑八，拿下这局啦。`;
   }
   return null;

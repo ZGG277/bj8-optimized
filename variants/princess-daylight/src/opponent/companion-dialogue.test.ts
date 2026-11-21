@@ -164,6 +164,28 @@ describe('facts-first companion dialogue', () => {
     expect(d.thinking('lu-jingchen', 20000)).toBeNull();
     expect(shot(d, 1, {}, {}, 1000)).toBeNull();
   });
+  it('gives Gu fewer optional lines than Wen on the same rack and the same draws', () => {
+    const play = (companionId: string) => {
+      const d = createCompanionDialogue(() => .2);
+      const opening = d.ready(companionId, 0)!;
+      d.shown(opening.id, 0);
+      const first = shot(d, 1, {}, { companionId }, 1500)!;
+      expect(first).toMatchObject({ sceneId: 'P_FIRST_POT', kind: 'progress' });
+      d.shown(first.id, 1500);
+      for (let id = 2; id <= 11; id++) {
+        const actor = id % 2 === 0 ? 'opponent' : 'player';
+        const choice = shot(d, id, {
+          firstContact: actor === 'opponent' ? 9 : 1,
+          pocketed: actor === 'opponent' ? [] : [1],
+        }, { actor, companionId });
+        if (choice) d.shown(choice.id, id * 20000);
+      }
+      return d.snapshot().ordinaryCount;
+    };
+    expect(play('gu-yanchuan')).toBe(2);
+    expect(play('wen-xingye')).toBeGreaterThan(4);
+    expect(createCompanionDialogue(() => 0).thinking('gu-yanchuan', 0)).toBeNull();
+  });
   it('keeps dry-player-shot statistics across intervening NPC turns', () => {
     const d = createCompanionDialogue(() => 0);
     for (let n = 1; n <= 3; n++) {
@@ -191,7 +213,9 @@ describe('facts-first companion dialogue', () => {
     expect(second.sceneId).toBe('REMATCH'); d.shown(second.id, 20000);
     const a = shot(d, 1, {}, {}, 40000)!;d.shown(a.id, 40000);
     shot(d, 2, { pocketed: [] });
-    const b = shot(d, 3, {}, {}, 80000)!; expect(b.text).not.toBe(a.text);
+    const b = shot(d, 3, {}, {}, 80000);
+    // Ordinary praise may stay silent when only a near-synonym remains.
+    expect(b?.text).not.toBe(a.text);
   });
   it('keeps both shooters’ misses separate and escalates only after legal black-eight attempts', () => {
     const d = createCompanionDialogue(() => .99);

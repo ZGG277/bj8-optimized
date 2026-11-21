@@ -1,3 +1,4 @@
+import type { Career } from '../opponent/career';
 /*
 [INPUT]: viewLevel / match、已选台词与展示回执、pointer处理器与控件学习记录
 [OUTPUT]: 单一小头像通道按事实优先显示犯规/分组/教学/台词；渲染球桌、摆球光圈与提前黑八的先台词后卡片结算
@@ -30,6 +31,8 @@ interface TableStageProps {
   collectionReward?: CompanionReward | null;
   collection?: CompanionCollection;
   collectionSaveFailed?: boolean;
+  career?: Career;
+  onCareer?: () => void;
   onCollection?: () => void;
   viewLevel: number;
   spectatorActive: boolean;
@@ -51,7 +54,7 @@ export function TableStage({
   placementHalo, highlights,
   victoryPraise,
   dialogue, onDialogueShown, guideText, viewHintText, speechEnabled = true, eightReady,
-  collection, collectionReward, collectionSaveFailed, onCollection,
+  collection, collectionReward, collectionSaveFailed, onCollection, career, onCareer,
   viewLevel,
   spectatorActive,
   manualCameraActive,
@@ -68,7 +71,12 @@ export function TableStage({
     match, prioritySpeech: dialogue?.kind ? dialogue : null,
     guide: guideText, view: viewHintText, eightReady,
   });
-  const speech = instruction ?? dialogue;
+  const openingWithInstruction = dialogue &&
+    (dialogue.sceneId === 'OPEN_PLAYER' || dialogue.sceneId === 'REMATCH') &&
+    (instruction?.sceneId === 'CONTROL_GUIDE' || instruction?.sceneId === 'VIEW_GUIDE');
+  const speech = openingWithInstruction
+    ? { ...dialogue, text: `${dialogue.text} ${instruction.text}` }
+    : instruction ?? dialogue;
   const announcement = earlyEightAnnouncement(match);
   const [announcedMatch, setAnnouncedMatch] = useState<MatchState | null>(null);
   const waitingForAnnouncement = announcement !== null && announcedMatch !== match;
@@ -93,10 +101,10 @@ export function TableStage({
         onLostPointerCapture={onPointerCancel}
       >
         {match.phase === 'placing' && placementHalo && <div className={`free-ball-halo ${placementHalo.valid ? '' : 'invalid'}`} style={{ left: placementHalo.x, top: placementHalo.y }} role="img" aria-label={placementHalo.valid ? '拖动光圈，松手放白球' : '此处不能放球，请拖回台面空位'}><i/></div>}
-        {speechEnabled && speech && match.phase !== 'finished' && <CompanionMoment key={`${speech.id}:${speech.sceneId}:${speech.text}`} dialogue={speech} onShown={speech.id >= 0 && speech.kind !== 'rule' ? onDialogueShown : undefined}/>}
+        {speechEnabled && speech && match.phase !== 'finished' && <CompanionMoment key={`${speech.id}:${speech.sceneId}:${speech.text}`} dialogue={speech} onShown={speech.id >= 0 ? onDialogueShown : undefined}/>}
 
         {speechEnabled && waitingForAnnouncement && announcement && <CompanionMoment dialogue={announcement}/>}
-        {match.phase === 'finished' && !waitingForAnnouncement && <RoyalFinish resultExplanation={terminalEightInstruction(match)} highlights={highlights} victoryPraise={victoryPraise} collection={collection} collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} messageKey={match.messageKey} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
+        {match.phase === 'finished' && !waitingForAnnouncement && <RoyalFinish career={career} onCareer={onCareer} resultExplanation={terminalEightInstruction(match)} highlights={highlights} victoryPraise={victoryPraise} collection={collection} collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} messageKey={match.messageKey} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
       </div>
 
     </section>

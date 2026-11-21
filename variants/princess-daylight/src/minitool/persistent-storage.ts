@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
  */
 export const SAVE_KEYS = [
+  'princess-billiards:dialogue-memory:v1', 'princess-billiards:career:v1',
   'princess-billiards:player-skill:v3', 'princess-billiards:player-skill:v2',
   'princess-billiards:player-skill:v1', 'princess-billiards:control-layout:v3',
   'princess-billiards:learned-controls:v1', 'princess-billiards:completed-match:v1',

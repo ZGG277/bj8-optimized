@@ -1,10 +1,12 @@
+import { loadCareer, recordCareerFinish, saveCareer } from '../opponent/career';
+import { settledShot, type SettledShot } from '../match/shot-log';
 import { nextVictoryPraise } from '../opponent/victory-praise';
 import { pickCompanion } from '../opponent/companions';
 import { collectCompanionWin, loadCompanionCollection, saveCompanionCollection, type CompanionReward } from '../opponent/companion-collection';
 import { createFriendlyOpponentProfile } from '../opponent/friendly-style';
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
-[OUTPUT]: 摆球错误保留真实犯规原因； 对外提供每次初始化默认第一视角的对局状态、整局结束才提交的双方能力档案与单点训练总结、
+[OUTPUT]: 摆球错误保留真实犯规原因；真实终局一次提交独立资历及技术均值；对外提供默认第一视角的对局状态、双方能力档案与单点训练总结、
           resetGame / settleShot / recordPlayerShot / completeMatchAssessment 等编排动作
 [POS]: 状态管理收敛层，集中管理 Game 组件的所有状态与 ref
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -71,6 +73,12 @@ export function useGameState() {
   );
   const [trainingSummary, setTrainingSummary] = useState<MatchTrainingSummary | null>(null);
   const assessmentDoneRef = useRef(false);
+  const [career, setCareer] = useState(() => loadCareer(browserStorage(), playerSkill.matchesEvaluated));
+  const careerRef = useRef(career);
+  const [careerSaveFailed, setCareerSaveFailed] = useState(false);
+  const careerShots = useRef<SettledShot[]>([]);
+  const resolvedFinish = useRef<MatchState | null>(null);
+  const rackId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const [collection, setCollection] = useState(() => loadCompanionCollection(browserStorage()));
   const collectionRef = useRef(collection);
   const [victoryPraise, setVictoryPraise] = useState('');
@@ -97,6 +105,8 @@ export function useGameState() {
     settlementGuardRef.current.reset();
     matchObservationsRef.current = [];
     assessmentDoneRef.current = false;
+    careerShots.current = []; resolvedFinish.current = null;
+    rackId.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setCollectionReward(null);
     setVictoryPraise('');
     setTrainingSummary(null);
@@ -118,6 +128,13 @@ export function useGameState() {
   const completeMatchAssessment = useCallback((winner: MatchState['winner']) => {
     if (!winner || assessmentDoneRef.current) return playerSkillRef.current;
     assessmentDoneRef.current = true;
+    if (resolvedFinish.current) {
+      const nextCareer = recordCareerFinish(careerRef.current, rackId.current, resolvedFinish.current, careerShots.current);
+      if (nextCareer !== careerRef.current) {
+        careerRef.current = nextCareer; setCareer(nextCareer);
+        setCareerSaveFailed(!saveCareer(browserStorage(), nextCareer));
+      }
+    }
     if (winner === 'player') {
       const praise = nextVictoryPraise(browserStorage());
       setVictoryPraise(praise);
@@ -148,6 +165,9 @@ export function useGameState() {
     if (!settlementGuardRef.current.accept(facts.shotId)) return null;
 
     const resolution = resolveStoppedShot(matchRef.current, facts);
+    const log = careerShots.current;
+    log.push(settledShot(matchRef.current, facts, resolution, log[log.length - 1]));
+    if (resolution.next.phase === 'finished') resolvedFinish.current = resolution.next;
     for (const effect of resolution.effects) {
       if (effect.type === 'auto-respot-cue') {
         respotCueBall(world);
@@ -175,6 +195,7 @@ export function useGameState() {
     collectionReward,
     victoryPraise,
     collectionSaveFailed,
+    career, careerSaveFailed,
     gameMode,
     opponentProfile,
     canAim,

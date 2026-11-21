@@ -1,3 +1,5 @@
+import { CareerBadge } from './CareerPanel';
+import type { Career } from '../opponent/career';
 /**
  * [INPUT]: 真实胜负、本局头像/原句、已赢收藏与可选小红书分享接口。
  * [OUTPUT]: 统一局后卡与近景整图分享封面；浏览器预览与平台首图同图同文案，取消或失败保留。
@@ -30,7 +32,8 @@ export function resultCardLine(winner: 'player' | 'opponent' | null, praise: str
   return winner === 'opponent' ? '下局再赢回来' : '歇一会再来一局';
 }
 /** All outcomes use one card with any rule explanation displayed separately. */
-export function RoyalFinish({ winner, onRestart, gameMode='practice', companionId, collection, collectionSaveFailed = false, onCollection, victoryPraise = VICTORY_PRAISES[0], messageKey = '', highlights, resultExplanation }: {
+export function RoyalFinish({ winner, onRestart, gameMode='practice', companionId, collection, collectionSaveFailed = false, onCollection, victoryPraise = VICTORY_PRAISES[0], messageKey = '', highlights, resultExplanation, career, onCareer }: {
+  career?: Career; onCareer?: () => void;
   resultExplanation?: string | null;
   highlights?: MatchHighlights;
   collection?: CompanionCollection;
@@ -106,6 +109,7 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', companionI
       <FollowAuthor />
       <button type="button" ref={restartButton} autoFocus data-control-tip="new-match" onClick={() => { stopCelebration(); onRestart(); }}>再来一局</button>
     </div>
+    {career && onCareer && <CareerBadge career={career} onClick={() => { stopCelebration(); onCareer(); }}/>}
     {resultExplanation && <p className="royal-card-status" role="status">{resultExplanation}</p>}
     {highlights && highlights.shots > 0 && <section className="royal-match-highlights" aria-label="本局亮点">
       <h2>本局亮点</h2><dl>
