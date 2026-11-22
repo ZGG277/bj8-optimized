@@ -177,7 +177,8 @@ export function cameraPoseAt(
   };
   const firstLookAt: CameraPoint = {
     x: cueX + sin * FP_LOOK_AHEAD,
-    y: 0.03,
+    // Lift the sightline slightly in portrait so the rack sits below conversation bubbles.
+    y: 0.03 + (aspect < 1 ? Math.min(0.035, (fullTableSafety?.top ?? 0) * .32) : 0),
     z: cueZ - cos * FP_LOOK_AHEAD,
   };
 

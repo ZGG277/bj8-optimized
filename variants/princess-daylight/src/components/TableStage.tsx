@@ -5,13 +5,12 @@ import type { Career } from '../opponent/career';
 [POS]: HUD 组件层；瞄准拨轮已并入统一可停靠控制层，相机/对局状态由上层持有
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { markControlLearned } from '../control-onboarding';
 import type { MatchState } from '../match/types';
 import type { GameMode, MatchTrainingSummary } from '../opponent/model';
 import { RoyalFinish } from './RoyalFinish';
 import type { CompanionCollection, CompanionReward } from '../opponent/companion-collection';
-import { CompanionMoment } from './CompanionMoment';
 import type { MatchHighlights } from '../match/highlights';
 
 import type { CompanionDialogue } from '../opponent/companion-dialogue';
@@ -20,10 +19,15 @@ import { companionInstruction, earlyEightAnnouncement, terminalEightInstruction 
 const EARLY_EIGHT_ANNOUNCEMENT_MS = 3500;
 
 interface TableStageProps {
+  chatFloat?: React.ReactNode;
   placementHalo?: { x: number; y: number; valid: boolean } | null;
   highlights?: MatchHighlights;
   victoryPraise?: string;
   dialogue?: CompanionDialogue | null;
+  onSpeech?: (line: CompanionDialogue) => void;
+  speechTurn?: number;
+  rackSerial?: number;
+  chatSpeaking?: boolean;
   onDialogueShown?: (id: number) => void;
   guideText?: string | null;
   viewHintText?: string | null;
@@ -51,9 +55,9 @@ interface TableStageProps {
 }
 
 export function TableStage({
-  placementHalo, highlights,
+  placementHalo, highlights, chatFloat,
   victoryPraise,
-  dialogue, onDialogueShown, guideText, viewHintText, speechEnabled = true, eightReady,
+  dialogue, onDialogueShown, onSpeech, speechTurn, rackSerial = 0, chatSpeaking, guideText, viewHintText, speechEnabled = true, eightReady,
   collection, collectionReward, collectionSaveFailed, onCollection, career, onCareer,
   viewLevel,
   spectatorActive,
@@ -71,15 +75,30 @@ export function TableStage({
     match, prioritySpeech: dialogue?.kind ? dialogue : null,
     guide: guideText, view: viewHintText, eightReady,
   });
-  const openingWithInstruction = dialogue &&
-    (dialogue.sceneId === 'OPEN_PLAYER' || dialogue.sceneId === 'REMATCH') &&
-    (instruction?.sceneId === 'CONTROL_GUIDE' || instruction?.sceneId === 'VIEW_GUIDE');
-  const speech = openingWithInstruction
-    ? { ...dialogue, text: `${dialogue.text} ${instruction.text}` }
-    : instruction ?? dialogue;
+  const greeting = dialogue?.sceneId === 'OPEN_PLAYER' || dialogue?.sceneId === 'REMATCH';
+  const speech = greeting ? dialogue : instruction ?? dialogue;
   const announcement = earlyEightAnnouncement(match);
   const [announcedMatch, setAnnouncedMatch] = useState<MatchState | null>(null);
   const waitingForAnnouncement = announcement !== null && announcedMatch !== match;
+
+  const audible = waitingForAnnouncement ? announcement : match.phase !== 'finished' ? speech : null;
+  const speechKey = audible && JSON.stringify([match.companionId, speechTurn, audible.id, audible.sceneId, audible.text]);
+  const spoken = useRef({ rackSerial: -1, last: '', guides: new Set<string>() });
+  useEffect(() => {
+    if (spoken.current.rackSerial !== rackSerial) {
+      spoken.current = { rackSerial, last: '', guides: new Set() };
+    }
+    const memory = spoken.current;
+    if ((!waitingForAnnouncement && chatSpeaking) || !speechEnabled || !audible || !speechKey || memory.last === speechKey) return;
+    if (audible.sceneId === 'CONTROL_GUIDE' || audible.sceneId === 'VIEW_GUIDE') {
+      const key = audible.text.includes('蓄力') ? 'power' : audible.text;
+      if (memory.guides.has(key)) return;
+      memory.guides.add(key);
+    }
+    memory.last = speechKey;
+    onSpeech?.({ ...audible, companionId: match.companionId });
+    if (audible.id >= 0) onDialogueShown?.(audible.id);
+  }, [rackSerial, chatSpeaking, waitingForAnnouncement, speechEnabled, audible, speechKey, match.companionId, onSpeech, onDialogueShown]);
 
   useEffect(() => {
     if (!waitingForAnnouncement || !speechEnabled) return;
@@ -100,10 +119,9 @@ export function TableStage({
         onPointerCancel={onPointerCancel}
         onLostPointerCapture={onPointerCancel}
       >
+        {chatFloat}
         {match.phase === 'placing' && placementHalo && <div className={`free-ball-halo ${placementHalo.valid ? '' : 'invalid'}`} style={{ left: placementHalo.x, top: placementHalo.y }} role="img" aria-label={placementHalo.valid ? '拖动光圈，松手放白球' : '此处不能放球，请拖回台面空位'}><i/></div>}
-        {speechEnabled && speech && match.phase !== 'finished' && <CompanionMoment key={`${speech.id}:${speech.sceneId}:${speech.text}`} dialogue={speech} onShown={speech.id >= 0 ? onDialogueShown : undefined}/>}
 
-        {speechEnabled && waitingForAnnouncement && announcement && <CompanionMoment dialogue={announcement}/>}
         {match.phase === 'finished' && !waitingForAnnouncement && <RoyalFinish career={career} onCareer={onCareer} resultExplanation={terminalEightInstruction(match)} highlights={highlights} victoryPraise={victoryPraise} collection={collection} collectionSaveFailed={collectionSaveFailed} collectionReward={collectionReward} onCollection={onCollection} companionId={match.companionId} winner={match.winner} messageKey={match.messageKey} gameMode={gameMode} onRestart={() => { onResetGame(); markControlLearned('new-match'); }} />}
       </div>
 

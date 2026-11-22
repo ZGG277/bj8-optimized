@@ -92,7 +92,7 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     const authored = typeof custom === 'string' ? [custom] : custom;
     const lines = (authored?.map(text => ({ text, weight: 1 })) ?? scene.lines)
       .filter(line => !spoken.has(line.text));
-    const fresh = memory.candidates(lines.map(l => lineFor(l.text, scene.id, companionId)));
+    const fresh = memory.candidates(lines.map(l => lineFor(l.text, scene.id, companionId)), opening);
     const eligible = lines.filter(l => fresh.some(f => f.text === l.text));
     const probability = opening || firstScore ? 1 : Math.min(1, scene.probability * rhythm.chance);
     if (!eligible.length || roll() >= probability) return null;

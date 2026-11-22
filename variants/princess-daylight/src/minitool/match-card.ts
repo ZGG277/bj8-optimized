@@ -47,7 +47,7 @@ async function drawCard(art: string, name: string, praise: string): Promise<stri
   ctx.fillStyle='#d5be89';ctx.beginPath();ctx.arc(360,292,171,0,Math.PI*2);ctx.fill();
   ctx.save();ctx.beginPath();ctx.arc(360,292,163,0,Math.PI*2);ctx.clip();
   const side=Math.min(portrait.naturalWidth,portrait.naturalHeight);
-  ctx.drawImage(portrait,(portrait.naturalWidth-side)/2,(portrait.naturalHeight-side)/2,side,side,197,129,326,326);ctx.restore();
+  ctx.drawImage(portrait,(portrait.naturalWidth-side)/2,(portrait.naturalHeight-side)*.06,side,side,197,129,326,326);ctx.restore();
   ctx.strokeStyle=gold;ctx.lineWidth=1;ctx.beginPath();ctx.arc(360,292,179,0,Math.PI*2);ctx.stroke();
   ctx.fillStyle='#8a6a36';ctx.font=canvasFont(36);ctx.fillText(name,360,526);
   ctx.strokeStyle='#c8af7b';ctx.beginPath();ctx.moveTo(240,574);ctx.lineTo(330,574);ctx.moveTo(390,574);ctx.lineTo(480,574);ctx.stroke();

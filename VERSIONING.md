@@ -1,3 +1,7 @@
+# 公主请开球当前基线 · 2026-11-22
+
+创服 V1.0.27 双人封面版，审核中。详见[本次交付记录](variants/princess-daylight/RELEASE_1_0_27_20261122.md)与[源码及包内文件指纹](variants/princess-daylight/PUBLIC_SOURCE_MANIFEST.json)。
+
 # Princess platform submission outcome - 2026-11-05
 
 Xiaohongshu original app6ac8c0d3c4b5540015fa41d0: V1.0.10 submitted once after successful deployment/simulator native shot and explicit user agreement acceptance. Independent platform list confirms review pending; public release is not yet verified. Existing ego-browser CLI account is authenticated; prior IAB401 only concerned the separate IAB login state. No account/permission/global settings changed.

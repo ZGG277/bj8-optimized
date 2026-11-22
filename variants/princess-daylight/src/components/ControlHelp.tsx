@@ -19,9 +19,10 @@ export const CONTROL_HELP = [
   ['切换场景', '点山形按钮，选择城堡或湖面。'],
   ['移动按钮', '长按控件，再拖动调整位置。'],
 ] as const;
-export function ControlHelp({ onClose, onReplayGuide, gameMode, onModeChange }: {
+export function ControlHelp({ onClose, onReplayGuide, onSkipGuide, gameMode, onModeChange }: {
   onClose: () => void;
   onReplayGuide?: () => void;
+  onSkipGuide?: () => void;
   gameMode?: GameMode;
   onModeChange?: (mode: GameMode) => void;
 }) {
@@ -29,6 +30,7 @@ export function ControlHelp({ onClose, onReplayGuide, gameMode, onModeChange }: 
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; close.current?.focus(); return () => previous?.focus(); }, []);
   return <div className="royal-help-mask" role="dialog" aria-modal="true" aria-labelledby="royal-help-title" onPointerDown={e => e.stopPropagation()} onKeyDown={e => { containRoyalDialogTab(e); if (e.key === 'Escape') onClose(); e.stopPropagation(); }}>
     <section className="royal-help-card"><header><h2 id="royal-help-title">操作说明</h2><button ref={close} aria-label="收起操作说明" onClick={onClose}><RoyalIcon name="close"/></button></header>
+      {onSkipGuide && <button className="replay-guide" onClick={onSkipGuide}>跳过新手引导</button>}
       {onReplayGuide && <button className="replay-guide" onClick={onReplayGuide}>再看操作引导</button>}
       {onModeChange && <label className="help-mode">本局模式
         <select value={gameMode} onChange={event => onModeChange(event.target.value as GameMode)}>

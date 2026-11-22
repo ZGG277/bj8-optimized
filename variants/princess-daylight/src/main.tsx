@@ -16,6 +16,7 @@ import './styles/layout.css';
 import './styles/controls.css';
 import './styles/themes/index.css';
 import './styles/princess.css';
+import './styles/table-chat.css';
 
 async function boot() {
   try {

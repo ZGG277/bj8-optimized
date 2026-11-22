@@ -1,6 +1,6 @@
 /*
 [INPUT]: 当前首局微提示、对局是否允许展示、跳过回调与逐控件学习记录
-[OUTPUT]: 小手和箭头只对准可操作的锚点；等待步骤只发台词
+[OUTPUT]: 操作说明与跳过入口；等待步骤只发台词
 [POS]: HUD 展示层；只观察稳定 DOM 锚点，不持有引导状态或改写对局
 [PROTOCOL]: 提示文案、锚点或布局变化时更新本注释、components/CLAUDE.md 与样式文档
 */
@@ -27,7 +27,7 @@ type PositionForAnchorOptions = {
 export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
   'first-power': { text: '下拉蓄力，松手出杆', selector: '[data-control-slot="power"] .shoot-pad' },
   'first-rolling': { text: '看球慢慢停稳', selector: '.scoreboard' },
-  'turn-wait': { text: '对手回合，稍等一下', selector: '.scoreboard' },
+  'turn-wait': { text: '该我打啦。', selector: '.scoreboard' },
   'free-place': { text: '拖动光圈，松手放好白球', selector: '.viewport' },
   'ghost-place': { text: '点目标球，或拖动瞄准点', selector: '.viewport' },
   'aim-direction': { text: '拨动刻度，微调方向', selector: '[data-control-slot="aimDial"] .aim-dial' },
@@ -74,15 +74,6 @@ const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 8;
 const MOBILE_BOTTOM_RESERVE = 82;
 const FULLSCREEN_AVOID_THRESHOLD = 0.82;
-
-/** 48×67.2px 手势图的指尖固定在控件内，文字避让不再带走手势。 */
-export function gestureForControl(anchor: GuideAvoidRect, horizontal: boolean, power: boolean) {
-  return {
-    left: anchor.left + anchor.width / 2 - 29 * .6,
-    top: anchor.top + anchor.height * (power && !horizontal ? .38 : .5) - 26 * .6,
-    rotation: horizontal ? -90 : 0,
-  };
-}
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
@@ -244,18 +235,17 @@ export function FirstMatchGuide({
 }: FirstMatchGuideProps) {
   const copy = FIRST_MATCH_GUIDE_COPY[step];
   const action = actionForStep(step);
-  const showHint = visible && (action !== null || !onInstruction);
+  const showHint = visible && (!onInstruction || action === 'power');
   const hintRef = useRef<HTMLElement>(null);
   const [placement, setPlacement] = useState<{
     step: FirstMatchGuideStep;
-    position: AnchorPosition;
+    position?: AnchorPosition;
     horizontal: boolean;
-    gesture: ReturnType<typeof gestureForControl> | null;
+    lowerRight: boolean;
   } | null>(null);
   const current = placement?.step === step ? placement : null;
   const position = current?.position;
   const horizontal = current?.horizontal ?? false;
-  const gesture = current?.gesture;
 
   useEffect(() => {
     if (!showHint) return;
@@ -267,7 +257,7 @@ export function FirstMatchGuide({
       const hint = hintRef.current;
       const anchor = document.querySelector<HTMLElement>(copy.selector);
       const anchorRect = anchor?.getBoundingClientRect();
-      if (!hint || !anchor || !anchorRect || anchorRect.width <= 0 || anchorRect.height <= 0 ||
+      if ((!hint && !onInstruction) || !anchor || !anchorRect || anchorRect.width <= 0 || anchorRect.height <= 0 ||
           anchorRect.right <= 0 || anchorRect.bottom <= 0 ||
           anchorRect.left >= window.innerWidth || anchorRect.top >= window.innerHeight ||
           anchor.closest('[hidden], [aria-disabled="true"], :disabled') ||
@@ -276,6 +266,14 @@ export function FirstMatchGuide({
         setPlacement(null);
         return;
       }
+      if (onInstruction) {
+        const horizontal = anchorRect.width > anchorRect.height * 1.35;
+        const lowerRight = anchorRect.left + anchorRect.width / 2 >= window.innerWidth / 2 && anchorRect.bottom >= window.innerHeight / 2;
+        const signature = `${horizontal}:${lowerRight}`;
+        if (signature !== last) { last = signature; setPlacement({ step, horizontal, lowerRight }); }
+        return;
+      }
+      if (!hint) return;
       const avoidRects = [
         ...Array.from(document.querySelectorAll<HTMLElement>('.theme-palette-button, [data-control-slot]')),
       ]
@@ -285,8 +283,6 @@ export function FirstMatchGuide({
         .map(el => normalizeAvoidRect(el.getBoundingClientRect()));
       const point = anchor.matches('.viewport') ? getTablePoint?.() : null;
       const isHorizontal = anchorRect.width > anchorRect.height * 1.35 && !anchor.matches('.viewport');
-      const nextGesture = !anchor.matches('.viewport') && (action === 'power' || action === 'aim')
-        ? gestureForControl(anchorRect, isHorizontal, action === 'power') : null;
       const next: AnchorPosition = point ? {
         left: clamp(point.x - 90, VIEWPORT_MARGIN, window.innerWidth - hint.getBoundingClientRect().width - VIEWPORT_MARGIN),
         top: clamp(point.y - 18, 100, window.innerHeight - hint.getBoundingClientRect().height - MOBILE_BOTTOM_RESERVE),
@@ -304,10 +300,10 @@ export function FirstMatchGuide({
           viewportWidth: window.innerWidth,
         },
       );
-      const signature = `${Math.round(next.left)}:${Math.round(next.top)}:${next.side}:${nextGesture?.left}:${nextGesture?.top}:${nextGesture?.rotation}`;
+      const signature = `${Math.round(next.left)}:${Math.round(next.top)}:${next.side}:${isHorizontal}:${anchorRect.left}:${anchorRect.bottom}`;
       if (signature !== last) {
         last = signature;
-        setPlacement({ step, position: next, horizontal: isHorizontal, gesture: nextGesture });
+        setPlacement({ step, position: next, horizontal: isHorizontal, lowerRight: anchorRect.left + anchorRect.width / 2 >= window.innerWidth / 2 && anchorRect.bottom >= window.innerHeight / 2 });
       }
     };
     const schedule = () => {
@@ -335,44 +331,32 @@ export function FirstMatchGuide({
       window.removeEventListener('resize', schedule);
       if (projectionTimer !== null) window.clearInterval(projectionTimer);
     };
-  }, [action, showHint, getTablePoint, copy.selector, step]);
+  }, [onInstruction, action, showHint, getTablePoint, copy.selector, step]);
 
   const instruction = textOverride ?? (action === 'power'
-    ? `按住球杆按钮，${horizontal ? '右拉' : '下拉'}蓄力，松手击球。`
+    ? `按住${current?.lowerRight ? '右下角的' : ''}球杆，${horizontal ? '右拉' : '下拉'}蓄力，松手击球。`
     : copy.text);
   useEffect(() => {
-    onInstruction?.(visible ? instruction : null);
+    onInstruction?.(visible && (action !== 'power' || !!current) ? instruction : null);
     return () => onInstruction?.(null);
-  }, [visible, instruction, onInstruction]);
-  if (!showHint) return null;
+  }, [visible, instruction, action, !!current, onInstruction]);
+  if (!showHint || onInstruction) return null;
 
   return (
     <aside
       ref={hintRef}
-      className={`first-match-guide${onInstruction ? ' speech-delivered' : ''} gesture-${action ?? 'wait'} is-${position?.side ?? 'measuring'} ${horizontal ? 'is-horizontal' : ''}`}
+      className={`first-match-guide gesture-${action ?? 'wait'} is-${position?.side ?? 'measuring'} ${horizontal ? 'is-horizontal' : ''}`}
       style={{
         left: position?.left ?? -1000,
         top: position?.top ?? -1000,
         visibility: position ? 'visible' : 'hidden',
       } as CSSProperties}
-      role={onInstruction ? undefined : 'status'}
-      aria-live={onInstruction ? undefined : 'polite'}
-      aria-label={onInstruction ? undefined : `新手提示：${instruction}`}
+      role="status"
+      aria-live="polite"
+      aria-label={`新手提示：${instruction}`}
     >
-      {action && <svg className={`guide-gesture${gesture ? ' on-control' : ''}`} viewBox="0 0 80 112" fill="none" aria-hidden="true"
-        style={gesture && position ? {
-          position: 'absolute', left: gesture.left - position.left, top: gesture.top - position.top,
-          transform: `rotate(${gesture.rotation}deg)`, transformOrigin: '17.4px 15.6px',
-        } : undefined}>
-        <g className="gesture-trail" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M28 21v54m-6-7 6 7 6-7"/>
-        </g>
-        <circle className="gesture-ripple" cx="29" cy="26" r="13" stroke="currentColor" strokeWidth="1.5"/>
-        <g className="gesture-hand" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" fill="#fff9efb8">
-          <path d="M26 53V28a4 4 0 0 1 8 0v16-5a4 4 0 0 1 8 0v6-3a4 4 0 0 1 8 0v6-1a4 4 0 0 1 8 0v16c0 9-5 15-14 15h-4c-6 0-9-3-13-8l-11-14a4 4 0 0 1 6-5l4 4Z"/>
-        </g>
-      </svg>}
-      {!onInstruction && <span className="guide-copy">{instruction}</span>}
+
+      <span className="guide-copy">{instruction}</span>
       <button
         type="button"
         className="guide-skip"

@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
  */
 import * as THREE from 'three';
+import { JEWEL_COLORS } from '../ball-appearance';
 import { canvasFont, UI_FONT_FAMILY } from '../typography';
 /** Authored atlas stations: opposite faces at u=.25/.75, v=.5. */
 function paintNumbers(ctx:CanvasRenderingContext2D,w:number,h:number,number:number,color:string){
@@ -22,7 +23,7 @@ export function applyObsidianNumberFont(m:THREE.MeshPhysicalMaterial){
   const map:THREE.Texture=new THREE.CanvasTexture(c);map.copy(original);map.source=new THREE.Source(c);map.needsUpdate=true;
   m.map=map;m.userData.sourceTextures=[...(m.userData.sourceTextures??[]),original];m.userData.numberFont=UI_FONT_FAMILY;
 }
-export const JEWEL_COLORS = ['#f4be21','#216ce2','#e9384b','#8946cd','#f57e24','#18b66b','#bd3855'] as const;
+export { JEWEL_COLORS } from '../ball-appearance';
 export function jewelColor(number:number){return number===8?'#202838':JEWEL_COLORS[(number-1)%8]??'#f8f1e4';}
 export function pearlBelt(number:number,v:number){return number>=9&&Math.abs(v-.5)<.115;}
 export function applyJewelFinish(m:THREE.MeshPhysicalMaterial,number:number,hot:boolean){

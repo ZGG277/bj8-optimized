@@ -4,9 +4,9 @@
   "license": "OFL-1.1",
   "source": "https://github.com/lxgw/LxgwWenKai-Lite",
   "sourceSha256": "140c99ba4e28e817cec49bf82a0c5fcdc4fe633fb9dfda16d0ee8d59a8545f15",
-  "subsetSha256": "dbea29c0d0679e057fadb94598f3289d05259cc5224c7b70b9c0f05e25b35f4a",
-  "requestedCodepoints": 970,
-  "includedCodepoints": 966,
+  "subsetSha256": "edbe52a752782c64060f07c1a9b9f4f2265187f40b8a590c74520d648ba424d8",
+  "requestedCodepoints": 1042,
+  "includedCodepoints": 1038,
   "unsupportedCodepoints": [
     8964,
     10024,
@@ -16,5 +16,21 @@
   ],
   "missingHanCodepoints": [],
   "coverageSource": "TS/TSX literal AST + CSS content + title; UI and canonical cards",
-  "bytes": 253176
+  "bytes": 272040,
+  "woff2Sha256": "8b79ff1096e0a64274e73d885adfc1125a6a7f3bca0bd917280b34b6625f31af",
+  "additionalFonts": [
+    {
+      "asset": "princess-wenkai-common.woff2",
+      "codepoints": 6509,
+      "bytes": 1428228,
+      "sha256": "abb9bef0eb663aa17cb94fe99fff01dd8cf9dc9797d7b152f3a24d24b2109760"
+    },
+    {
+      "asset": "princess-wenkai-extended.woff2",
+      "codepoints": 18051,
+      "bytes": 4013444,
+      "sha256": "73ff9e15a557ac6afd7de8c5b968d5f217806c2281ba1da6b33aadcd3365dceb"
+    }
+  ],
+  "totalSourceCoverage": 25598
 }

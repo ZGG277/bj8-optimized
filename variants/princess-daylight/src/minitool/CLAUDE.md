@@ -34,3 +34,5 @@
 2026-11-09 按用户提供的笔记格式，在 `postNote.content` 中用 `#话题名[话题]#` 写入每个话题，多个话题以空格相隔。胜局与安慰卡共用该正文规则。
 
 2026-11-13：persistent-storage SAVE_KEYS 增加 princess-billiards:career:v1 与 dialogue-memory:v1，复用容器存储启动水合和失败提示，不增加平台排行调用。
+
+table-chat.ts 仅经 window.xhs.AI 请求当前球友的短回复，保留平台错误与 request_id；缺接口、超时或拒绝时在聊天页给出状态并允许重试。模型收到本局最近十轮问答、最近四句桌边发言、真实球色与台区、最近六杆以及当前问题点名的杆。

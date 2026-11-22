@@ -22,7 +22,9 @@ describe('one-row ball progress',()=>{
     expect(html).not.toContain('skill-level');
     // Group prose is available to a screen reader, not painted in the row.
     const visible=html.replace(/<span class="royal-sr-only"[\s\S]*?<\/span>/g,'').replace(/<[^>]*>/g,'');
-    expect(visible).toBe('公主8沈予白');
+    expect(visible).toBe('8');
+    expect(html).toContain('设置公主头像');
+    expect(html).toContain('设置球友资料，沈予白');
   });
   it('does not claim group ownership before the first legal assignment',()=>{
     const world=createInitialWorld(()=>.5),profile=createPlayerSkillProfile();

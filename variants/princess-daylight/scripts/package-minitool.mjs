@@ -58,7 +58,7 @@ const thirdPartyNotices = await Promise.all(runtimePackages.map(async name => {
 thirdPartyNotices.push({ ...JSON.parse(await readFile(path.join(projectDir, 'src/assets/fonts/provenance.json'), 'utf8')), licenseText: await readFile(path.join(projectDir, 'src/assets/fonts/OFL.txt'), 'utf8') });
 thirdPartyNotices.push(JSON.parse(await readFile(path.join(projectDir, 'src/assets/ambience/provenance.json'), 'utf8')));
 await writeFile(path.join(distDir, 'THIRD_PARTY_NOTICES.json'), JSON.stringify(thirdPartyNotices, null, 2) + '\n');
-await writeFile(path.join(distDir, 'OPENING_ASSET_PROVENANCE.json'), await readFile(path.join(projectDir, 'src/assets/opening/provenance.json'), 'utf8'));
+await writeFile(path.join(distDir, 'OPENING_ASSET_PROVENANCE.json'), await readFile(path.join(projectDir, 'src/assets/companion-cards/provenance.json'), 'utf8'));
 const builtFiles = (await filesUnder(distDir)).filter(file => file !== 'BUILD_PROVENANCE.json');
 const builtFileSha256 = Object.fromEntries(await Promise.all(builtFiles.map(async file => [
   file,
@@ -132,7 +132,7 @@ for (const file of files.filter(file => /\.(?:html|css|js|json)$/i.test(file))) 
 if (textBytes > 5 * MiB) console.warn('WARN: uncompressed text exceeds 5 MiB');
 await mkdir(artifactDir, { recursive: true });
 await unlink(zipPath).catch(error => { if (error.code !== 'ENOENT') throw error; });
-execFileSync('zip', ['-9', '-q', '-r', zipPath, '.'], { cwd: distDir });
+execFileSync('zip', ['-9', '-X', '-q', '-r', zipPath, '.'], { cwd: distDir });
 execFileSync('unzip', ['-tq', zipPath], { stdio: 'pipe' });
 const zipEntries = execFileSync('unzip', ['-Z1', zipPath], { encoding: 'utf8' }).trim().split('\n');
 if (!zipEntries.includes('index.html')) throw new Error('ZIP root does not contain index.html');

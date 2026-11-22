@@ -1,8 +1,9 @@
 /*
 [INPUT]: 世界快照与双方分组、当前回合
-[OUTPUT]: 单行双方姓名、球色与进球明暗；8号居中，未分组只画空位
+[OUTPUT]: 单行双方头像、球色与进球明暗；8号居中，未分组只画空位
 [POS]: 纯展示层；不再显示等级或球组文字，aria保留具体球号与状态
 */
+import { TableAvatar } from './TableAvatar';
 import type { BilliardsWorld } from '../physics';
 import type { MatchState } from '../match/types';
 import type { OpponentProfile, PlayerSkillProfile, GameMode } from '../opponent/model';
@@ -10,12 +11,13 @@ import { companionFor } from '../opponent/companions';
 import { turnDescription } from '../match/presentation';
 import type { ShotReward } from '../shot-reward';
 interface ScoreboardProps {
+  onProfile?: (id: string) => void; disabled?: boolean;
   match: MatchState; worldView: BilliardsWorld;
   playerSkill: PlayerSkillProfile; opponentProfile: OpponentProfile;
   gameMode?: GameMode; onModeChange?: (mode: GameMode) => void;
   shotReward?: ShotReward | null;
 }
-export function Scoreboard({ match, worldView, shotReward }: ScoreboardProps) {
+export function Scoreboard({ match, worldView, shotReward, onProfile, disabled }: ScoreboardProps) {
   const companion = companionFor(match.companionId);
   const active = new Set(worldView.balls.filter(ball => ball.active).map(ball => ball.number));
   const solids = [1,2,3,4,5,6,7], stripes = [9,10,11,12,13,14,15];
@@ -29,11 +31,11 @@ export function Scoreboard({ match, worldView, shotReward }: ScoreboardProps) {
   </div>;
   return <section className="scoreboard royal-scoreboard" aria-label="公主请开球 · 对局比分">
     <div className="royal-player player" data-active={match.actor === 'player' && match.phase !== 'finished'}>
-      <span className="player-name">公主</span>{rack(player, '公主')}
+      <button type="button" className="score-avatar" aria-label="设置公主头像" disabled={disabled} onClick={()=>onProfile?.('player')}><TableAvatar id="player"/></button>{rack(player, '公主')}
     </div>
     <span className={`mini-ball eight royal-eight ${active.has(8) ? '' : 'down'} ${ready ? 'is-ready' : ''}`} data-ball-number="8" aria-label="8号球">8</span>
     <div className="royal-player opponent" data-active={match.actor === 'opponent' && match.phase !== 'finished'}>
-      {rack(opponent, companion.name)}<span className="player-name">{companion.name}</span><img className="royal-companion-avatar" src={companion.avatar} alt={`${companion.name}头像`} width="26" height="26"/>
+      {rack(opponent, companion.name)}<button type="button" className="score-avatar" aria-label={'设置球友资料，'+companion.name} disabled={disabled} onClick={()=>onProfile?.(companion.id)}><TableAvatar id={companion.id}/></button>
     </div>
     <span className="royal-sr-only" role={shotReward ? undefined : 'status'} aria-hidden={shotReward ? true : undefined}>{turnDescription(match, ready)}</span>
   </section>;

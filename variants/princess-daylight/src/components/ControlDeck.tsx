@@ -277,6 +277,7 @@ function DockableControlSlot({
 }
 
 interface ControlDeckProps {
+  chatButton?: ReactNode;
   utilityControls?: Partial<Record<UtilityDockItemId, ReactNode>>;
   viewLevel: number;
   manualCameraActive: boolean;
@@ -334,7 +335,7 @@ function axisFor(id: DockItemId, placement: Placement): Axis {
 }
 
 export function ControlDeck({
-  utilityControls,
+  utilityControls, chatButton,
   viewLevel,
   manualCameraActive,
   viewLocked,
@@ -796,6 +797,7 @@ export function ControlDeck({
     pause: profile === 'desktop' ? null : utilityControls?.pause ?? null,
     view: (
       <div className={`persistent-view-control is-${viewOrientation}`} role="group" aria-label="视角调整">
+          {chatButton}
           <ViewToolbar
             compact={profile !== 'desktop'}
             viewLevel={viewLevel}
@@ -926,7 +928,7 @@ export function ControlDeck({
       )
     ) : null,
   }), [
-    profile, utilityControls,
+    profile, utilityControls, chatButton,
     aimAssistEnabled,
     aimDialEnabled,
     aimDialPrecisionActive,

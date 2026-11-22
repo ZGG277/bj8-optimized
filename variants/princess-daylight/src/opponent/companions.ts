@@ -1,3 +1,4 @@
+import { portraitFor } from './player-portraits';
 /** Ten original adult companions. Identity is picked once per match, never per render. */
 import avatar0 from '../assets/companions/shen-yubai.webp';
 import avatar1 from '../assets/companions/lu-jingchen.webp';
@@ -23,7 +24,10 @@ export const COMPANIONS: readonly Companion[] = [
   { id: 'xu-qinghe', name: '许清和', avatar: avatar9, congratulations: '恭喜公主，下一局也为你加油。' },
 ];
 export function companionFor(id?: string): Companion {
-  return COMPANIONS.find(companion => companion.id === id) ?? COMPANIONS[0];
+  const base = COMPANIONS.find(companion => companion.id === id) ?? COMPANIONS[0];
+  const profile = portraitFor(base.id);
+  if (!profile.name && !profile.avatar) return base;
+  return { ...base, name: profile.name || base.name, avatar: profile.avatar || base.avatar };
 }
 /** Avoid an immediate repeat; the remaining nine are equally likely. */
 export function pickCompanion(previousId?: string, rng: () => number = Math.random): Companion {

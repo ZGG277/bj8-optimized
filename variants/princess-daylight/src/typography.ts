@@ -5,7 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
  */
 export const UI_FONT_FAMILY = 'Princess WenKai UI';
-export const UI_FONT_STACK = `"${UI_FONT_FAMILY}", serif`;
+export const UI_FONT_STACK = `"${UI_FONT_FAMILY}", "Princess WenKai Common", "Princess WenKai Extended", serif`;
 export const canvasFont = (size: number, weight = 400) => `${weight} ${size}px ${UI_FONT_STACK}`;
 let loading: Promise<void> | null = null;
 export function ensureUiFont(): Promise<void> {
