@@ -30,7 +30,7 @@ export const FIRST_MATCH_GUIDE_COPY: Record<FirstMatchGuideStep, GuideCopy> = {
   'turn-wait': { text: '该我打啦。', selector: '.scoreboard' },
   'free-place': { text: '拖动光圈，松手放好白球', selector: '.viewport' },
   'ghost-place': { text: '点目标球，或拖动瞄准点', selector: '.viewport' },
-  'aim-direction': { text: '拨动刻度，微调方向', selector: '[data-control-slot="aimDial"] .aim-dial' },
+  'aim-direction': { text: '拨动刻度，微调方向。', selector: '[data-control-slot="aimDial"] .aim-dial' },
   'next-power': { text: '下拉蓄力，松手出杆', selector: '[data-control-slot="power"] .shoot-pad' },
   'break-place': {
     text: '放好白球',

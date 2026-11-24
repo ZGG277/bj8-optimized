@@ -9,8 +9,18 @@ import pei from '../assets/companion-cards/pei-zhixu.webp';
 import song from '../assets/companion-cards/song-yucheng.webp';
 import xu from '../assets/companion-cards/xu-qinghe.webp';
 
-/** Full-height character illustrations for rack introductions and collectible cards. */
+import { STORYBOOK_COMPANIONS } from './storybook-companions';
+
+const storybookArt = import.meta.glob<string>('../assets/companion-cards/storybook/*.webp', { eager: true, import: 'default' });
+const storybookCards = Object.fromEntries(Object.entries(STORYBOOK_COMPANIONS).map(([id, role]) => [id, {
+  src: storybookArt[`../assets/companion-cards/storybook/${id}.webp`],
+  expression: role.description,
+  praise: role.lines.goodShot,
+}]));
+
+/** Character illustrations for rack introductions and collectible cards. */
 export const COMPANION_CARD_ART: Record<string, { src: string; expression: string; praise: string }> = {
+  ...storybookCards,
   'shen-yubai': { src: shen, expression: '温柔赞许', praise: '公主的这一杆，漂亮得让我移不开眼。' },
   'lu-jingchen': { src: lu, expression: '脸红心服', praise: '输给公主，我连心跳都慢了半拍。' },
   'wen-xingye': { src: wen, expression: '笑眼喝彩', praise: '公主也太厉害了！这一局，我心服口服。' },

@@ -52,3 +52,5 @@ useGameState 在开局抽选十位陪练，胜负后幂等评估准度/走位及
 2026-11-05发布兼容检查：useAimInteraction生成自由球候选点改用基础循环，避免依赖Chrome61缺少的flatMap；候选顺序、合法性和触摸落实语义保持。
 
 2026-11-13：useGameState 在原 settleShotRaw 守卫后累计独立 careerShots，真实规则终局完成时与本局 ID 一次结算资历；重开只清当前逐杆记录，完整局不依赖胜利卡。局数/技术存档失败可见，旧能力画像的真实完成计数用于兼容迁移。
+
+useCompanionMemory 管理球友记忆快照与存档反馈。useGameState 提供稳定局 ID 和重置白球之前的实际停位，下一局按已保存的陪打选择或默认抽选确定球友。

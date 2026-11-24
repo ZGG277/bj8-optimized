@@ -14,8 +14,8 @@ const foulText: Record<FoulReason, string> = {
 export function foulSentence(match: MatchState): string | null {
   const reason = match.messageParams.reason;
   if (!reason || (!['foul', 'lose-8-foul'].includes(match.messageKey) && match.phase !== 'placing')) return null;
-  const who = match.messageParams.actor === 'opponent' ? companionFor(match.companionId).name : '公主';
-  const next = match.phase === 'finished' ? '本局结束' : match.messageParams.actor === 'opponent' ? '公主自由球' : '对手自由球';
+  const who = match.messageParams.actor === 'opponent' ? companionFor(match.companionId).name : '你';
+  const next = match.phase === 'finished' ? '本局结束' : match.messageParams.actor === 'opponent' ? '你的自由球' : '对手自由球';
   return `${who}${foulText[reason]}，${next}。`;
 }
 export function turnDescription(match: MatchState, eightReady = false): string {
@@ -30,15 +30,15 @@ export function turnDescription(match: MatchState, eightReady = false): string {
     : match.messageKey === 'foul' ? `${(match.messageParams.reason ? foulText[match.messageParams.reason] : '本杆犯规')} · ${opponentName}出杆中` : `${opponentName}出杆中`;
   if (match.actor === 'opponent') return match.messageKey === 'foul'
     ? `${(match.messageParams.reason ? foulText[match.messageParams.reason] : '本杆犯规')} · 对手自由球` : `轮到${opponentName}，稍等一下`;
-  if (match.breaking) return '公主请开球';
+  if (match.breaking) return '请开球';
   if (eightReady) return '本组球已清空 · 现在打8号';
-  if (match.messageKey === 'pot-continue') return '进球了，公主继续';
+  if (match.messageKey === 'pot-continue') return '进球了，继续打';
   const group = match.playerGroup === 'solid' ? '全色球' : match.playerGroup === 'stripe' ? '白腰带球' : '开放球局';
-  return `轮到公主 · ${group}`;
+  return `轮到你 · ${group}`;
 }
 export function finishReason(match: MatchState): string {
   const opponentName = companionFor(match.companionId).name;
-  const actor = match.messageParams.actor === 'opponent' ? opponentName : '公主';
+  const actor = match.messageParams.actor === 'opponent' ? opponentName : '你';
   if (match.messageKey === 'lose-8-early') return `${actor}还没清空本组球，8号已落袋。`;
   if (match.messageKey === 'lose-8-foul') return `${actor}打进8号，但${(match.messageParams.reason ? foulText[match.messageParams.reason] : '本杆犯规')}。`;
   if (match.messageKey === 'win-8') return `${actor}清空本组球，稳稳收下8号。`;

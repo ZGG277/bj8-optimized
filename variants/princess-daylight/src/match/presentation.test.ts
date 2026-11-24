@@ -14,14 +14,14 @@ describe('rule facts are explained to the player', () => {
     const initial=beginMatch(createInitialMatchState());
     expect(turnDescription({...initial,phase:'placing',messageKey:'place-occupied'})).toContain('这里有球');
     expect(finishReason({...initial,phase:'finished',messageKey:'lose-8-foul',messageParams:{actor:'opponent',reason:'scratch'}})).toBe('沈予白打进8号，但白球落袋。');
-    expect(finishReason({...initial,phase:'finished',messageKey:'lose-8-early',messageParams:{actor:'player'}})).toContain('公主还没清空本组球');
+    expect(finishReason({...initial,phase:'finished',messageKey:'lose-8-early',messageParams:{actor:'player'}})).toContain('你还没清空本组球');
   });
   it('names every actual foul in one sentence, including opponent free-ball placement', () => {
     const initial = beginMatch(createInitialMatchState());
     for (const [reason, text] of Object.entries({ scratch: '白球落袋', 'no-contact': '没有碰到目标球', 'wrong-first': '先碰到了不属于本杆的球', 'no-cushion': '碰球后没有进球或碰库' })) {
       const match = { ...initial, breaking: false, phase: 'placing' as const, messageKey: 'foul' as const, messageParams: { actor: 'opponent' as const, reason: reason as 'scratch' } };
       expect(foulSentence(match)).toContain(text);
-      expect(turnDescription(match)).toContain('公主自由球');
+      expect(turnDescription(match)).toContain('你的自由球');
       expect(foulSentence({ ...match, messageKey: 'place-occupied' })).toContain(text);
     }
     expect(foulSentence(initial)).toBeNull();

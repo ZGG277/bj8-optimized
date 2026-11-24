@@ -2205,11 +2205,7 @@ export class Scene3D {
     this.impactFeedback?.sync(this.ballMeshes, this.camera, dt);
 
     this.daylight?.sync();
-    try { this.renderer.render(this.scene, this.camera); }
-    catch (error) {
-      if (import.meta.env.VITE_MINITOOL !== '1') throw error;
-      this.unavailable('球桌绘制暂时中断，请稍后重新进入。'); return;
-    }
+    if (!this.drawScene()) return;
     if (import.meta.env.VITE_MINITOOL === '1' && this.adaptiveQuality.tier === 'hot') {
       this.overloadFrames = continuousWork && frameIntervalMs !== null && frameIntervalMs > 80 ? this.overloadFrames + 1 : 0;
       if (this.overloadFrames >= 60) { this.unavailable('设备当前负载较高，请稍后重新进入。'); return; }
@@ -2362,9 +2358,21 @@ export class Scene3D {
     return null;
   }
 
+  private drawScene(): boolean {
+    try {
+      this.renderer.render(this.scene, this.camera);
+      return true;
+    } catch (error) {
+      if (import.meta.env.VITE_MINITOOL !== '1') throw error;
+      this.unavailable('球桌绘制暂时中断，请稍后重新进入。');
+      return false;
+    }
+  }
+
   handleResize = () => {
     const w = this.element.clientWidth;
     const h = this.element.clientHeight;
+    if (w <= 0 || h <= 0) return;
     const nextBudget = renderBudgetFor({
       width: w,
       height: h,
@@ -2395,7 +2403,13 @@ export class Scene3D {
     this.syncTransmissionScale();
     this.miniToolBudgetDirty = true;
     this.updateCameraTarget();
-    this.requestRender();
+    // Changing the canvas size clears its buffer. Redraw the frozen scene
+    // without stepping the simulation or camera while the keyboard resizes it.
+    if (this.paused && this.running && !document.hidden) {
+      if (import.meta.env.VITE_MINITOOL !== '1' || this.enforceMiniToolBudget()) this.drawScene();
+    } else {
+      this.requestRender();
+    }
   };
 
   dispose() {

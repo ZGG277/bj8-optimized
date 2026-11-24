@@ -35,4 +35,6 @@
 
 2026-11-13：persistent-storage SAVE_KEYS 增加 princess-billiards:career:v1 与 dialogue-memory:v1，复用容器存储启动水合和失败提示，不增加平台排行调用。
 
-table-chat.ts 仅经 window.xhs.AI 请求当前球友的短回复，保留平台错误与 request_id；缺接口、超时或拒绝时在聊天页给出状态并允许重试。模型收到本局最近十轮问答、最近四句桌边发言、真实球色与台区、最近六杆以及当前问题点名的杆。
+table-chat.ts 用角色卡、当前球况、本局聊天及相关的跨局事实组装上下文，经 window.xhs.AI 请求短回复。缺 AI 时可用本地事实回答开球、复盘与记忆类问题，保留独立的球桌提示标识。内容审核及无法本地回答的问题保留平台错误和请求号。persistent-storage.ts 对新球友记忆做原生确认与单独读档保护，读失败时原字节保留。
+
+chat-share-card.ts 分页并绘制本局对话。share-note.ts 在原有分享图后追加用户选中的对话截图，沿用临时文件和笔记编辑页。

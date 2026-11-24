@@ -1,68 +1,79 @@
-import { CareerBadge } from './CareerPanel';
-import type { Career } from '../opponent/career';
 /**
- * [INPUT]: 真实胜负、本局头像/原句、已赢收藏与可选小红书分享接口。
- * [OUTPUT]: 统一局后卡与近景整图分享封面；浏览器预览与平台首图同图同文案，取消或失败保留。
- * [POS]: 局后呈现与用户主动分享入口，不制造胜局或改写对局规则。
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [INPUT]: 已结算比分、双方身份、本局对话与小红书分享接口。
+ * [OUTPUT]: 可编辑的象牙金线回忆卡；收藏整份保留的对话，分享当前三比四卡面。
+ * [POS]: 局后呈现和主动分享入口，只消费胜负事实。
  */
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { containRoyalDialogTab } from './royal-dialog-focus';
-import type { MatchHighlights } from '../match/highlights';
 import { PostMatchFeedback } from './PostMatchFeedback';
 import { feedbackParentOrigin } from '../post-match-feedback';
 import { companionFor } from '../opponent/companions';
-import { COMPANION_CARD_ART } from '../opponent/companion-card-art';
-import { defeatedCompanionNames, type CompanionCollection, type CompanionReward } from '../opponent/companion-collection';
 import { RoyalIcon } from './RoyalIcon';
-import { PraiseCard } from './PraiseCard';
 import { FollowAuthor } from './FollowAuthor';
 import type { GameMode } from '../opponent/model';
-import { miniToolApi, postVictoryNote, shareFailure, victoryNote, type NoteDraft } from '../minitool/share-note';
-import { renderMatchCard } from '../minitool/match-card';
-import { renderShareCover } from '../minitool/share-cover';
-import { VICTORY_PRAISES } from '../opponent/victory-praise';
+import { DEFAULT_PRINCESS, portraitFor } from '../opponent/player-portraits';
+import { pickMemoryFrame, type CardScore, type MatchMemoryCard, type MemoryLine } from '../match/memory-card';
+import { loadMemoryCards, saveMemoryCard } from '../minitool/memory-card-storage';
+import { renderMemoryCard } from '../minitool/render-memory-card';
+import { miniToolApi, postMemoryNote, shareFailure } from '../minitool/share-note';
+import { MemoryCardFace, useMemoryPages } from './MemoryCard';
 import { startRoyalCelebration, ROYAL_CELEBRATION_PARTICLES } from './royal-celebration';
 export { ROYAL_CELEBRATION_MS, ROYAL_CELEBRATION_PARTICLES } from './royal-celebration';
 
-export function resultCardLine(winner: 'player' | 'opponent' | null, praise: string, messageKey = '') {
-  if (winner === 'player') return Array.from(praise).length <= 10 && praise.trim() ? praise : VICTORY_PRAISES[0];
-  if (messageKey.startsWith('lose-8')) return '没关系，我陪你';
-  return winner === 'opponent' ? '下局再赢回来' : '歇一会再来一局';
-}
-/** All outcomes use one card with any rule explanation displayed separately. */
-export function RoyalFinish({ winner, onRestart, gameMode='practice', companionId, collection, collectionSaveFailed = false, onCollection, victoryPraise = VICTORY_PRAISES[0], messageKey = '', highlights, resultExplanation, career, onCareer }: {
-  career?: Career; onCareer?: () => void;
+const NO_LINES: readonly MemoryLine[] = [];
+const NO_SCORE: CardScore = { group: null, active: [] };
+
+export function RoyalFinish({ winner, onRestart, gameMode = 'practice', companionId, onCollection, resultExplanation,
+  chatLines = NO_LINES, rackId, score = NO_SCORE }: {
   resultExplanation?: string | null;
-  highlights?: MatchHighlights;
-  collection?: CompanionCollection;
-  victoryPraise?: string; collectionSaveFailed?: boolean; collectionReward?: CompanionReward | null; onCollection?: () => void;
-  companionId?: string; winner: 'player' | 'opponent' | null; onRestart: () => void; gameMode?: GameMode; messageKey?: string;
+  chatLines?: readonly MemoryLine[];
+  rackId?: string;
+  score?: CardScore;
+  onCollection?: () => void;
+  companionId?: string;
+  winner: 'player' | 'opponent' | null;
+  onRestart: () => void;
+  gameMode?: GameMode;
 }) {
   const feedbackAvailable = typeof window !== 'undefined' && window.parent !== window && Boolean(feedbackParentOrigin(window.location.search, document.referrer));
-  const companion = companionFor(companionId), won = winner === 'player';
-  const art = won ? COMPANION_CARD_ART[companion.id].src : companion.avatar;
-  const line = resultCardLine(winner, victoryPraise, messageKey);
-  const [cardImage, setCardImage] = useState('');
-  const [shareImage, setShareImage] = useState('');
-  const [shareDraft, setShareDraft] = useState<NoteDraft | null>(null);
-  useEffect(() => { setCardImage(''); setShareImage(''); setShareDraft(null); }, [art, companion.name, line]);
-  const [sharing, setSharing] = useState(false), [shareMessage, setShareMessage] = useState('');
-  const [sharePreview, setSharePreview] = useState(false);
-  const previewClose = useRef<HTMLButtonElement>(null);
+  const companion = companionFor(companionId);
+  const player = portraitFor('player');
+  const portraits = { opponent: companion.avatar, player: player.avatar || DEFAULT_PRINCESS };
+  const won = winner === 'player';
+  const [identity] = useState(() => {
+    let stored: MatchMemoryCard | undefined;
+    try { if (rackId) stored = loadMemoryCards().find(card => card.id === rackId); } catch { /* Preserve unreadable cards. */ }
+    return { frame: stored?.frame ?? pickMemoryFrame(), finishedAt: stored?.finishedAt ?? Date.now() };
+  });
+  const [removed, setRemoved] = useState<number[]>([]);
+  const [page, setPage] = useState(0);
+  const [image, setImage] = useState('');
+  const [notice, setNotice] = useState('');
+  const [saveNotice, setSaveNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const shareLock = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const visible = useMemo(() => chatLines.filter(line => !removed.includes(line.id)).map(({ id, side, text }) => ({ id, side, text })), [chatLines, removed]);
+  const card = useMemo<MatchMemoryCard>(() => ({
+    ...identity, id: rackId ?? '', winner, opponentId: companion.id, opponentName: companion.name, playerName: player.name || '你',
+    score, reason: resultExplanation || undefined, lines: visible,
+  }), [identity, rackId, winner, companion.id, companion.name, player.name, score, resultExplanation, visible]);
+  const pages = useMemoryPages(visible);
+  const selectedPage = Math.min(page, pages.length - 1);
   useEffect(() => {
-    if (!sharePreview) return;
-    const previous = document.activeElement as HTMLElement | null;
-    previewClose.current?.focus();
-    return () => previous?.focus();
-  }, [sharePreview]);
-  const sharingLock = useRef(false), mounted = useRef(true);
+    if (!rackId) return;
+    let current = true;
+    void saveMemoryCard(card).then(() => { if (current) setSaveNotice(''); }, (error: unknown) => {
+      if (current) setSaveNotice(error instanceof Error ? error.message : '回忆卡暂未保存。');
+    });
+    return () => { current = false; };
+  }, [card, rackId]);
+  useEffect(() => { setImage(''); }, [card, selectedPage]);
+
   const [celebrating, setCelebrating] = useState(false);
   const cancelCelebration = useRef<(() => void) | null>(null);
-  const restartButton = useRef<HTMLButtonElement>(null);
   const stopCelebration = () => { cancelCelebration.current?.(); setCelebrating(false); };
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     setCelebrating(false);
     if (!won) return;
@@ -72,64 +83,66 @@ export function RoyalFinish({ winner, onRestart, gameMode='practice', companionI
     setCelebrating(run.active); cancelCelebration.current = run.cancel;
     return () => { run.cancel(); cancelCelebration.current = null; };
   }, [won]);
+
+  const remove = (id: number) => {
+    if (shareLock.current) return;
+    setRemoved(previous => previous.includes(id) ? previous : [...previous, id]);
+  };
+
   const share = async () => {
-    if (sharingLock.current) return;
-    stopCelebration(); sharingLock.current = true; setSharing(true); setShareMessage('');
+    if (shareLock.current) return;
+    shareLock.current = true;
+    stopCelebration();
+    setBusy(true);
+    setNotice('');
     try {
-      const image = cardImage || await renderMatchCard(art, companion.name, line);
-      if (!mounted.current) return;
-      setCardImage(image);
-      const cover = won ? shareImage || await renderShareCover(art, companion.name, line) : image;
-      if (!mounted.current) return;
-      const names = won ? defeatedCompanionNames(collection, companionId) : [];
-      setShareImage(cover);
-      setShareDraft(victoryNote(cover, gameMode, companion.name, won ? image : undefined, won, names));
+      const exported = await renderMemoryCard(card, pages, selectedPage, portraits);
+      if (!alive.current) return;
       const api = miniToolApi();
       if (api) {
-        await postVictoryNote(api, cover, gameMode, companion.name, won ? image : undefined, won, names);
+        const result = await postMemoryNote(api, exported, card.opponentName);
+        if (result.errMsg !== 'postNote:ok') throw result;
+        if (alive.current) setNotice('回忆卡已交给小红书。');
+      } else if (import.meta.env.VITE_MINITOOL !== '1') {
+        setImage(exported);
       } else {
-        // The browser preview uses the same cover and draft, without pretending to publish a note.
-        setSharePreview(true);
+        setNotice('请在小红书 App 中打开分享。');
       }
-    } catch (error) { if (mounted.current) setShareMessage(shareFailure(error)); }
-    finally { sharingLock.current = false; if (mounted.current) setSharing(false); }
+    } catch (error) {
+      if (alive.current) setNotice(shareFailure(error).replace('战绩卡', '回忆卡'));
+    } finally {
+      shareLock.current = false;
+      if (alive.current) setBusy(false);
+    }
   };
-  return <div className={`finish-mask royal-finish ${won ? 'won' : 'comfort'}`} role="dialog" aria-modal="true" aria-labelledby="royal-result-title"
+
+  return <div className={`finish-mask royal-finish royal-memory-finish ${won ? 'won' : 'comfort'}`} role="dialog" aria-modal="true" aria-labelledby="royal-result-title"
     onPointerDown={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerCancel={e => e.stopPropagation()}
     onKeyDown={e => { containRoyalDialogTab(e); if (e.key === 'Escape') stopCelebration(); e.stopPropagation(); }}>
-    <h1 id="royal-result-title" className="royal-sr-only">{won ? '公主赢了' : '本局结束'}</h1>
+    <h1 id="royal-result-title" className="royal-sr-only">本局回忆卡</h1>
     {celebrating && <div className="royal-petals" aria-hidden="true">{Array.from({ length: ROYAL_CELEBRATION_PARTICLES }, (_, i) => <i key={i} className="royal-flower" style={{ '--fall-x':`${(i*37+7)%100}%`, '--fall-delay':`${i%7*.08}s`, '--fall-spin':`${i%2?210:-160}deg`, '--petal-color':['#eab6c3','#fff3db','#cfabc9','#d4b469'][i%4] } as CSSProperties}><RoyalIcon name="sparkle"/></i>)}</div>}
-    {onCollection && <button className="royal-finish-book" aria-label="查看赞美卡册" onClick={() => { stopCelebration(); onCollection(); }}><RoyalIcon name="cards"/><span>赞美卡册</span></button>}
-    <div className="royal-result-scroll" data-has-highlights={Boolean(highlights?.shots) || undefined}>
-    <div className="finish-content royal-result-card unified-praise-card" data-companion-id={companion.id}>
-      <PraiseCard art={art} name={companion.name} text={line} onImage={setCardImage}/>
+    <div className="royal-result-scroll">
+      <MemoryCardFace card={card} portraits={portraits} pages={pages} page={selectedPage} onPage={setPage} onRemove={remove}/>
+      {chatLines.length > 0 && <div className="memory-edit-help">
+        <span>长按气泡左右滑动可删除</span>
+        {removed.length > 0 && <button type="button" disabled={busy} onClick={() => setRemoved(previous => previous.slice(0, -1))}>撤销删除</button>}
+      </div>}
+      <div className="royal-card-actions">
+        <button type="button" className="royal-share" disabled={busy} onClick={() => void share()}>{busy ? '生成中…' : '分享'}</button>
+        <FollowAuthor />
+        <button type="button" data-control-tip="new-match" onClick={() => { stopCelebration(); onRestart(); }}>再来一局</button>
+      </div>
+      {onCollection && <button type="button" className="memory-open-book" onClick={() => { stopCelebration(); onCollection(); }}>
+        <RoyalIcon name="cards"/>回忆卡册
+      </button>}
+      {resultExplanation && visible.length > 0 && <p className="royal-card-status" role="status">{resultExplanation}</p>}
+      {saveNotice && <p className="royal-card-status" role="status">{saveNotice}</p>}
+      {notice && <p className="royal-card-status" role="status">{notice}</p>}
+      {image && <div className="memory-export">
+        <img className="memory-export-image" src={image} width="1080" height="1440" alt="回忆卡分享图"/>
+        <a className="memory-export-download" href={image} download="公主请开球-回忆卡.jpg">下载回忆卡</a>
+      </div>}
+      {feedbackAvailable && <PostMatchFeedback outcome={won ? 'win' : 'loss'} mode={gameMode} compact onContinue={onRestart}/>}
     </div>
-    <div className="royal-card-actions">
-      <button type="button" className="royal-share" disabled={sharing} onClick={() => void share()}>{sharing ? '准备中…' : '分享'}</button>
-      <FollowAuthor />
-      <button type="button" ref={restartButton} autoFocus data-control-tip="new-match" onClick={() => { stopCelebration(); onRestart(); }}>再来一局</button>
-    </div>
-    {career && onCareer && <CareerBadge career={career} onClick={() => { stopCelebration(); onCareer(); }}/>}
-    {resultExplanation && <p className="royal-card-status" role="status">{resultExplanation}</p>}
-    {highlights && highlights.shots > 0 && <section className="royal-match-highlights" aria-label="本局亮点">
-      <h2>本局亮点</h2><dl>
-        <div><dt>合法进球</dt><dd>{highlights.legalPots}<small> 球</small></dd></div>
-        <div><dt>最高连进</dt><dd>{highlights.bestRun}<small> 球</small></dd></div>
-        <div><dt>本局出杆</dt><dd>{highlights.shots}<small> 杆</small></dd></div>
-      </dl>
-    </section>}
-    {collectionSaveFailed && <p className="royal-card-status" role="status">卡片暂未保存，请保持页面打开。</p>}
-    {shareMessage && <p className="royal-card-status" role="status">{shareMessage}</p>}
-    {feedbackAvailable && <PostMatchFeedback outcome={won ? 'win' : 'loss'} mode={gameMode} compact onContinue={onRestart}/>}
-    </div>
-    {sharePreview && createPortal(<div className="royal-share-preview" role="dialog" aria-modal="true" aria-labelledby="share-preview-title"
-      onKeyDown={e => { containRoyalDialogTab(e); if (e.key === 'Escape') setSharePreview(false); e.stopPropagation(); }}>
-      <section><header><h2 id="share-preview-title">{shareDraft?.title ?? '公主的赞美卡'}</h2><button ref={previewClose} aria-label="关闭分享预览" onClick={() => setSharePreview(false)}><RoyalIcon name="close"/></button></header>
-        <img src={shareImage} alt={`${companion.name} · ${line}`} className="share-preview-image"/>
-        <p className="share-preview-copy">{shareDraft?.content}</p>
-        <p className="share-preview-hint">在小红书内点分享，即可带上这张封面和文案。</p>
-        <button className="share-preview-return" onClick={() => setSharePreview(false)}>返回赞美卡</button>
-      </section>
-    </div>, document.body)}
   </div>;
 }

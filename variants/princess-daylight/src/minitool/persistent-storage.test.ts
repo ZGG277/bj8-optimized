@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createNativeSaveStore, SAVE_KEYS } from './persistent-storage';
+import { COMPANION_MEMORY_KEY, createNativeSaveStore, SAVE_KEYS } from './persistent-storage';
 const key = SAVE_KEYS[0];
 function fixture(values = new Map<string, string>()) {
   return { values, getStorageInfo: async () => ({ keys: [...values.keys()] }),
@@ -18,6 +18,25 @@ describe('native cache non-destructive upgrade', () => {
     const api = fixture(new Map([[key, JSON.stringify('{"level":61}')]]));
     const { store } = await createNativeSaveStore(api, { getItem: () => '{"level":1}', setItem() {} }, () => {});
     expect(store.getItem(key)).toBe('{"level":61}');
+  });
+  it('does not mirror continued play to browser storage after native migration', async () => {
+    const api = fixture();
+    const browser = new Map([[key, '{"level":1}']]);
+    const { store, flush } = await createNativeSaveStore(api, {
+      getItem: key => browser.get(key) ?? null, setItem: (key, value) => { browser.set(key, value); },
+    }, () => {});
+    store.setItem(key, '{"level":2}'); await flush();
+    expect(JSON.parse(api.values.get(key)!)).toBe('{"level":2}');
+    expect(browser.get(key)).toBe('{"level":1}');
+  });
+  it('accepts the iOS empty response without replacing it with a historical copy', async () => {
+    const api = fixture(new Map([[key, ''], [COMPANION_MEMORY_KEY, '']]));
+    const { store, memory } = await createNativeSaveStore(api, {
+      getItem: () => 'old', setItem() {},
+    }, () => {});
+    expect(store.getItem(key)).toBeNull();
+    expect(memory.read()).toBeNull();
+    expect(api.values.get(key)).toBe('');
   });
   it.each(['celadon', 'noir', 'neon'])('reads raw and JSON-wrapped %s themes without rewriting saves', async theme => {
     const values = new Map([
@@ -86,5 +105,29 @@ describe('retry without changing player data', () => {
     const api = fixture(new Map([[name, scene]]));
     const { store } = await createNativeSaveStore(api, null, () => {});
     expect(store.getItem(name)).toBe(scene); expect(api.values.get(name)).toBe(scene);
+  });
+});
+
+describe('companion memory in the native cache', () => {
+  it('uses a confirmed native write without reading or mirroring browser memory', async () => {
+    const api = fixture();
+    const browser = new Map([[COMPANION_MEMORY_KEY, 'browser-only']]);
+    const { memory } = await createNativeSaveStore(api, {
+      getItem: key => browser.get(key) ?? null, setItem: (key, value) => { browser.set(key, value); },
+    }, () => {});
+    expect(memory.read()).toBeNull();
+    const raw = '{"version":1,"friends":{},"shots":[]}';
+    expect(await memory.write(raw)).toBe(true);
+    expect(browser.get(COMPANION_MEMORY_KEY)).toBe('browser-only');
+    expect((await createNativeSaveStore(api, null, () => {})).memory.read()).toBe(raw);
+  });
+
+  it('preserves a failed memory read and keeps older game data available', async () => {
+    const api = fixture(new Map([[key, JSON.stringify('{}')], [COMPANION_MEMORY_KEY, 'broken']]));
+    const { store, memory } = await createNativeSaveStore(api, null, () => {});
+    expect(store.getItem(key)).toBe('{}');
+    expect(() => memory.read()).toThrow();
+    expect(await memory.write('{}')).toBe(false);
+    expect(api.values.get(COMPANION_MEMORY_KEY)).toBe('broken');
   });
 });

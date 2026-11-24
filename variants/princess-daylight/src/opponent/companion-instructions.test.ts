@@ -6,11 +6,11 @@ const match = () => beginMatch(createInitialMatchState());
 describe('companion-owned operational instructions', () => {
   it('announces each real group with the companion’s own group', () => {
     expect(groupInstruction(null)).toBeNull();
-    expect(groupInstruction('solid')).toBe('公主这局打全色球，1到7号，我打花色。');
-    expect(groupInstruction('stripe')).toBe('公主这局打花色球，9到15号，我打全色。');
+    expect(groupInstruction('solid')).toBe('你这局打全色球，1到7号，我打花色。');
+    expect(groupInstruction('stripe')).toBe('你这局打花色球，9到15号，我打全色。');
   });
   it('prioritizes the required event above the guide without replacing the speaker or identity', () => {
-    const rule = { id: 4, sceneId: 'P_SCRATCH', text: '公主白球进袋啦，该我打咯。', companionId: 'lu-jingchen' };
+    const rule = { id: 4, sceneId: 'P_SCRATCH', text: '你的白球进袋啦，该我打咯。', companionId: 'lu-jingchen' };
     expect(companionInstruction({ match: match(), prioritySpeech: rule, guide: '下拉蓄力' })).toBe(rule);
   });
   it('keeps the placement correction actionable and the free ball in the same channel', () => {
@@ -20,8 +20,8 @@ describe('companion-owned operational instructions', () => {
     expect(companionInstruction({ match: { ...placing, messageKey: 'place-occupied' }, prioritySpeech: rule })?.text).toContain('有球');
   });
   it.each([
-    { actor: 'player', firstContact: 8, pocketed: [8], remainingSolids: 2, key: 'lose-8-foul', shooter: '公主' },
-    { actor: 'player', firstContact: 3, pocketed: [3, 8], remainingSolids: 0, key: 'lose-8-early', shooter: '公主' },
+    { actor: 'player', firstContact: 8, pocketed: [8], remainingSolids: 2, key: 'lose-8-foul', shooter: '你' },
+    { actor: 'player', firstContact: 3, pocketed: [3, 8], remainingSolids: 0, key: 'lose-8-early', shooter: '你' },
     { actor: 'opponent', firstContact: 9, pocketed: [8], remainingSolids: 2, key: 'lose-8-early', shooter: '我' },
   ] as const)('explains a premature black eight for $actor ($key)', ({ actor, firstContact, pocketed, remainingSolids, key, shooter }) => {
     const { next } = resolveStoppedShot({ ...match(), actor, playerGroup: 'solid', breaking: false }, {
@@ -45,9 +45,9 @@ describe('companion-owned operational instructions', () => {
   it('keeps the terminal fact and uses the actual speaker and winner for the closing reaction', () => {
     const finish = { ...match(), phase: 'finished', messageKey: 'win-8', winner: 'player', actor: 'player' } as const;
     expect(terminalEightInstruction({ ...finish, companionId: 'gu-yanchuan' }))
-      .toBe('公主清完本组球后打进黑八。你赢了。漂亮。');
+      .toBe('你清完本组球后打进黑八。你赢了。漂亮。');
     expect(terminalEightInstruction({ ...finish, companionId: 'wen-xingye' }))
-      .toBe('公主清完本组球后打进黑八。公主赢啦！我输得很有参与感。');
+      .toBe('你清完本组球后打进黑八。你赢啦！我输得很有参与感。');
     const foul = { ...finish, messageKey: 'lose-8-foul', winner: 'opponent', messageParams: { reason: 'scratch' } } as const;
     expect(terminalEightInstruction({ ...foul, companionId: 'wen-xingye' }))
       .toContain('白球也进袋了，这局结束啦。我赢了');

@@ -5,6 +5,16 @@ export const DIALOGUE_MEMORY_KEY = 'princess-billiards:dialogue-memory:v1';
 export type SpokenLine = { voice: string; scene: string; text: string; motif: string };
 type Memory = { version: 1; racks: SpokenLine[][]; current: SpokenLine[]; active: boolean };
 const normalized = (text: string) => text.replace(/[\s，。！？、；：,.!?…“”「」]/g, '');
+function samePhrasing(first: string, second: string) {
+  const a = Array.from(normalized(first));
+  const b = Array.from(normalized(second));
+  if (a.join('') === b.join('')) return true;
+  if (Math.min(a.length, b.length) < 8) return false;
+  const pairs = (chars: string[]) => new Set(chars.slice(1).map((char, index) => chars[index] + char));
+  const left = pairs(a), right = pairs(b);
+  const shared = [...left].filter(pair => right.has(pair)).length;
+  return shared >= 5 && 2 * shared / (left.size + right.size) >= 0.72;
+}
 function valid(line: unknown): line is SpokenLine {
   if (!line || typeof line !== 'object') return false;
   const l = line as SpokenLine;
@@ -28,7 +38,8 @@ export function createDialogueMemory(store: SaveStore | null = null) {
     candidates(lines: readonly SpokenLine[], required = false) {
       const all = history();
       const exact = (a: SpokenLine, b: SpokenLine) => a.voice === b.voice && normalized(a.text) === normalized(b.text);
-      const fresh = lines.filter(line => !all.some(old => exact(old, line)));
+      const fresh = lines.filter(line => !all.some(old => required ? exact(old, line) :
+        old.voice === line.voice && samePhrasing(old.text, line.text)));
       if (required) {
         // Facts must always be spoken. Prefer unseen phrasing, then avoid the last same-scene wording.
         const last = [...all].reverse().find(l => l.voice === lines[0]?.voice && l.scene === lines[0]?.scene);

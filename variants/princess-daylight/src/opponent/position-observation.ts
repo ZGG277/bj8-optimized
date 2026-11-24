@@ -11,7 +11,7 @@ export function observePlayerShot(
   before: MatchState,
   facts: ShotFacts,
   next: MatchState,
-): ShotSkillObservation {
+): ShotSkillObservation & { openNextTargets: number[] } {
   const foul = next.messageKey === 'foul' || next.messageKey.startsWith('lose-8');
   const legal = legalNumbers(capture.worldBefore, 'player', before.playerGroup);
   let target = capture.intent?.target;
@@ -33,14 +33,14 @@ export function observePlayerShot(
   const pocketed = target !== undefined && facts.pocketed.includes(target);
   const continuedAfterPot = !capture.breaking && !foul && next.phase === 'aiming' &&
     next.actor === 'player' && facts.pocketed.some(number => legal.includes(number));
+  const routes = continuedAfterPot ? positionRoutes(worldAfter, legalNumbers(worldAfter, 'player', next.playerGroup)) : null;
   return {
     tolerance,
     pocketed,
     foul,
     assisted: capture.assisted,
-    position: continuedAfterPot
-      ? positionAfterPot(worldAfter, legalNumbers(worldAfter, 'player', next.playerGroup))
-      : 'unknown',
+    position: routes === null ? 'unknown' : routes.length ? 'success' : 'miss',
+    openNextTargets: routes ?? [],
   };
 }
 
@@ -48,8 +48,13 @@ export function observePlayerShot(
  * Geometric opportunity, not a guarantee of a pot; no extra physics search on the UI thread.
  */
 export function positionAfterPot(world: BilliardsWorld, legal: number[]): PositionOutcome {
-  if (!world.balls.some(ball => ball.active && legal.includes(ball.number))) return 'unknown';
-  return generateCandidates(world, legal).some(shot =>
-    shot.tolerance >= .008 && shot.cutAngle <= 1.05 && shot.cueDistance + shot.pocketDistance <= 2.8)
-    ? 'success' : 'miss';
+  const routes = positionRoutes(world, legal);
+  return routes === null ? 'unknown' : routes.length ? 'success' : 'miss';
+}
+
+function positionRoutes(world: BilliardsWorld, legal: number[]): number[] | null {
+  if (!world.balls.some(ball => ball.active && legal.includes(ball.number))) return null;
+  return Array.from(new Set(generateCandidates(world, legal).filter(shot =>
+    shot.tolerance >= .008 && shot.cutAngle <= 1.05 && shot.cueDistance + shot.pocketDistance <= 2.8,
+  ).map(shot => shot.target)));
 }

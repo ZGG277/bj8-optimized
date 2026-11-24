@@ -24,9 +24,9 @@ export function CareerPanel({ career, saveFailed, onClose, onCards }: {
     onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()}
     onKeyDown={e => { containRoyalDialogTab(e); if (e.key === 'Escape') onClose(); e.stopPropagation(); }}>
     <section className="career-sheet">
-      <header className="career-heading"><div><small>每一局，都算数</small><h2 id="career-title">公主的球局簿</h2></div>
+      <header className="career-heading"><div><small>每一局，都算数</small><h2 id="career-title">你的球局簿</h2></div>
         <button ref={close} onClick={onClose} aria-label="收起球局簿"><RoyalIcon name="close"/></button></header>
-      <nav className="career-tabs" aria-label="卡册与球局"><button onClick={onCards}>赞美卡册</button><button aria-current="page" onClick={() => setExamples(false)}>球局排行</button></nav>
+      <nav className="career-tabs" aria-label="卡册与球局"><button onClick={onCards}>回忆卡册</button><button aria-current="page" onClick={() => setExamples(false)}>球局排行</button></nav>
       <div className="career-scroll">
         <section className="career-hero" aria-label="我的资历"><span className="career-level">{summary.level}</span>
           <div className="career-score"><strong>{summary.score}</strong><span>资历分</span></div>

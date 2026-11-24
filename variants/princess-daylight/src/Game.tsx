@@ -1,9 +1,10 @@
-import { addShotHighlight, EMPTY_HIGHLIGHTS } from './match/highlights';
+import { CompanionPicker } from './components/CompanionPicker';
+import { flushSync } from 'react-dom';
 import { ControlHelp } from './components/ControlHelp';
 import { observePlayerShot } from './opponent/position-observation';
 /*
 [INPUT]: 自动播放的短 WebP 开场；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 教学/分组/犯规与鼓励共用小头像通道、本局击球亮点与触摸自由球；既有8秒开场、双视角、训练与赞美卡册
+[OUTPUT]: 教学、规则和球友短句共用球桌对话气泡，含开局个人资料与球友提醒；编排击球反馈、镜头和局后回忆卡
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -14,7 +15,10 @@ import { CompanionCollectionBook } from './components/CompanionCollection';
 import { RoyalIcon } from './components/RoyalIcon';
 import { MatchWelcome } from './components/MatchWelcome';
 import { companionVoice } from './opponent/companion-voices';
-import { shortSpeech } from './opponent/short-speech';
+import { callPlayerByName, greetPlayer } from './opponent/player-address';
+import { hasCustomizedPlayerPortrait, playerNickname } from './opponent/player-portraits';
+import { companionSelection } from './opponent/companions';
+import { nextOpeningReminder, OPENING_REMINDERS, type OpeningReminder } from './opponent/opening-reminder';
 import { FirstPersonViewHint } from './components/FirstPersonViewHint';
 import { actionForEvent, actionForStep, createGuideLearning, type GuideAction } from './guide-learning';
 import {
@@ -39,6 +43,7 @@ import { followFeelSpin, type FollowFeel } from './input/follow-feel';
 import { usePhysicsLoop } from './simulation/use-physics-loop';
 import { renderBudgetFor } from './render-policy';
 import { useGameState } from './hooks/useGameState';
+import { useCompanionMemory } from './hooks/useCompanionMemory';
 import { useStageGesture } from './hooks/useStageGesture';
 import { useAimInteraction } from './hooks/useAimInteraction';
 import { useOpponentAI } from './hooks/useOpponentAI';
@@ -47,8 +52,10 @@ import { usePositionPlan } from './hooks/usePositionPlan';
 import { useAimAssist } from './hooks/useAimAssist';
 import { PortraitEditor } from './components/PortraitEditor';
 import { useScoreInset } from './minitool/score-inset';
-import { ChatRoom, ChatFloat, useTableChat } from './components/TableChat';
-import { tableBrief } from './opponent/table-coach';
+import { ChatMemory, ChatFloat, QuickChat, TalkButton, useTableChat } from './components/TableChat';
+import { asksForRoute, tableBrief } from './opponent/table-coach';
+import { captureShotEvidence, isCompanionId, rememberExchange, rememberFinish, rememberShot, skillForTable } from './opponent/companion-memory';
+import { memoryGreeting } from './opponent/companion-role';
 import { Scoreboard } from './components/Scoreboard';
 import { TableStage } from './components/TableStage';
 import { createCompanionDialogue, type CompanionDialogue } from './opponent/companion-dialogue';
@@ -141,16 +148,35 @@ function sameCameraSafety(a: CameraSafetyInsets, b: CameraSafetyInsets) {
 }
 
 export default function Game() {
+  const showFollowComparison = import.meta.env.DEV && typeof location !== 'undefined'
+    && new URLSearchParams(location.search).get('followAB') === '1';
   const [pageHidden, setPageHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
   const [collectionOpen, setCollectionOpen] = useState(false);
-  const [careerTab, setCareerTab] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   useScoreInset();
   const [profileEditor,setProfileEditor] = useState<string|null>(null);
   const chat = useTableChat();
-  const resetChat = chat.reset;
+  const { reset: resetChat, showOpeningReminder } = chat;
+  const profileFocus = useRef<HTMLButtonElement>();
+  const openProfile = (id: string, focusAfterClose?: HTMLButtonElement) => {
+    chat.dismissOpeningReminder();
+    profileFocus.current = focusAfterClose;
+    setProfileEditor(id);
+  };
+  useEffect(() => {
+    if (profileEditor !== null) return;
+    // The scoreboard buttons are disabled while a profile dialog is mounted.
+    profileFocus.current?.focus({ preventScroll: true });
+    profileFocus.current = undefined;
+  }, [profileEditor]);
+  const [quickChat, setQuickChat] = useState(false);
+  const quickInput = useRef<HTMLInputElement>(null);
+  const companionMemory = useCompanionMemory();
+  const { update: updateCompanionMemory, current: companionMemoryRef } = companionMemory;
   const rackSerial = useRef(0);
-  const gamePaused = !!profileEditor || chat.reviewing || pageHidden || collectionOpen || helpOpen;
+  const lastOpeningReminder = useRef<{ rack: number; kind: OpeningReminder }>();
+  const otherOverlay = !!profileEditor || pageHidden || collectionOpen || helpOpen;
+  const gamePaused = otherOverlay || quickChat;
   useEffect(() => {
     const syncVisibility = () => setPageHidden(document.hidden);
     document.addEventListener('visibilitychange', syncVisibility);
@@ -160,12 +186,11 @@ export default function Game() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [sceneRevision, setSceneRevision] = useState(0);
   const [openingActive, setOpeningActive] = useState(true);
-  const [openingGreeting, setOpeningGreeting] = useState<CompanionDialogue | null>(null);
+  const [openingGreeting, setOpeningGreeting] = useState<(CompanionDialogue & { memoryKey?: string }) | null>(null);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const [followFeel, setFollowFeel] = useState<FollowFeel>('current');
   const [followShotPending, setFollowShotPending] = useState(false);
   const followShotPendingRef = useRef(false);
-  const [matchHighlights, setMatchHighlights] = useState(EMPTY_HIGHLIGHTS);
   const [shotReward, setShotReward] = useState<ShotReward | null>(null);
   useEffect(() => {
     if (!shotReward) return;
@@ -185,10 +210,11 @@ export default function Game() {
     match, matchRef, setMatch,
     viewLevel, setViewLevel,
     playerSkill, trainingSummary, gameMode, opponentProfile,
-    collection, collectionReward, collectionSaveFailed, victoryPraise, career, careerSaveFailed,
+    collection, career, careerSaveFailed, rackId,
     recordPlayerShot, completeMatchAssessment,
     canAim: canAimBase, setMessage, resetGame, settleShotRaw,
-  } = useGameState();
+  } = useGameState(companionMemory.memory.preferredCompanionId);
+  const sharedSkill = useMemo(() => skillForTable(playerSkill, career), [playerSkill, career]);
 
   const dialogueDirector = useRef<ReturnType<typeof createCompanionDialogue> | null>(null);
   if (!dialogueDirector.current) dialogueDirector.current = createCompanionDialogue(Math.random, browserStorage());
@@ -217,7 +243,10 @@ export default function Game() {
         const director = dialogueDirector.current!;
         const greeting = director.ready(match.companionId, performance.now());
         if (greeting) {
-          setOpeningGreeting({ ...greeting, text: shortSpeech(greeting.text, '公主，请开球。') });
+          const id = greeting.companionId;
+          const memory = id ? memoryGreeting(id, companionMemoryRef.current.friends[id]) : null;
+          const text = greetPlayer(memory?.text ?? greeting.text, id, playerNickname());
+          setOpeningGreeting({ ...greeting, memoryKey: memory?.key, text });
           director.shown(greeting.id, performance.now());
         }
       }
@@ -232,7 +261,7 @@ export default function Game() {
     const choice = match.phase === 'opponent' && !dialogue?.kind && match.messageKey !== 'foul'
         ? director.thinking(match.companionId, performance.now()) : null;
     if (choice) setDialogue(choice);
-  }, [gamePaused, openingActive, scenePickerOpen, renderError, match.phase, match.breaking, match.companionId, match.messageKey, dialogue?.kind]);
+  }, [gamePaused, openingActive, scenePickerOpen, renderError, match.phase, match.breaking, match.companionId, match.messageKey, dialogue?.kind, companionMemoryRef]);
 
   const legalTargets = useMemo(
     () =>
@@ -1054,6 +1083,7 @@ export default function Game() {
   const handleResetGame = useCallback((nextMode: GameMode, isReplay = false) => {
     rackSerial.current++;
     resetChat();
+    setQuickChat(false);
     setHelpOpen(false);
     scene3DRef.current?.cancelStrike();
     cancelCharge();
@@ -1069,7 +1099,6 @@ export default function Game() {
     dialogueDirector.current?.reset(isReplay);
     setOpeningGreeting(null);
     setOpeningActive(true);
-    setMatchHighlights(EMPTY_HIGHLIGHTS);
     resetGame(setAim, nextMode);
     markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
     setSpin({ x: 0, y: 0 });
@@ -1101,7 +1130,6 @@ export default function Game() {
         : undefined;
       setDialogue(dialogueDirector.current!.settle(before, settlement.facts, settlement.resolution, performance.now(), context));
     }
-    if (settlement) setMatchHighlights(previous => addShotHighlight(previous, before, settlement.facts, settlement.resolution));
     setShotReward(settlement ? rewardForStoppedShot(settlement.facts, settlement.resolution) : null);
     if (settlement && firstMatchGuideStepRef.current) {
       const next = guideAfterSettlement(firstMatchGuideStepRef.current, settlement.resolution.next, settlement.facts.pocketed);
@@ -1121,13 +1149,24 @@ export default function Game() {
     setGuidanceEnabled(false);
 
     if (settlement && capture && before.actor === 'player') {
-      recordPlayerShot(observePlayerShot(capture, worldRef.current, before, settlement.facts, settlement.resolution.next));
+      const { openNextTargets, ...observation } = observePlayerShot(capture, worldRef.current, before, settlement.facts, settlement.resolution.next);
+      recordPlayerShot(observation);
+      if (isCompanionId(before.companionId)) {
+        const evidence = captureShotEvidence(
+          { rackId: rackId.current, companionId: before.companionId, mode: gameMode, at: Date.now() },
+          capture, settlement.shot, worldRef.current, settlement.cueEnd, observation,
+          legalNumbers(capture.worldBefore, 'player', before.playerGroup), openNextTargets,
+        );
+        updateCompanionMemory(memory => rememberShot(memory, evidence));
+      }
     }
     if (settlement?.resolution.next.phase === 'finished') {
+      const id = before.companionId;
+      if (isCompanionId(id)) updateCompanionMemory(memory => rememberFinish(memory, id, rackId.current, Date.now()));
       completeMatchAssessment(settlement.resolution.next.winner);
       if (settlement.resolution.next.winner === 'player') playVictory();
     }
-  }, [completeMatchAssessment, finishFirstMatchGuide, playerSkill.executionSigma, playVictory, recordPlayerShot, settleShotRaw, setViewLevel, worldRef]);
+  }, [completeMatchAssessment, finishFirstMatchGuide, gameMode, playerSkill.executionSigma, playVictory, rackId, recordPlayerShot, settleShotRaw, setViewLevel, updateCompanionMemory, worldRef]);
 
   // ── 物理模拟循环 ──
   usePhysicsLoop({
@@ -1262,7 +1301,7 @@ export default function Game() {
   const utilityControls = {
     scene: <button className="scene-entry" aria-label="场景" disabled={gamePaused || charging || followShotPending || openingActive || (!canAim && match.phase !== 'finished')} onClick={() => setScenePickerOpen(v => !v)}><RoyalIcon name="scene"/></button>,
     help: <button className="help-entry" aria-label="操作说明" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setHelpOpen(true); }}><RoyalIcon name="help"/></button>,
-    cards: <button className="cardbook-entry" aria-label="查看赞美卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCareerTab(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>,
+    cards: <button className="cardbook-entry" aria-label="查看回忆卡册" disabled={openingActive || !!renderError} onClick={() => { cancelCharge(); setScenePickerOpen(false); setCollectionOpen(true); }}><RoyalIcon name="cards"/></button>,
     // Reuse the saved dock position of the former pause control.
     pause: <button className="sound-entry" aria-label={muted ? '开启音效' : '关闭音效'} disabled={openingActive || !!renderError} onClick={toggleMuted}><RoyalIcon name={muted ? 'muted' : 'sound'}/></button>,
   };
@@ -1279,6 +1318,22 @@ export default function Game() {
       else if (!match.breaking) displayGuide = !guideLearning.learned('ghost') ? 'ghost-place' : !guideLearning.learned('aim') ? 'aim-direction' : !guideLearning.learned('power') ? 'next-power' : null;
     }
   }
+  const openingIdle = canAim && match.breaking && worldView.shot === 0 && !charging;
+  const openingReminderReady = openingIdle && !chat.live && !chat.waiting && !chat.failure;
+  useEffect(() => {
+    const rack = rackSerial.current;
+    if (!openingReminderReady || lastOpeningReminder.current?.rack === rack) return;
+    const timer = window.setTimeout(() => {
+      if (rack !== rackSerial.current || worldRef.current.shot !== 0 || worldRef.current.moving) return;
+      const { personal, preferred } = companionSelection(companionMemoryRef.current.preferredCompanionId);
+      const kind = nextOpeningReminder(hasCustomizedPlayerPortrait(), Boolean(personal.length || preferred), lastOpeningReminder.current?.kind);
+      if (!kind) return;
+      lastOpeningReminder.current = { rack, kind };
+      const text = callPlayerByName(OPENING_REMINDERS[kind], playerNickname(), kind === 'companion');
+      showOpeningReminder(text, match.companionId);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [openingReminderReady, match.companionId, showOpeningReminder, companionMemoryRef, worldRef]);
   let farShotTarget: number | null = null;
   if (canAim && !charging && !match.breaking && !displayGuide && !dialogue?.kind &&
       !isGlobalCameraView(viewLevel) && !manualCameraActive) {
@@ -1320,12 +1375,40 @@ export default function Game() {
   }, [matchRef, worldRef]);
 
   // ── 渲染 ──
+  const sendChat = (question: string, retry = false) => {
+    const brief = tableBrief(worldRef.current, matchRef.current, dialogueDirector.current?.snapshot().shots ?? [], asksForRoute(question), question);
+    const memory = companionMemoryRef.current;
+    void chat.send(question, brief, {
+      rackId: rackId.current, relationship: memory.friends[brief.roleId], skill: sharedSkill, shots: memory.shots,
+    }, (id, exchange) => {
+      if (id !== matchRef.current.companionId || exchange.rackId !== rackId.current) return;
+      updateCompanionMemory(current => rememberExchange(current, id, exchange));
+    }, retry);
+  };
+  const toggleQuickChat = () => {
+    if (quickChat) { setQuickChat(false); return; }
+    // WebKit opens the system keyboard only when focus runs inside the original tap.
+    flushSync(() => setQuickChat(true));
+    quickInput.current?.focus({ preventScroll: true });
+  };
+  const outsideChat = (target: EventTarget) => quickChat && target instanceof Element && !target.closest('.quick-chat, .talk-to-friend');
   return (
-    <div className={`game-shell royal-game${import.meta.env.DEV ? ' follow-ab' : ''}`} data-paused={gamePaused ? 'true' : undefined} data-guide={displayGuide ?? undefined} data-world={selectedWorld} data-match-finished={match.phase === 'finished' ? 'true' : undefined} data-opening={openingActive && !renderError ? 'true' : undefined}>
+    <div className={`game-shell royal-game${showFollowComparison ? ' follow-ab' : ''}`} onPointerDownCapture={event => {
+        if (outsideChat(event.target)) { event.preventDefault(); event.stopPropagation(); }
+      }} onClickCapture={event => {
+        if (outsideChat(event.target)) { event.preventDefault(); event.stopPropagation(); setQuickChat(false); }
+      }} data-paused={gamePaused ? 'true' : undefined} data-guide={displayGuide ?? undefined} data-world={selectedWorld} data-match-finished={match.phase === 'finished' ? 'true' : undefined} data-opening={openingActive && !renderError ? 'true' : undefined}>
       {renderError && match.phase !== 'finished' && <div role="alert" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 9998, background: '#10251b', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <p>{renderError}</p><button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 12 }}>重新进入</button>
       </div>}
       {openingActive && openingGreeting && !renderError && <MatchWelcome greeting={openingGreeting} onEnter={() => {
+        const { companionId, memoryKey } = openingGreeting;
+        if (memoryKey && companionId) updateCompanionMemory(memory => {
+          const friend = memory.friends[companionId];
+          if (!friend) return memory;
+          const greetingKeys = [...(friend.greetingKeys ?? []), memoryKey].slice(-4);
+          return { ...memory, friends: { ...memory.friends, [companionId]: { ...friend, greetingKeys } } };
+        });
         chat.automatic(openingGreeting);
         setOpeningActive(false);
       }}/>}
@@ -1333,13 +1416,27 @@ export default function Game() {
         const step = match.actor === 'opponent' ? 'turn-wait' : match.phase === 'placing' ? 'free-place' : match.breaking ? 'first-power' : 'ghost-place';
         firstMatchGuideStepRef.current = step; setFirstMatchGuideStep(step);
         setGuideDismissed(false); setManualGuide(true); setHelpOpen(false);
-      }}/>}
-      {collectionOpen && <CompanionCollectionBook career={career} careerSaveFailed={careerSaveFailed} initialCareer={careerTab} collection={collection} initialCompanionId={collectionReward?.companionId} saveFailed={collectionSaveFailed} onClose={() => setCollectionOpen(false)} />}
+      }}>
+        <ChatMemory
+          companionId={match.companionId} rackId={rackId.current} relationship={companionMemory.memory.friends[match.companionId ?? '']} skill={sharedSkill}
+          status={companionMemory.status} preferredId={companionMemory.memory.preferredCompanionId} onRetry={companionMemory.retry}
+          onPreferred={id => updateCompanionMemory(memory => ({ ...memory, preferredCompanionId: isCompanionId(id) ? id : undefined }))}
+          onClear={() => {
+            const id = match.companionId;
+            if (!isCompanionId(id)) return;
+            updateCompanionMemory(memory => {
+              const friends = { ...memory.friends };
+              delete friends[id];
+              return { ...memory, friends };
+            });
+          }}/>
+      </ControlHelp>}
+      {collectionOpen && <CompanionCollectionBook career={career} careerSaveFailed={careerSaveFailed} collection={collection} onClose={() => setCollectionOpen(false)} />}
       <div className="royal-entry" role="group" aria-label="场景、教学与声音">
         {Object.entries(utilityControls).filter(([id]) => id !== 'cards' || match.phase !== 'finished').map(([id, node]) => <span key={id}>{node}</span>)}
       </div>
       {scenePickerOpen && <ScenePicker value={selectedWorld} disabled={(!canAimBase && match.phase !== 'finished') || openingActive || charging || followShotPending || worldView.moving} onClose={() => setScenePickerOpen(false)} onChange={next => { if ((!canAimBase && match.phase !== 'finished') || openingActive || charging || worldRef.current.moving || followShotPendingRef.current) return; try { browserStorage()?.setItem('princess-billiards:scene:v1', next); } catch { /* Current scene still switches. */ } const url = new URL(location.href); url.searchParams.set('world', next); url.searchParams.delete('lake360'); history.replaceState(null, '', url.href); setSelectedWorld(next); setScenePickerOpen(false); }} />}
-      {import.meta.env.DEV && <div className="follow-comparison" aria-label="开发手感对照">
+      {showFollowComparison && <div className="follow-comparison" aria-label="开发手感对照">
         <label>场景 <select aria-label="场景" value={selectedWorld} disabled={!canAim || charging || followShotPending} onChange={event => {
           const next = event.target.value as 'lake' | 'castle';
           const url = new URL(location.href); url.searchParams.set('world', next); url.searchParams.delete('lake360');
@@ -1361,11 +1458,9 @@ export default function Game() {
         </select></label>
         <span id="follow-feel-description">轻跟进：双方中杆略抬击点，停球也会稍跟；刷新回当前</span>
       </div>}
-      {profileEditor && <PortraitEditor id={profileEditor} close={()=>setProfileEditor(null)}/>}
-      {chat.reviewing && <ChatRoom lines={chat.lines} companionId={match.companionId} waiting={chat.waiting} failure={chat.failure}
-        onSend={(q,retry)=>void chat.send(q,tableBrief(worldRef.current,matchRef.current,dialogueDirector.current?.snapshot().shots ?? []),match.companionId,retry)}
-        onClose={chat.closeRoom}/>}
-      <Scoreboard onProfile={setProfileEditor} disabled={openingActive || gamePaused || scenePickerOpen || charging || followShotPending}
+      {profileEditor === 'player' && <PortraitEditor id="player" close={() => setProfileEditor(null)}/>}
+      {profileEditor && profileEditor !== 'player' && <CompanionPicker close={() => setProfileEditor(null)} preferredId={companionMemory.memory.preferredCompanionId}/>}
+      <Scoreboard onProfile={openProfile} disabled={openingActive || gamePaused || scenePickerOpen || charging || followShotPending}
         match={match}
         worldView={worldView}
         playerSkill={playerSkill}
@@ -1375,10 +1470,20 @@ export default function Game() {
         shotReward={shotReward}
       />
       <TableStage
-        chatFloat={!gamePaused && !openingActive && !scenePickerOpen && chat.live ? <ChatFloat line={chat.live}/> : null}
+        chatFloat={!otherOverlay && !openingActive && !scenePickerOpen && match.phase !== 'finished' && (
+          quickChat ? <QuickChat input={quickInput} waiting={chat.waiting} onClose={() => setQuickChat(false)}
+            onSend={question => { setQuickChat(false); sendChat(question); }}/>
+          : chat.failure ? <div className="chat-float quick-chat-error" role="status">
+            <span>{chat.failure.reason}</span>
+            {!/AI_NOT_ALLOWED|AI_QUOTA_EXCEEDED|AI_CONTENT_BLOCKED|104003|NO_AI_BRIDGE/.test(chat.failure.reason) &&
+              <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => sendChat(chat.failure!.question, true)}>重试</button>}
+            <button type="button" aria-label="关闭聊天提示" onPointerDown={event => event.stopPropagation()} onClick={chat.dismissFailure}>×</button>
+          </div> : chat.live && (!chat.live.openingReminder || openingIdle) ? <ChatFloat line={chat.live}/> : null
+        )}
+        chatLines={chat.lines}
         placementHalo={placementHalo}
-        highlights={matchHighlights}
-        victoryPraise={victoryPraise}
+        rackId={rackId.current}
+        worldView={worldView}
         dialogue={!gamePaused && !openingActive && !scenePickerOpen && !renderError ? dialogue : null}
         onDialogueShown={onDialogueShown}
         onSpeech={chat.automatic}
@@ -1388,12 +1493,7 @@ export default function Game() {
         guideText={guideSpeech}
         viewHintText={farShotTarget !== null && farShotHint === shotNumber ? FAR_SHOT_VIEW_LINE : viewSpeech}
         speechEnabled={!gamePaused && !openingActive && !scenePickerOpen && (!renderError || match.phase === 'finished') && !charging}
-        collection={collection}
-        collectionReward={collectionReward}
-        collectionSaveFailed={collectionSaveFailed}
-        career={career}
-        onCareer={() => { setCareerTab(true); setCollectionOpen(true); }}
-        onCollection={() => { setCareerTab(false); setCollectionOpen(true); }}
+        onCollection={() => { setCollectionOpen(true); }}
         eightReady={legalTargets.length === 1 && legalTargets[0] === 8}
         viewLevel={viewLevel}
         spectatorActive={spectatorActive}
@@ -1410,7 +1510,8 @@ export default function Game() {
         onResetGame={handleReplay}
       />
       <ControlDeck
-        chatButton={<button type="button" className="talk-to-friend" aria-label="和球友聊天" disabled={openingActive || gamePaused || scenePickerOpen || charging || followShotPending} onClick={chat.openRoom}><svg className="chat-glyph" aria-hidden="true" viewBox="0 0 32 32"><path d="M5 4.5C9 2 22 2 26.5 6.5c4 4.2 3.1 12.2-.7 15.8-3.2 3.1-10 3.8-14.5 2.6L4 29l1.4-7.6C1.3 18 1.1 8.7 5 4.5Z"/></svg><span aria-hidden="true">聊</span></button>}
+        chatButton={<TalkButton disabled={openingActive || otherOverlay || scenePickerOpen || charging || followShotPending ||
+          match.phase === 'finished' || worldView.moving} expanded={quickChat} onClick={toggleQuickChat}/>}
         utilityControls={utilityControls}
         viewLevel={viewLevel}
         manualCameraActive={manualCameraActive}

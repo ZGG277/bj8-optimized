@@ -6,8 +6,12 @@
 */
 import { describe, expect, it, vi } from 'vitest';
 import { createCompanionDialogue } from './companion-dialogue';
-import { COMPANIONS } from './companions';
-import { DIALOGUE_SCENES } from './companion-dialogue-bank';
+import { COMPANION_PREFERENCES_KEY, lockCompanionProfile } from './companion-preferences';
+import { COMPANIONS, ORIGINAL_COMPANIONS, pickCompanion } from './companions';
+import { DIALOGUE_SCENES, SHOT_PROGRESS_LINES, STREAK_FALLBACK_LINES } from './companion-dialogue-bank';
+import { ruleLinesForShot } from './companion-instructions';
+import { VOICE_STREAK_LINES } from './companion-voice-variations';
+import { STORYBOOK_REPLY_LIMIT } from './storybook-companions';
 import { beginMatch, createInitialMatchState, resolveStoppedShot } from '../match/match-machine';
 import type { MatchState, ShotFacts } from '../match/types';
 import { createInitialWorld, POCKETS, TABLE, type PhysicsEvent } from '../physics';
@@ -19,15 +23,15 @@ function shot(d: ReturnType<typeof createCompanionDialogue>, id: number, patch: 
   return d.settle(b, f, resolveStoppedShot(b, f), now);
 }
 describe('facts-first companion dialogue', () => {
-  it('keeps 60 short, unique optional lines alongside deterministic progress', () => {
+  it('keeps short, unique optional lines alongside deterministic progress', () => {
     const lines = DIALOGUE_SCENES.flatMap(s => s.lines.map(l => l.text));
-    expect(DIALOGUE_SCENES).toHaveLength(20); expect(lines).toHaveLength(60);
-    expect(new Set(lines).size).toBe(60);
+    expect(DIALOGUE_SCENES).toHaveLength(19); expect(lines).toHaveLength(57);
+    expect(new Set(lines).size).toBe(lines.length);
     expect(lines.every(text => Array.from(text).length <= 10)).toBe(true);
     expect(DIALOGUE_SCENES.some(s => s.id.includes('BANK') || s.id.includes('NEAR_MISS'))).toBe(false);
   });
   it('keeps ten distinct voices across the real opening, score, foul, and group paths', () => {
-    const choices = COMPANIONS.map(({ id }) => {
+    const choices = ORIGINAL_COMPANIONS.map(({ id }) => {
       const director = createCompanionDialogue(() => 0);
       const opening = director.ready(id, 1000);
       if (opening) director.shown(opening.id, 1000);
@@ -57,13 +61,36 @@ describe('facts-first companion dialogue', () => {
     const random = vi.fn(() => .99);
     const d = createCompanionDialogue(random);
     expect(shot(d, 1, { firstContact: 9, pocketed: [9] })).toMatchObject({
-      kind: 'rule', sceneId: 'P_WRONG_FIRST', text: '公主先碰到我的球啦，该我打咯。',
+      kind: 'rule', sceneId: 'P_WRONG_FIRST', text: '你帮我进球啦，谢谢！先碰错球，换我。',
     });
     expect(shot(d, 2, { pocketed: [9, 10] })).toMatchObject({ kind: 'rule', sceneId: 'P_OPPONENT_ONLY' });
-    expect(shot(d, 3, { cueScratch: true, firstContact: 9, pocketed: [0] }, { actor: 'opponent' })?.text).toContain('公主来摆球');
-    expect(shot(d, 4, { firstContact: 9, pocketed: [9] }, { actor: 'opponent', playerGroup: null })?.text).toContain('公主这局打全色球');
+    expect(shot(d, 3, { cueScratch: true, firstContact: 9, pocketed: [0] }, { actor: 'opponent' })?.text).toContain('你来摆球');
+    expect(shot(d, 4, { firstContact: 9, pocketed: [9] }, { actor: 'opponent', playerGroup: null })?.text).toContain('你这局打全色球');
     expect(d.snapshot().spoken).toHaveLength(0);
     expect(random).not.toHaveBeenCalled();
+  });
+  it('uses the real balls and turn for distinct, short reactions in every built-in voice', () => {
+    const lines = COMPANIONS.map(({ id }) => {
+      const state = before({ companionId: id });
+      const line = (patch: Partial<ShotFacts>) => {
+        const f = facts(1, patch);
+        return ruleLinesForShot(state, f, resolveStoppedShot(state, f).next);
+      };
+      const accidental = line({ firstContact: 9, pocketed: [9] });
+      expect(accidental?.lines).toHaveLength(2);
+      expect(accidental?.lines.every(text => text.endsWith('先碰错球，换我。'))).toBe(true);
+      expect(line({ firstContact: 8, pocketed: [9] })?.lines[0]).toContain('先碰了黑八');
+      expect(line({ pocketed: [9], firstContact: 1 })?.lines[0]).toContain('轮到我啦');
+      expect(line({ pocketed: [1, 9] })?.lines[0]).toContain('你接着打');
+      expect(line({ pocketed: [1, 9], remainingSolids: 0 })?.lines[0]).toContain('接着打黑八');
+      const scratch = line({ cueScratch: true, pocketed: [0, 9] });
+      expect(scratch?.lines.every(text => text.endsWith('白球也进袋，换我。'))).toBe(true);
+      expect([...accidental!.lines, ...scratch!.lines].every(text => Array.from(text).length <= STORYBOOK_REPLY_LIMIT)).toBe(true);
+      expect(line({ firstContact: 9, pocketed: [] })?.lines[0]).not.toContain('进球');
+      expect(line({ firstContact: 9, pocketed: [8, 9] })).toBeNull();
+      return accidental!.lines[0];
+    });
+    expect(new Set(lines).size).toBe(COMPANIONS.length);
   });
   it('admits distance, speed and free-ball lines only for a recorded legal scoring shot', () => {
     const world = createInitialWorld(() => .5);
@@ -197,7 +224,7 @@ describe('facts-first companion dialogue', () => {
   });
   it('handles opponent-only balls and derives the final-eight phase from the actual group', () => {
     expect(shot(createCompanionDialogue(() => 0), 1, { pocketed: [9] })?.sceneId).toBe('P_OPPONENT_ONLY');
-    expect(shot(createCompanionDialogue(() => 0), 1, { remainingSolids: 0 })?.sceneId).toBe('P_FINAL_READY');
+    expect(shot(createCompanionDialogue(() => 0), 1, { remainingSolids: 0 })?.sceneId).toBe('P_EIGHT_READY');
     expect(shot(createCompanionDialogue(() => 0), 1, { firstContact: 8, pocketed: [], remainingSolids: 0 })?.sceneId).toBe('P_FINAL_MISS');
     expect(shot(createCompanionDialogue(() => 0), 1, { pocketed: [], remainingSolids: 0 }, { playerGroup: null })?.sceneId).not.toBe('P_FINAL_MISS');
   });
@@ -252,10 +279,25 @@ describe('facts-first companion dialogue', () => {
         expect(d.shown(choice.id, run * 100)).toBe(true);
       }
     }
-    expect(choices.map(c => c.sceneId)).toEqual([2, 3, 5, 7].map(run => `${prefix}_STREAK_${run}`));
+    expect(choices.map(c => c.sceneId)).toEqual([2, 3, 4, 5].map(run => `${prefix}_STREAK_${run}`)
+      .concat(`${prefix}_NEAR_CLEAR`, `${prefix}_EIGHT_READY`));
     expect(d.snapshot().shots[6]).toMatchObject({ scoringRun: 7, blackEightAtStart: false });
-    if (actor === 'player') expect(choices[3].text).toContain('下一杆打黑八');
+    expect(choices[5].text).toContain('黑八');
+    expect(new Set(choices.map(choice => choice.text)).size).toBe(6);
     expect(d.snapshot().ordinaryCount).toBe(0);
+  });
+  it('uses fresh praise when the recent history already contains every line for this milestone', () => {
+    const scene = 'P_STREAK_2';
+    const text = [VOICE_STREAK_LINES.f05[scene], ...SHOT_PROGRESS_LINES[scene]];
+    const current = text.map(text => ({ voice: 'f05', scene, text, motif: scene }));
+    const d = createCompanionDialogue(() => 0, {
+      getItem: () => JSON.stringify({ version: 1, racks: [], current, active: true }),
+      setItem: () => {},
+    });
+    shot(d, 1, {}, { companionId: 'f05' });
+    expect(shot(d, 2, { firstContact: 2, pocketed: [2] }, { companionId: 'f05' })).toMatchObject({
+      sceneId: scene, text: STREAK_FALLBACK_LINES.P[0],
+    });
   });
 
   it('starts a new scoring run after a handoff and records the actual terminal shot', () => {
@@ -293,4 +335,37 @@ describe('facts-first companion dialogue', () => {
     shot(d, 2, { pocketed: [] });
     expect(shot(d, 3, { remainingSolids: 0 })).toBeNull();
   });
+});
+
+it('uses each saved custom line for its actual event without swallowing rule calls', () => {
+  const profile = { id: 'custom-test', name: '小满', voiceId: 'wen-xingye', avatarId: 'xu-qinghe',
+    lines: { opening: '球摆好啦，等你。', pot: '这颗漂亮，算你赢。', miss: '再慢一点，我等你。', win: '今天这桌归你。' } };
+  lockCompanionProfile(profile);
+  try {
+    const director = createCompanionDialogue(() => .999);
+    const opening = director.ready(profile.id, 0)!;
+    expect(opening.text).toBe(profile.lines.opening);
+    director.shown(opening.id, 0);
+    const pot = shot(director, 1, {}, { companionId: profile.id }, 100);
+    expect(pot?.text).toBe(profile.lines.pot);
+    expect(shot(director, 2, { pocketed: [] }, { companionId: profile.id }, 200)?.text).toBe(profile.lines.miss);
+    expect(shot(director, 3, { cueScratch: true, pocketed: [0, 1] }, { companionId: profile.id })?.sceneId).toBe('P_SCRATCH');
+  } finally {
+    lockCompanionProfile();
+  }
+});
+
+it('matches only selected companions and falls back when the pool is empty or invalid', () => {
+  const memory = new Map<string, string>();
+  vi.stubGlobal('window', { localStorage: { getItem: (key: string) => memory.get(key) ?? null } });
+  try {
+    const ids = [COMPANIONS[2].id, COMPANIONS[4].id];
+    memory.set(COMPANION_PREFERENCES_KEY, JSON.stringify({ saved: ids, selected: ids }));
+    expect(pickCompanion(ids[0], () => 0).id).toBe(ids[0]);
+    expect(pickCompanion(undefined, () => .999).id).toBe(ids[1]);
+    memory.set(COMPANION_PREFERENCES_KEY, JSON.stringify({ selected: ['deleted'] }));
+    expect(pickCompanion(undefined, () => 0).id).toBe(COMPANIONS[0].id);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

@@ -1,8 +1,8 @@
 import { loadCareer, recordCareerFinish, saveCareer } from '../opponent/career';
 import { settledShot, type SettledShot } from '../match/shot-log';
-import { nextVictoryPraise } from '../opponent/victory-praise';
+import { customCompanionFor, lockCompanionProfile, readCompanionPreferences } from '../opponent/companion-preferences';
 import { pickCompanion } from '../opponent/companions';
-import { collectCompanionWin, loadCompanionCollection, saveCompanionCollection, type CompanionReward } from '../opponent/companion-collection';
+import { loadCompanionCollection } from '../opponent/companion-collection';
 import { createFriendlyOpponentProfile } from '../opponent/friendly-style';
 /*
 [INPUT]: 依赖 physics 确定性世界、match 纯规则状态机
@@ -16,6 +16,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   createInitialWorld,
   cloneWorld,
+  getCueBall,
   respotCueBall,
   type BilliardsWorld,
 } from '../physics';
@@ -47,16 +48,24 @@ function browserStorage(): ReturnType<typeof gameStorage> {
   }
 }
 
-export function useGameState() {
+export function useGameState(preferredCompanionId?: string) {
   // ── 物理世界 ──
   // 首次加载也使用随机摆法，确保每一局的初始球局都不重复
   const [worldView, setWorldView] = useState<BilliardsWorld>(() => createInitialWorld(Math.random));
   const worldRef = useRef<BilliardsWorld>(cloneWorld(worldView));
 
   // ── 规则状态 ──
-  const [match, setMatch] = useState<MatchState>(() => beginMatch({ ...createInitialMatchState(), companionId: pickCompanion().id }));
+  const [match, setMatch] = useState<MatchState>(() => beginMatch({
+    ...createInitialMatchState(),
+    companionId: pickCompanion(undefined, Math.random, preferredCompanionId).id,
+  }));
   const matchRef = useRef(match);
   useEffect(() => { matchRef.current = match; }, [match]);
+
+  useEffect(() => {
+    lockCompanionProfile(customCompanionFor(match.companionId));
+    return () => lockCompanionProfile();
+  }, [match.companionId]);
 
   // ── 视图状态 ──
   const [viewLevel, setViewLevel] = useState(FIRST_PERSON_VIEW);
@@ -79,11 +88,7 @@ export function useGameState() {
   const careerShots = useRef<SettledShot[]>([]);
   const resolvedFinish = useRef<MatchState | null>(null);
   const rackId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const [collection, setCollection] = useState(() => loadCompanionCollection(browserStorage()));
-  const collectionRef = useRef(collection);
-  const [victoryPraise, setVictoryPraise] = useState('');
-  const [collectionReward, setCollectionReward] = useState<CompanionReward | null>(null);
-  const [collectionSaveFailed, setCollectionSaveFailed] = useState(false);
+  const [collection] = useState(() => loadCompanionCollection(browserStorage()));
   const matchObservationsRef = useRef<ShotSkillObservation[]>([]);
 
   // ── 派生 ──
@@ -107,17 +112,16 @@ export function useGameState() {
     assessmentDoneRef.current = false;
     careerShots.current = []; resolvedFinish.current = null;
     rackId.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setCollectionReward(null);
-    setVictoryPraise('');
     setTrainingSummary(null);
     setWorldView(cloneWorld(fresh));
-    const companion = pickCompanion(matchRef.current.companionId);
+    const companion = pickCompanion(matchRef.current.companionId, Math.random, preferredCompanionId);
+    lockCompanionProfile(readCompanionPreferences().custom.find(profile => profile.id === companion.id));
     setMatch(m => beginMatch({ ...m, companionId: companion.id }));
     setGameMode(nextMode);
     setOpponentProfile(createFriendlyOpponentProfile(playerSkillRef.current, nextMode));
     setViewLevel(OVERHEAD_VIEW);
     setAim(0);
-  }, [gameMode]);
+  }, [gameMode, preferredCompanionId]);
 
   /** 局内只收集事实；不改可见分数、不持久化、不改本局 AI。 */
   const recordPlayerShot = useCallback((observation: ShotSkillObservation) => {
@@ -133,17 +137,6 @@ export function useGameState() {
       if (nextCareer !== careerRef.current) {
         careerRef.current = nextCareer; setCareer(nextCareer);
         setCareerSaveFailed(!saveCareer(browserStorage(), nextCareer));
-      }
-    }
-    if (winner === 'player') {
-      const praise = nextVictoryPraise(browserStorage());
-      setVictoryPraise(praise);
-      const earned = collectCompanionWin(collectionRef.current, matchRef.current.companionId, Date.now(), praise);
-      if (earned) {
-        collectionRef.current = earned.collection;
-        setCollection(earned.collection);
-        setCollectionReward(earned.reward);
-        setCollectionSaveFailed(!saveCompanionCollection(browserStorage(), earned.collection));
       }
     }
     const observations = matchObservationsRef.current;
@@ -166,7 +159,10 @@ export function useGameState() {
 
     const resolution = resolveStoppedShot(matchRef.current, facts);
     const log = careerShots.current;
-    log.push(settledShot(matchRef.current, facts, resolution, log[log.length - 1]));
+    const shot = settledShot(matchRef.current, facts, resolution, log[log.length - 1]);
+    const cue = getCueBall(world);
+    const cueEnd = cue?.active && !facts.cueScratch ? { x: cue.x, z: cue.z } : null;
+    log.push(shot);
     if (resolution.next.phase === 'finished') resolvedFinish.current = resolution.next;
     for (const effect of resolution.effects) {
       if (effect.type === 'auto-respot-cue') {
@@ -177,7 +173,7 @@ export function useGameState() {
     }
     setMatch(resolution.next);
     setWorldView(cloneWorld(world));
-    return { facts, resolution };
+    return { facts, resolution, shot, cueEnd };
   }, []);
 
   return {
@@ -192,10 +188,8 @@ export function useGameState() {
     playerSkill,
     trainingSummary,
     collection,
-    collectionReward,
-    victoryPraise,
-    collectionSaveFailed,
     career, careerSaveFailed,
+    rackId,
     gameMode,
     opponentProfile,
     canAim,

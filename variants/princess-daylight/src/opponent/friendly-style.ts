@@ -1,7 +1,7 @@
 /** Favor the princess through shot choice, never by rewriting physics or a result. */
 import { confidenceAdjustedLevel, createOpponentProfile, levelLabel, levelToSigma, recordedAccuracy, type GameMode, type OpponentProfile, type PlayerSkillProfile } from './model';
 
-export const FRIENDLY_STYLE_DESCRIPTION = '按公主多局的准度和走位匹配实力。顺手的球认真打，难球偶尔留一杆机会。';
+export const FRIENDLY_STYLE_DESCRIPTION = '按玩家多局的准度和走位匹配实力。顺手的球认真打，难球偶尔留一杆机会。';
 const MAX_CONSECUTIVE_OPPORTUNITIES = 3;
 
 export function createFriendlyOpponentProfile(player: PlayerSkillProfile, mode: GameMode): OpponentProfile {

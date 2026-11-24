@@ -12,8 +12,11 @@ describe('one-row ball progress',()=>{
     world.balls.find(ball=>ball.number===3)!.active=false;
     world.balls.find(ball=>ball.number===12)!.active=false;
     const html=renderToStaticMarkup(<Scoreboard match={match} worldView={world} playerSkill={profile} opponentProfile={createOpponentProfile(profile,'practice')} />);
-    const player=html.slice(html.indexOf('royal-player player'),html.indexOf('royal-eight'));
-    const opponent=html.slice(html.indexOf('royal-player opponent'));
+    const left=html.indexOf('royal-player opponent'), divider=html.indexOf('royal-eight'), right=html.indexOf('royal-player player');
+    expect(left).toBeLessThan(divider);
+    expect(divider).toBeLessThan(right);
+    const player=html.slice(right);
+    const opponent=html.slice(left,divider);
     expect(player).toContain(`data-ball-number="${group==='stripe'?15:7}"`);
     expect(opponent).toContain(`data-ball-number="${group==='stripe'?7:15}"`);
     expect(html).toContain('aria-label="3号已进" class="mini-ball solid down"');
@@ -22,15 +25,16 @@ describe('one-row ball progress',()=>{
     expect(html).not.toContain('skill-level');
     // Group prose is available to a screen reader, not painted in the row.
     const visible=html.replace(/<span class="royal-sr-only"[\s\S]*?<\/span>/g,'').replace(/<[^>]*>/g,'');
-    expect(visible).toBe('8');
-    expect(html).toContain('设置公主头像');
-    expect(html).toContain('设置球友资料，沈予白');
+    expect(visible).toBe('8你');
+    expect(player).toContain('编辑你的昵称和头像');
+    expect(html).toContain('选球友，当前对手沈予白');
   });
   it('does not claim group ownership before the first legal assignment',()=>{
     const world=createInitialWorld(()=>.5),profile=createPlayerSkillProfile();
     const html=renderToStaticMarkup(<Scoreboard match={createInitialMatchState()} worldView={world} playerSkill={profile} opponentProfile={createOpponentProfile(profile,'practice')}/>);
     expect(html.match(/class="mini-ball unassigned"/g)).toHaveLength(14);
     expect(html).not.toContain('data-ball-number="1"');
+    expect(html).toContain('class="score-avatar-you" aria-hidden="true">你</span>');
   });
   it('pulses only the legally pocketed balls and lets the visible reward own the announcement',()=>{
     const match={...createInitialMatchState(),playerGroup:'solid' as const,breaking:false};

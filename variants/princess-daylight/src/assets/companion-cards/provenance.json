@@ -7,91 +7,457 @@
       "id": "shen-yubai",
       "asset": "src/assets/companion-cards/shen-yubai.webp",
       "sourceSha256": "ea83a9baa075d9b0225b28e7c12340c3b2715780f4c3129b2b398f9b1ab93406",
-      "sha256": "758fd2a8808d64c52328bb6a33b2c2980258ae548736617ddfa6a3e04017bd31",
-      "width": 792,
-      "height": 1188,
-      "bytes": 193450
+      "sha256": "5a87078b45ee6cd627caf36afa2cfbc574d5680493036b4e952261cdd57308e1",
+      "width": 560,
+      "height": 840,
+      "bytes": 78312
     },
     {
       "id": "lu-jingchen",
       "asset": "src/assets/companion-cards/lu-jingchen.webp",
       "sourceSha256": "425fd3808b9ddd8cce7552df4f2dd4e57cfab566cdbef0a6cf0ff350478c6afc",
-      "sha256": "efdb9c000af35b9dd8e41194ab44be7bc557c491138e10838e1ead53b473234e",
-      "width": 792,
-      "height": 1188,
-      "bytes": 126710
+      "sha256": "a9a5d456fb32cd5ff9ae453635ddb921bfc23ce55e1d940e188eebc30fe6ef8d",
+      "width": 560,
+      "height": 840,
+      "bytes": 51874
     },
     {
       "id": "wen-xingye",
       "asset": "src/assets/companion-cards/wen-xingye.webp",
       "sourceSha256": "5a241e9666a72d2394ea607bb7c5dbc0a3d623ee37d3a917fb51bac13a40536c",
-      "sha256": "b62eaa3100ddde0f44ad971dfadd7523b079e4ea1b98bc0553e1413893e4785d",
-      "width": 792,
-      "height": 1188,
-      "bytes": 160378
+      "sha256": "7600bc9637e572ba180c3be60ea48728cd4462d20be466f0e519f12b9d53b1e2",
+      "width": 560,
+      "height": 840,
+      "bytes": 63386
     },
     {
       "id": "gu-yanchuan",
       "asset": "src/assets/companion-cards/gu-yanchuan.webp",
       "sourceSha256": "172b569c925e89b8d9b8cafa87f64e3da20751d8141cfe274cf3567ecef5b13e",
-      "sha256": "05fb0c9bf6083cbfbbb9518c2be0b9e52fac3ac9f4257b1a616be7fe5ca2916e",
-      "width": 792,
-      "height": 1188,
-      "bytes": 131458
+      "sha256": "7f216e3d29e5ec776bb543bce800048ddb777214a7bc746afc19b7dce69389d2",
+      "width": 560,
+      "height": 840,
+      "bytes": 54516
     },
     {
       "id": "jiang-yueheng",
       "asset": "src/assets/companion-cards/jiang-yueheng.webp",
       "sourceSha256": "748cfc9271850c95dc7a9ef838fec8ff334d1939dd37852a1a836ce0f0382ba5",
-      "sha256": "1fa7b0af1c9d6eee9047c6d1ae696e4b137121eb04203c9b22f538a271487a28",
-      "width": 792,
-      "height": 1188,
-      "bytes": 178926
+      "sha256": "121cc841d96a62fee95203b87b3f35d07cbd35b2240d8e978b8313ca21861264",
+      "width": 560,
+      "height": 840,
+      "bytes": 69754
     },
     {
       "id": "zhou-mubai",
       "asset": "src/assets/companion-cards/zhou-mubai.webp",
       "sourceSha256": "be6372b1a5be5ff6b69841695573c80533e8f104e859c8c948dc4772118a2f14",
-      "sha256": "b1659de84b72a44e15e78c3d9a1f06a99301d932f3348d29cf23974a451e7d4d",
-      "width": 792,
-      "height": 1188,
-      "bytes": 170540
+      "sha256": "555ffd8814bdd65ecccd49f0584e9e3030f0805b755813dab73d3fb3fb180b54",
+      "width": 560,
+      "height": 840,
+      "bytes": 70024
     },
     {
       "id": "xie-linyu",
       "asset": "src/assets/companion-cards/xie-linyu.webp",
       "sourceSha256": "fd844464e96919b381314d868e748b6529ba740fac40daef105eef95368cb20f",
-      "sha256": "cedb8b4d85d283154cdf75e599fd8a97db403ca6e91be1da3e56f4184d8eb9f2",
-      "width": 792,
-      "height": 1188,
-      "bytes": 155046
+      "sha256": "ab8e46a419c42c55eb378bd235707384ac79986378366be83f95841f51571170",
+      "width": 560,
+      "height": 840,
+      "bytes": 63604
     },
     {
       "id": "pei-zhixu",
       "asset": "src/assets/companion-cards/pei-zhixu.webp",
       "sourceSha256": "4dc69dd5ebf09df5ad06de34f2db3103a6c5df66fa950cd19d88b0728d0322ad",
-      "sha256": "bccee211137bbfeec784ff2c05fdf901efa4d42ccb30bff341e1a68a90e2fbbf",
-      "width": 792,
-      "height": 1188,
-      "bytes": 135004
+      "sha256": "691c6b34f38b71c2d30d704cf184ca2bf4e691888116a8b5cf3954784b9cd4c5",
+      "width": 560,
+      "height": 840,
+      "bytes": 55876
     },
     {
       "id": "song-yucheng",
       "asset": "src/assets/companion-cards/song-yucheng.webp",
       "sourceSha256": "e9cc13c022bbe524ccc489f4b22c922e5786d4b923d7085f34425c4c68e0b453",
-      "sha256": "ef91e766f83aa127c67a42bd4ae59d34dba9f7d601b5a1a1dbdcf0833228415b",
-      "width": 792,
-      "height": 1188,
-      "bytes": 187236
+      "sha256": "dfe533e5088665f7e7068c464c42c9fa0a2154d14ef3db4f39a15c32224cbc2b",
+      "width": 560,
+      "height": 840,
+      "bytes": 75804
     },
     {
       "id": "xu-qinghe",
       "asset": "src/assets/companion-cards/xu-qinghe.webp",
       "sourceSha256": "11ff8eae7d30e9c7f919f9d5ffb32cde399295947ea4768cd7e8257fc03b6822",
-      "sha256": "f505a8c4fcbbffdc7b8ef682cd1d2af334c92b74ded694f7397feeec96783d3f",
-      "width": 792,
-      "height": 1188,
-      "bytes": 183684
+      "sha256": "198ae67c63c3e8e4dd6e31686dcf50e23baf90a78e99d128082c985337ce925e",
+      "width": 560,
+      "height": 840,
+      "bytes": 71554
     }
-  ]
+  ],
+  "storybook20261124": {
+    "tool": "built-in imagegen",
+    "reference": "《公主请开球》20位古典可爱角色设定与内置 AI 提示词手册",
+    "assets": [
+      {
+        "id": "f01",
+        "sourceSha256": "542ed0fc56b3f09ce516f13a955198eaacd05c0fce2f100a1e4d5cc7d293311e",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f01.webp",
+          "sha256": "b9344ceeae67ec67506a5666a3368531508ac9698c5c6832d1272fb1d2620c4e",
+          "width": 480,
+          "height": 640,
+          "bytes": 55740
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f01.webp",
+          "sha256": "954885b277ef4cea62fbb29c2630b37abb1a686cb69ceab62264f67d9b187e51",
+          "width": 144,
+          "height": 144,
+          "bytes": 5648
+        }
+      },
+      {
+        "id": "f02",
+        "sourceSha256": "e99f25b9ede593d48e2725a298e3e1d5d7375f50bfbe10e5afd1e0f09887a664",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f02.webp",
+          "sha256": "d23b7a827f44af3584e3107e5d90dac606b26da1165671cf59bd2a027bf1f4dc",
+          "width": 480,
+          "height": 640,
+          "bytes": 46342
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f02.webp",
+          "sha256": "ecefaa972a5fdac11bac3a1f95bd8ab5739568fabefdcf75f52b8ccc343b7e3b",
+          "width": 144,
+          "height": 144,
+          "bytes": 5592
+        }
+      },
+      {
+        "id": "f03",
+        "sourceSha256": "8ec17405bcae8e3c4d7b35d064c386b41f62bb9da0a360196b7b905b6b532e88",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f03.webp",
+          "sha256": "6716a33d0da68ca939cf585b50cd287bb9f8da5bce04c6e61ce43a2a066e4bff",
+          "width": 480,
+          "height": 640,
+          "bytes": 37362
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f03.webp",
+          "sha256": "b45471e8c7f774174a6878df4510663f3d5790aab42fc562de17ab44638dd0bf",
+          "width": 144,
+          "height": 144,
+          "bytes": 4228
+        }
+      },
+      {
+        "id": "f04",
+        "sourceSha256": "2bdbb64e3c8d5a286c05fe089dd3343a5943b0cfe438ee393dc741ecbf49c2e0",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f04.webp",
+          "sha256": "7aa6c7f4a85e08df943ba7d70a5d6d7b5b4a85e57408a0b389e4eb0a44b95730",
+          "width": 480,
+          "height": 640,
+          "bytes": 34432
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f04.webp",
+          "sha256": "48bca20b0e38be42a9a85692b75bd18d562cd24f00976023ae575ab8167b5fb0",
+          "width": 144,
+          "height": 144,
+          "bytes": 4342
+        }
+      },
+      {
+        "id": "f05",
+        "sourceSha256": "50381b8443de8eef75ac77623122277b007d20aba153efb5a66239651df8036f",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f05.webp",
+          "sha256": "b957712a3a2c137da4d031f43804b471bea38ae4dc17a6aa89bb6f7791f6138c",
+          "width": 480,
+          "height": 640,
+          "bytes": 53326
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f05.webp",
+          "sha256": "7e7ccda4d3e088f15aad554bd0017fb27998b341f9b092e3f828ed63d9b57552",
+          "width": 144,
+          "height": 144,
+          "bytes": 5066
+        }
+      },
+      {
+        "id": "f06",
+        "sourceSha256": "1ba440486054ba6f2df917de6ac51458a494da0a5612fc29840ca962502e91dc",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f06.webp",
+          "sha256": "80bbd814cb81620edd0c11d481668ed76ecb2e41cdf43d34461d233e8703e67a",
+          "width": 480,
+          "height": 640,
+          "bytes": 51736
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f06.webp",
+          "sha256": "adaff104e2532fff7b454b896c4518736eae448b068ead7aae5c1fd5fbe3b2ba",
+          "width": 144,
+          "height": 144,
+          "bytes": 5190
+        }
+      },
+      {
+        "id": "f07",
+        "sourceSha256": "a2bfc77afa759ec5dd5cdac9123fe0a0703fb97681d94306ee34d2f557ccad4b",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f07.webp",
+          "sha256": "7123b31ad95fedd282c24e4bb034432d495da22d2ecab5844090f453820b6317",
+          "width": 480,
+          "height": 640,
+          "bytes": 45664
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f07.webp",
+          "sha256": "d0d00850ad716890b39bdc6c256151957489859f3dbc3abda84745f92fb70360",
+          "width": 144,
+          "height": 144,
+          "bytes": 5474
+        }
+      },
+      {
+        "id": "f08",
+        "sourceSha256": "fc5557a82b1194c3175d89a1003274e71e4a8167b04360b27a8bfa51ede680ff",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f08.webp",
+          "sha256": "bad7ed8efd1e1fe19bf78a65072625503726932cebc1cecda05fbcad0c9cb2ca",
+          "width": 480,
+          "height": 640,
+          "bytes": 50062
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f08.webp",
+          "sha256": "677a802a8e091c0d56ea3c7b4fbf9021dd89e6b98387b01bd5c81485ad41ffad",
+          "width": 144,
+          "height": 144,
+          "bytes": 5372
+        }
+      },
+      {
+        "id": "f09",
+        "sourceSha256": "9f0a26988a27e548988b6a1281e22922596184c0941f1698b41d380a4874ec8e",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f09.webp",
+          "sha256": "1a94c0224b36756ae9472a43ebae1bf2ddc5482cfbdd319acd5d71d2caacd644",
+          "width": 480,
+          "height": 640,
+          "bytes": 49928
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f09.webp",
+          "sha256": "d15e525e10e11938480ba1bc2b76c9e59b72e03e221e473f4e2e27421047495c",
+          "width": 144,
+          "height": 144,
+          "bytes": 5258
+        }
+      },
+      {
+        "id": "f10",
+        "sourceSha256": "d9fbd720d356e2d66913c287f6feba0d6ffbb84d4dbdcbca58559b61a2946854",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/f10.webp",
+          "sha256": "5759677cf73aa212468a3e2cf813c2f30132020a7ca26a401144fc72055778e8",
+          "width": 480,
+          "height": 640,
+          "bytes": 42928
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/f10.webp",
+          "sha256": "f244718086abc1a613a3421b126d680fc5398a41d1d4fc04d2790cf6d5b1dec5",
+          "width": 144,
+          "height": 144,
+          "bytes": 4592
+        }
+      },
+      {
+        "id": "m01",
+        "sourceSha256": "7606d2931283774aacd033b89a7473e3e668626641046cc53b2309b3ef560618",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m01.webp",
+          "sha256": "646e86a1ce5e0cbe2314cd12777c6e5b47056688e6bb1b0a3bd4855b8d7cd1bb",
+          "width": 480,
+          "height": 640,
+          "bytes": 41688
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m01.webp",
+          "sha256": "857d2a6e673061c5d8bebdf1ea5702fda99d22cc08a95ad459c1df69a00e05f5",
+          "width": 144,
+          "height": 144,
+          "bytes": 5364
+        }
+      },
+      {
+        "id": "m02",
+        "sourceSha256": "0e3ac7694619897d284848975b9e9760f29e7a5b24832e66ac529022c2ae750e",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m02.webp",
+          "sha256": "7e79caf6273e9135c6684dce565c7aa655375002478154a5540f950fce277e5b",
+          "width": 480,
+          "height": 640,
+          "bytes": 43600
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m02.webp",
+          "sha256": "bc1f92b06abfa9acda3e7c668c12383369364b7b7ab8afda8f95ea5cdb74769b",
+          "width": 144,
+          "height": 144,
+          "bytes": 5410
+        }
+      },
+      {
+        "id": "m03",
+        "sourceSha256": "384284e986b2eb1b8ee0b396687048599e5c20cab5b37026427ede8557715163",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m03.webp",
+          "sha256": "4a03bac832eb6bcc80484ff191e43bd293826e109f2268441783af97d9f4a60b",
+          "width": 480,
+          "height": 640,
+          "bytes": 49468
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m03.webp",
+          "sha256": "06ca724b8eb2ff07b9519d89fd47a60f8e3818ab77c5cd9394a78f27a3aead8b",
+          "width": 144,
+          "height": 144,
+          "bytes": 5344
+        }
+      },
+      {
+        "id": "m04",
+        "sourceSha256": "690ec2c0a4994e02229d8eb71d2fb5e156ee02828d266f6aab4afc731b0b0030",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m04.webp",
+          "sha256": "1e5ffa91ca7a7dbe1e96a51985d137a6853c782bab3a319a7a3f1cf1395c69f0",
+          "width": 480,
+          "height": 640,
+          "bytes": 45778
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m04.webp",
+          "sha256": "1547ed1bedc09bf82598be6c002f33fb0b8be4de362fcbeabf9252dbcb443d50",
+          "width": 144,
+          "height": 144,
+          "bytes": 5072
+        }
+      },
+      {
+        "id": "m05",
+        "sourceSha256": "5ab92a17b54837f7426d14e295eb8309f0717eca60b642935f0c0229c797aaa7",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m05.webp",
+          "sha256": "501947eefe4a891cac583123903e5ee643a8e36b738a8edd4138f97d7b857fa0",
+          "width": 480,
+          "height": 640,
+          "bytes": 31830
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m05.webp",
+          "sha256": "b6eb2ae07e800337ad3b51d5c08b39c2a014f055cb64cfc09c1464a8133a25a6",
+          "width": 144,
+          "height": 144,
+          "bytes": 4292
+        }
+      },
+      {
+        "id": "m06",
+        "sourceSha256": "2cdb7a1f9f59cf25fc304fc1c4d559402dca86e71f6259d4880a111c838d4346",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m06.webp",
+          "sha256": "cd1f00baab3843150e547dbeaa4d647c825c62dd25fcb234c439eac8baffb8c0",
+          "width": 480,
+          "height": 640,
+          "bytes": 49036
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m06.webp",
+          "sha256": "30dc1b88a50e84115bed64f1d81577158561c5a828ee8410eb75126bdb8a6ca5",
+          "width": 144,
+          "height": 144,
+          "bytes": 5646
+        }
+      },
+      {
+        "id": "m07",
+        "sourceSha256": "26b7efecc3b075869e2ced319cc0043deac88a5423d5462fbcdeb77c0b22791e",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m07.webp",
+          "sha256": "3445ebc825afaebabed23503cba9cc0861dc9fa69f8e22c46fe04fd83676d114",
+          "width": 480,
+          "height": 640,
+          "bytes": 39716
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m07.webp",
+          "sha256": "69be530b9d06869c43af379dc8d9de20cdc9462c6ecc91679ef1baaf44db55e0",
+          "width": 144,
+          "height": 144,
+          "bytes": 4884
+        }
+      },
+      {
+        "id": "m08",
+        "sourceSha256": "b920a50720918d631e3c3d33eaff593376c22b9646662c41ab8a198b546f90f8",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m08.webp",
+          "sha256": "b4cc7d4dafc082c3137aec561de8bf4805be57b91171961e3552d42d1dd79ce3",
+          "width": 480,
+          "height": 640,
+          "bytes": 43168
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m08.webp",
+          "sha256": "e4a33218d875f55d3d11167b527b4ab3773ddbc4f18a00aa8f5911f85b948662",
+          "width": 144,
+          "height": 144,
+          "bytes": 4752
+        }
+      },
+      {
+        "id": "m09",
+        "sourceSha256": "062c924fff9856d7b4f5e0e40ff279e3752e468b9379761189fbabf306903ba8",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m09.webp",
+          "sha256": "8561fb3c549e78c7c5514964e86b4d3822c42974071da38fd94cb8bd8442c86a",
+          "width": 480,
+          "height": 640,
+          "bytes": 41374
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m09.webp",
+          "sha256": "e80d2e92b5ec3f4bd58741b70e19419794a5dd0071082f9146f866cbd68b3861",
+          "width": 144,
+          "height": 144,
+          "bytes": 4870
+        }
+      },
+      {
+        "id": "m10",
+        "sourceSha256": "498db883effbdb8e650466acddcb83f6c9abfafaa123b45c615c49bcc228b266",
+        "portrait": {
+          "asset": "src/assets/companion-cards/storybook/m10.webp",
+          "sha256": "65dcfe3fa13242dd8382b091f438dc75f2c0a52df4160b1de61cfff6edb1928d",
+          "width": 480,
+          "height": 640,
+          "bytes": 44956
+        },
+        "avatar": {
+          "asset": "src/assets/companions/storybook/m10.webp",
+          "sha256": "1093fec7e559e6578a0d1db2aa14eaf1905c46ade6c5079b6ff6831df4435eaf",
+          "width": 144,
+          "height": 144,
+          "bytes": 5490
+        }
+      }
+    ]
+  }
 }

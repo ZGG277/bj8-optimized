@@ -8,6 +8,14 @@ describe('dialogue memory', () => {
     const d = createDialogueMemory(); d.shown(line('好球。'));
     expect(d.candidates([line('好球！'), line('漂亮。'), line('我等着。', 'give-space')]).map(l => l.text)).toEqual(['我等着。']);
   });
+  it('rejects a largely repeated sentence across different streak stages', () => {
+    const history = createDialogueMemory();
+    const seen = line('连进两杆了，看你这样打，我也慢慢放松了。', 'two');
+    history.shown(seen);
+    const similar = line('连进三杆了！看你这样打，我也慢慢放松了。', 'three');
+    const fresh = line('哇，第三杆也进！我都看入迷了。', 'three');
+    expect(history.candidates([similar, fresh])).toEqual([fresh]);
+  });
   it('keeps the previous three spoken racks and current rack, including refresh exits', () => {
     const s = store(); let d = createDialogueMemory(s);
     d.shown(line('第一颗。', 'first')); d = createDialogueMemory(s);

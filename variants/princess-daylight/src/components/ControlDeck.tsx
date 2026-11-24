@@ -149,9 +149,9 @@ function DockableControlSlot({
       style={style}
       onPointerDownCapture={(event) => {
         if (dragging || !layoutDrag) return;
-        // 左右微调按钮的静止长按属于连续瞄准，不得被控件布局长按抢走。
+        // 内容按钮自有的长按操作优先于布局拖动。
         if (event.target instanceof Element &&
-          event.target.closest('[data-control-content-hold="aim-button"]')) return;
+          event.target.closest('[data-control-content-hold]')) return;
         clearActivation();
         const target = event.currentTarget;
         const pointerId = event.pointerId;

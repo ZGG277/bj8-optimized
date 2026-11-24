@@ -24,9 +24,14 @@ export function miniToolApi(): MiniToolApi | undefined {
   return typeof api?.postNote === 'function' ? api : undefined;
 }
 
-export function victoryNote(image: string, mode: GameMode, opponentName = '对手', extraImage?: string, won = true, defeatedNames: readonly string[] = []): NoteDraft {
+export const NOTE_IMAGE_LIMIT = 18;
+
+export function victoryNote(image: string, mode: GameMode, opponentName = '对手', extraImage?: string, won = true, defeatedNames: readonly string[] = [], chatImages: readonly string[] = []): NoteDraft {
   if (!/^data:image\/(png|jpeg);base64,/.test(image)) throw new Error('战绩卡生成失败，请重试。');
   if (extraImage !== undefined && !/^data:image\/(png|jpeg);base64,/.test(extraImage)) throw new Error('分享图片生成失败，请重试。');
+  if (chatImages.some(url => !/^data:image\/(png|jpeg);base64,/.test(url))) throw new Error('对话截图生成失败，请重试。');
+  const images = [image, ...(extraImage ? [extraImage] : []), ...chatImages];
+  if (images.length > NOTE_IMAGE_LIMIT) throw new Error('分享图片最多18张。');
   const names = [...new Set([...defeatedNames, opponentName])].filter(name => COMPANIONS.some(c => c.name === name));
   const wins = names.length ? `本公主已经赢过${names.join('、')}啦！👑🎱` : '本公主又赢下一局啦！👑🎱';
   const topics = ['小红书小工具', '公主请开球', '台球'];
@@ -35,13 +40,13 @@ export function victoryNote(image: string, mode: GameMode, opponentName = '对�
   return {
     title: won ? '这一局公主又赢了' : '公主的赞美卡',
     content: won ? `${wins}\n公主宝宝好棒啊💕💕✨\n${topicLine}` : `在公主请开球和${opponentName}打了一局。\n${topicLine}`,
-    mediaInfo: { image_resources: [image, ...(extraImage ? [extraImage] : [])].map(url => ({ url })) },
+    mediaInfo: { image_resources: images.map(url => ({ url })) },
   };
 }
 
 /** Prefer the documented temporary-file bridge for larger generated cards. */
-export async function postVictoryNote(api: MiniToolApi, image: string, mode: GameMode, opponentName = '对手', extraImage?: string, won = true, defeatedNames: readonly string[] = []) {
-  const draft = victoryNote(image, mode, opponentName, extraImage, won, defeatedNames);
+export async function postVictoryNote(api: MiniToolApi, image: string, mode: GameMode, opponentName = '对手', extraImage?: string, won = true, defeatedNames: readonly string[] = [], chatImages: readonly string[] = []) {
+  const draft = victoryNote(image, mode, opponentName, extraImage, won, defeatedNames, chatImages);
   if (typeof api.writeTempFile === 'function') {
     for (const resource of draft.mediaInfo.image_resources) {
       const { filePath } = await api.writeTempFile({ data: resource.url });
@@ -67,4 +72,20 @@ export async function renderVictoryCard(mode: GameMode, shots?: number, opponent
   if (!ctx) throw new Error('战绩卡生成失败，请重试。');
   paintVictoryCard(ctx, mode, shots, undefined, opponentName);
   return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+/** Open the note composer with the single page the player chose on the memory card. */
+export async function postMemoryNote(api: MiniToolApi, image: string, opponentName: string) {
+  if (!/^data:image\/(png|jpeg);base64,/.test(image)) throw new Error('回忆卡生成失败。');
+  let url = image;
+  if (api.writeTempFile) {
+    const result = await api.writeTempFile({ data: image });
+    if (!result.filePath || /^https?:/i.test(result.filePath)) throw new Error('回忆卡暂时无法传递。');
+    url = result.filePath;
+  }
+  return api.postNote({
+    title: '这局的球桌回忆卡',
+    content: `和${opponentName}打了一局。\n#公主请开球[话题]# #台球[话题]#`,
+    mediaInfo: { image_resources: [{ url }] },
+  });
 }

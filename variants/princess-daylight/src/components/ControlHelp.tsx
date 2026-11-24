@@ -4,7 +4,7 @@
  * [POS]: HUD 帮助层，不重置存档或球局。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { RoyalIcon } from './RoyalIcon';
 import type { GameMode } from '../opponent/model';
 import { containRoyalDialogTab } from './royal-dialog-focus';
@@ -15,16 +15,17 @@ export const CONTROL_HELP = [
   ['切换视角', '全局视角看球位，第一视角沿杆瞄准；选中的按钮会变色。'],
   ['调整杆法', '点开右侧的小白球，选择击球点。'],
   ['声音', '点喇叭按钮，可开关游戏声音。'],
-  ['赞美卡册', '点卡册按钮，按获胜顺序翻看收下的卡。'],
+  ['回忆卡册', '点卡册按钮，翻看保存的球局和对话。'],
   ['切换场景', '点山形按钮，选择城堡或湖面。'],
   ['移动按钮', '长按控件，再拖动调整位置。'],
 ] as const;
-export function ControlHelp({ onClose, onReplayGuide, onSkipGuide, gameMode, onModeChange }: {
+export function ControlHelp({ onClose, onReplayGuide, onSkipGuide, gameMode, onModeChange, children }: {
   onClose: () => void;
   onReplayGuide?: () => void;
   onSkipGuide?: () => void;
   gameMode?: GameMode;
   onModeChange?: (mode: GameMode) => void;
+  children?: ReactNode;
 }) {
   const close = useRef<HTMLButtonElement>(null);
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; close.current?.focus(); return () => previous?.focus(); }, []);
@@ -38,6 +39,7 @@ export function ControlHelp({ onClose, onReplayGuide, onSkipGuide, gameMode, onM
           <option value="challenge">轻松挑战</option>
         </select>
       </label>}
+      {children}
       <ol>{CONTROL_HELP.map(([title, copy]) => <li key={title}><strong>{title}</strong><p>{copy}</p></li>)}</ol>
     </section>
   </div>;

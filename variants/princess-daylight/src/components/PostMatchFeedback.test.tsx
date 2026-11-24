@@ -1,3 +1,4 @@
+import { createInitialWorld } from '../physics';
 /*
 [INPUT]: 局后卡片和 TableStage 的真实 SSR 结构
 [OUTPUT]: 保留自由继续、可选留言、长度/隐私提示，局内不出现卡片
@@ -24,6 +25,8 @@ describe('局后留言入口', () => {
     const match = createInitialMatchState();
     const render = (finished: boolean) => renderToStaticMarkup(
       <TableStage
+        rackId="test-rack"
+        worldView={createInitialWorld()}
         viewLevel={1} spectatorActive={false} manualCameraActive={false} firstMatchGuideActive={false}
         match={finished ? { ...match, phase: 'finished', winner: 'player' } : match}
         trainingSummary={null} gameMode="challenge" containerRef={null}
@@ -33,7 +36,7 @@ describe('局后留言入口', () => {
     );
     expect(render(false)).not.toContain('本局留言');
     const html = render(true);
-    expect(html).toContain('公主赢了');
+    expect(html).toContain('你赢了');
     expect(html).toContain('>再来一局</button>');
     expect(html).not.toContain('>留言</button>');
     expect(html).toContain('data-match-finished="true"');

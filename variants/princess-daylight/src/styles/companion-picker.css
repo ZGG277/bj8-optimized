@@ -1,0 +1,38 @@
+.companion-picker-mask{position:fixed;inset:0;z-index:10060;display:grid;place-items:center;background:#21332580;overflow:hidden;overscroll-behavior-x:none;padding:calc(var(--scoreboard-h,44px) + 8px) 28px 10px;padding-bottom:max(10px,env(safe-area-inset-bottom));padding-left:max(28px,calc(env(safe-area-inset-left,0px) + 12px));padding-right:max(28px,calc(env(safe-area-inset-right,0px) + 12px));}
+.companion-picker{display:flex;flex-direction:column;width:100%;max-width:480px;height:100%;max-height:620px;min-height:0;padding:12px;box-sizing:border-box;background:#faf5e7;color:#334638;border:1px solid #af956b;border-radius:19px;box-shadow:0 12px 36px #18251c55;}
+.companion-picker header{display:grid;grid-template-columns:62px 1fr 62px;align-items:center;gap:4px;flex:none;margin-bottom:7px;}
+.companion-picker h2,.companion-picker h3{margin:0;text-align:center;}
+.companion-picker h2{font-size:20px;}
+.companion-picker h3{font-size:14px;padding:9px 0;border-bottom:1px solid #dcd4bc;}
+.companion-picker button{cursor:pointer;color:#355844;background:none;border:0;border-radius:7px;min-height:34px;}
+.companion-picker button:disabled{opacity:.5;}
+.companion-columns{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:0;flex:1;}
+.companion-columns section{display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid #e0d4b7;background:#fffaf1;border-radius:12px;}
+.companion-columns section:nth-child(2){background:#eff2e6;border-color:#cbd1b9;}
+.companion-columns section.companion-drop{border-color:#4b785a;box-shadow:inset 0 0 0 1px #4b785a;}
+.companion-list{overflow:auto;overscroll-behavior-x:none;flex:1;min-height:0;padding:4px 5px;}
+.companion-picker[data-dragging] .companion-columns section:first-child .companion-list{overflow:hidden;}
+.companion-item{box-sizing:border-box;min-width:0;display:flex;align-items:center;gap:5px;min-height:48px;padding:2px;color:#35463a;border-bottom:1px solid #d9d1bb80;font-size:13px;}
+.companion-item label{display:flex;align-items:center;flex:1;gap:4px;min-width:0;cursor:pointer;}
+.companion-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.companion-item img,.companion-photo img{display:block;flex:none;width:32px;height:32px;object-fit:cover;border:1px solid #bcaa7c;border-radius:50%;}
+.companion-picker .companion-drag{width:100%;min-height:48px;gap:7px;padding:2px 5px;color:#35463a;font:inherit;font-size:13px;text-align:left;border-bottom:1px solid #d9d1bb80;border-radius:0;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+.companion-item input{margin:0;accent-color:#4b7654;}
+.companion-item .companion-edit{padding:2px 3px;font-size:11px;}
+.companion-picker .companion-add,.companion-picker .companion-save{background:#386047;color:#fffaf0;margin:5px;min-height:42px;}
+.companion-picker-note,.companion-picker-error{margin:8px 3px 2px;font-size:12px;line-height:1.45;}
+.companion-picker-note{color:#5e6b57;}.companion-picker-error{color:#963e33;}
+.companion-pool{text-align:center;flex:none;}
+.companion-custom{display:flex;flex-direction:column;gap:10px;padding:2px;overflow:auto;min-height:0;}
+.companion-custom label{display:flex;flex-direction:column;gap:5px;font-size:14px;}
+.companion-custom input:not([type=file]),.companion-custom select,.companion-custom textarea{box-sizing:border-box;width:100%;color:#304538;background:#fffdf4;border:1px solid #cfc19f;border-radius:7px;padding:8px;font:inherit;font-size:16px;}
+.companion-custom textarea{display:block;min-height:42px;height:55px;resize:vertical;}
+.companion-custom fieldset{border:1px solid #dbcfb0;border-radius:9px;margin:0;padding:8px;min-width:0;}
+.companion-custom fieldset label{margin:5px 0 8px;}
+.companion-custom fieldset button{align-self:flex-start;min-height:28px;}
+.companion-photo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;}
+.companion-photo img{width:48px;height:48px;}
+.companion-photo select{flex-basis:100%;}
+.companion-custom .companion-file{position:relative;border:1px solid #b9b18d;padding:7px;border-radius:7px;overflow:hidden;}
+.companion-file input{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer;}
+.companion-drag-ghost{position:fixed;width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #e2ca8c;box-shadow:0 4px 12px #25352865;transform:translate(-50%,-55%);pointer-events:none;z-index:1;}

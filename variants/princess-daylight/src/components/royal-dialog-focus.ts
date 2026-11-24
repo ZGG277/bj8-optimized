@@ -5,7 +5,12 @@ export function containRoyalDialogTab(event: {
   preventDefault:()=>void;
 }) {
   if(event.key!=='Tab') return;
-  const buttons=Array.from(event.currentTarget.querySelectorAll('button:not(:disabled):not([tabindex="-1"]), select:not(:disabled), input:not(:disabled), [tabindex="0"]'));
+  const buttons = Array.from(event.currentTarget.querySelectorAll(
+    'button:not(:disabled):not([tabindex="-1"]), select:not(:disabled), input:not(:disabled), a[href], summary, [tabindex="0"]',
+  )).filter(element => {
+    const closed = element.closest('details:not([open])');
+    return !closed || closed.firstElementChild === element;
+  });
   if(!buttons.length){event.preventDefault();return;}
   const first=buttons[0],last=buttons[buttons.length-1];
   if(event.shiftKey && event.target===first){event.preventDefault();last.focus();}

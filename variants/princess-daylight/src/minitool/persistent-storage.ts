@@ -5,7 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md。
  */
 export const SAVE_KEYS = [
-  'princess-billiards:portraits:v1',
+  'princess-billiards:portraits:v1', 'princess-billiards:companion-preferences:v1',
   'princess-billiards:dialogue-memory:v1', 'princess-billiards:career:v1',
   'princess-billiards:player-skill:v3', 'princess-billiards:player-skill:v2',
   'princess-billiards:player-skill:v1', 'princess-billiards:control-layout:v3',
@@ -14,24 +14,37 @@ export const SAVE_KEYS = [
   'princess-billiards:first-match-progress:v1', 'princess-billiards:scene:v1',
   'princess-billiards:muted:v1',
   'princess-billiards:guide-learning:v1',
-  'princess-billiards:companion-collection:v1',
+  'princess-billiards:companion-collection:v1', 'princess-billiards:match-memory-cards:v1',
   'princess-billiards:victory-praise:v1',
   'princess-billiards:view-switch-hint:v1',
 ];
 export type SaveStore = Pick<Storage, 'getItem' | 'setItem'>;
+export const COMPANION_MEMORY_KEY = 'princess-billiards:companion-memory:v1';
+export type CompanionMemoryStorage = { read(): string | null; write(raw: string): Promise<boolean> };
 type NativeCache = {
   getStorageInfo(): Promise<{ keys: string[] }>;
   getStorage(options: { key: string }): Promise<{ data: string | null }>;
   setStorage(options: { key: string; data: string }): Promise<unknown>;
 };
-type Launch = { miniToolEnv?: { buildVersion?: number } };
+type Launch = { miniToolEnv?: { buildVersion?: number | string } };
 type Bridge = { launchOptions?: Launch; miniTool?: Partial<NativeCache> & { getLaunchOptions?: () => Promise<Launch> } };
 let active: SaveStore | null = null;
+let companionMemory: CompanionMemoryStorage | null = null;
+let knownLegacyClient = false;
 function legacy(): Storage | null {
   try { return typeof window === 'undefined' ? null : window.localStorage; } catch { return null; }
 }
 export function gameStorage(): SaveStore | null {
-  return import.meta.env.VITE_MINITOOL === '1' && active ? active : legacy();
+  if (import.meta.env.VITE_MINITOOL !== '1' || knownLegacyClient) return legacy();
+  return active;
+}
+export function gameCompanionMemory(): CompanionMemoryStorage | null {
+  if (import.meta.env.VITE_MINITOOL === '1' && !knownLegacyClient) return companionMemory;
+  const browser = legacy();
+  return browser && {
+    read: () => browser.getItem(COMPANION_MEMORY_KEY),
+    async write(raw) { browser.setItem(COMPANION_MEMORY_KEY, raw); return true; },
+  };
 }
 function bounded<T>(request: Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -40,6 +53,10 @@ function bounded<T>(request: Promise<T>): Promise<T> {
   });
 }
 let retryPendingSaves: (() => Promise<void>) | null = null;
+let confirmPendingSave: ((key: string) => Promise<boolean>) | null = null;
+export async function confirmGameStorage(key: string) {
+  if (confirmPendingSave && !(await confirmPendingSave(key))) throw Error('球友设置尚未保存，请重试。');
+}
 function reportSaveFailure() {
   let status = document.getElementById('minitool-save-status');
   if (!status) {
@@ -75,18 +92,37 @@ export async function createNativeSaveStore(api: NativeCache, old: SaveStore | n
   const keys = (await bounded(api.getStorageInfo())).keys;
   if (!Array.isArray(keys)) throw new Error('无法确认已有存档，请重试。');
   const cache = new Map<string, string>();
+  async function read(key: string) {
+    const { data } = await bounded(api.getStorage({ key }));
+    if (data === null || data === '') return null;
+    if (typeof data !== 'string') throw new Error('存档读取不完整，请重试。');
+    return decodeNativeSave(key, data);
+  }
+  async function write(key: string, raw: string, verify = false) {
+    const result = await bounded(api.setStorage({ key, data: JSON.stringify(raw) }));
+    const acknowledged = (result as { errMsg?: string } | undefined)?.errMsg === 'setStorage:ok';
+    if ((verify || !acknowledged) && await read(key) !== raw) throw new Error('存档未确认，请重试。');
+  }
   for (const key of SAVE_KEYS) {
     if (keys.includes(key)) {
-      const { data } = await bounded(api.getStorage({ key }));
-      if (typeof data !== 'string') throw new Error('存档读取不完整，请重试。');
-      cache.set(key, decodeNativeSave(key, data));
+      const value = await read(key);
+      if (value !== null) cache.set(key, value);
     } else {
       let value: string | null;
       try { value = old?.getItem(key) ?? null; } catch { throw new Error('旧存档暂时无法读取，请重试。'); }
       if (value !== null) {
-        await bounded(api.setStorage({ key, data: JSON.stringify(value) }));
+        await write(key, value, true);
         cache.set(key, value);
       }
+    }
+  }
+  let memoryReadError: unknown;
+  if (keys.includes(COMPANION_MEMORY_KEY)) {
+    try {
+      const value = await read(COMPANION_MEMORY_KEY);
+      if (value !== null) cache.set(COMPANION_MEMORY_KEY, value);
+    } catch (error) {
+      memoryReadError = error || new Error('球友记忆读取失败');
     }
   }
   // Writes are ordered. Failed entries stay pending, so another update retries every unsaved key.
@@ -96,9 +132,8 @@ export async function createNativeSaveStore(api: NativeCache, old: SaveStore | n
     queue = queue.then(async () => {
       for (const [name, raw] of pending) {
         try {
-          await bounded(api.setStorage({ key: name, data: JSON.stringify(raw) }));
+          await write(name, raw);
           if (pending.get(name) === raw) pending.delete(name);
-          try { old?.setItem(name, raw); } catch { /* Native cache is already durable. */ }
         } catch { onFailure(); return; }
       }
       if (!pending.size) onRecovered();
@@ -113,18 +148,38 @@ export async function createNativeSaveStore(api: NativeCache, old: SaveStore | n
       void retry();
     },
   };
-  return { store, flush: () => queue, retry };
+  const memory: CompanionMemoryStorage = {
+    read() {
+      if (memoryReadError) throw memoryReadError;
+      return cache.get(COMPANION_MEMORY_KEY) ?? null;
+    },
+    async write(raw) {
+      if (memoryReadError) return false;
+      cache.set(COMPANION_MEMORY_KEY, raw);
+      pending.set(COMPANION_MEMORY_KEY, raw);
+      await retry();
+      return !pending.has(COMPANION_MEMORY_KEY);
+    },
+  };
+  return { store, memory, flush: () => queue, retry, async confirmed(key: string) { await queue; return !pending.has(key); } };
 
 }
 export async function prepareGameStorage() {
   if (import.meta.env.VITE_MINITOOL !== '1') return;
+  knownLegacyClient = false;
   const bridge = (window as Window & { xhs?: Bridge }).xhs;
   const api = bridge?.miniTool;
-  let version = Number(bridge?.launchOptions?.miniToolEnv?.buildVersion) || 0;
+  const buildVersion = (launch?: Launch) => {
+    const raw = String(launch?.miniToolEnv?.buildVersion ?? '');
+    const version = Number(raw);
+    return /^[1-9]\d{6,}$/.test(raw) && Number.isSafeInteger(version) ? version : 0;
+  };
+  let version = buildVersion(bridge?.launchOptions);
   if (!version && typeof api?.getLaunchOptions === 'function') {
-    try { version = Number((await bounded(api.getLaunchOptions())).miniToolEnv?.buildVersion) || 0; } catch { /* Unknown version uses documented legacy path. */ }
+    try { version = buildVersion(await bounded(api.getLaunchOptions())); } catch { /* An unknown version cannot enable new memory storage. */ }
   }
-  if (Math.floor(version / 1000) < 9460) return;
+  if (!version) return;
+  if (Math.floor(version / 1000) < 9460) { knownLegacyClient = true; return; }
   if (!api || typeof api.getStorageInfo !== 'function' || typeof api.getStorage !== 'function' || typeof api.setStorage !== 'function') {
     throw new Error('当前客户端存档服务未就绪，请关闭后重新打开。');
   }
@@ -132,5 +187,7 @@ export async function prepareGameStorage() {
     document.getElementById('minitool-save-status')?.remove();
   });
   active = result.store;
+  companionMemory = result.memory;
   retryPendingSaves = result.retry;
+  confirmPendingSave = result.confirmed;
 }

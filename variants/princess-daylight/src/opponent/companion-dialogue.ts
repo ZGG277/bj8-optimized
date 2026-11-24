@@ -5,11 +5,12 @@
 [PROTOCOL]: 变更时更新此头部，然后检查CLAUDE.md
 */
 import { createDialogueMemory, type SpokenLine } from './dialogue-memory';
-import { VOICE_VARIATIONS, dialogueMotif } from './companion-voice-variations';
+import { VOICE_STREAK_LINES, VOICE_VARIATIONS, dialogueMotif } from './companion-voice-variations';
 import type { SaveStore } from '../minitool/persistent-storage';
 import type { MatchState, RoundResolution, ShotFacts } from '../match/types';
-import { DIALOGUE_SCENES, DIALOGUE_SETTINGS as settings, SHOT_PROGRESS_LINES } from './companion-dialogue-bank';
+import { DIALOGUE_SCENES, DIALOGUE_SETTINGS as settings, SHOT_PROGRESS_LINES, STREAK_FALLBACK_LINES } from './companion-dialogue-bank';
 import { settledShot, type SettledShot } from '../match/shot-log';
+import { companionVoiceId, customCompanionLine } from './companion-preferences';
 import { companionVoice, voicedProgress } from './companion-voices';
 import { companionMomentLine } from './companion-moments';
 import { ruleLinesForShot } from './companion-instructions';
@@ -28,7 +29,7 @@ type ShotContext = {
 };
 type Selection = { choice: CompanionDialogue; group: string | null; shot: number; at: number; opening: boolean; memoryLine?: SpokenLine; required?: boolean };
 type ProgressId = keyof typeof SHOT_PROGRESS_LINES;
-const runMilestones = [2, 3, 5, 7] as const;
+const runMilestones = [2, 3, 4, 5] as const;
 const RARE_POT_CHANCE = 0.25;
 
 function speechRhythm(companionId: string | undefined) {
@@ -88,7 +89,8 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     const limit = settings.semantic_limits[scene.semantic_group as keyof typeof settings.semantic_limits];
     if ((scenes.get(scene.id) ?? 0) >= scene.max_per_rack || (groups.get(scene.semantic_group) ?? 0) >= limit) return null;
     if (!opening && !firstScore && (now - lastAt < rhythm.cooldown || shotLog.size - lastShot < rhythm.shotGap)) return null;
-    const custom = (companionId && VOICE_VARIATIONS[companionId]?.[scene.id]) || voice?.scenes[scene.id];
+    const voiceId = companionVoiceId(companionId);
+    const custom = (voiceId && VOICE_VARIATIONS[voiceId]?.[scene.id]) || voice?.scenes[scene.id];
     const authored = typeof custom === 'string' ? [custom] : custom;
     const lines = (authored?.map(text => ({ text, weight: 1 })) ?? scene.lines)
       .filter(line => !spoken.has(line.text));
@@ -105,16 +107,20 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     return choice;
   }
 
-  function progress(id: ProgressId, companionId: string | undefined, now: number, toBlackEight = false): CompanionDialogue | null {
+  function progress(id: ProgressId, companionId: string | undefined, now: number): CompanionDialogue | null {
     const voice = companionVoice(companionId);
-    if (voice?.cadence === 'quiet' && !toBlackEight &&
-        (id.startsWith('N_STREAK_') || id === 'P_STREAK_2' || id === 'P_STREAK_5')) return null;
-    const authored = (voicedProgress(voice, id) ?? SHOT_PROGRESS_LINES[id])
-      .map(text => toBlackEight ? `${text} 下一杆打黑八。` : text)
-      .filter(text => !spoken.has(text));
-    const available = memory.candidates(authored.map(text => lineFor(text, id, companionId)), toBlackEight).map(line => line.text);
-    if (!available.length || (!id.endsWith('_LATER') && scenes.has(id))) return null;
-    const text = available[Math.floor(roll() * available.length)];
+    const scoring = id.includes('_STREAK_') || id.endsWith('_NEAR_CLEAR') || id.endsWith('_EIGHT_READY');
+    if (!scoring && !id.endsWith('_LATER') && scenes.has(id)) return null;
+    const variant = VOICE_STREAK_LINES[companionVoiceId(companionId) ?? '']?.[id] ?? VOICE_STREAK_LINES[voice?.cadence ?? '']?.[id];
+    const authored = variant ? [variant] : voicedProgress(voice, id);
+    const fresh = (lines: readonly string[]) => memory.candidates(lines.filter(text => !spoken.has(text))
+      .map(text => lineFor(text, id, companionId)));
+    const voiced = authored ? fresh(authored) : [];
+    const staged = voiced.length ? voiced : fresh(SHOT_PROGRESS_LINES[id]);
+    const available = staged.length || !id.includes('_STREAK_') ? staged :
+      fresh(STREAK_FALLBACK_LINES[id.startsWith('P_') ? 'P' : 'N']);
+    if (!available.length) return null;
+    const text = available[Math.floor(roll() * available.length)].text;
     const choice = { id: ++token, text, sceneId: id, companionId, kind: 'progress' as const };
     pending = { choice, group: null, shot: shotLog.size, at: now, opening: false, memoryLine: lineFor(text, id, companionId) };
     return choice;
@@ -128,11 +134,20 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     lastShot = -Infinity; rematch = isRematch; ended = readyDone = thinkingDone = false;
   }
 
+  function personalLine(sceneId: string, text: string, companionId: string | undefined, now: number, opening = false) {
+    if (scenes.has(sceneId)) return null;
+    const choice: CompanionDialogue = { id: ++token, text, sceneId, companionId, ...(opening ? {} : { kind: 'progress' }) };
+    pending = { choice, group: null, at: now, shot: shotLog.size, opening };
+    return choice;
+  }
+
   function ready(companionId: string | undefined, now: number) {
     if (readyDone || ended) return null;
     memory.start();
     readyDone = true;
-    return choose([rematch ? 'REMATCH' : 'OPEN_PLAYER'], companionId, now, true);
+    const opening = rematch ? 'REMATCH' : 'OPEN_PLAYER';
+    const custom = customCompanionLine(companionId, 'opening');
+    return custom ? personalLine(opening, custom, companionId, now, true) : choose([opening], companionId, now, true);
   }
 
   function settle(before: MatchState, facts: ShotFacts, resolution: RoundResolution, now: number, context?: ShotContext): CompanionDialogue | null {
@@ -146,7 +161,6 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     const foul = next.messageKey === 'foul';
     if (!foul && !['pot-continue', 'group-assigned', 'miss-turn', 'opponent-pot-turn'].includes(next.messageKey)) return null;
     const player = before.actor === 'player';
-    const playerGroup = next.playerGroup;
     const objects = record.pocketed.filter(number => number >= 1 && number <= 15 && number !== 8);
     const count = record.legalPots.length;
     const previousPots = pots, previousDry = dry;
@@ -174,19 +188,28 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
       return progress(scene, before.companionId, now);
     }
 
-    const remaining = playerGroup === 'solid' ? facts.remainingSolids : playerGroup === 'stripe' ? facts.remainingStripes : null;
-    const toBlackEight = player && remaining === 0;
-    const rare = player ? rarePlayerPot(record, context) : null;
-    if (rare) {
-      const choice = progress(rare, before.companionId, now, toBlackEight);
-      if (choice) return choice;
-    }
+    const remaining = record.groupAtStart === 'solid' ? facts.remainingSolids :
+      record.groupAtStart === 'stripe' ? facts.remainingStripes : null;
+    const prefix = player ? 'P' : 'N';
+    if (record.scoringRun > 0 && remaining === 0) return progress(`${prefix}_EIGHT_READY`, before.companionId, now);
+    if (record.scoringRun > 0 && remaining === 1) return progress(`${prefix}_NEAR_CLEAR`, before.companionId, now);
 
     const milestone = runMilestones.find(run => run === record.scoringRun);
-    if (milestone) {
-      const choice = progress(`${player ? 'P' : 'N'}_STREAK_${milestone}`, before.companionId, now, toBlackEight);
+    if (player && !before.breaking && !milestone) {
+      const scene = count > 0 ? 'pot' : !objects.length ? 'miss' : null;
+      const text = scene && customCompanionLine(before.companionId, scene);
+      if (text) {
+        const choice = personalLine(scene === 'pot' ? 'CUSTOM_POT' : 'CUSTOM_MISS', text, before.companionId, now);
+        if (choice) return choice;
+      }
+    }
+    const rare = player ? rarePlayerPot(record, context) : null;
+    if (rare) {
+      const choice = progress(rare, before.companionId, now);
       if (choice) return choice;
     }
+    // Once the available lines for a milestone are spent, leave space instead of repeating routine praise.
+    if (milestone) return progress(`${prefix}_STREAK_${milestone}`, before.companionId, now);
 
     const ids: SceneId[] = [];
     const add = (id: SceneId, matches = true) => { if (matches) ids.push(id); };
@@ -206,7 +229,6 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
           add('P_SLOW', event.time - context.worldBefore.time >= 2 && event.speed >= 0 && event.speed <= .06 * TABLE.length);
         }
       }
-      add('P_FINAL_READY', toBlackEight);
     } else if (player) {
       for (const n of [1, 2, 3] as const) add(`P_EMPTY_${n}`, empty === n);
     } else if (!before.breaking) {

@@ -10,10 +10,10 @@ import type { MatchState } from '../match/types';
 /** 规则层只给 messageKey + params，中文文案统一在这里渲染 */
 export function renderMatchMessage(m: MatchState): string {
   const opponentName = companionFor(m.companionId).name;
-  if (m.phase === 'finished') return m.winner === 'player' ? '公主赢了' : m.winner === 'opponent' ? '再接再厉' : '本局结束';
+  if (m.phase === 'finished') return m.winner === 'player' ? '你赢了' : m.winner === 'opponent' ? '再接再厉' : '本局结束';
   const { actor, count, group, reason, target } = m.messageParams;
-  const name = actor === 'player' ? '公主' : opponentName;
-  const other = actor === 'player' ? opponentName : '公主';
+  const name = actor === 'player' ? '你' : opponentName;
+  const other = actor === 'player' ? opponentName : '你';
   switch (m.messageKey) {
     case 'break-start': return '开球：正中1号球，把力量送到八成';
     case 'rolling': return '球在运动中...';
@@ -29,9 +29,9 @@ export function renderMatchMessage(m: MatchState): string {
         ? `${name}犯规，${r}，${opponentName}获得自由球`
         : `${name}犯规，${r}，你的自由球，点击台面放置白球`;
     }
-    case 'win-8': return `8号球入袋，${actor === 'player' ? '公主赢了' : `${opponentName}赢了`}`;
-    case 'lose-8-foul': return `犯规打8号球，${actor === 'player' ? '公主输了' : `${opponentName}输了`}`;
-    case 'lose-8-early': return `8号球提前入袋，${actor === 'player' ? '公主输了' : `${opponentName}输了`}`;
+    case 'win-8': return `8号球入袋，${actor === 'player' ? '你赢了' : `${opponentName}赢了`}`;
+    case 'lose-8-foul': return `犯规打8号球，${actor === 'player' ? '你输了' : `${opponentName}输了`}`;
+    case 'lose-8-early': return `8号球提前入袋，${actor === 'player' ? '你输了' : `${opponentName}输了`}`;
     case 'ai-choice': return `${opponentName}选择${target}号球`;
     case 'ai-safe': return `${opponentName}准备出杆`;
     case 'placing-freeball': return '你的自由球，点击台面放置白球';

@@ -19,7 +19,7 @@ describe('公主请开球独立产品', () => {
   it('opens with a selectable castle or lake and an aiming-ready match', () => {
     expect(source('./Game.tsx')).toContain("useState<'lake' | 'castle'>");
     expect(source('./Game.tsx')).not.toContain('<IntroScreen');
-    expect(source('./hooks/useGameState.ts')).toContain('companionId: pickCompanion().id');
+    expect(source('./hooks/useGameState.ts')).toContain('pickCompanion(undefined, Math.random, preferredCompanionId).id');
     expect(beginMatch(createInitialMatchState())).toMatchObject({phase:'aiming',actor:'player',breaking:true});
     expect(source('./Scene3D.ts')).toContain("this.environmentOptions.worldId === 'lake' || lake360Enabled()");
   });

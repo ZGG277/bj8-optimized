@@ -53,10 +53,10 @@ describe('live table conversation', () => {
 });
 
 import { CHAT_EXAMPLES } from './chat-examples';
-import { COMPANIONS } from './companions';
+import { ORIGINAL_COMPANIONS } from './companions';
 import { shortReply } from '../minitool/table-chat';
-it('has three distinct voice examples for every companion and keeps complete short replies',()=>{
-  expect(Object.keys(CHAT_EXAMPLES).sort()).toEqual(COMPANIONS.map(p=>p.id).sort());
+it('has three distinct voice examples for each original companion and keeps complete short replies',()=>{
+  expect(Object.keys(CHAT_EXAMPLES).sort()).toEqual(ORIGINAL_COMPANIONS.map(p=>p.id).sort());
   expect(new Set(Object.values(CHAT_EXAMPLES).flat()).size).toBe(30);
   expect(shortReply('先看右边。'+'很长的废话'.repeat(30))).toBe('先看右边。');
 });
