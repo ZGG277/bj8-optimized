@@ -1,6 +1,7 @@
 /** Character dialogue is authored against verified match facts. Each rack keeps one voice. */
 import { companionVoiceId } from './companion-preferences';
 import { STORYBOOK_COMPANIONS, storybookCompanion } from './storybook-companions';
+import { CORE_COMPANIONS } from './core-companions';
 import type { DIALOGUE_SCENES, SHOT_PROGRESS_LINES } from './companion-dialogue-bank';
 
 type Scene = typeof DIALOGUE_SCENES[number]['id'];
@@ -12,7 +13,7 @@ type Voice = {
   result: { win: string; lose: string };
   thinking: string;
   scenes: Record<Scene, string | readonly string[]>;
-  progress: Record<ProgressScene, string | readonly string[]>;
+  progress: Record<ProgressScene, string | readonly string[]> & Partial<Record<Progress, string | readonly string[]>>;
   group: (own: string, numbers: string, other: string) => string;
   take: (fact: string) => string;
   give: (fact: string) => string;
@@ -304,15 +305,42 @@ const storybookVoices: Record<string, Voice> = Object.fromEntries(
   }),
 );
 
+const coreVoices: Record<string, Voice> = Object.fromEntries(CORE_COMPANIONS.map(role => {
+  const { lines } = role;
+  const base = role.cadence === 'quiet' ? COMPANION_VOICES['gu-yanchuan'] :
+    role.cadence === 'lively' ? COMPANION_VOICES['song-yucheng'] : COMPANION_VOICES['shen-yubai'];
+  const voice: Voice = {
+    ...base,
+    personality: role.personality,
+    cadence: role.cadence,
+    result: { win: lines.win, lose: lines.lose },
+    scenes: {
+      ...base.scenes,
+      OPEN_PLAYER: lines.opening, REMATCH: [lines.returning, lines.opening],
+      P_BREAK_ONE: lines.firstPot, P_FIRST_POT: lines.firstPot, P_ONE: lines.goodShot,
+      P_RECOVER: lines.goodShot, P_EMPTY_1: lines.miss,
+      P_EMPTY_2: lines.miss, P_EMPTY_3: lines.miss, N_ONE: lines.ownPot, N_EMPTY: lines.ownMiss,
+    },
+    progress: {
+      ...base.progress,
+      P_STREAK_2: role.streak[0], P_STREAK_3: role.streak[1],
+      P_STREAK_4: role.streak[2], P_STREAK_5: role.streak[3],
+      P_NEAR_CLEAR: lines.nearClear, P_EIGHT_READY: lines.eight,
+    },
+  };
+  return [role.id, voice];
+}));
+
 export function companionVoice(id: string | undefined): Voice | undefined {
   const voiceId = companionVoiceId(id);
   if (!voiceId) return undefined;
+  if (Object.prototype.hasOwnProperty.call(coreVoices, voiceId)) return coreVoices[voiceId];
   if (storybookCompanion(voiceId)) return storybookVoices[voiceId];
   return Object.prototype.hasOwnProperty.call(COMPANION_VOICES, voiceId) ? COMPANION_VOICES[voiceId as keyof typeof COMPANION_VOICES] : undefined;
 }
 
 export function voicedProgress(voice: Voice | undefined, id: Progress): readonly string[] | undefined {
   if (!voice) return undefined;
-  const lines = voice.progress[id as ProgressScene];
+  const lines = voice.progress[id];
   return typeof lines === 'string' ? [lines] : lines;
 }

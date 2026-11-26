@@ -1,6 +1,7 @@
 import { customCompanionFor, readCompanionPreferences } from './companion-preferences';
 import { portraitFor } from './player-portraits';
 import { STORYBOOK_COMPANIONS } from './storybook-companions';
+import { CORE_COMPANIONS, coreCompanion } from './core-companions';
 /** Identity is picked once per match, never per render. */
 import avatar0 from '../assets/companions/shen-yubai.webp';
 import avatar1 from '../assets/companions/lu-jingchen.webp';
@@ -13,9 +14,13 @@ import avatar7 from '../assets/companions/pei-zhixu.webp';
 import avatar8 from '../assets/companions/song-yucheng.webp';
 import avatar9 from '../assets/companions/xu-qinghe.webp';
 export type Companion = { id: string; name: string; avatar: string; congratulations: string };
-const storybookAvatars = import.meta.glob<string>('../assets/companions/storybook/*.webp', { eager: true, import: 'default' });
+const storybookAvatars = import.meta.glob<string>([
+  '../assets/companions/storybook/*.webp',
+  '!../assets/companions/storybook/f01.webp',
+  '!../assets/companions/storybook/m05.webp',
+], { eager: true, import: 'default' });
 export const STORYBOOK_ROSTER: readonly Companion[] = Object.entries(STORYBOOK_COMPANIONS).map(([id, role]) => ({
-  id, name: role.name, avatar: storybookAvatars[`../assets/companions/storybook/${id}.webp`],
+  id, name: role.name, avatar: coreCompanion(id)?.avatar ?? storybookAvatars[`../assets/companions/storybook/${id}.webp`],
   congratulations: role.lines.goodShot,
 }));
 export const ORIGINAL_COMPANIONS: readonly Companion[] = [
@@ -30,23 +35,35 @@ export const ORIGINAL_COMPANIONS: readonly Companion[] = [
   { id: 'song-yucheng', name: '宋予澄', avatar: avatar8, congratulations: '漂亮！今天的赢家是你。' },
   { id: 'xu-qinghe', name: '许清和', avatar: avatar9, congratulations: '恭喜你，下一局也为你加油。' },
 ];
-export const COMPANIONS: readonly Companion[] = [...ORIGINAL_COMPANIONS, ...STORYBOOK_ROSTER];
+export const CORE_ROSTER = CORE_COMPANIONS.map(role => ({
+  id: role.id, name: role.name, avatar: role.avatar, label: role.label, congratulations: role.lines.win,
+}));
+const legacyRoster = [...ORIGINAL_COMPANIONS, ...STORYBOOK_ROSTER];
+const legacyIds = new Set(legacyRoster.map(friend => friend.id));
+const coreRosterById = new Map(CORE_ROSTER.map(friend => [friend.id, friend]));
+// Historical IDs remain resolvable in memory and saved cards.
+export const COMPANIONS: readonly Companion[] = [
+  ...legacyRoster.map(friend => coreRosterById.get(friend.id) ?? friend),
+  ...CORE_ROSTER.filter(friend => !legacyIds.has(friend.id)),
+];
+const companionById = new Map(COMPANIONS.map(friend => [friend.id, friend]));
 export function companionFor(id?: string): Companion {
   const custom = customCompanionFor(id);
   if (custom) {
-    const appearance = COMPANIONS.find(companion => companion.id === custom.avatarId) ?? COMPANIONS[0];
+    const appearance = companionById.get(custom.avatarId) ?? CORE_ROSTER[0];
     return { id: custom.id, name: custom.name, avatar: custom.avatar || appearance.avatar,
       congratulations: custom.lines.win || appearance.congratulations };
   }
-  const base = COMPANIONS.find(companion => companion.id === id) ?? COMPANIONS[0];
+  const base = companionById.get(id ?? '') ?? CORE_ROSTER[0];
+  if (coreCompanion(base.id)) return base;
   const profile = portraitFor(base.id);
   if (!profile.name && !profile.avatar) return base;
   return { ...base, name: profile.name || base.name, avatar: profile.avatar || base.avatar };
 }
 export function companionSelection(preferredId?: string) {
-  const { selected, custom } = readCompanionPreferences();
-  const valid = new Set([...COMPANIONS, ...custom].map(companion => companion.id));
-  const personal = selected.filter(id => valid.has(id));
+  const { saved, custom } = readCompanionPreferences();
+  const valid = new Set([...CORE_ROSTER, ...custom].map(companion => companion.id));
+  const personal = saved.filter(id => valid.has(id));
   return { personal, preferred: preferredId && valid.has(preferredId) ? preferredId : undefined };
 }
 
@@ -54,7 +71,7 @@ export function companionSelection(preferredId?: string) {
 export function pickCompanion(previousId?: string, rng: () => number = Math.random, preferredId?: string): Companion {
   const { personal, preferred } = companionSelection(preferredId);
   if (!personal.length && preferred) return companionFor(preferred);
-  const pool = personal.length ? personal : COMPANIONS.filter(companion => companion.id !== previousId).map(companion => companion.id);
+  const pool = personal.length ? personal : CORE_ROSTER.filter(companion => companion.id !== previousId).map(companion => companion.id);
   const roll = rng();
   const index = Number.isFinite(roll) ? Math.floor(Math.max(0, Math.min(.999999999, roll)) * pool.length) : 0;
   return companionFor(pool[index]);

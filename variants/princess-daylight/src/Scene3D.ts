@@ -35,6 +35,7 @@ import {
   type PocketGeometry,
 } from './physics';
 import type { PositionPlan } from './planner/search';
+import type { EscapeRoute } from './planner/escape-route';
 import type { ShotReview } from './planner/review';
 import {
   CAMERA_FOV_DEGREES,
@@ -159,6 +160,7 @@ type GpuTimerExtension = {
 export type Scene3DOptions = {
   worldId?: WorldId;
   onRenderUnavailable?: (message: string) => void;
+  onFirstFrame?: () => void;
   onOpeningChange?: (active: boolean) => void;
   skipOpening?: boolean;
   /** The local film owns duration; the table waits in its final gameplay pose. */
@@ -1219,6 +1221,20 @@ export class Scene3D {
     this.requestRender(true);
   }
 
+  showEscapeRoute(route: EscapeRoute | null) {
+    this.clearPlan();
+    this.planActive = route !== null;
+    if (route) {
+      const color = 0xf4d887;
+      const [, bounce] = route.points;
+      this.addPlanPolyline(route.points, color, 1);
+      this.addPlanRing(R * .25, R * .46, color, .96, bounce.x, bounce.z);
+      this.addPlanRing(R * 1.08, R * 1.27, color, .96, route.targetPosition.x, route.targetPosition.z);
+    }
+    this.updateAimGuide();
+    this.requestRender(true);
+  }
+
   /**
    * 只展示选中的一杆。第 2/3 杆先把球网格贴到上一杆 endWorld，
    * 使轨迹起点与画面球位一致；清除、越界或空计划都会恢复真实球局。
@@ -2221,6 +2237,7 @@ export class Scene3D {
       );
     }
     this.renderFrameCount += 1;
+    if (this.renderFrameCount === 1) this.environmentOptions.onFirstFrame?.();
     if (!this.lastWorld?.moving && !this.hasFrameWork()) {
       this.thermalGovernor.resetActivity();
       this.scheduleThermalIdleRecovery();

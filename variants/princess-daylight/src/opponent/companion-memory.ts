@@ -1,5 +1,6 @@
 import { getCueBall, type BilliardsWorld } from '../physics';
 import type { SettledShot } from '../match/shot-log';
+import type { ShotHighlight } from '../match/shot-highlights';
 import type { ShotCapture } from '../planner/review';
 import type { Career } from './career';
 import { customCompanionFor } from './companion-preferences';
@@ -29,6 +30,7 @@ export type ShotEvidence = {
   result: SettledShot['result'];
   foul: SettledShot['foul'];
   scoringRun: number;
+  highlight?: ShotHighlight;
   observation: ShotSkillObservation;
 };
 
@@ -144,6 +146,7 @@ export function captureShotEvidence(
   observation: ShotSkillObservation,
   legalTargets: number[],
   openNextTargets: number[],
+  highlight?: ShotHighlight | null,
 ): ShotEvidence {
   return {
     ...context, shotId: settled.shotId, breaking: capture.breaking, angle: capture.angle,
@@ -154,11 +157,19 @@ export function captureShotEvidence(
     inferredTarget: capture.intent, legalTargets, openNextTargets, firstContact: settled.firstContact,
     pockets: world.events.flatMap(event => event.type === 'pocket' ? [{ ball: event.ball, pocket: event.pocket }] : []),
     legalPots: settled.legalPots, result: settled.result, foul: settled.foul, scoringRun: settled.scoringRun, observation,
+    ...(highlight ? { highlight } : {}),
   };
 }
 
 export function highlightLabel(shot: ShotEvidence) {
   if (shot.foul || shot.result.startsWith('lose-8')) return null;
+  switch (shot.highlight?.kind) {
+    case 'combination-pot': return '那杆传球入袋';
+    case 'multi-rail-pot': return `那杆球撞了${shot.highlight.rails}库还进了`;
+    case 'kick-pot': return `那杆借${shot.highlight.rails}库打进的球`;
+    case 'snooker': return '那杆把白球藏住的防守';
+    case 'escape': return '那杆从封球里解出来的好球';
+  }
   if (shot.legalPots.includes(8)) return '那杆稳稳收下的黑八';
   if (shot.scoringRun >= 3) return `连进${shot.scoringRun}杆的那回`;
   if (shot.legalPots.length >= 2) return `一杆进${shot.legalPots.length}颗的好球`;

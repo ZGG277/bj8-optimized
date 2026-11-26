@@ -1,6 +1,10 @@
-# 公主请开球当前基线 · 2026-11-22
+# 公主请开球当前基线 · 2026-11-26
 
-创服 V1.0.27 双人封面版，审核中。详见[本次交付记录](variants/princess-daylight/RELEASE_1_0_27_20261122.md)与[源码及包内文件指纹](variants/princess-daylight/PUBLIC_SOURCE_MANIFEST.json)。
+小红书 V1.0.41 陪聊版已由用户提交，创作后台显示审核中。构建产物和 GitHub 源码基线见[版本记录](variants/princess-daylight/RELEASE_1_0_41_20261126.md)和[文件指纹](variants/princess-daylight/PUBLIC_SOURCE_MANIFEST_1_0_41.json)。
+
+## V1.0.27 双人封面版历史记录
+
+2026-11-22 创作后台回读为审核中。详见[交付记录](variants/princess-daylight/RELEASE_1_0_27_20261122.md)和[文件指纹](variants/princess-daylight/PUBLIC_SOURCE_MANIFEST.json)。
 
 # Princess platform submission outcome - 2026-11-05
 

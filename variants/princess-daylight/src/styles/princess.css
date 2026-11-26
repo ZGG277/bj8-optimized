@@ -99,6 +99,7 @@
 
 /* Opening hides only HUD paint: measured control rectangles stay stable for camera fit. */
 .game-shell[data-opening='true'] > :not(.table-stage):not([role='alert']) { opacity: 0; pointer-events: none; }
+.game-shell[data-opening='true'] > .companion-picker-mask[role='dialog'] { opacity: 1; pointer-events: auto; }
 .game-shell[data-opening='true'] .viewport::after { content: '轻触跳过开场'; position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; color: #f9efd6; font-size: 12px; letter-spacing: .14em; pointer-events: none; text-shadow: 0 1px 5px #153b2f; }
 
 /* Private A/B strip stays in document flow; the table and its controls retain their sizing contract. */

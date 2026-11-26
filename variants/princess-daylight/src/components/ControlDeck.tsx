@@ -289,6 +289,7 @@ interface ControlDeckProps {
   breaking: boolean;
   planStatus: PositionPlanStatus;
   guidanceEnabled: boolean;
+  escapeAvailable?: boolean;
   reviewEnabled: boolean;
   hasReview: boolean;
   aimAssistEnabled: boolean;
@@ -346,6 +347,7 @@ export function ControlDeck({
   breaking,
   planStatus,
   guidanceEnabled,
+  escapeAvailable,
   reviewEnabled,
   hasReview,
   aimAssistEnabled,
@@ -848,7 +850,7 @@ export function ControlDeck({
               type="button"
               className={`assist-option guidance-option ${guidanceEnabled ? 'active' : ''}`}
               role="switch"
-              aria-label="走位规划"
+              aria-label={escapeAvailable ? '借库解球' : '走位规划'}
               data-control-tip="assist-plan"
               aria-checked={guidanceEnabled}
               disabled={!guidanceAvailable}
@@ -939,6 +941,7 @@ export function ControlDeck({
     charging,
     guidanceAvailable,
     guidanceEnabled,
+    escapeAvailable,
     guidanceStateClass,
     hasReview,
     layout,

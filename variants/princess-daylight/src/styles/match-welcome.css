@@ -1,5 +1,5 @@
-/* One tappable portrait, with the text inside the device's safe reading area. */
-.game-shell.royal-game[data-opening='true'] > button.royal-opening.match-welcome {
+/* Opening portrait with its change-companion action in the safe reading area. */
+.game-shell.royal-game[data-opening='true'] > .royal-opening.match-welcome {
   position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;overflow:hidden;
   border:none;border-radius:0;isolation:isolate;display:flex;align-items:flex-end;
   background:#20372e;color:#fff6e4;text-align:left;font:inherit;pointer-events:auto;cursor:pointer;
@@ -16,17 +16,24 @@
   color:#fff4d9;font-size:clamp(30px,8vw,44px);font-weight:600;letter-spacing:.075em;line-height:1.17;
 }
 .match-welcome .welcome-quote {font-size:clamp(16px,4.6vw,21px);line-height:1.55;text-wrap:pretty;color:#fff9ed;}
-.match-welcome .welcome-enter {
-  display:inline-flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;
-  border-top:1px solid #dac39395;color:#f0d7a3;font-size:13px;letter-spacing:.08em;
+.match-welcome .welcome-change {
+  display:inline-flex;align-items:center;gap:10px;min-height:44px;margin-top:4px;padding:0 12px;
+  border:1px solid #dac39395;border-radius:9px;background:#163027a0;color:#f0d7a3;cursor:pointer;
 }
-.match-welcome .welcome-enter span {font:20px/1 serif;}
+.match-welcome .welcome-change,.match-welcome .welcome-waiting {--royal-font-size:13px;}
+.match-welcome .welcome-change span {--royal-font-size:20px;line-height:1;}
+.match-welcome .welcome-waiting {color:#f0d7a3;}
 .match-welcome[data-custom] {background:radial-gradient(ellipse at 50% 35%,#667960,#203a2d 70%)!important;}
 .match-welcome[data-custom] .welcome-art {display:grid;place-items:center;bottom:23%;}
 .match-welcome[data-custom] .welcome-portrait {width:min(54vw,36vh);height:min(54vw,36vh);border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px #d2b576,0 8px 30px #112c2344;}
 .match-welcome[data-custom] .welcome-art::after {display:none;}
+@media (orientation:portrait) {
+  .game-shell.royal-game[data-opening='true'] > .royal-opening.match-welcome[data-featured] {background:#10231e;}
+  .match-welcome[data-featured] .welcome-art {bottom:auto;height:80%;max-height:145vw;}
+  .match-welcome[data-featured] .welcome-art::after {background:linear-gradient(180deg,transparent 67%,#10231e 100%);}
+}
 @media (orientation:landscape) {
-  .game-shell.royal-game[data-opening='true'] > button.royal-opening.match-welcome {align-items:center;background:linear-gradient(115deg,#334c40,#142a23 80%);}
+  .game-shell.royal-game[data-opening='true'] > .royal-opening.match-welcome {align-items:center;background:linear-gradient(115deg,#334c40,#142a23 80%);}
   .match-welcome .welcome-art {width:57%;}
   .match-welcome .welcome-portrait {object-position:50% 23%;}
   .match-welcome .welcome-art::after {background:linear-gradient(90deg,transparent 65%,#21392d);}
@@ -38,4 +45,14 @@
 }
 .match-welcome .welcome-message strong {--royal-font-size:clamp(30px,8vw,44px);letter-spacing:.075em!important;}
 .match-welcome .welcome-quote {--royal-font-size:clamp(16px,4.6vw,21px);}
-.match-welcome .welcome-enter {--royal-font-size:13px;}
+.game-shell.royal-game[data-opening='true'] > .royal-opening.match-welcome:not([data-art-ready]) {
+  background:radial-gradient(ellipse at 50% 40%,#fffaf0,#e5dac6)!important;
+}
+.match-welcome:not([data-art-ready]) .welcome-art {opacity:0;}
+.match-welcome .welcome-spinner {position:absolute;top:43%;left:50%;margin-left:-11px;}
+.match-welcome:not([data-art-ready]) .welcome-message {text-shadow:none;}
+.match-welcome:not([data-art-ready]) .welcome-message strong,
+.match-welcome:not([data-art-ready]) .welcome-quote,
+.match-welcome:not([data-art-ready]) .welcome-waiting {color:#73552c;}
+.match-welcome:not([data-art-ready]) .welcome-change {background:#fffaf0;border-color:#af956b;color:#73552c;}
+.game-shell .royal-opening.boot-card h1 {--royal-font-size:24px;}

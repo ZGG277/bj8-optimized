@@ -1,92 +1,201 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_PRINCESS, portraitFor, savePortrait } from '../opponent/player-portraits';
-import { COMPANIONS } from '../opponent/companions';
+import { defaultCrop } from '../input/portrait-crop';
+import { PLAYER_AVATARS, PLAYER_AVATAR_PAIRS, portraitFor, savePortrait, type PlayerAvatar } from '../opponent/player-portraits';
+import { exportPortraitCrop, PortraitCropCanvas, readPortraitPhoto } from './PortraitCropCanvas';
 import { containRoyalDialogTab } from './royal-dialog-focus';
 
-const defaultCrop = { x: .5, y: .5, zoom: 1 };
+const nicknamePresets = ['帅哥', '美女', '宝宝', '团子', '糖糖', '小柚子'];
+type AvatarChoice = { preset: PlayerAvatar['id'] } | { photo: number };
 
-export function PortraitEditor({ id, close }: { id: string; close: () => void }) {
-  const base = COMPANIONS.find(c => c.id === id);
-  const original = base?.avatar ?? DEFAULT_PRINCESS;
-  const stored = portraitFor(id);
-  const [name, setName] = useState(stored.name ?? base?.name ?? '');
-  const [photo, setPhoto] = useState(stored.avatar || original);
+function rememberNickname(names: string[], name: string) {
+  return !name || name === '你' || nicknamePresets.includes(name) || names.includes(name) ? names : [name, ...names];
+}
+
+function initialPortrait() {
+  const saved = portraitFor('player');
+  let photos = Array.isArray(saved.photos) ? saved.photos : [];
+  const preset = PLAYER_AVATARS.find(option => option.id === saved.avatarPreset);
+  let photo = photos.indexOf(saved.avatar ?? '');
+  // Older versions saved only the active photo. Keep it when switching to a preset.
+  if (!preset && saved.avatar && photo < 0) {
+    photo = photos.length;
+    photos = [...photos, saved.avatar];
+  }
+  const choice: AvatarChoice = preset ? { preset: preset.id } : photo >= 0 ? { photo } : { preset: 'classic' };
+  const name = saved.name ?? '';
+  return {
+    choice, photos, name,
+    nicknames: rememberNickname(Array.isArray(saved.nicknames) ? saved.nicknames : [], name),
+    customized: Boolean(saved.avatar || saved.avatarPreset),
+  };
+}
+
+export function PortraitEditor({ close }: { close: () => void }) {
+  const [initial] = useState(initialPortrait);
+  const [name, setName] = useState(initial.name);
+  const [nicknames, setNicknames] = useState(initial.nicknames);
+  const [nameInput, setNameInput] = useState('');
+  const [choice, setChoice] = useState(initial.choice);
+  const [photos, setPhotos] = useState(initial.photos);
+  const [image, setImage] = useState<HTMLImageElement>();
   const [crop, setCrop] = useState(defaultCrop);
-  const [changed, setChanged] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const srcImage = useRef<HTMLImageElement | null>(null);
-  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const request = useRef(0);
-  const back = useRef<HTMLButtonElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const preset = 'preset' in choice && !image ? choice.preset : undefined;
+  const activePhoto = 'photo' in choice && !image ? choice.photo : undefined;
+  const preview = 'preset' in choice ? PLAYER_AVATARS.find(option => option.id === choice.preset)?.image : photos[choice.photo];
+
   useEffect(() => {
-    back.current?.focus();
+    cancelButton.current?.focus({ preventScroll: true });
     return () => { request.current++; };
   }, []);
-  useEffect(() => {
-    let active = true;
-    setReady(false);
-    const img = new Image(); img.onload = () => { if (active) { srcImage.current = img; setReady(true); } };
-    img.onerror = () => { if (active) setError('这张图片打不开，请换一张。'); };
-    img.src = photo;
-    return () => { active = false; };
-  }, [photo]);
-  useEffect(() => {
-    const img = srcImage.current, ctx = canvas.current?.getContext('2d');
-    if (!img || !ctx || !ready) return;
-    const side = Math.min(img.naturalWidth, img.naturalHeight) / crop.zoom;
-    ctx.fillStyle = '#f5f1e4'; ctx.fillRect(0,0,192,192);
-    ctx.drawImage(img, (img.naturalWidth-side)*crop.x, (img.naturalHeight-side)*crop.y, side,side,0,0,192,192);
-  }, [ready, crop, photo]);
-  function choose(file?: File) {
-    if (!file) return;
-    const token = ++request.current;
-    if (file.type && !file.type.startsWith('image/')) { setError('请选择一张图片。'); return; }
-    const reader = new FileReader();
-    setError(''); setReady(false);
-    reader.onload = () => { if (request.current === token) {setChanged(true); setCrop({x:.5,y:.5,zoom:1}); const src=String(reader.result); if(src===photo)setReady(true); else setPhoto(src);} };
-    reader.onerror = () => { if (request.current === token) {setError('读取失败，请重新选图。');setReady(true);} };
-    reader.readAsDataURL(file);
+
+  function archiveCrop() {
+    if (!image) return { photos, choice };
+    const avatar = exportPortraitCrop(image, crop, true);
+    const existing = photos.indexOf(avatar);
+    return existing < 0 ? { photos: [...photos, avatar], choice: { photo: photos.length } }
+      : { photos, choice: { photo: existing } };
   }
+
+  function selectAvatar(next: AvatarChoice) {
+    request.current++;
+    setLoading(false);
+    try { setPhotos(archiveCrop().photos); }
+    catch { setError('照片暂未裁剪，请再试一次。'); return; }
+    setImage(undefined);
+    setChoice(next);
+    setError('');
+  }
+
+  async function choosePhoto(file?: File) {
+    if (!file) return;
+    if (file.type && !file.type.startsWith('image/')) { setError('请选择一张图片。'); return; }
+    const token = ++request.current;
+    setLoading(true);
+    setError('');
+    try {
+      const photo = await readPortraitPhoto(file);
+      if (request.current !== token) return;
+      setPhotos(archiveCrop().photos);
+      setImage(photo);
+      setCrop(defaultCrop);
+    } catch {
+      if (request.current === token) setError('这张图片打不开，请换一张。');
+    } finally {
+      if (request.current === token) setLoading(false);
+    }
+  }
+
+  function selectNickname(value: string) {
+    setNicknames(names => rememberNickname(names, nameInput.trim()));
+    setName(value === '你' ? '' : value);
+    setNameInput('');
+  }
+
   async function save() {
-    if (saving || !ready) return;
+    if (loading || saving) return;
     setSaving(true);
     setError('');
     try {
-      let avatar = stored.avatar;
-      if (changed && canvas.current) {
-        if (photo === original && crop.zoom === defaultCrop.zoom && crop.x === defaultCrop.x && crop.y === defaultCrop.y) avatar = undefined;
-        else {
-          const cut = document.createElement('canvas');
-          cut.width = cut.height = canvas.current.width;
-          const ctx = cut.getContext('2d');
-          if (!ctx) throw Error('裁剪失败');
-          const r = cut.width / 2;
-          ctx.beginPath(); ctx.arc(r, r, r, 0, 2 * Math.PI); ctx.clip();
-          ctx.drawImage(canvas.current, 0, 0);
-          avatar = cut.toDataURL('image/webp', .84);
-        }
-      }
-      const nextName = name.trim();
-      await savePortrait(id, { avatar, name: nextName && nextName !== base?.name ? nextName : undefined });
+      const album = archiveCrop();
+      const avatarPreset = 'preset' in album.choice ? album.choice.preset : undefined;
+      const nextName = nameInput.trim() || name;
+      const savedNames = rememberNickname(nicknames, nextName);
+      await savePortrait('player', {
+        avatarPreset: avatarPreset === 'classic' && !initial.customized ? undefined : avatarPreset,
+        avatarPhoto: 'photo' in album.choice ? album.choice.photo : undefined,
+        photos: album.photos.length ? album.photos : undefined,
+        name: nextName && nextName !== '你' ? nextName : undefined,
+        nicknames: savedNames.length ? savedNames : undefined,
+      });
       close();
     } catch {
       setError('资料暂未保存，请再试一次。');
       setSaving(false);
     }
   }
-  return <div className="portrait-mask" role="dialog" aria-modal="true" aria-labelledby="portrait-title" onKeyDown={e=>{containRoyalDialogTab(e);if(e.key==='Escape' && !saving)close();e.stopPropagation();}}>
-    <section className="portrait-editor" aria-busy={saving}><header><button ref={back} onClick={close} disabled={saving}>取消</button><h2 id="portrait-title">{base?'球友资料':'编辑个人资料'}</h2><button onClick={() => void save()} disabled={saving || !ready || (!!base && !name.trim())}>{saving ? '保存中' : '保存'}</button></header>
-    <label className="portrait-name">昵称<input value={name} placeholder={base ? base.name : '默认显示「你」'}
-      disabled={saving} maxLength={12} onChange={e=>setName(e.target.value)}/></label>
-    <canvas width="192" height="192" ref={canvas} aria-label="圆形头像裁剪预览" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId); drag.current={x:e.clientX,y:e.clientY,cx:crop.x,cy:crop.y};}}
-      onPointerMove={e=>{const d=drag.current,img=srcImage.current;if(!d||!img||!ready)return;const side=Math.min(img.width,img.height)/crop.zoom, scale=side/e.currentTarget.clientWidth;
-        const pan=(start:number,delta:number,room:number)=> room>0?Math.max(0,Math.min(1,start-delta*scale/room)):.5;
-        setCrop({...crop,x:pan(d.cx,e.clientX-d.x,img.width-side),y:pan(d.cy,e.clientY-d.y,img.height-side)});setChanged(true);}}
-      onLostPointerCapture={()=>{drag.current=null;}} />
-    <input type="range" aria-label="缩放头像" min="1" max="3" step=".02" value={crop.zoom} disabled={saving} onChange={e=>{setCrop({...crop,zoom:Number(e.target.value)});setChanged(true);}}/>
-    <div className="portrait-choices"><label>选一张照片<input type="file" accept="image/*" disabled={saving} onChange={e=>{choose(e.target.files?.[0]);e.target.value='';}}/></label><button disabled={saving} onClick={()=>{++request.current;setPhoto(original);setCrop(defaultCrop);setChanged(true);setError('');if(photo===original)setReady(true);}}>恢复默认头像</button></div>
-    {error && <p role="alert">{error}</p>}</section></div>;
+
+  return <div className="portrait-mask" role="dialog" aria-modal="true" aria-labelledby="portrait-title"
+    onKeyDown={event => {
+      containRoyalDialogTab(event);
+      if (event.key === 'Escape' && !saving) close();
+      event.stopPropagation();
+    }}>
+    <section className="portrait-editor" aria-busy={saving || loading}>
+      <header><h2 id="portrait-title">编辑个人资料</h2></header>
+      <div className="portrait-editor-body">
+        <div className="portrait-avatar-section">
+          <h3>头像</h3>
+          <div className="portrait-avatar-board">
+            <div className="portrait-avatar-current">
+              {image ? <PortraitCropCanvas className="portrait-preview" image={image} crop={crop} onCrop={setCrop}
+                disabled={saving || loading}/> : <img className="portrait-preview" width="192" height="192" src={preview}
+                alt="当前头像预览" draggable={false}/>}
+              {image ? <p className="portrait-crop-hint">双指缩放 · 拖动调整</p> :
+                <button type="button" className="portrait-default" aria-pressed={preset === 'classic'} disabled={saving}
+                  onClick={() => selectAvatar({ preset: 'classic' })}>默认头像</button>}
+            </div>
+            <div className="portrait-preset-list" role="group" aria-label="内置头像">
+              {PLAYER_AVATAR_PAIRS.map(pair => <div className="portrait-avatar-pair" key={pair.style}
+                role="group" aria-label={pair.style}>
+                <span className="portrait-pair-name" aria-hidden="true">{pair.style}</span>
+                {pair.avatars.map(id => {
+                  const option = PLAYER_AVATARS.find(avatar => avatar.id === id)!;
+                  return <button key={id} type="button" aria-label={option.name} aria-pressed={id === preset}
+                    disabled={saving} onClick={() => selectAvatar({ preset: id })}>
+                    <img src={option.image} alt="" draggable={false}/>
+                  </button>;
+                })}
+              </div>)}
+            </div>
+          </div>
+          <div className="portrait-photo-actions" role="group" aria-label="我的照片">
+            <label className="portrait-upload" title="上传自己的照片">
+              <span aria-hidden="true">{loading ? '…' : '+'}</span>
+              <input type="file" accept="image/*" aria-label="上传自己的照片" disabled={saving || loading} onChange={event => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                void choosePhoto(file);
+              }}/>
+            </label>
+            {image && <span className="portrait-pending-photo" title="正在裁剪的照片"><img src={image.src} alt="正在裁剪的照片"/></span>}
+            {photos.map((photo, index) => <button className="portrait-photo-option" key={index} type="button"
+              aria-label={`个人头像 ${index + 1}`} aria-pressed={activePhoto === index} disabled={saving}
+              onClick={() => selectAvatar({ photo: index })}><img src={photo} alt="" draggable={false}/></button>)}
+          </div>
+        </div>
+        <div className="portrait-name">
+          <h3>昵称</h3>
+          <div className="portrait-name-options" role="group" aria-label="常用昵称">
+            {['你', ...nicknamePresets].map(option => <button type="button" key={option} disabled={saving}
+              aria-pressed={(name || '你') === option} onClick={() => selectNickname(option)}>{option}</button>)}
+          </div>
+          {nicknames.length > 0 && <div className="portrait-nickname-shelf" role="group" aria-label="自定义昵称">
+            {nicknames.map(option => <button type="button" key={option} disabled={saving}
+              aria-pressed={name === option} onClick={() => selectNickname(option)}>{option}</button>)}
+          </div>}
+          <div className="portrait-name-field">
+            <input id="portrait-nickname" aria-label="添加自定义昵称" value={nameInput} placeholder="添加自定义昵称"
+              disabled={saving} maxLength={12} onChange={event => setNameInput(event.target.value)}
+              onKeyDown={event => {
+                if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.keyCode === 229 || !nameInput.trim()) return;
+                event.preventDefault();
+                selectNickname(nameInput.trim());
+              }}/>
+            <button type="button" disabled={saving || !nameInput.trim()} onClick={() => selectNickname(nameInput.trim())}>添加</button>
+          </div>
+        </div>
+        {error && <p className="portrait-error" role="alert">{error}</p>}
+      </div>
+      <footer className="profile-dialog-actions">
+        <button type="button" ref={cancelButton} onClick={close} disabled={saving}>取消</button>
+        <button type="button" className="profile-dialog-save" onClick={() => void save()}
+          disabled={saving || loading}>{saving ? '保存中…' : '保存'}</button>
+      </footer>
+    </section>
+  </div>;
 }

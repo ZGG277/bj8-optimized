@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TableAvatar } from './TableAvatar';
-import { COMPANIONS, companionFor } from '../opponent/companions';
-import { readCompanionPreferences } from '../opponent/companion-preferences';
+import { CORE_ROSTER, companionSelection } from '../opponent/companions';
 import { highlightLabel, practiceGoalFrom, type CompanionRelationship, type RememberedExchange, type TableSkill } from '../opponent/companion-memory';
 import { addressPlayer, callPlayerByName } from '../opponent/player-address';
 import { playerNickname } from '../opponent/player-portraits';
 import { shortSpeech } from '../opponent/short-speech';
 import { storybookCompanion } from '../opponent/storybook-companions';
 import type { Brief } from '../opponent/table-coach';
-import { aiBridge, askTableFriend, chatFailure, localTableAnswer, storybookReply, TABLE_SOURCE, type Exchange, type TableConversation } from '../minitool/table-chat';
+import { aiBridge, askTableFriend, chatFailure, coreTableReply, localTableAnswer, storybookReply, TABLE_SOURCE, type Exchange, type TableConversation } from '../minitool/table-chat';
 import type { CompanionDialogue } from '../opponent/companion-dialogue';
 import { RoyalIcon } from './RoyalIcon';
 
-export type TableChatLine = { id: number; side: 'player' | 'opponent'; text: string; companionId?: string; source?: string; requestId?: string; openingReminder?: true };
+export type TableChatLine = { id: number; side: 'player' | 'opponent'; text: string; companionId?: string; source?: string; requestId?: string; openingReminder?: true; specialShot?: true };
 const READING_MS = 1600;
 
 export function useTableChat() {
@@ -42,7 +41,7 @@ export function useTableChat() {
     const line = { ...message, text, id: ++sequence.current };
     setLines(previous => [...previous, line]);
     if (showOnTable) {
-      const preview = !authored ? body : storybookCompanion(message.companionId) ? storybookReply(body) : shortSpeech(body);
+      const preview = !authored || message.specialShot ? body : storybookCompanion(message.companionId) ? storybookReply(body) : shortSpeech(body);
       setLive({ ...line, text: callPlayerByName(preview, nickname, body.includes('你')) });
     }
   }, []);
@@ -54,7 +53,10 @@ export function useTableChat() {
 
   const automatic = useCallback((speech: CompanionDialogue) => {
     const alreadyOnCard = speech.sceneId === 'OPEN_PLAYER' || speech.sceneId === 'REMATCH';
-    say({ side: 'opponent', companionId: speech.companionId, text: speech.text }, !alreadyOnCard);
+    say({
+      side: 'opponent', companionId: speech.companionId, text: speech.text,
+      specialShot: speech.kind === 'highlight' ? true : undefined,
+    }, !alreadyOnCard);
   }, [say]);
   const showOpeningReminder = useCallback((text: string, companionId?: string) => {
     say({ side: 'opponent', text, companionId, openingReminder: true });
@@ -83,7 +85,8 @@ export function useTableChat() {
       if (!answer) return false;
       const addressed = addressPlayer(answer, brief.roleId, conversation.nickname);
       const line = storybookCompanion(brief.roleId) ? storybookReply(addressed, '这杆先看清，再慢慢打。') : shortSpeech(addressed);
-      receive({ question, answer: callPlayerByName(line, conversation.nickname, true), source: TABLE_SOURCE });
+      receive({ question, answer: coreTableReply(answer, brief.roleId, question, conversation.nickname) ??
+        callPlayerByName(line, conversation.nickname, true), source: TABLE_SOURCE });
       return true;
     };
     function receive(reply: Exchange) {
@@ -131,7 +134,7 @@ function ChatBubble({line}: {line:TableChatLine}) {
   </div>;
 }
 export function ChatFloat({line}: {line:TableChatLine}) {
-  return <div key={line.id} className="chat-float" role="status" data-opening-reminder={line.openingReminder}><ChatBubble line={line}/></div>;
+  return <div key={line.id} className="chat-float" role="status" data-opening-reminder={line.openingReminder} data-special-shot={line.specialShot}><ChatBubble line={line}/></div>;
 }
 type MemoryPanel = {
   relationship?: CompanionRelationship;
@@ -148,14 +151,15 @@ type MemoryPanel = {
 export function ChatMemory({ relationship, skill, status, preferredId, onPreferred, onClear, onRetry, rackId, companionId }: MemoryPanel) {
   const [confirming, setConfirming] = useState(false);
   const nickname = playerNickname();
+  const { personal, preferred } = companionSelection(preferredId);
   const previous = relationship?.exchanges.filter(exchange => exchange.rackId !== rackId).slice(-4) ?? [];
   return <details className="chat-memory">
     <summary>球友记忆与球技</summary>
     <div className="chat-memory-content">
-      {!readCompanionPreferences().selected.length && <label className="chat-next-companion">以后陪打
-        <select aria-label="以后陪打" value={preferredId ?? ''} onChange={event => onPreferred(event.target.value)}>
+      {!personal.length && <label className="chat-next-companion">以后陪打
+        <select aria-label="以后陪打" value={preferred ?? ''} onChange={event => onPreferred(event.target.value)}>
           <option value="">随机球友</option>
-          {COMPANIONS.map(friend => <option key={friend.id} value={friend.id}>{companionFor(friend.id).name}</option>)}
+          {CORE_ROSTER.map(friend => <option key={friend.id} value={friend.id}>{friend.name}</option>)}
         </select>
       </label>}
       <section aria-label="这位球友的记忆">

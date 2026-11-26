@@ -1,60 +1,51 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type TouchEvent as ReactTouchEvent } from 'react';
-import { COMPANIONS, ORIGINAL_COMPANIONS, STORYBOOK_ROSTER, companionFor } from '../opponent/companions';
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent, type TouchEvent as ReactTouchEvent } from 'react';
+import { CORE_ROSTER, companionFor } from '../opponent/companions';
+import { coreCompanion } from '../opponent/core-companions';
 import {
-  COMPANION_LINE_LABELS, readCompanionPreferences, saveCompanionPreferences,
-  type CompanionLine, type CompanionPreferences, type CustomCompanion,
+  readCompanionPreferences, saveCompanionPreferences,
+  type CompanionPreferences, type CustomCompanion,
 } from '../opponent/companion-preferences';
-import { companionVoice } from '../opponent/companion-voices';
+import { localPersonalityLabel, summarizeCompanionPersonality } from '../minitool/table-chat';
+import { defaultCrop, restoreCrop, type Crop } from '../input/portrait-crop';
+import { exportPortraitCrop, loadPortraitImage, PortraitCropCanvas, readPortraitPhoto } from './PortraitCropCanvas';
 import { containRoyalDialogTab } from './royal-dialog-focus';
 import '../styles/companion-picker.css';
 
-const styles = ['温和有礼','认真直接','爱接梗','清冷少言','傲娇嘴硬','耐心教练','争强好胜','冷幽默','热情捧场','轻声温柔'];
-const availableFriends = [...STORYBOOK_ROSTER, ...ORIGINAL_COMPANIONS];
-const lineKeys = Object.keys(COMPANION_LINE_LABELS) as CompanionLine[];
-const first = (line: string | readonly string[] | undefined) => typeof line === 'string' ? line : line?.[0] ?? '';
-
-function example(voiceId: string, line: CompanionLine) {
-  const voice = companionVoice(voiceId);
-  if (line === 'win') return voice?.result.win ?? '';
-  return first(voice?.scenes[({ opening: 'OPEN_PLAYER', pot: 'P_ONE', miss: 'P_EMPTY_1' } as const)[line]]);
-}
-function cropPhoto(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    if (file.type && !file.type.startsWith('image/')) { reject(Error('请选择一张照片。')); return; }
-    if (file.size > 12_000_000) { reject(Error('照片太大，请选择 12 MB 以内的图片。')); return; }
-    const reader = new FileReader();
-    reader.onerror = () => reject(Error('照片读取失败。'));
-    reader.onload = () => {
-      const image = new Image();
-      image.onerror = () => reject(Error('照片打不开，请换一张。'));
-      image.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = 192;
-        const ctx = canvas.getContext('2d');
-        if (!ctx || !image.naturalWidth || !image.naturalHeight) { reject(Error('照片裁剪失败。')); return; }
-        const side = Math.min(image.naturalWidth, image.naturalHeight);
-        ctx.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, 0, 0, 192, 192);
-        resolve(canvas.toDataURL('image/webp', .84));
-      };
-      image.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
-  });
+const personalityExample = '例如：他平时说话温和，偶尔会接梗。开局爱开个小玩笑，看到好球会说出哪里打得漂亮。遇到失误先安慰一句，玩家开口问时再耐心给一个具体建议。到了赛点就认真起来，少说几句，留时间给对方瞄准。';
+function compactPhotoSource(image: HTMLImageElement) {
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw Error('照片读取失败。');
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const webp = canvas.toDataURL('image/webp', .76);
+  return webp.startsWith('data:image/webp,') || webp.startsWith('data:image/webp;')
+    ? webp : canvas.toDataURL('image/jpeg', .76);
 }
 
-type Drag = { id: string; pointer: number; input: 'mouse' | 'touch'; x: number; y: number; timer: number; lifted: boolean };
-export function CompanionPicker({ close, preferredId }: { close: () => void; preferredId?: string }) {
+type DragAction = 'add' | 'remove';
+type Drag = { id: string; action: DragAction; pointer: number; input: 'mouse' | 'touch'; x: number; y: number; timer: number; lifted: boolean };
+export function CompanionPicker({ close, forRack }: {
+  close: () => void;
+  forRack?: { currentId?: string; choose: (id: string) => void };
+}) {
   const [data, setData] = useState(readCompanionPreferences);
+  const [selected, setSelected] = useState(forRack?.currentId);
   const [draft, setDraft] = useState<CustomCompanion | null>(null);
+  const [photo, setPhoto] = useState<{ image: HTMLImageElement; source: string }>();
+  const [photoCrop, setPhotoCrop] = useState(defaultCrop);
   const [saving, setSaving] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [error, setError] = useState('');
-  const [ghost, setGhost] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [ghost, setGhost] = useState<{ id: string; action: DragAction; x: number; y: number } | null>(null);
   const drag = useRef<Drag>();
   const committing = useRef(false);
   const photoRequest = useRef(0);
   const suppressClick = useRef(false);
   const panel = useRef<HTMLElement>(null);
+  const featured = useRef<HTMLElement>(null);
   const collection = useRef<HTMLElement>(null);
   const back = useRef<HTMLButtonElement>(null);
   const finishPress = useCallback((cancelled: boolean) => {
@@ -66,7 +57,7 @@ export function CompanionPicker({ close, preferredId }: { close: () => void; pre
     setGhost(null);
   }, []);
   const movePress = useCallback((press: Drag, x: number, y: number) => {
-    if (press.lifted) setGhost({ id: press.id, x, y });
+    if (press.lifted) setGhost({ id: press.id, action: press.action, x, y });
     else if (Math.hypot(x - press.x, y - press.y) > 10) finishPress(true);
   }, [finishPress]);
 
@@ -90,12 +81,13 @@ export function CompanionPicker({ close, preferredId }: { close: () => void; pre
     };
   }, [movePress]);
 
-  async function commit(next: CompanionPreferences, complete?: () => void) {
+  async function commit(update: CompanionPreferences | (() => Promise<CompanionPreferences>), complete?: () => void) {
     if (committing.current) return;
     committing.current = true;
     setSaving(true);
     setError('');
     try {
+      const next = typeof update === 'function' ? await update() : update;
       await saveCompanionPreferences(next);
       setData(next);
       complete?.();
@@ -106,43 +98,78 @@ export function CompanionPicker({ close, preferredId }: { close: () => void; pre
       setSaving(false);
     }
   }
-  const saved = data.saved.filter(id => COMPANIONS.some(friend => friend.id === id) || data.custom.some(friend => friend.id === id));
-  const selectedCount = saved.filter(id => data.selected.includes(id)).length;
+  const saved = data.saved.filter(id => coreCompanion(id) || data.custom.some(friend => friend.id === id));
   const add = (id: string) => {
     if (saved.includes(id)) return;
-    void commit({ ...data, saved: [...saved, id], selected: [...data.selected, id] });
+    void commit({ ...data, saved: [...data.saved, id] });
   };
-  const toggle = (id: string) => void commit({ ...data,
-    selected: data.selected.includes(id) ? data.selected.filter(value => value !== id) : [...data.selected, id] });
+  const remove = (id: string) => {
+    if (!coreCompanion(id) || !saved.includes(id)) return;
+    void commit({ ...data, saved: data.saved.filter(friend => friend !== id) });
+  };
   const newFriend = () => {
     suppressClick.current = false;
     setError('');
     setDraft({ id: 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2), name: '',
-      avatarId: COMPANIONS[0].id, voiceId: COMPANIONS[0].id, lines: {} });
+      avatarId: CORE_ROSTER[0].id, voiceId: CORE_ROSTER[0].id, lines: {} });
   };
-  function startPress(id: string, input: Drag['input'], pointer: number, x: number, y: number) {
+  function startPress(id: string, action: DragAction, input: Drag['input'], pointer: number, x: number, y: number) {
     if (saving || drag.current) return false;
     suppressClick.current = false;
+    if (action === 'add' && saved.includes(id)) return false;
     const timer = window.setTimeout(() => {
       if (!drag.current || drag.current.pointer !== pointer) return;
       drag.current.lifted = true;
       suppressClick.current = true;
-      setGhost({ id, x, y });
+      setGhost({ id, action, x, y });
     }, 420);
-    drag.current = { id, input, pointer, x, y, timer, lifted: false };
+    drag.current = { id, action, input, pointer, x, y, timer, lifted: false };
     return true;
-  }
-  function begin(event: PointerEvent, id: string) {
-    if (event.pointerType === 'touch' || !event.isPrimary || event.button !== 0) return;
-    if (startPress(id, 'mouse', event.pointerId, event.clientX, event.clientY)) {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    }
   }
   function endPress(press: Drag, x: number, y: number, cancelled: boolean) {
     finishPress(cancelled);
-    const rect = collection.current?.getBoundingClientRect();
-    if (!cancelled && press.lifted && rect && x >= rect.left && x <= rect.right &&
-      y >= rect.top && y <= rect.bottom) add(press.id);
+    if (cancelled || !press.lifted) return;
+    const target = press.action === 'add' ? collection : featured;
+    const rect = target.current?.getBoundingClientRect();
+    const dropped = rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    if (press.action === 'remove') {
+      if (dropped) remove(press.id);
+    } else if (dropped || (forRack && Math.hypot(x - press.x, y - press.y) <= 12)) {
+      add(press.id);
+    }
+  }
+  function pressHandlers(id: string, action: DragAction) {
+    return {
+      onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
+        if (event.pointerType === 'touch' || !event.isPrimary || event.button !== 0) return;
+        if (startPress(id, action, 'mouse', event.pointerId, event.clientX, event.clientY)) {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }
+      },
+      onPointerMove: (event: PointerEvent<HTMLButtonElement>) => {
+        const press = drag.current;
+        if (press?.input === 'mouse' && press.pointer === event.pointerId) movePress(press, event.clientX, event.clientY);
+      },
+      onPointerUp: (event: PointerEvent<HTMLButtonElement>) => {
+        const press = drag.current;
+        if (press?.input === 'mouse' && press.pointer === event.pointerId) endPress(press, event.clientX, event.clientY, false);
+      },
+      onLostPointerCapture: (event: PointerEvent<HTMLButtonElement>) => {
+        if (drag.current?.input === 'mouse' && drag.current.pointer === event.pointerId) finishPress(true);
+      },
+      onTouchStart: (event: ReactTouchEvent<HTMLButtonElement>) => {
+        const touch = event.changedTouches[0];
+        if (event.touches.length === 1 && touch) startPress(id, action, 'touch', touch.identifier, touch.clientX, touch.clientY);
+        else if (drag.current?.input === 'touch') finishPress(true);
+      },
+      onTouchEnd: (event: ReactTouchEvent<HTMLButtonElement>) => endTouch(event),
+      onTouchCancel: (event: ReactTouchEvent<HTMLButtonElement>) => endTouch(event, true),
+      onContextMenu: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
+    };
+  }
+  function afterPress(event: MouseEvent<HTMLButtonElement>, action: () => void) {
+    if (!suppressClick.current || event.detail === 0) action();
+    suppressClick.current = false;
   }
   function endTouch(event: ReactTouchEvent, cancelled = false) {
     const press = drag.current;
@@ -155,6 +182,7 @@ export function CompanionPicker({ close, preferredId }: { close: () => void; pre
     if (!draft) { close(); return; }
     photoRequest.current++;
     setPhotoLoading(false);
+    setPhoto(undefined);
     setError('');
     setDraft(null);
   };
@@ -164,130 +192,147 @@ export function CompanionPicker({ close, preferredId }: { close: () => void; pre
     return profile ? { name: profile.name, avatar: profile.avatar || fallback.avatar } : fallback;
   };
 
+  async function editPhoto(load: () => Promise<HTMLImageElement>, source?: string, crop?: Crop) {
+    const ticket = ++photoRequest.current;
+    setError('');
+    setPhotoLoading(true);
+    try {
+      const image = await load();
+      if (photoRequest.current !== ticket) return;
+      setPhoto({ image, source: source || compactPhotoSource(image) });
+      setPhotoCrop(restoreCrop(crop));
+    } catch {
+      if (photoRequest.current === ticket) setError('照片打不开，请换一张。');
+    } finally {
+      if (photoRequest.current === ticket) setPhotoLoading(false);
+    }
+  }
+
+  function choosePhoto(file?: File) {
+    if (!file) return;
+    if (file.type && !file.type.startsWith('image/')) { setError('请选择一张照片。'); return; }
+    if (file.size > 12_000_000) { setError('照片太大，请选择 12 MB 以内的图片。'); return; }
+    void editPhoto(() => readPortraitPhoto(file));
+  }
+
+  function adjustPhoto(friend: CustomCompanion) {
+    const source = typeof friend.avatarEdit?.source === 'string' && friend.avatarEdit.source || friend.avatar;
+    if (source) void editPhoto(() => loadPortraitImage(source), source, friend.avatarEdit?.crop);
+  }
+
+  function saveCustom(friend: CustomCompanion) {
+    const name = friend.name.trim();
+    if (!name || photoLoading) return;
+    const personality = friend.personality?.trim() || undefined;
+    const existing = data.custom.find(item => item.id === friend.id);
+    void commit(async () => {
+      const avatar = photo ? exportPortraitCrop(photo.image, photoCrop) : friend.avatar;
+      const avatarEdit = photo ? { source: photo.source, crop: photoCrop } : friend.avatarEdit;
+      const oldLabel = existing?.personality === personality ? existing?.personalityLabel : undefined;
+      const personalityLabel = oldLabel ?? await summarizeCompanionPersonality(personality ?? '');
+      const next = { ...friend, name, personality, personalityLabel, avatar, avatarEdit };
+      return {
+        ...data,
+        saved: saved.includes(next.id) ? data.saved : [...data.saved, next.id],
+        custom: existing ? data.custom.map(item => item.id === next.id ? next : item) : [...data.custom, next],
+      };
+    }, () => { setPhoto(undefined); setDraft(null); });
+  }
+
   return <div className="companion-picker-mask" role="dialog" aria-modal="true" aria-labelledby="companion-picker-title"
     onKeyDown={event => { containRoyalDialogTab(event); if (event.key === 'Escape') cancel(); event.stopPropagation(); }}>
-    <section className="companion-picker" ref={panel} data-dragging={ghost ? 'true' : undefined}>
-      <header><button type="button" onClick={cancel} ref={back} disabled={saving}>‹ 返回</button>
-        <h2 id="companion-picker-title">{draft ? '定制球友' : '选球友'}</h2></header>
+    <section className="companion-picker" ref={panel} data-dragging={ghost?.action}>
+      <header><h2 id="companion-picker-title">{draft ? '定制球友' : forRack ? '换一位球友' : '选球友'}</h2></header>
       {error && <p className="companion-picker-error" role="alert">{error}</p>}
-      {draft ? <form className="companion-custom" onSubmit={event => {
+      {draft ? <><form id="companion-custom-form" className="companion-custom" onSubmit={event => {
         event.preventDefault();
-        const name = draft.name.trim();
-        if (!name || photoLoading) return;
-        const existing = data.custom.some(friend => friend.id === draft.id);
-        const lines: CustomCompanion['lines'] = {};
-        for (const key of lineKeys) {
-          const text = draft.lines[key]?.trim();
-          if (text) lines[key] = text;
-        }
-        const next = { ...draft, name, lines };
-        void commit({
-          saved: saved.includes(next.id) ? saved : [...saved, next.id],
-          selected: existing ? data.selected : [...data.selected, next.id],
-          custom: existing ? data.custom.map(friend => friend.id === next.id ? next : friend) : [...data.custom, next],
-        }, () => setDraft(null));
+        saveCustom(draft);
       }}>
-        <label>名字<input name="companion-name" value={draft.name} maxLength={12} required
-          onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder="给球友起个名字"/></label>
-        <div className="companion-photo"><span>照片</span>
-          <img alt="球友头像预览" src={draft.avatar || companionFor(draft.avatarId).avatar} draggable={false}/>
-          <label className="companion-file">{photoLoading ? '照片读取中…' : '选择本地照片'}
-            <input type="file" accept="image/*" aria-label="选择球友照片" onChange={async event => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (!file) return;
-              const ticket = ++photoRequest.current;
-              setError('');
-              setPhotoLoading(true);
-              try {
-                const avatar = await cropPhoto(file);
-                if (photoRequest.current === ticket) setDraft(current => current && { ...current, avatar });
-              } catch (error) {
-                if (photoRequest.current === ticket) setError(error instanceof Error ? error.message : '照片读取失败。');
-              } finally {
-                if (photoRequest.current === ticket) setPhotoLoading(false);
-              }
-            }}/>
-          </label>
-          <select aria-label="使用内置头像" value={draft.avatar ? '' : draft.avatarId} onChange={event => {
-            const avatarId = event.target.value;
-            photoRequest.current++;
-            setPhotoLoading(false);
-            setDraft({ ...draft, avatarId, avatar: undefined });
-          }}>
-            {draft.avatar && <option value="" disabled>使用已选照片</option>}
-            {COMPANIONS.map(friend => <option key={friend.id} value={friend.id}>{friend.name}</option>)}
-          </select>
+        <div className="companion-photo" data-cropping={Boolean(photo) || undefined}>
+          <span>照片</span>
+          {photo ? <div className="companion-photo-crop">
+            <PortraitCropCanvas className="portrait-preview" image={photo.image} crop={photoCrop} onCrop={setPhotoCrop}
+              disabled={saving || photoLoading}/>
+            <p className="portrait-crop-hint">双指缩放 · 拖动调整</p>
+          </div> : <img alt="球友头像预览" src={draft.avatar || companionFor(draft.avatarId).avatar} draggable={false}/>}
+          <div className="companion-photo-actions">
+            <label className="companion-file">{photoLoading ? '照片读取中…' : '更换照片'}
+              <input type="file" accept="image/*" disabled={saving || photoLoading} aria-label="选择球友照片" onChange={event => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                choosePhoto(file);
+              }}/>
+            </label>
+            {!photo && draft.avatar && <button type="button" className="companion-photo-adjust" disabled={saving || photoLoading}
+              onClick={() => adjustPhoto(draft)}>调整照片</button>}
+          </div>
         </div>
-        <label>个性描述<select aria-label="说话风格" value={draft.personality !== undefined ? 'custom' : draft.voiceId}
-          onChange={event => setDraft(event.target.value === 'custom' ? { ...draft, personality: '' } :
-            { ...draft, voiceId: event.target.value, personality: undefined })}>
-          {COMPANIONS.map((friend, index) => <option key={friend.id} value={friend.id}>{styles[index] ?? companionVoice(friend.id)?.personality ?? friend.name}</option>)}
-          <option value="custom">自定义</option>
-        </select></label>
-        {draft.personality !== undefined ? <textarea aria-label="自定义个性" value={draft.personality} maxLength={120}
-          onChange={event => setDraft({ ...draft, personality: event.target.value })} placeholder="写几句他的说话习惯"/>
-          : <p className="companion-picker-note">{companionVoice(draft.voiceId)?.personality}</p>}
-        <fieldset><legend>对话示例</legend>
-          {lineKeys.map(key => <label key={key}>{COMPANION_LINE_LABELS[key]}
-            <textarea aria-label={COMPANION_LINE_LABELS[key] + '台词'} maxLength={30}
-              value={draft.lines[key] ?? example(draft.voiceId, key)}
-              onChange={event => setDraft({ ...draft, lines: { ...draft.lines, [key]: event.target.value } })}/>
-            {draft.lines[key] !== undefined && <button type="button" onClick={() => {
-              const lines = { ...draft.lines }; delete lines[key]; setDraft({ ...draft, lines });
-            }}>恢复默认</button>}
-          </label>)}
-        </fieldset>
-        <button type="submit" className="companion-save" disabled={saving || photoLoading || !draft.name.trim()}>{saving ? '保存中…' : '保存球友'}</button>
-      </form> : <>
+        <label>名字<input name="companion-name" value={draft.name} maxLength={12} required disabled={saving}
+          onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder="给球友起个名字"/></label>
+        <label>个性描述<textarea value={draft.personality ?? ''} maxLength={1200} rows={5}
+          disabled={saving} placeholder="写下球友的性格、说话方式和打球时的反应"
+          aria-describedby="companion-personality-example"
+          onChange={event => setDraft({ ...draft, personality: event.target.value })}/></label>
+        <p id="companion-personality-example" className="companion-personality-example">{personalityExample}</p>
+      </form><footer className="profile-dialog-actions">
+        <button type="button" onClick={cancel} disabled={saving}>取消</button>
+        <button type="submit" form="companion-custom-form" className="profile-dialog-save"
+          disabled={saving || photoLoading || !draft.name.trim()}>{saving ? '保存中…' : '保存球友'}</button>
+      </footer></> : <>
         <div className="companion-columns">
-          <section><h3>内置球友</h3><div className="companion-list">
-            {availableFriends.map(({ id }) => {
+          <section ref={featured} className={ghost?.action === 'remove' ? 'companion-drop' : ''}>
+            <h3>精选球友</h3><div className="companion-list">
+            {CORE_ROSTER.map(({ id, label }) => {
               const friend = portrait(id);
-              return <button key={id} type="button" className="companion-item companion-drag" aria-label={'加入' + friend.name}
-                onPointerDown={event => begin(event, id)}
-                onPointerMove={event => {
-                  const press = drag.current;
-                  if (press?.input === 'mouse' && press.pointer === event.pointerId) movePress(press, event.clientX, event.clientY);
-                }}
-                onPointerUp={event => {
-                  const press = drag.current;
-                  if (press?.input === 'mouse' && press.pointer === event.pointerId) endPress(press, event.clientX, event.clientY, false);
-                }}
-                onLostPointerCapture={event => {
-                  if (drag.current?.input === 'mouse' && drag.current.pointer === event.pointerId) finishPress(true);
-                }}
-                onTouchStart={event => {
-                  const touch = event.changedTouches[0];
-                  if (event.touches.length === 1 && touch) startPress(id, 'touch', touch.identifier, touch.clientX, touch.clientY);
-                  else if (drag.current?.input === 'touch') finishPress(true);
-                }}
-                onTouchEnd={event => endTouch(event)} onTouchCancel={event => endTouch(event, true)}
-                onContextMenu={event => event.preventDefault()}
-                onClick={event => { if (!suppressClick.current || event.detail === 0) add(id); suppressClick.current = false; }}
-                disabled={saving}>
+              return <button key={id} type="button"
+                className={forRack ? 'companion-item companion-rack-option companion-movable' : 'companion-item companion-drag'}
+                aria-label={forRack ? undefined : '加入' + friend.name} aria-pressed={forRack ? selected === id : undefined}
+                {...pressHandlers(id, 'add')}
+                onClick={event => afterPress(event, () => forRack ? setSelected(id) : add(id))}
+                disabled={saving || (!forRack && saved.includes(id))}>
                 <img src={friend.avatar} alt="" draggable={false} loading="lazy"/>
-                <span>{friend.name}</span>
+                <span className="companion-name">{friend.name}</span>
+                <small className="companion-trait">{label}</small>
               </button>;
             })}
-          </div></section>
-          <section ref={collection} className={ghost ? 'companion-drop' : ''}><h3>我的球友</h3>
+          </div>{!forRack && <button type="button" className="companion-add" disabled={saving} onClick={newFriend}>＋ 定制球友</button>}</section>
+          <section ref={collection} className={ghost?.action === 'add' ? 'companion-drop' : ''}><h3>我的球友</h3>
+            {forRack && <p className="companion-picker-note">长按左栏头像加入，精选球友可长按拖回</p>}
+            {!forRack && saved.some(id => coreCompanion(id)) && <p className="companion-picker-note">长按右栏的精选球友，拖回左栏移出</p>}
             <div className="companion-list">
               {saved.map(id => {
                 const profile = data.custom.find(friend => friend.id === id);
                 const friend = portrait(id);
-                return <div className="companion-item" key={id}>
-                  <label><input type="checkbox" checked={data.selected.includes(id)} aria-label={friend.name + '参与匹配'} disabled={saving}
-                    onChange={() => toggle(id)}/><img src={friend.avatar} alt="" draggable={false}/><span>{friend.name}</span></label>
-                  {profile && <button className="companion-edit" type="button" disabled={saving} onClick={() => { setError(''); setDraft(profile); }}>编辑</button>}
-                </div>;
+                return profile && !forRack ? <button className="companion-item companion-edit" key={id} type="button" disabled={saving}
+                  aria-label={`编辑球友 ${friend.name}`} onClick={() => { setError(''); setDraft(profile); }}>
+                  <img src={friend.avatar} alt="" draggable={false}/>
+                  <span className="companion-custom-identity">
+                    <span className="companion-name">{friend.name}</span>
+                    <small className="companion-trait">{profile.personalityLabel ?? localPersonalityLabel(profile.personality ?? '')}</small>
+                  </span>
+                </button> : <button className="companion-item companion-rack-option companion-movable" key={id}
+                  type="button" disabled={saving}
+                  aria-label={forRack ? undefined : `将${friend.name}移回精选球友`}
+                  aria-pressed={forRack ? selected === id : undefined}
+                  {...(!profile ? pressHandlers(id, 'remove') : {})}
+                  onClick={event => {
+                    if (forRack) {
+                      if (profile) setSelected(id);
+                      else afterPress(event, () => setSelected(id));
+                    } else if (event.detail === 0) remove(id);
+                  }}>
+                  <img src={friend.avatar} alt="" draggable={false}/><span className="companion-name">{friend.name}</span>
+                </button>;
               })}
-              {!saved.length && <p className="companion-picker-note">长按左栏球友，拖到这里</p>}
+              {!saved.length && !forRack && <p className="companion-picker-note">长按左栏球友，拖到这里</p>}
             </div>
-            <button type="button" className="companion-add" disabled={saving} onClick={newFriend}>＋ 定制球友</button>
           </section>
         </div>
-        <p className="companion-picker-note companion-pool" role="status">{selectedCount ? `下一局从已选的 ${selectedCount} 位球友中随机匹配` : preferredId ? `下一局和${companionFor(preferredId).name}打球` : '下一局从内置球友中随机匹配'}</p>
+        <footer className="profile-dialog-actions">
+          <button type="button" onClick={cancel} ref={back} disabled={saving}>返回</button>
+          <button type="button" onClick={forRack ? () => { if (selected) forRack.choose(selected); } : close}
+            className="profile-dialog-save" disabled={saving || (Boolean(forRack) && !selected)}>确认</button>
+        </footer>
       </>}
     </section>
     {ghost && <img className="companion-drag-ghost" src={portrait(ghost.id).avatar} alt="" style={{ left: ghost.x, top: ghost.y }}/>}

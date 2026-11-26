@@ -9,6 +9,7 @@ import type { FoulReason, MatchState, ShotFacts } from '../match/types';
 import { groupOfNumber, oppositeGroup } from '../match/match-machine';
 import type { CompanionDialogue } from './companion-dialogue';
 import { companionVoice } from './companion-voices';
+import { coreCompanion } from './core-companions';
 import { VOICE_OPPONENT_BALL_POTTED, VOICE_RULE_TURNS } from './companion-voice-variations';
 
 type RuleLines = { sceneId: string; lines: readonly string[] };
@@ -53,7 +54,9 @@ function playerPottedOpponentBall(before: MatchState, facts: ShotFacts, next: Ma
   if (before.actor !== 'player' || before.breaking || !before.playerGroup || next.phase === 'finished') return null;
   const otherGroup = oppositeGroup(before.playerGroup);
   if (!facts.pocketed.some(number => groupOfNumber(number) === otherGroup)) return null;
-  const reactions = VOICE_OPPONENT_BALL_POTTED[companionVoiceId(before.companionId) ?? ''] ??
+  const voiceId = companionVoiceId(before.companionId);
+  const core = coreCompanion(voiceId);
+  const reactions = core?.lines.helped ?? VOICE_OPPONENT_BALL_POTTED[voiceId ?? ''] ??
     ['你帮我进球啦，谢谢！', '你顺手送我一球啦。'];
   const deliver = (sceneId: string, ending: string) => ({ sceneId, lines: reactions.map(line => line + ending) });
   switch (next.messageKey) {

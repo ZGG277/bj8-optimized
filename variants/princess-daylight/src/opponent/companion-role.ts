@@ -2,6 +2,7 @@ import { customCompanionFor } from './companion-preferences';
 import { storybookCompanion } from './storybook-companions';
 import { CHAT_EXAMPLES, POSITION_EXAMPLE } from './chat-examples';
 import { companionVoice } from './companion-voices';
+import { coreCompanion } from './core-companions';
 import { highlightLabel, type CompanionRelationship } from './companion-memory';
 
 const goals: Record<string, string> = {
@@ -21,13 +22,14 @@ export function companionRole(id: string) {
   const voice = companionVoice(id);
   const custom = customCompanionFor(id);
   const story = storybookCompanion(id);
+  const core = coreCompanion(id);
   return {
     version: 1,
     personality: custom?.personality || voice?.personality,
-    goal: goals[id] ?? '保持自己的球友性格，陪玩家享受一局真实的台球',
-    cadence: voice?.cadence === 'quiet' ? '拿不准时少说，表扬要具体' : voice?.cadence === 'lively' ? '可以活泼，别打断出杆' : '一句话说完，给出杆留空',
-    examples: {
-      handbook: story?.lines,
+    goal: core?.goal ?? goals[id] ?? '保持自己的球友性格，陪玩家享受一局真实的台球',
+    cadence: core?.style ?? (voice?.cadence === 'quiet' ? '拿不准时少说，表扬要具体' : voice?.cadence === 'lively' ? '可以活泼，别打断出杆' : '一句话说完，给出杆留空'),
+    examples: custom?.personality ? undefined : {
+      handbook: core?.lines ?? story?.lines,
       chat: CHAT_EXAMPLES[id] ?? [],
       position: POSITION_EXAMPLE[id],
       greeting: voice?.scenes.OPEN_PLAYER,
@@ -57,6 +59,6 @@ export function memoryGreeting(id: string, friend?: CompanionRelationship) {
   }
   const key = `visit:${friend.visits}`;
   return greeted.includes(key) ? null : {
-    key, text: id === 'gu-yanchuan' ? '又见面了。球摆好了，你先。' : '又见面了。还是请你先开球。',
+    key, text: coreCompanion(id)?.lines.returning ?? (id === 'gu-yanchuan' ? '又见面了。球摆好了，你先。' : '又见面了。还是请你先开球。'),
   };
 }

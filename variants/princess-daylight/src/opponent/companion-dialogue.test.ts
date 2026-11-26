@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createCompanionDialogue } from './companion-dialogue';
 import { COMPANION_PREFERENCES_KEY, lockCompanionProfile } from './companion-preferences';
-import { COMPANIONS, ORIGINAL_COMPANIONS, pickCompanion } from './companions';
+import { COMPANIONS, CORE_ROSTER, ORIGINAL_COMPANIONS, pickCompanion } from './companions';
 import { DIALOGUE_SCENES, SHOT_PROGRESS_LINES, STREAK_FALLBACK_LINES } from './companion-dialogue-bank';
 import { ruleLinesForShot } from './companion-instructions';
 import { VOICE_STREAK_LINES } from './companion-voice-variations';
@@ -355,16 +355,21 @@ it('uses each saved custom line for its actual event without swallowing rule cal
   }
 });
 
-it('matches only selected companions and falls back when the pool is empty or invalid', () => {
+it('matches saved core and custom companions, skipping hidden built-ins without erasing them', () => {
   const memory = new Map<string, string>();
   vi.stubGlobal('window', { localStorage: { getItem: (key: string) => memory.get(key) ?? null } });
   try {
-    const ids = [COMPANIONS[2].id, COMPANIONS[4].id];
-    memory.set(COMPANION_PREFERENCES_KEY, JSON.stringify({ saved: ids, selected: ids }));
+    const ids = [CORE_ROSTER[2].id, CORE_ROSTER[4].id];
+    const original = JSON.stringify({ saved: [ids[0], 'f05', ids[1]], selected: [ids[0]] });
+    memory.set(COMPANION_PREFERENCES_KEY, original);
     expect(pickCompanion(ids[0], () => 0).id).toBe(ids[0]);
     expect(pickCompanion(undefined, () => .999).id).toBe(ids[1]);
-    memory.set(COMPANION_PREFERENCES_KEY, JSON.stringify({ selected: ['deleted'] }));
-    expect(pickCompanion(undefined, () => 0).id).toBe(COMPANIONS[0].id);
+    expect(memory.get(COMPANION_PREFERENCES_KEY)).toBe(original);
+    const custom = { id: 'custom-test', name: '熟人', avatarId: 'f05', voiceId: 'f05', lines: {} };
+    memory.set(COMPANION_PREFERENCES_KEY, JSON.stringify({ saved: ['f05', custom.id], custom: [custom] }));
+    expect(pickCompanion(undefined, () => 0, 'f05').id).toBe(custom.id);
+    memory.set(COMPANION_PREFERENCES_KEY, JSON.stringify({ selected: ['f05'] }));
+    expect(pickCompanion(undefined, () => 0, 'f05').id).toBe(CORE_ROSTER[0].id);
   } finally {
     vi.unstubAllGlobals();
   }

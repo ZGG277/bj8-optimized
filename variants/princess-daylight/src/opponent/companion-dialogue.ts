@@ -1,6 +1,6 @@
 /*
 [INPUT]: 双方逐杆结算记录、开局、思考和真实球路事实
-[OUTPUT]: 去重、冷却与事实优先级约束的一句台词；只在UI确实展示时计入预算
+[OUTPUT]: 按规则和特殊球事实选必播台词，普通台词受去重和冷却约束；展示后记入预算
 [POS]: 陪练表现层适配器；不判球规、只持久化有界发言记忆、不改变AI速度或已获赞美卡
 [PROTOCOL]: 变更时更新此头部，然后检查CLAUDE.md
 */
@@ -12,14 +12,17 @@ import { DIALOGUE_SCENES, DIALOGUE_SETTINGS as settings, SHOT_PROGRESS_LINES, ST
 import { settledShot, type SettledShot } from '../match/shot-log';
 import { companionVoiceId, customCompanionLine } from './companion-preferences';
 import { companionVoice, voicedProgress } from './companion-voices';
+import { coreCompanion } from './core-companions';
 import { companionMomentLine } from './companion-moments';
 import { ruleLinesForShot } from './companion-instructions';
 import { POCKETS, TABLE, type BilliardsWorld, type PhysicsEvent } from '../physics';
 import { erfProb } from '../planner/evaluate';
 import type { ShotCapture } from '../planner/review';
+import type { ShotHighlight } from '../match/shot-highlights';
+import { shotHighlightLines } from './shot-highlight-lines';
 
 type SceneId = typeof DIALOGUE_SCENES[number]['id'];
-export type CompanionDialogue = { id: number; text: string; sceneId: string; companionId?: string; kind?: 'rule' | 'progress' };
+export type CompanionDialogue = { id: number; text: string; sceneId: string; companionId?: string; kind?: 'rule' | 'progress' | 'highlight' };
 type ShotContext = {
   worldBefore: BilliardsWorld;
   events: readonly PhysicsEvent[];
@@ -90,7 +93,7 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     if ((scenes.get(scene.id) ?? 0) >= scene.max_per_rack || (groups.get(scene.semantic_group) ?? 0) >= limit) return null;
     if (!opening && !firstScore && (now - lastAt < rhythm.cooldown || shotLog.size - lastShot < rhythm.shotGap)) return null;
     const voiceId = companionVoiceId(companionId);
-    const custom = (voiceId && VOICE_VARIATIONS[voiceId]?.[scene.id]) || voice?.scenes[scene.id];
+    const custom = (!coreCompanion(voiceId) && voiceId && VOICE_VARIATIONS[voiceId]?.[scene.id]) || voice?.scenes[scene.id];
     const authored = typeof custom === 'string' ? [custom] : custom;
     const lines = (authored?.map(text => ({ text, weight: 1 })) ?? scene.lines)
       .filter(line => !spoken.has(line.text));
@@ -111,8 +114,10 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     const voice = companionVoice(companionId);
     const scoring = id.includes('_STREAK_') || id.endsWith('_NEAR_CLEAR') || id.endsWith('_EIGHT_READY');
     if (!scoring && !id.endsWith('_LATER') && scenes.has(id)) return null;
-    const variant = VOICE_STREAK_LINES[companionVoiceId(companionId) ?? '']?.[id] ?? VOICE_STREAK_LINES[voice?.cadence ?? '']?.[id];
-    const authored = variant ? [variant] : voicedProgress(voice, id);
+    const voiceId = companionVoiceId(companionId);
+    const variant = VOICE_STREAK_LINES[voiceId ?? '']?.[id] ?? VOICE_STREAK_LINES[voice?.cadence ?? '']?.[id];
+    const voiceLines = voicedProgress(voice, id);
+    const authored = coreCompanion(voiceId) && voiceLines ? voiceLines : variant ? [variant] : voiceLines;
     const fresh = (lines: readonly string[]) => memory.candidates(lines.filter(text => !spoken.has(text))
       .map(text => lineFor(text, id, companionId)));
     const voiced = authored ? fresh(authored) : [];
@@ -150,14 +155,30 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     return custom ? personalLine(opening, custom, companionId, now, true) : choose([opening], companionId, now, true);
   }
 
-  function settle(before: MatchState, facts: ShotFacts, resolution: RoundResolution, now: number, context?: ShotContext): CompanionDialogue | null {
+  function required(sceneId: string, lines: readonly string[], companionId: string | undefined, now: number, kind: 'rule' | 'highlight') {
+    const occurrence = ruleVisits.get(sceneId) ?? 0;
+    ruleVisits.set(sceneId, occurrence + 1);
+    const candidates = memory.candidates(lines.map(text => lineFor(text, sceneId, companionId)), true);
+    const selected = candidates[occurrence % candidates.length];
+    const choice: CompanionDialogue = { id: ++token, text: selected.text, sceneId, companionId, kind };
+    pending = { choice, group: null, at: now, shot: shotLog.size, opening: false, required: true, memoryLine: selected };
+    return choice;
+  }
+
+  function settle(before: MatchState, facts: ShotFacts, resolution: RoundResolution, now: number, context?: ShotContext,
+    highlight: ShotHighlight | null = null): CompanionDialogue | null {
     if (ended || before.phase === 'finished' || facts.shotId !== resolution.shotId || shotLog.has(facts.shotId)) return null;
     const record = settledShot(before, facts, resolution, lastEntry);
     shotLog.set(facts.shotId, record);
     lastEntry = record;
     pending = null;
     const next = resolution.next;
-    if (next.phase === 'finished') { ended = true; return null; } // Existing award/comfort card owns the ending.
+    const reactions = highlight && shotHighlightLines(highlight, before.companionId);
+    const highlightScene = highlight && `SHOT_${highlight.actor}_${highlight.kind}`;
+    if (next.phase === 'finished') {
+      ended = true;
+      return reactions && highlightScene ? required(highlightScene, reactions, before.companionId, now, 'highlight') : null;
+    }
     const foul = next.messageKey === 'foul';
     if (!foul && !['pot-continue', 'group-assigned', 'miss-turn', 'opponent-pot-turn'].includes(next.messageKey)) return null;
     const player = before.actor === 'player';
@@ -170,16 +191,12 @@ export function createCompanionDialogue(random: () => number = Math.random, stor
     }
     const rule = ruleLinesForShot(before, facts, next);
     if (rule) {
-      const occurrence = ruleVisits.get(rule.sceneId) ?? 0;
-      ruleVisits.set(rule.sceneId, occurrence + 1);
-      const candidates = memory.candidates(rule.lines.map(text => lineFor(text, rule.sceneId, before.companionId)), true);
-      const selected = candidates[occurrence % candidates.length];
-      const choice: CompanionDialogue = { id: ++token, text: selected.text, sceneId: rule.sceneId, companionId: before.companionId, kind: 'rule' };
-      pending = { choice, group: null, at: now, shot: shotLog.size, opening: false, required: true, memoryLine: selected };
-      return choice;
+      const lines = reactions ? rule.lines.map((line, index) => line + reactions[index % reactions.length]) : rule.lines;
+      return required(rule.sceneId, lines, before.companionId, now, reactions ? 'highlight' : 'rule');
     }
 
     if (foul) return null;
+    if (reactions && highlightScene) return required(highlightScene, reactions, before.companionId, now, 'highlight');
 
     if (record.blackEightMiss) {
       const misses = [...shotLog.values()].filter(entry => entry.actor === record.actor && entry.blackEightMiss).length;

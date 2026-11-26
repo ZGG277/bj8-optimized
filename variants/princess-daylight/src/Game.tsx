@@ -4,7 +4,7 @@ import { ControlHelp } from './components/ControlHelp';
 import { observePlayerShot } from './opponent/position-observation';
 /*
 [INPUT]: 自动播放的短 WebP 开场；首局/视角提示存档；局前 world 参数与选择；依赖 physics 确定性世界、match 纯规则状态机、Scene3D 快照适配器、audio 合成音效与 React 状态
-[OUTPUT]: 教学、规则和球友短句共用球桌对话气泡，含开局个人资料与球友提醒；编排击球反馈、镜头和局后回忆卡
+[OUTPUT]: 局前选球友、非模态球桌聊天、特殊球反馈、单库解球提示、镜头和局后回忆卡
 [POS]: 正式产品编排层，只消费物理快照与规则迁移；不得在此重新实现规则判定或底层蓄力时钟
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -28,6 +28,7 @@ import {
   useMemo,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type SyntheticEvent,
 } from 'react';
 import {
   getCueBall,
@@ -49,10 +50,14 @@ import { useAimInteraction } from './hooks/useAimInteraction';
 import { useOpponentAI } from './hooks/useOpponentAI';
 import { useAudioManager } from './hooks/useAudioManager';
 import { usePositionPlan } from './hooks/usePositionPlan';
+import { useEscapeGuide } from './hooks/useEscapeGuide';
+import { isSnookered, safetyHighlight } from './aim/snooker';
+import { potHighlight, type ShotHighlight } from './match/shot-highlights';
 import { useAimAssist } from './hooks/useAimAssist';
 import { PortraitEditor } from './components/PortraitEditor';
 import { useScoreInset } from './minitool/score-inset';
 import { ChatMemory, ChatFloat, QuickChat, TalkButton, useTableChat } from './components/TableChat';
+import { isTableChat } from './minitool/table-chat';
 import { asksForRoute, tableBrief } from './opponent/table-coach';
 import { captureShotEvidence, isCompanionId, rememberExchange, rememberFinish, rememberShot, skillForTable } from './opponent/companion-memory';
 import { memoryGreeting } from './opponent/companion-role';
@@ -156,7 +161,7 @@ export default function Game() {
   useScoreInset();
   const [profileEditor,setProfileEditor] = useState<string|null>(null);
   const chat = useTableChat();
-  const { reset: resetChat, showOpeningReminder } = chat;
+  const { reset: resetChat, showOpeningReminder, automatic: recordOpening } = chat;
   const profileFocus = useRef<HTMLButtonElement>();
   const openProfile = (id: string, focusAfterClose?: HTMLButtonElement) => {
     chat.dismissOpeningReminder();
@@ -175,8 +180,7 @@ export default function Game() {
   const { update: updateCompanionMemory, current: companionMemoryRef } = companionMemory;
   const rackSerial = useRef(0);
   const lastOpeningReminder = useRef<{ rack: number; kind: OpeningReminder }>();
-  const otherOverlay = !!profileEditor || pageHidden || collectionOpen || helpOpen;
-  const gamePaused = otherOverlay || quickChat;
+  const gamePaused = !!profileEditor || pageHidden || collectionOpen || helpOpen;
   useEffect(() => {
     const syncVisibility = () => setPageHidden(document.hidden);
     document.addEventListener('visibilitychange', syncVisibility);
@@ -187,11 +191,46 @@ export default function Game() {
   const [sceneRevision, setSceneRevision] = useState(0);
   const [openingActive, setOpeningActive] = useState(true);
   const [openingGreeting, setOpeningGreeting] = useState<(CompanionDialogue & { memoryKey?: string }) | null>(null);
+  const [openingPickerOpen, setOpeningPickerOpen] = useState(false);
+  const [openingPresented, setOpeningPresented] = useState(false);
+  const [openingRequested, setOpeningRequested] = useState(false);
+  const [sceneMayStart, setSceneMayStart] = useState(false);
+  const [tableHasFrame, setTableHasFrame] = useState(false);
+  const onOpeningArtSettled = useCallback(() => setOpeningPresented(true), []);
+  useEffect(() => {
+    if (sceneMayStart || (!openingPresented && !openingRequested)) return;
+    let warmupFrame = 0;
+    const paintedFrame = requestAnimationFrame(() => {
+      warmupFrame = requestAnimationFrame(() => setSceneMayStart(true));
+    });
+    return () => {
+      cancelAnimationFrame(paintedFrame);
+      cancelAnimationFrame(warmupFrame);
+    };
+  }, [openingPresented, openingRequested, sceneMayStart]);
+  useEffect(() => {
+    if (!openingActive || openingPickerOpen || !openingRequested || !openingGreeting || !tableHasFrame || renderError) return;
+    const { companionId, memoryKey } = openingGreeting;
+    if (memoryKey && companionId) updateCompanionMemory(memory => {
+      const friend = memory.friends[companionId];
+      if (!friend) return memory;
+      const greetingKeys = [...(friend.greetingKeys ?? []), memoryKey].slice(-4);
+      return { ...memory, friends: { ...memory.friends, [companionId]: { ...friend, greetingKeys } } };
+    });
+    recordOpening(openingGreeting);
+    setOpeningActive(false);
+  }, [openingActive, openingPickerOpen, openingRequested, openingGreeting, tableHasFrame, renderError, recordOpening, updateCompanionMemory]);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const [followFeel, setFollowFeel] = useState<FollowFeel>('current');
   const [followShotPending, setFollowShotPending] = useState(false);
   const followShotPendingRef = useRef(false);
   const [shotReward, setShotReward] = useState<ShotReward | null>(null);
+  const [shotHighlight, setShotHighlight] = useState<ShotHighlight | null>(null);
+  useEffect(() => {
+    if (!shotHighlight) return;
+    const timer = window.setTimeout(() => setShotHighlight(null), 4400);
+    return () => window.clearTimeout(timer);
+  }, [shotHighlight]);
   useEffect(() => {
     if (!shotReward) return;
     const timer = window.setTimeout(() => {
@@ -218,6 +257,23 @@ export default function Game() {
 
   const dialogueDirector = useRef<ReturnType<typeof createCompanionDialogue> | null>(null);
   if (!dialogueDirector.current) dialogueDirector.current = createCompanionDialogue(Math.random, browserStorage());
+  const openOpeningPicker = () => {
+    setOpeningRequested(false);
+    setOpeningPickerOpen(true);
+  };
+  const closeOpeningPicker = () => {
+    setOpeningRequested(false);
+    setOpeningPickerOpen(false);
+  };
+  const chooseOpeningCompanion = (id: string) => {
+    if (!openingActive || !openingPickerOpen || worldRef.current.shot !== 0) return;
+    if (id !== match.companionId) {
+      dialogueDirector.current?.reset(openingGreeting?.sceneId === 'REMATCH');
+      setOpeningGreeting(null);
+      setMatch(current => ({ ...current, companionId: id }));
+    }
+    closeOpeningPicker();
+  };
   const [dialogue, setDialogue] = useState<CompanionDialogue | null>(null);
   const [guideSpeech, setGuideSpeech] = useState<string | null>(null);
   const [viewSpeech, setViewSpeech] = useState<string | null>(null);
@@ -228,7 +284,7 @@ export default function Game() {
     if (!dialogue || (dialogue.kind && (gamePaused || openingActive || scenePickerOpen || renderError))) return;
     const timer = window.setTimeout(() => {
       setDialogue(current => current?.id === dialogue.id ? null : current);
-    }, dialogue.kind === 'rule' ? 4800 : dialogue.kind === 'progress' ? 3600 : 2800);
+    }, dialogue.kind === 'rule' || dialogue.kind === 'highlight' ? 4800 : dialogue.kind === 'progress' ? 3600 : 2800);
     return () => window.clearTimeout(timer);
   }, [dialogue, gamePaused, openingActive, scenePickerOpen, renderError]);
   const dialogueCompanion = useRef(match.companionId);
@@ -399,6 +455,11 @@ export default function Game() {
   const planOpen = positionPlan.status === 'showing';
   // 规划视图打开期间禁用瞄准输入（最小侵入：只压低 canAim，不动交互层内部）
   const canAim = !gamePaused && !renderError && !openingActive && !followShotPending && canAimBase && !planOpen && !scenePickerOpen && shotCameraTarget === null;
+  const [escapeGuideOpen, setEscapeGuideOpen] = useState(false);
+  const escapeAvailable = useMemo(() => canAimBase && !match.breaking && isSnookered(worldView, legalTargets),
+    [canAimBase, match.breaking, worldView, legalTargets]);
+  const showEscapeGuide = escapeGuideOpen && escapeAvailable && canAim;
+  const escapeRoute = useEscapeGuide(showEscapeGuide, worldView, match);
   const planConsultedRef = useRef(false);
   /** 规划视图关闭会停用 Worker/清空 plans；另存用户真正看过的首杆直到本次出杆。 */
   const consultedPlanStepRef = useRef<PlannedStep | null>(null);
@@ -564,6 +625,7 @@ export default function Game() {
   const prevReviewViewLevelRef = useRef(viewLevel);
   const handleOpenReview = useCallback(() => {
     if (!shotReview?.planned) return;
+    setEscapeGuideOpen(false);
     prevReviewViewLevelRef.current = viewLevel;
     setReviewOpen(true);
     setViewLevel(OVERHEAD_VIEW);
@@ -577,6 +639,14 @@ export default function Game() {
 
   // 规划与复盘是灯泡中的两个独立开关，避免查看复盘时意外启动规划 Worker。
   const handleTogglePlan = useCallback(() => {
+    if (escapeAvailable && !planOpen) {
+      if (escapeGuideOpen) { setEscapeGuideOpen(false); return; }
+      if (reviewOpen) handleCloseReview();
+      setGuidanceEnabled(false);
+      showFullTable();
+      setEscapeGuideOpen(true);
+      return;
+    }
     if (guidanceEnabled) {
       if (planOpen) handleClosePlan();
       setGuidanceEnabled(false);
@@ -586,6 +656,9 @@ export default function Game() {
     setGuidanceEnabled(true);
     if (positionPlan.status === 'ready') handleOpenPlan();
   }, [
+    escapeAvailable,
+    escapeGuideOpen,
+    showFullTable,
     guidanceEnabled,
     planOpen,
     positionPlan.status,
@@ -697,6 +770,8 @@ export default function Game() {
     const lease = createShotLease(worldRef, matchRef, 'player');
     if (!lease.current()) return;
     setShotReward(null);
+    setShotHighlight(null);
+    setEscapeGuideOpen(false);
     setDialogue(null);
     dialogueDirector.current?.cancel();
     setTouchAimCameraLocked(false);
@@ -1095,9 +1170,13 @@ export default function Game() {
     setFollowShotPending(false);
     setCollectionOpen(false);
     setShotReward(null);
+    setShotHighlight(null);
+    setEscapeGuideOpen(false);
     setDialogue(null);
     dialogueDirector.current?.reset(isReplay);
     setOpeningGreeting(null);
+    setOpeningPickerOpen(false);
+    setOpeningRequested(false);
     setOpeningActive(true);
     resetGame(setAim, nextMode);
     markControlLearned(nextMode === 'practice' ? 'start-practice' : 'start-challenge');
@@ -1123,12 +1202,17 @@ export default function Game() {
     const settlement = settleShotRaw(setViewLevel);
     const capture = shotCaptureRef.current;
     shotCaptureRef.current = null;
+    const highlight = settlement
+      ? potHighlight(settlement.shot, worldRef.current.events) ??
+        safetyHighlight(worldRef.current, settlement.shot, settlement.resolution.next, before, capture?.worldBefore)
+      : null;
+    if (highlight) setShotHighlight(highlight);
     if (settlement) {
       freeBallPendingRef.current = settlement.resolution.effects.some(effect => effect.type === 'request-player-placement');
       const context = capture && before.actor === 'player'
         ? { ...capture, events: worldRef.current.events, executionSigma: playerSkill.executionSigma }
         : undefined;
-      setDialogue(dialogueDirector.current!.settle(before, settlement.facts, settlement.resolution, performance.now(), context));
+      setDialogue(dialogueDirector.current!.settle(before, settlement.facts, settlement.resolution, performance.now(), context, highlight));
     }
     setShotReward(settlement ? rewardForStoppedShot(settlement.facts, settlement.resolution) : null);
     if (settlement && firstMatchGuideStepRef.current) {
@@ -1155,7 +1239,7 @@ export default function Game() {
         const evidence = captureShotEvidence(
           { rackId: rackId.current, companionId: before.companionId, mode: gameMode, at: Date.now() },
           capture, settlement.shot, worldRef.current, settlement.cueEnd, observation,
-          legalNumbers(capture.worldBefore, 'player', before.playerGroup), openNextTargets,
+          legalNumbers(capture.worldBefore, 'player', before.playerGroup), openNextTargets, highlight,
         );
         updateCompanionMemory(memory => rememberShot(memory, evidence));
       }
@@ -1204,19 +1288,21 @@ export default function Game() {
     onShot: resetEvents,
   });
 
-  // ── 初始化 3D 场景：介绍页不创建 WebGL/纹理，开始对局后再一次性装配 ──
-  const sceneEnabled = match.phase !== 'intro';
+  // Let the welcome screen paint before WebGL setup can block the main thread.
+  const sceneEnabled = match.phase !== 'intro' && sceneMayStart;
   useEffect(() => {
     if (!sceneEnabled) return;
     const el = containerRef.current;
     if (!el) return;
 
+    setTableHasFrame(false);
     let scene: Scene3D;
     try {
       scene = new Scene3D(el, {
         worldId: selectedWorld,
         skipOpening: true,
         onRenderUnavailable: setRenderError,
+        onFirstFrame: () => setTableHasFrame(true),
         onThermalQualityChange: quality => handleThermalQualityChange(quality.movingPresentationFps),
       });
     } catch (error) {
@@ -1257,7 +1343,14 @@ export default function Game() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneEnabled, selectedWorld, sceneRevision]);
 
-  useEffect(() => { scene3DRef.current?.setPaused(gamePaused || !!renderError); }, [gamePaused, renderError, selectedWorld, sceneRevision]);
+  useEffect(() => {
+    const scene = scene3DRef.current;
+    if (!scene || !escapeRoute) return;
+    scene.showEscapeRoute(escapeRoute);
+    return () => { if (scene3DRef.current === scene) scene.showEscapeRoute(null); };
+  }, [escapeRoute, selectedWorld, sceneRevision, sceneEnabled]);
+
+  useEffect(() => { scene3DRef.current?.setPaused(gamePaused || !!renderError); }, [gamePaused, renderError, selectedWorld, sceneRevision, sceneEnabled]);
 
   // ── 同步世界状态到 3D 场景 ──
   useEffect(() => {
@@ -1296,6 +1389,7 @@ export default function Game() {
     aimGhostDistRef,
     legalTargets,
     sceneRevision,
+    sceneEnabled,
   ]);
 
   const utilityControls = {
@@ -1319,7 +1413,7 @@ export default function Game() {
     }
   }
   const openingIdle = canAim && match.breaking && worldView.shot === 0 && !charging;
-  const openingReminderReady = openingIdle && !chat.live && !chat.waiting && !chat.failure;
+  const openingReminderReady = openingIdle && !quickChat && !chat.live && !chat.waiting && !chat.failure;
   useEffect(() => {
     const rack = rackSerial.current;
     if (!openingReminderReady || lastOpeningReminder.current?.rack === rack) return;
@@ -1376,7 +1470,7 @@ export default function Game() {
 
   // ── 渲染 ──
   const sendChat = (question: string, retry = false) => {
-    const brief = tableBrief(worldRef.current, matchRef.current, dialogueDirector.current?.snapshot().shots ?? [], asksForRoute(question), question);
+    const brief = tableBrief(worldRef.current, matchRef.current, dialogueDirector.current?.snapshot().shots ?? [], isTableChat(question) && asksForRoute(question), question);
     const memory = companionMemoryRef.current;
     void chat.send(question, brief, {
       rackId: rackId.current, relationship: memory.friends[brief.roleId], skill: sharedSkill, shots: memory.shots,
@@ -1391,27 +1485,26 @@ export default function Game() {
     flushSync(() => setQuickChat(true));
     quickInput.current?.focus({ preventScroll: true });
   };
-  const outsideChat = (target: EventTarget) => quickChat && target instanceof Element && !target.closest('.quick-chat, .talk-to-friend');
+  const dismissChatOutside = ({ target }: SyntheticEvent) => {
+    if (quickChat && target instanceof Element && !target.closest('.quick-chat, .talk-to-friend')) setQuickChat(false);
+  };
   return (
-    <div className={`game-shell royal-game${showFollowComparison ? ' follow-ab' : ''}`} onPointerDownCapture={event => {
-        if (outsideChat(event.target)) { event.preventDefault(); event.stopPropagation(); }
-      }} onClickCapture={event => {
-        if (outsideChat(event.target)) { event.preventDefault(); event.stopPropagation(); setQuickChat(false); }
-      }} data-paused={gamePaused ? 'true' : undefined} data-guide={displayGuide ?? undefined} data-world={selectedWorld} data-match-finished={match.phase === 'finished' ? 'true' : undefined} data-opening={openingActive && !renderError ? 'true' : undefined}>
+    <div className={`game-shell royal-game${showFollowComparison ? ' follow-ab' : ''}`}
+      onPointerDownCapture={dismissChatOutside} onClickCapture={dismissChatOutside}
+      data-paused={gamePaused ? 'true' : undefined} data-guide={displayGuide ?? undefined} data-world={selectedWorld} data-match-finished={match.phase === 'finished' ? 'true' : undefined} data-opening={openingActive && !renderError ? 'true' : undefined}>
       {renderError && match.phase !== 'finished' && <div role="alert" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 9998, background: '#10251b', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <p>{renderError}</p><button onClick={() => window.location.reload()} style={{ marginTop: 20, padding: 12 }}>重新进入</button>
       </div>}
-      {openingActive && openingGreeting && !renderError && <MatchWelcome greeting={openingGreeting} onEnter={() => {
-        const { companionId, memoryKey } = openingGreeting;
-        if (memoryKey && companionId) updateCompanionMemory(memory => {
-          const friend = memory.friends[companionId];
-          if (!friend) return memory;
-          const greetingKeys = [...(friend.greetingKeys ?? []), memoryKey].slice(-4);
-          return { ...memory, friends: { ...memory.friends, [companionId]: { ...friend, greetingKeys } } };
-        });
-        chat.automatic(openingGreeting);
-        setOpeningActive(false);
-      }}/>}
+      {openingActive && !renderError && (openingGreeting
+        ? <MatchWelcome greeting={openingGreeting} onArtSettled={onOpeningArtSettled}
+            onEnter={() => setOpeningRequested(true)} onChoose={openOpeningPicker}
+            pickerOpen={openingPickerOpen} waiting={openingRequested}/>
+        : <div className="royal-opening boot-card" role="status">
+            <span className="boot-spinner" aria-hidden="true"/><h1>公主请开球</h1>
+          </div>)}
+      {openingActive && openingPickerOpen && !renderError &&
+        <CompanionPicker close={closeOpeningPicker}
+          forRack={{ currentId: match.companionId, choose: chooseOpeningCompanion }}/>}
       {helpOpen && <ControlHelp onClose={() => setHelpOpen(false)} onSkipGuide={!guideDismissed && displayGuide ? () => { setManualGuide(false); finishFirstMatchGuide(); setHelpOpen(false); } : undefined} gameMode={gameMode} onModeChange={worldView.shot === 0 ? handleResetGame : undefined} onReplayGuide={match.phase === 'finished' ? undefined : () => {
         const step = match.actor === 'opponent' ? 'turn-wait' : match.phase === 'placing' ? 'free-place' : match.breaking ? 'first-power' : 'ghost-place';
         firstMatchGuideStepRef.current = step; setFirstMatchGuideStep(step);
@@ -1458,8 +1551,8 @@ export default function Game() {
         </select></label>
         <span id="follow-feel-description">轻跟进：双方中杆略抬击点，停球也会稍跟；刷新回当前</span>
       </div>}
-      {profileEditor === 'player' && <PortraitEditor id="player" close={() => setProfileEditor(null)}/>}
-      {profileEditor && profileEditor !== 'player' && <CompanionPicker close={() => setProfileEditor(null)} preferredId={companionMemory.memory.preferredCompanionId}/>}
+      {profileEditor === 'player' && <PortraitEditor close={() => setProfileEditor(null)}/>}
+      {profileEditor && profileEditor !== 'player' && <CompanionPicker close={() => setProfileEditor(null)}/>}
       <Scoreboard onProfile={openProfile} disabled={openingActive || gamePaused || scenePickerOpen || charging || followShotPending}
         match={match}
         worldView={worldView}
@@ -1470,10 +1563,15 @@ export default function Game() {
         shotReward={shotReward}
       />
       <TableStage
-        chatFloat={!otherOverlay && !openingActive && !scenePickerOpen && match.phase !== 'finished' && (
+        shotHighlight={!gamePaused && !openingActive && !scenePickerOpen ? shotHighlight : null}
+        escapeGuide={canAim && escapeAvailable && !charging ? {
+          open: showEscapeGuide, route: escapeRoute, toggle: handleTogglePlan,
+        } : undefined}
+        chatInputOpen={quickChat}
+        chatFloat={!gamePaused && !openingActive && !scenePickerOpen && (
           quickChat ? <QuickChat input={quickInput} waiting={chat.waiting} onClose={() => setQuickChat(false)}
             onSend={question => { setQuickChat(false); sendChat(question); }}/>
-          : chat.failure ? <div className="chat-float quick-chat-error" role="status">
+          : chat.failure && match.phase !== 'finished' ? <div className="chat-float quick-chat-error" role="status">
             <span>{chat.failure.reason}</span>
             {!/AI_NOT_ALLOWED|AI_QUOTA_EXCEEDED|AI_CONTENT_BLOCKED|104003|NO_AI_BRIDGE/.test(chat.failure.reason) &&
               <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => sendChat(chat.failure!.question, true)}>重试</button>}
@@ -1510,8 +1608,8 @@ export default function Game() {
         onResetGame={handleReplay}
       />
       <ControlDeck
-        chatButton={<TalkButton disabled={openingActive || otherOverlay || scenePickerOpen || charging || followShotPending ||
-          match.phase === 'finished' || worldView.moving} expanded={quickChat} onClick={toggleQuickChat}/>}
+        chatButton={<TalkButton disabled={openingActive || gamePaused || scenePickerOpen || !!renderError ||
+          (match.phase === 'finished' && !quickChat)} expanded={quickChat} onClick={toggleQuickChat}/>}
         utilityControls={utilityControls}
         viewLevel={viewLevel}
         manualCameraActive={manualCameraActive}
@@ -1522,7 +1620,8 @@ export default function Game() {
         previewPower={previewPower}
         breaking={match.breaking}
         planStatus={positionPlan.status}
-        guidanceEnabled={guidanceEnabled}
+        guidanceEnabled={guidanceEnabled || showEscapeGuide}
+        escapeAvailable={escapeAvailable}
         reviewEnabled={reviewEnabled}
         hasReview={Boolean(shotReview)}
         aimAssistEnabled={aimAssist.enabled}

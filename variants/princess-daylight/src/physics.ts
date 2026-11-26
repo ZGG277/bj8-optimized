@@ -1,6 +1,6 @@
 /*
 [INPUT]: 只依赖常量表与纯数学；禁止依赖 React、DOM、规则状态或渲染层
-[OUTPUT]: 共用 R2 球径 75.438mm；对外输出 240 Hz 确定性世界：全局最早 TOI 步进、统一球碰/库边/袋口时序、接触事件与可观测求解预算
+[OUTPUT]: 240 Hz 确定性世界、统一球碰/库边/袋口时序、首碰与有效库边点位、求解预算
 [POS]: 物理内核层，规则与 UI 的事实来源；所有时间积分必须以 PHYSICS_DT 固定步长进行
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
@@ -31,8 +31,11 @@ import {
   getPocketCaptureDepth,
   getPocketAimWindow,
   worldToPocketLocal,
+  railSide,
   type CushionSegment,
+  type Point2,
   type PocketGeometry,
+  type RailSide,
 } from './physics/table-geometry';
 export {
   applyBallCollisionImpulse,
@@ -61,6 +64,7 @@ export {
   type PocketGeometry,
   type PocketMouthWidthPreset,
   type Point2,
+  type RailSide,
 } from './physics/table-geometry';
 
 export const TABLE = {
@@ -111,8 +115,8 @@ export type CueSpin = { x: number; y: number };
 
 export type PhysicsEvent =
   | { type: "ball-collision"; first: number; second: number; time: number; speed: number }
-  | { type: "first-contact"; ball: number; time: number; speed: number }
-  | { type: "cushion"; ball: number; time: number; speed: number }
+  | { type: "first-contact"; ball: number; time: number; speed: number; cuePosition?: Point2 }
+  | { type: "cushion"; ball: number; time: number; speed: number; rail?: Point2 & { side: RailSide } }
   | {
       type: "pocket";
       ball: number;
@@ -671,7 +675,15 @@ function resolveBoundaryVelocity(
     ball.wy *= scale;
     ball.wz *= scale;
   }
-  world.events.push({ type: "cushion", ball: ball.number, time: eventTime, speed });
+  const segment = hit.segment;
+  const face = segment.role === 'rail' && hit.nx === segment.inward.x && hit.nz === segment.inward.z;
+  // Skip segment ends and pocket noses when recording an identifiable rail bounce.
+  const clearEnds = face && [segment.a, segment.b].every(end =>
+    Math.abs((ball.x - end.x) * tx + (ball.z - end.z) * tz) > R * .4);
+  world.events.push({
+    type: 'cushion', ball: ball.number, time: eventTime, speed,
+    ...(clearEnds ? { rail: { side: railSide(segment), x: ball.x, z: ball.z } } : {}),
+  });
 }
 
 const EVENT_TIME_EPS = 1e-9;
@@ -1017,12 +1029,14 @@ function resolveContactIsland(
     const first = cueContacts[0];
     if (first) {
       const object = first.first.number === 0 ? first.second : first.first;
+      const cue = first.first.number === 0 ? first.first : first.second;
       world.firstContact = object.number;
       world.events.push({
         type: 'first-contact',
         ball: object.number,
         time: eventTime,
         speed: first.speed,
+        cuePosition: { x: cue.x, z: cue.z },
       });
     }
   }

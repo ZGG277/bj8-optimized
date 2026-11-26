@@ -9,6 +9,7 @@ import { generateCandidates, pocketName, type ShotCandidate } from '../planner/c
 import { simulateForDisplay } from '../planner/evaluate';
 import { companionFor } from './companions';
 import { companionVoice } from './companion-voices';
+import { customCompanionFor } from './companion-preferences';
 
 export const TABLE_RULES = '开球进普通球可以续杆，开球不定组。开球后首次合法进普通球定组。全色是1至7号，白腰带是9至15号。分组后要先碰本组球；本组在出杆前清空才轮到8号。白球落袋、没碰球、首碰非法球，或首碰后没进球也没碰库，都犯规。普通犯规给对方自由球。提前进8号或进8号伴随犯规判负。';
 const groupNames = { solid: '全色球', stripe: '花色球' };
@@ -74,7 +75,8 @@ export function tableBrief(world: BilliardsWorld, match: MatchState, recent: rea
   });
   const advice: Advice = includeRoute ? positionTip(world, match, legal, question) : { tip: '本次没有计算下一杆路线。' };
   return {
-    roleId: companion.id, companion: companion.name, personality: companionVoice(companion.id)?.personality,
+    roleId: companion.id, companion: companion.name,
+    personality: customCompanionFor(companion.id)?.personality || companionVoice(companion.id)?.personality,
     turn: turnDescription(match, legal.length === 1 && legal[0] === 8), breaking: match.breaking,
     group: match.playerGroup ? groupNames[match.playerGroup] : '未分组', legal,
     balls: world.balls.filter(b => b.active).map(b => ({ number: b.number, appearance: ballAppearance(b.number), area: tableArea(b.x, b.z) })),

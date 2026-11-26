@@ -14,6 +14,7 @@ export type TableGeometryInput = {
 };
 
 export type Point2 = { x: number; z: number };
+export type RailSide = 'left' | 'right' | 'top' | 'bottom';
 
 export type CushionSegment = {
   id: string;
@@ -24,6 +25,11 @@ export type CushionSegment = {
   pocket: number | null;
   role: 'rail' | 'jaw';
 };
+
+export function railSide(segment: CushionSegment): RailSide {
+  if (segment.inward.x !== 0) return segment.inward.x > 0 ? 'left' : 'right';
+  return segment.inward.z > 0 ? 'top' : 'bottom';
+}
 
 export type PocketGeometry = {
   index: number;

@@ -5,7 +5,6 @@ import { companionVoiceId } from './companion-preferences';
 [POS]: 情感化呈现纯数据层；不参与 AI 和规则
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 */
-import { companionFor } from './companions';
 const LINES: Record<string, { pot: string; thinking: string }> = {
   'shen-yubai': { pot: '这一杆，稳得漂亮', thinking: '容我想一杆' },
   'lu-jingchen': { pot: '这杆真漂亮', thinking: '这条球路有点意思' },
@@ -19,5 +18,5 @@ const LINES: Record<string, { pot: string; thinking: string }> = {
   'xu-qinghe': { pot: '清清爽爽的一杆', thinking: '让我静静看一眼' },
 };
 export function companionMomentLine(id: string | undefined, moment: 'pot' | 'thinking'): string {
-  return (LINES[companionVoiceId(id) ?? ''] ?? LINES[companionFor().id])[moment];
+  return (LINES[companionVoiceId(id) ?? ''] ?? LINES['shen-yubai'])[moment];
 }

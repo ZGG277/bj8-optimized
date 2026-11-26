@@ -1,6 +1,6 @@
 # 公主请开球
 
-当前基线为小红书 V1.0.27 双人封面版，2026-11-22 回读状态为审核中。[交付记录](RELEASE_1_0_27_20261122.md) · [文件映射](PUBLIC_SOURCE_MANIFEST.json)
+当前基线为小红书 V1.0.41 陪聊版，2026-11-26 创作后台显示审核中。[版本记录](RELEASE_1_0_41_20261126.md) · [文件指纹](PUBLIC_SOURCE_MANIFEST_1_0_41.json)
 
 [固定试玩](https://zgg277.github.io/guagua-game-prototypes/princess/)
 

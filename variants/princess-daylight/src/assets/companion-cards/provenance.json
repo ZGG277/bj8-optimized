@@ -459,5 +459,355 @@
         }
       }
     ]
+  },
+  "featuredWelcome": {
+    "encoding": "Center crop to 3:4, Lanczos resize, WebP quality 79 with sharp YUV and adaptive filtering.",
+    "assets": [
+      {
+        "id": "lin-qing",
+        "master": "Approved ImageGen avatar master",
+        "sourceSha256": "6fa8e7a25afa119a30555a4b7698d58340a4b2e701360ea9d707072fe326fc10",
+        "asset": "src/assets/companion-cards/core/lin-qing-hd.webp",
+        "width": 864,
+        "height": 1152,
+        "bytes": 123552,
+        "sha256": "25a6b59f7070c8239143679b3e7da9bdd5b91f5aec99b53bef05d5c7631177ba"
+      },
+      {
+        "id": "xia-qing",
+        "master": "Approved ImageGen avatar master",
+        "sourceSha256": "f7f2d70a80ac3ad109a27854b4a0ec3bc0053007cf95ca840020d46c259fa4cd",
+        "asset": "src/assets/companion-cards/core/xia-qing-hd.webp",
+        "width": 864,
+        "height": 1152,
+        "bytes": 118976,
+        "sha256": "aadc8db503439cc9276847ba8892e3cf22df568b12996b774cb7416f25a245ca"
+      },
+      {
+        "id": "f01",
+        "master": "ImageGen high-resolution redraw from approved atlas crop",
+        "sourceSha256": "36ffe01178be8d727651c12ca62d668a0eed4058069a3ac9f5f0e5bdb44fde2d",
+        "asset": "src/assets/companion-cards/core/anna-hd.webp",
+        "width": 864,
+        "height": 1152,
+        "bytes": 181518,
+        "sha256": "88009ccbf25082d8a541f4edc53d8a9919147d5e1919ade87d3ef791a485f4aa"
+      },
+      {
+        "id": "m05",
+        "master": "ImageGen high-resolution redraw from approved atlas crop",
+        "sourceSha256": "c106b3b2393a06d1b2370744c96b67f10d74f616c67e194211772e4f894be28d",
+        "asset": "src/assets/companion-cards/core/noah-hd.webp",
+        "width": 864,
+        "height": 1152,
+        "bytes": 168338,
+        "sha256": "7eee3e4612a1948700f2ab7da1a204130f4b75fbc8dd8d50aa74321885d94dc0"
+      },
+      {
+        "id": "zhou-yang",
+        "master": "Approved ImageGen avatar master",
+        "sourceSha256": "1f83fae35ebe03151687645ed293cfb44a473bc7d4d95ea8f0db2a9fea3b0357",
+        "asset": "src/assets/companion-cards/core/zhou-yang-hd.webp",
+        "width": 864,
+        "height": 1152,
+        "bytes": 123850,
+        "sha256": "eba450388fdc1f32c8da3991e2697c2773660b44b9c16cf922a39e1261bb3e30"
+      },
+      {
+        "id": "su-yan",
+        "master": "ImageGen high-resolution redraw from approved atlas crop",
+        "sourceSha256": "c124d7206b65bb02817b69a26c4217a905b647748348878484dddc779e402875",
+        "asset": "src/assets/companion-cards/core/su-yan-hd.webp",
+        "width": 864,
+        "height": 1152,
+        "bytes": 157724,
+        "sha256": "e5efadffb8001a3f690618ead4f4191e63c88cba2cb7cb4324bfa816db35548d"
+      }
+    ]
+  },
+  "archivedCardPortraits": {
+    "encoding": "Use the square sampled by the 326-pixel circle on the finished card. Resize to 384 pixels and encode WebP quality 78. Full portrait sources are preserved.",
+    "assets": [
+      {
+        "id": "f02",
+        "source": "src/assets/companion-cards/storybook/f02.webp",
+        "sourceSha256": "d23b7a827f44af3584e3107e5d90dac606b26da1165671cf59bd2a027bf1f4dc",
+        "asset": "src/assets/companion-cards/archive/f02.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 19632,
+        "sha256": "a7b4a59d0a9718922ff186ca3f1e5bcb9e0763a0e4d73d0e52ed9c607c2fbbf7"
+      },
+      {
+        "id": "f03",
+        "source": "src/assets/companion-cards/storybook/f03.webp",
+        "sourceSha256": "6716a33d0da68ca939cf585b50cd287bb9f8da5bce04c6e61ce43a2a066e4bff",
+        "asset": "src/assets/companion-cards/archive/f03.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 15142,
+        "sha256": "55080104185172ee91d98e2d811714304f50b18dac152983b22a7296b4c0b2d9"
+      },
+      {
+        "id": "f04",
+        "source": "src/assets/companion-cards/storybook/f04.webp",
+        "sourceSha256": "7aa6c7f4a85e08df943ba7d70a5d6d7b5b4a85e57408a0b389e4eb0a44b95730",
+        "asset": "src/assets/companion-cards/archive/f04.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 14712,
+        "sha256": "033adf15bd807a6cb597c1586b30fefd66568457784f25b18283a3f831105f7e"
+      },
+      {
+        "id": "f05",
+        "source": "src/assets/companion-cards/storybook/f05.webp",
+        "sourceSha256": "b957712a3a2c137da4d031f43804b471bea38ae4dc17a6aa89bb6f7791f6138c",
+        "asset": "src/assets/companion-cards/archive/f05.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 20704,
+        "sha256": "1e88e200917ab8dfe483152e4f2b2a44b4a5f3a5380268fc7a23ebaa1f14ac54"
+      },
+      {
+        "id": "f06",
+        "source": "src/assets/companion-cards/storybook/f06.webp",
+        "sourceSha256": "80bbd814cb81620edd0c11d481668ed76ecb2e41cdf43d34461d233e8703e67a",
+        "asset": "src/assets/companion-cards/archive/f06.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 20718,
+        "sha256": "ba5c59b03ca922bb00bec50e43b7bd320d40d802c107e020ae0b245fec7ba50d"
+      },
+      {
+        "id": "f07",
+        "source": "src/assets/companion-cards/storybook/f07.webp",
+        "sourceSha256": "7123b31ad95fedd282c24e4bb034432d495da22d2ecab5844090f453820b6317",
+        "asset": "src/assets/companion-cards/archive/f07.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 20398,
+        "sha256": "95b9f42329becbf9b0079c9487e505e18ed0aa1d93205368dd3a0e4fd71aa04f"
+      },
+      {
+        "id": "f08",
+        "source": "src/assets/companion-cards/storybook/f08.webp",
+        "sourceSha256": "bad7ed8efd1e1fe19bf78a65072625503726932cebc1cecda05fbcad0c9cb2ca",
+        "asset": "src/assets/companion-cards/archive/f08.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 20200,
+        "sha256": "9fa71fae546cd42356f34eec9ac7a3382547d1f55ffabc32ca2ad909ac80e99d"
+      },
+      {
+        "id": "f09",
+        "source": "src/assets/companion-cards/storybook/f09.webp",
+        "sourceSha256": "1a94c0224b36756ae9472a43ebae1bf2ddc5482cfbdd319acd5d71d2caacd644",
+        "asset": "src/assets/companion-cards/archive/f09.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 20442,
+        "sha256": "13f6fe06a143d878d283fbdb8a38e3b8893ed5cb14ee4ecab004ffca204d272b"
+      },
+      {
+        "id": "f10",
+        "source": "src/assets/companion-cards/storybook/f10.webp",
+        "sourceSha256": "5759677cf73aa212468a3e2cf813c2f30132020a7ca26a401144fc72055778e8",
+        "asset": "src/assets/companion-cards/archive/f10.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 17664,
+        "sha256": "577e6a7e1f60f7b903791696b0547fac21e3fb789427c32d46379993a1502904"
+      },
+      {
+        "id": "gu-yanchuan",
+        "source": "src/assets/companion-cards/gu-yanchuan.webp",
+        "sourceSha256": "7f216e3d29e5ec776bb543bce800048ddb777214a7bc746afc19b7dce69389d2",
+        "asset": "src/assets/companion-cards/archive/gu-yanchuan.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 22306,
+        "sha256": "5b77fd7af9da45eee202091fad657ab1007da4ec24c687448ee6ab7311f3fc58"
+      },
+      {
+        "id": "jiang-yueheng",
+        "source": "src/assets/companion-cards/jiang-yueheng.webp",
+        "sourceSha256": "121cc841d96a62fee95203b87b3f35d07cbd35b2240d8e978b8313ca21861264",
+        "asset": "src/assets/companion-cards/archive/jiang-yueheng.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 25006,
+        "sha256": "7b726d357114ee458b91a85e83a8a4e1c6932e7127c0a729a3495b06fa4d90ba"
+      },
+      {
+        "id": "lu-jingchen",
+        "source": "src/assets/companion-cards/lu-jingchen.webp",
+        "sourceSha256": "a9a5d456fb32cd5ff9ae453635ddb921bfc23ce55e1d940e188eebc30fe6ef8d",
+        "asset": "src/assets/companion-cards/archive/lu-jingchen.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 21450,
+        "sha256": "fabb4a6156839fe407b8acfe335f8c9b252c5aafd170dd1939781135a0a6525d"
+      },
+      {
+        "id": "m01",
+        "source": "src/assets/companion-cards/storybook/m01.webp",
+        "sourceSha256": "646e86a1ce5e0cbe2314cd12777c6e5b47056688e6bb1b0a3bd4855b8d7cd1bb",
+        "asset": "src/assets/companion-cards/archive/m01.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 17556,
+        "sha256": "e4178c8e2dd68d6b5522d81e7deb149f74a2cb9bc00059157d47ff64bc5d99ea"
+      },
+      {
+        "id": "m02",
+        "source": "src/assets/companion-cards/storybook/m02.webp",
+        "sourceSha256": "7e79caf6273e9135c6684dce565c7aa655375002478154a5540f950fce277e5b",
+        "asset": "src/assets/companion-cards/archive/m02.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 19734,
+        "sha256": "904143a69686173be22ebab1f4be032519d8d1793c3d3113cf842dae5377d179"
+      },
+      {
+        "id": "m03",
+        "source": "src/assets/companion-cards/storybook/m03.webp",
+        "sourceSha256": "4a03bac832eb6bcc80484ff191e43bd293826e109f2268441783af97d9f4a60b",
+        "asset": "src/assets/companion-cards/archive/m03.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 19192,
+        "sha256": "70fcd2750e7337b775379f47de2e89aa7f4714d93754e3b4214480bf02ba4896"
+      },
+      {
+        "id": "m04",
+        "source": "src/assets/companion-cards/storybook/m04.webp",
+        "sourceSha256": "1e5ffa91ca7a7dbe1e96a51985d137a6853c782bab3a319a7a3f1cf1395c69f0",
+        "asset": "src/assets/companion-cards/archive/m04.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 18526,
+        "sha256": "4d5fdd7b4f606bd27ea4c26ae07017e4130eccc31261169b5bb81bd853c78a82"
+      },
+      {
+        "id": "m06",
+        "source": "src/assets/companion-cards/storybook/m06.webp",
+        "sourceSha256": "cd1f00baab3843150e547dbeaa4d647c825c62dd25fcb234c439eac8baffb8c0",
+        "asset": "src/assets/companion-cards/archive/m06.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 19172,
+        "sha256": "3ec26cec141d41e56028ac11c9c9d4ef750ff0b1ccca12fc6c75fb20f4c6d778"
+      },
+      {
+        "id": "m07",
+        "source": "src/assets/companion-cards/storybook/m07.webp",
+        "sourceSha256": "3445ebc825afaebabed23503cba9cc0861dc9fa69f8e22c46fe04fd83676d114",
+        "asset": "src/assets/companion-cards/archive/m07.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 17120,
+        "sha256": "6041b2d21802b262c27bd1e7749d336c7448e5f78245b5ab0ee191f44fb604fb"
+      },
+      {
+        "id": "m08",
+        "source": "src/assets/companion-cards/storybook/m08.webp",
+        "sourceSha256": "b4cc7d4dafc082c3137aec561de8bf4805be57b91171961e3552d42d1dd79ce3",
+        "asset": "src/assets/companion-cards/archive/m08.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 17580,
+        "sha256": "be1e0d749038b3a4577af93134ff7d7634d28b0740e917704a467cc20d1456ff"
+      },
+      {
+        "id": "m09",
+        "source": "src/assets/companion-cards/storybook/m09.webp",
+        "sourceSha256": "8561fb3c549e78c7c5514964e86b4d3822c42974071da38fd94cb8bd8442c86a",
+        "asset": "src/assets/companion-cards/archive/m09.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 17152,
+        "sha256": "85c45a36680225bea4bdeef20488636ec891a25cfae27baee93982a7cd213011"
+      },
+      {
+        "id": "m10",
+        "source": "src/assets/companion-cards/storybook/m10.webp",
+        "sourceSha256": "65dcfe3fa13242dd8382b091f438dc75f2c0a52df4160b1de61cfff6edb1928d",
+        "asset": "src/assets/companion-cards/archive/m10.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 19706,
+        "sha256": "671cc2192eb9c0de20973852ba1fe945c2eff39492347208206a97a96bcb0786"
+      },
+      {
+        "id": "pei-zhixu",
+        "source": "src/assets/companion-cards/pei-zhixu.webp",
+        "sourceSha256": "691c6b34f38b71c2d30d704cf184ca2bf4e691888116a8b5cf3954784b9cd4c5",
+        "asset": "src/assets/companion-cards/archive/pei-zhixu.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 21084,
+        "sha256": "ccf062faf1bc1a8937b1785cd8af13ff9aa0f26a1d6d7a41df5e3d275145d00d"
+      },
+      {
+        "id": "shen-yubai",
+        "source": "src/assets/companion-cards/shen-yubai.webp",
+        "sourceSha256": "5a87078b45ee6cd627caf36afa2cfbc574d5680493036b4e952261cdd57308e1",
+        "asset": "src/assets/companion-cards/archive/shen-yubai.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 28976,
+        "sha256": "61aaaad9a7a9eba6d3f3ec7c6ad43ea9ce92322abde4ba4c97e40db219f14151"
+      },
+      {
+        "id": "song-yucheng",
+        "source": "src/assets/companion-cards/song-yucheng.webp",
+        "sourceSha256": "dfe533e5088665f7e7068c464c42c9fa0a2154d14ef3db4f39a15c32224cbc2b",
+        "asset": "src/assets/companion-cards/archive/song-yucheng.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 28290,
+        "sha256": "9b4a684fbbb44468fb481f8356863db4073e7a4d23e2b9778596ce4a8a0fc934"
+      },
+      {
+        "id": "wen-xingye",
+        "source": "src/assets/companion-cards/wen-xingye.webp",
+        "sourceSha256": "7600bc9637e572ba180c3be60ea48728cd4462d20be466f0e519f12b9d53b1e2",
+        "asset": "src/assets/companion-cards/archive/wen-xingye.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 24552,
+        "sha256": "c8a3692f7fdda8328f19ae8d3150fdddbca77bf302aae9305406a20b12dcb187"
+      },
+      {
+        "id": "xie-linyu",
+        "source": "src/assets/companion-cards/xie-linyu.webp",
+        "sourceSha256": "ab8e46a419c42c55eb378bd235707384ac79986378366be83f95841f51571170",
+        "asset": "src/assets/companion-cards/archive/xie-linyu.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 25038,
+        "sha256": "d326c83e310495b0e667a376e54af710e68ed7e3aba9f4d3fad6dd1f3a94d78c"
+      },
+      {
+        "id": "xu-qinghe",
+        "source": "src/assets/companion-cards/xu-qinghe.webp",
+        "sourceSha256": "198ae67c63c3e8e4dd6e31686dcf50e23baf90a78e99d128082c985337ce925e",
+        "asset": "src/assets/companion-cards/archive/xu-qinghe.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 25938,
+        "sha256": "a58aa96a083983ce1cd9ec3ae54f51adec714b8746d1dbb8838cc01ab87c643a"
+      },
+      {
+        "id": "zhou-mubai",
+        "source": "src/assets/companion-cards/zhou-mubai.webp",
+        "sourceSha256": "555ffd8814bdd65ecccd49f0584e9e3030f0805b755813dab73d3fb3fb180b54",
+        "asset": "src/assets/companion-cards/archive/zhou-mubai.webp",
+        "width": 384,
+        "height": 384,
+        "bytes": 23966,
+        "sha256": "b85e4caeaeeabed105bb77416abf9cbfc4d1062d11ce2e20e5f9a850e4036d3a"
+      }
+    ]
   }
 }

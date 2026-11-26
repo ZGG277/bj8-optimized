@@ -1,4 +1,5 @@
 import { confirmGameStorage, gameStorage } from '../minitool/persistent-storage';
+import type { Crop } from '../input/portrait-crop';
 
 export const COMPANION_PREFERENCES_KEY = 'princess-billiards:companion-preferences:v1';
 export const COMPANION_LINE_LABELS = {
@@ -9,9 +10,11 @@ export type CustomCompanion = {
   id: string;
   name: string;
   avatar?: string;
+  avatarEdit?: { source: string; crop: Crop };
   avatarId: string;
   voiceId: string;
   personality?: string;
+  personalityLabel?: string;
   lines: Partial<Record<CompanionLine, string>>;
 };
 export type CompanionPreferences = { saved: string[]; selected: string[]; custom: CustomCompanion[] };
@@ -26,7 +29,7 @@ export function readCompanionPreferences(): CompanionPreferences {
       typeof item.name === 'string' && !!item.name.trim() &&
       typeof item.voiceId === 'string' && typeof item.avatarId === 'string' && !!item.lines
     ) as CustomCompanion[] : [];
-    return { saved: ids(value?.saved), selected: ids(value?.selected), custom };
+    return { saved: ids(value?.saved ?? value?.selected), selected: ids(value?.selected), custom };
   } catch {
     return { saved: [], selected: [], custom: [] };
   }
@@ -35,7 +38,8 @@ export function readCompanionPreferences(): CompanionPreferences {
 export async function saveCompanionPreferences(preferences: CompanionPreferences) {
   const store = gameStorage();
   if (!store) throw Error('暂时无法保存球友设置。');
-  const value = JSON.stringify(preferences);
+  // Older clients still read selected; keep it synchronized with the saved pool.
+  const value = JSON.stringify({ ...preferences, selected: preferences.saved });
   if (new Blob([value]).size > 1_000_000) throw Error('球友照片占用空间过多，请减少照片后重试。');
   store.setItem(COMPANION_PREFERENCES_KEY, value);
   await confirmGameStorage(COMPANION_PREFERENCES_KEY);
